@@ -44,12 +44,16 @@ export const INTRO_PUBLISH_VALUE = 17_810_000n;
 
 /**
  * RS_MIN_VALUE — required on EVERY recovery write (gate 13572), NOT just the first: it is RS_RECOVERY_ENDOWMENT
- * (29_600_000, the ~3-year on-chain rent float) + RS_RECOVERY_PATH_GAS, and the first bind retains the endowment while
- * an overwrite returns the surplus. So one figure covers both cases. Pinned == 37_600_000 by tests/publish-builder.test.ts.
+ * (30_400_000, the ~3-year on-chain rent float) + RS_RECOVERY_PATH_GAS, and the first bind retains the endowment while
+ * an overwrite returns the surplus. So one figure covers both cases. Pinned == 38_400_000 by tests/publish-builder.test.ts.
  * [RAISED 2026-07-24, twice, as the W1-009 eviction code grew: 29_000_000 -> 29_300_000 (owner-signed eviction) ->
  * 29_600_000 (re-audit fix: basechain gate on refund_to). Endowment (and so this floor) moved to hold the 1.5x rule.]
+ * [RAISED 2026-07-29, wave-8: -> 30_400_000. Adding RS_EVICT_SEQ_ENDOWMENT (so the anti-rollback seq is FUNDED to
+ * survive eviction, not merely written) grew the code again and RENT-01 measured the margin at 1.4891x. This floor
+ * lives in the CLIENT, so leaving it behind would have meant every recovery write refused at 13572 in production
+ * while every contract test stayed green.]
  */
-export const RECOVERY_PUBLISH_VALUE = 37_600_000n;
+export const RECOVERY_PUBLISH_VALUE = 38_400_000n;
 
 /**
  * KS_MIN_REGISTER_VALUE — what a FIRST KeyShard register must bring (gate 22110): KS_BASE_ENDOWMENT (45_000_000, the

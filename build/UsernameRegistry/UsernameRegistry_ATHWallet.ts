@@ -756,6 +756,112 @@ export function dictValueParserTopUpStorageReserve(): DictionaryValue<TopUpStora
     }
 }
 
+export type GetStaticData = {
+    $$type: 'GetStaticData';
+    query_id: bigint;
+}
+
+export function storeGetStaticData(src: GetStaticData) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(801842850, 32);
+        b_0.storeUint(src.query_id, 64);
+    };
+}
+
+export function loadGetStaticData(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 801842850) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    return { $$type: 'GetStaticData' as const, query_id: _query_id };
+}
+
+export function loadTupleGetStaticData(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'GetStaticData' as const, query_id: _query_id };
+}
+
+export function loadGetterTupleGetStaticData(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'GetStaticData' as const, query_id: _query_id };
+}
+
+export function storeTupleGetStaticData(source: GetStaticData) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    return builder.build();
+}
+
+export function dictValueParserGetStaticData(): DictionaryValue<GetStaticData> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeGetStaticData(src)).endCell());
+        },
+        parse: (src) => {
+            return loadGetStaticData(src.loadRef().beginParse());
+        }
+    }
+}
+
+export type ReportStaticData = {
+    $$type: 'ReportStaticData';
+    query_id: bigint;
+    index: bigint;
+    collection: Address;
+}
+
+export function storeReportStaticData(src: ReportStaticData) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2339837749, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.index, 256);
+        b_0.storeAddress(src.collection);
+    };
+}
+
+export function loadReportStaticData(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2339837749) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _index = sc_0.loadUintBig(256);
+    const _collection = sc_0.loadAddress();
+    return { $$type: 'ReportStaticData' as const, query_id: _query_id, index: _index, collection: _collection };
+}
+
+export function loadTupleReportStaticData(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _index = source.readBigNumber();
+    const _collection = source.readAddress();
+    return { $$type: 'ReportStaticData' as const, query_id: _query_id, index: _index, collection: _collection };
+}
+
+export function loadGetterTupleReportStaticData(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _index = source.readBigNumber();
+    const _collection = source.readAddress();
+    return { $$type: 'ReportStaticData' as const, query_id: _query_id, index: _index, collection: _collection };
+}
+
+export function storeTupleReportStaticData(source: ReportStaticData) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.index);
+    builder.writeAddress(source.collection);
+    return builder.build();
+}
+
+export function dictValueParserReportStaticData(): DictionaryValue<ReportStaticData> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeReportStaticData(src)).endCell());
+        },
+        parse: (src) => {
+            return loadReportStaticData(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ProveUsernameOwnership = {
     $$type: 'ProveUsernameOwnership';
     query_id: bigint;
@@ -5207,6 +5313,8 @@ const ATHWallet_types: ABIType[] = [
     {"name":"InitializeUsernameItem","header":1431193934,"fields":[{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"mint_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"ResendDeployedAck","header":1671232620,"fields":[]},
     {"name":"TopUpStorageReserve","header":665640843,"fields":[]},
+    {"name":"GetStaticData","header":801842850,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"ReportStaticData","header":2339837749,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"index","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"collection","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ProveUsernameOwnership","header":1431195730,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"to","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"UsernameOwnershipProof","header":1431195727,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"username_len","type":{"kind":"simple","type":"uint","optional":false,"format":8}},{"name":"username","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"UsernameItemDeployedAck","header":3148082201,"fields":[{"name":"name_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"owner_wallet","type":{"kind":"simple","type":"address","optional":false}},{"name":"mint_nonce","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
@@ -5278,6 +5386,8 @@ const ATHWallet_opcodes = {
     "InitializeUsernameItem": 1431193934,
     "ResendDeployedAck": 1671232620,
     "TopUpStorageReserve": 665640843,
+    "GetStaticData": 801842850,
+    "ReportStaticData": 2339837749,
     "ProveUsernameOwnership": 1431195730,
     "UsernameOwnershipProof": 1431195727,
     "UsernameItemDeployedAck": 3148082201,
@@ -5357,7 +5467,7 @@ const ATHWallet_receivers: ABIReceiver[] = [
 ]
 
 export const USERNAME_ITEM_ACK_FORWARD_RESERVE = 3000000n;
-export const USERNAME_ITEM_ACK_EXEC_RESERVE = 1000000n;
+export const USERNAME_ITEM_ACK_EXEC_RESERVE = 2000000n;
 export const USERNAME_ITEM_ACK_MAX_RESEND_VALUE = 20000000n;
 export const USERNAME_ITEM_TRANSFER_EXEC_RESERVE = 2000000n;
 export const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE = 10000000n;
@@ -5411,6 +5521,7 @@ export const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE = 2000000n;
 export const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE = 2000000n;
 export const USERNAME_ATH_NOTIFICATION_ACK_VALUE = 1000000n;
 export const USERNAME_ATH_NOTIFICATION_REFUND_VALUE = 45000000n;
+export const USERNAME_TON_REFUND_MIN_VALUE = 5000000n;
 export const USERNAME_PENDING_MINT_STALE_TTL = 86400n;
 export const USERNAME_MAX_LENGTH = 16n;
 export const USERNAME_SPLIT_BASE_BPS = 10000n;

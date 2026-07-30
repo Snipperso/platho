@@ -22,7 +22,7 @@ import { UsernameNFTItem } from '../build/UsernameNFTItem/UsernameNFTItem_Userna
 // deletion depends on; if any goes red, the map is load-bearing after all and must stay.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-const ITEM_ACK_RESERVE = 4_000_000n;   // ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE, gate 18015
+const ITEM_ACK_RESERVE = 5_000_000n;   // ITEM_ACK_FORWARD_RESERVE + ITEM_ACK_EXEC_RESERVE, gate 18015 (exec reserve raised 1M->2M in wave-8)
 
 const fixtureAddress = (label: string) =>
   new Address(0, createHash('sha256').update(`PLATHO.V1.TEST.${label}`).digest());

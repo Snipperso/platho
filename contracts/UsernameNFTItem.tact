@@ -3,7 +3,13 @@
 // and permissionless deployed-ACK resend. No admin/pause/upgrade/rescue/fallback behavior is implemented.
 
 const USERNAME_ITEM_ACK_FORWARD_RESERVE: Int = 3000000;
-const USERNAME_ITEM_ACK_EXEC_RESERVE: Int = 1000000;
+// [RAISED 2026-07-29, wave-8 LOW: 1M -> 2M] Gate 18015 admits ACK_FORWARD_RESERVE + this, and at 1,000,000 the
+// threshold was 4,000,000 against a MEASURED true cost of 4,056,601: 14,194 gas units at the live 66.667/unit =
+// 946,267, plus 110,334 of forwarding, plus the 3,000,000 the ACK body itself carries. The measured balance delta of
+// an item receiving exactly 4,000,000 was -56,602 — the shortfall came out of the item's own rent endowment,
+// silently, on an initialization that reports success. Both callers fund far above this (the registry sends
+// USERNAME_NFT_ITEM_DEPLOY_RESERVE, and a resend is capped by 18022 at 20,000,000), so raising it costs nothing.
+const USERNAME_ITEM_ACK_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ITEM_ACK_MAX_RESEND_VALUE: Int = 20000000;
 const USERNAME_ITEM_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const USERNAME_ITEM_TRANSFER_FWD_FEE_ALLOWANCE: Int = 10000000;
@@ -28,6 +34,17 @@ message(0x554E494E) InitializeUsernameItem {
 message(0x639CFC6C) ResendDeployedAck {}
 
 message(0x27ACDF8B) TopUpStorageReserve {}
+
+// TEP-62 static-data query/response pair. Opcodes are the standard's, not ours.
+message(0x2FCB26A2) GetStaticData {
+    query_id: Int as uint64;
+}
+
+message(0x8B771735) ReportStaticData {
+    query_id: Int as uint64;
+    index: Int as uint256;
+    collection: Address;
+}
 
 // Cross-generation migration. A contract redeploy gives the next generation's registry an empty name map, so
 // without this the names bought here would look free there and could be taken by anyone — the owner keeps the
@@ -383,5 +400,23 @@ contract UsernameNFTItem {
 
     receive() {
         throw(18099);
+    }
+
+    // [ADDED 2026-07-29, wave-8 LOW] TEP-62 get_static_data. The router did not know opcode 0x2FCB26A2 and fell into
+    // the generic throw(130), so a standard wallet or marketplace asking this item to state its collection and index
+    // got a bounce and nothing else — the get-method get_nft_data was correct all along, but the MESSAGE surface,
+    // which is what off-chain indexers use, answered nothing. index is the name_hash, matching get_nft_data.
+    receive(msg: GetStaticData) {
+        message(MessageParameters {
+            to: sender(),
+            value: 0,
+            bounce: false,
+            mode: SendRemainingValue | SendIgnoreErrors,
+            body: ReportStaticData {
+                query_id: msg.query_id,
+                index: self.name_hash,
+                collection: self.username_registry_address
+            }.toCell()
+        });
     }
 }

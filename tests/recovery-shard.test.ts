@@ -250,6 +250,13 @@ describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', (
     expect(freed.bound, 'slot freed').toBe(false);
     expect(freed.seq, 'but the high-water mark is retained').toBe(7n);
 
+    // [ADDED 2026-07-29, wave-8 LOW] And it is FUNDED to stay retained. The payout goes out with mode 128, which
+    // empties the account to exactly zero — while an emptied account still pays rent on 19 code cells plus data. The
+    // invariant asserted on the line above was therefore not a property of the code but a bet on how long an unfunded
+    // account survives storage-debt collection. RS_EVICT_SEQ_ENDOWMENT is now reserved before the payout.
+    expect((await blockchain.getContract(rs.address)).balance, 'the retained seq is funded, not merely written')
+      .toBeGreaterThan(40_000_000n);
+
     // replaying the captured seq-3 publish into the freed slot must fail
     expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, stale as any), rs.address),
       'stale replay into a freed slot -> 13573').toBe(13573);

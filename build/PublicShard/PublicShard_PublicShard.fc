@@ -628,7 +628,7 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
 
 ((int, int, cell, int), int) $PublicShard$_fun_retireAt((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_14 = (((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() + 2) * ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds()) + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention());
+    var $fresh$ret_14 = ((((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex() + 2) * ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds()) + ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention()) + 86400);
     return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_14);
 }
 
@@ -815,7 +815,7 @@ _ %get_view() method_id(76114) {
     ;; Receive RetirePublicShard message
     if (op == 0x50535033) {
         var $msg = empty_tuple();
-        throw_unless(13706, ($global_now() > (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt() + 86400)));
+        throw_unless(13706, ($global_now() > ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt()));
         $self'entries = null();
         $self'entry_count = 0;
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 162, false));

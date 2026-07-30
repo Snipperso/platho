@@ -312,7 +312,7 @@ describe('PUBLIC-SHARD — four domains, one self-verifying address', () => {
     expect(et?.description?.computePhase?.exitCode, 'at the death instant itself the shard survives').toBe(13706);
     expect((await bc.getContract(shard.address)).accountState?.type).toBe('active');
 
-    bc.now = retireAt + 86401;                           // past retire_at + PS_RETIRE_SLACK
+    bc.now = retireAt + 1;                               // retire_at now INCLUDES the slack; the gate is `>`
     await shard.send(retirer.getSender(), { value: toNano('0.05') }, { $$type: 'RetirePublicShard' } as any);
     expect((await bc.getContract(shard.address)).accountState?.type, 'after the slack it is gone').not.toBe('active');
   }, 300_000);
@@ -332,7 +332,10 @@ describe('PUBLIC-SHARD — four domains, one self-verifying address', () => {
       const v = await shard.getGetView();
       expect(v.kind).toBe(BigInt(kind));
       expect(v.era_seconds, `kind ${kind} era length`).toBe(BigInt(eraLen));
-      expect(v.retire_at, `kind ${kind} retire_at`).toBe(BigInt((era + 2) * eraLen + ret));
+      // [CHANGED 2026-07-29, wave-8 MED] PS_RETIRE_SLACK is now INSIDE the published value, so the getter equals the
+      // second gate 13706 actually enforces. This assertion used to omit it and therefore pinned the discrepancy —
+      // a green suite while the field documented as "the exact second" was a full day early.
+      expect(v.retire_at, `kind ${kind} retire_at`).toBe(BigInt((era + 2) * eraLen + ret + 86_400));
     }
   }, 300_000);
 });

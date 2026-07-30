@@ -690,6 +690,15 @@ describe('UsernameRegistry paid mint milestone', () => {
     await sendMint(registry, officialAthWallet, ownerA, 'larisa', PRICE_6_PLUS);
     const dup = await sendMint(registry, officialAthWallet, ownerB, 'larisa', PRICE_6_PLUS);
 
+    // [ADDED 2026-07-29, wave-8 MED] The TON comes back too, not just the ATH. The bounce used to return the item
+    // deploy reserve to the registry where it simply stayed — this contract has no other handler that sends TON to a
+    // payer or an owner — so roughly 0.9 GRAM per duplicate was immured in an immutable registry.
+    const tonBack = dup.transactions
+      .flatMap((t: any) => t.outMessages?.values?.() ?? [])
+      .filter((m: any) => m.info?.dest?.equals?.(ownerB) && m.info?.type === 'internal');
+    expect(tonBack.length, 'the second buyer gets their TON back').toBe(1);
+    expect(tonBack[0].info.value.coins, 'and it is the deploy reserve, not dust').toBeGreaterThan(100_000_000n);
+
     // The first owner keeps the name — the duplicate changed nothing.
     const rec = await readItemRecord(blockchain, registry.address, hash);
     expect(rec.minted).toBe(true);

@@ -29,6 +29,12 @@ cell __tact_string_builder_end(tuple builders) inline;
 ;; __tact_dict_set_uint_cell
 (cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline;
 
+;; $ReportStaticData$_store
+builder $ReportStaticData$_store(builder build_0, (int, int, slice) v) inline;
+
+;; $ReportStaticData$_store_cell
+cell $ReportStaticData$_store_cell((int, int, slice) v, builder b) inline;
+
 ;; $UsernameOwnershipProof$_store
 builder $UsernameOwnershipProof$_store(builder build_0, (int, int, slice, int, slice) v) inline;
 
@@ -151,6 +157,9 @@ slice $Cell$_fun_asSlice(cell $self) impure inline;
 
 ;; $NftExcesses$_constructor_query_id
 ((int)) $NftExcesses$_constructor_query_id(int $query_id) inline;
+
+;; $ReportStaticData$_constructor_query_id_index_collection
+((int, int, slice)) $ReportStaticData$_constructor_query_id_index_collection(int $query_id, int $index, slice $collection) inline;
 
 
 ;; UsernameNFTItem_UsernameNFTItem.stdlib.fc
@@ -373,6 +382,29 @@ _ $Context$_get_value((int, slice, int, slice) v) inline {
 
 ((int, cell, int, slice, int)) $MessageParameters$_constructor_to_value_mode_bounce_body(slice $to, int $value, int $mode, int $bounce, cell $body) inline {
     return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: ReportStaticData
+;; Header: 0x8b771735
+;; TLB: report_static_data#8b771735 query_id:uint64 index:uint256 collection:address = ReportStaticData
+;;
+
+builder $ReportStaticData$_store(builder build_0, (int, int, slice) v) inline {
+    var (v'query_id, v'index, v'collection) = v;
+    build_0 = store_uint(build_0, 2339837749, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    build_0 = build_0.store_uint(v'index, 256);
+    build_0 = build_0.store_slice(v'collection);
+    return build_0;
+}
+
+cell $ReportStaticData$_store_cell((int, int, slice) v, builder b) inline {
+    return $ReportStaticData$_store(b, v).end_cell();
+}
+
+((int, int, slice)) $ReportStaticData$_constructor_query_id_index_collection(int $query_id, int $index, slice $collection) inline {
+    return ($query_id, $index, $collection);
 }
 
 ;;
@@ -763,7 +795,7 @@ _ %get_nft_data() method_id(102351) {
         throw_unless(18012, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_isBasechainAddress($msg'owner_wallet));
         throw_unless(18013, ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_isValidUsernameBytes($msg'username_len, $msg'username));
         throw_unless(18014, (($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_computeNameHash($msg'username) == $self'name_hash));
-        throw_unless(18015, ($Context$_get_value(__tact_context_get()) >= 4000000));
+        throw_unless(18015, ($Context$_get_value(__tact_context_get()) >= 5000000));
         $self'initialized = true;
         $self'owner_wallet = $msg'owner_wallet;
         $self'init_owner_wallet = $msg'owner_wallet;
@@ -779,7 +811,7 @@ _ %get_nft_data() method_id(102351) {
     if (op == 0x639cfc6c) {
         var $msg = empty_tuple();
         throw_unless(18020, $self'initialized);
-        throw_unless(18021, ($Context$_get_value(__tact_context_get()) >= 4000000));
+        throw_unless(18021, ($Context$_get_value(__tact_context_get()) >= 5000000));
         throw_unless(18022, ($Context$_get_value(__tact_context_get()) <= 20000000));
         ($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce)~$UsernameNFTItem$_fun_sendDeployedAck();
         $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce));
@@ -838,6 +870,14 @@ _ %get_nft_data() method_id(102351) {
     ;; Receive TopUpStorageReserve message
     if (op == 0x27acdf8b) {
         var $msg = empty_tuple();
+        $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce));
+        return ();
+    }
+    
+    ;; Receive GetStaticData message
+    if (op == 0x2fcb26a2) {
+        var $msg'query_id = in_msg~load_uint(64);
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__tact_context_get_sender(), 0, false, 66, $ReportStaticData$_store_cell($ReportStaticData$_constructor_query_id_index_collection($msg'query_id, $self'name_hash, $self'username_registry_address), begin_cell())));
         $UsernameNFTItem$_contract_store(($self'initialized, $self'owner_wallet, $self'username_registry_address, $self'name_hash, $self'username_len, $self'username, $self'init_owner_wallet, $self'init_mint_nonce));
         return ();
     }
