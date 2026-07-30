@@ -89,7 +89,11 @@ export function publishValueFor(lane) {
 export const PUBLIC_CHANNEL_PUBLISH_VALUE = 20_300_000n;
 export const PUBLIC_THREAD_PUBLISH_VALUE = 20_300_000n;
 export const PUBLIC_BEACON_PUBLISH_VALUE = 31_400_000n;
-export const PUBLIC_AVATAR_PUBLISH_VALUE = 39_200_000n;
+// [RAISED 2026-07-30, wave-8: 39_200_000 -> 39_500_000] PS_BASE_ENDOWMENT_AVATAR moved 21.5M -> 21.8M because packing
+//  the publisher tag into a page row grew the shard's code, and AVATAR — the longest-lived kind — fell to a 1.4956x
+//  rent margin. deploy_min_value moves with the endowment, and this figure IS what the client sends, so leaving it
+//  behind means gate 13704 refuses every first avatar publish in production while every contract test stays green.
+export const PUBLIC_AVATAR_PUBLISH_VALUE = 39_500_000n;
 
 const PUBLIC_PUBLISH_VALUE_BY_KIND = Object.freeze({
   0: PUBLIC_CHANNEL_PUBLISH_VALUE,

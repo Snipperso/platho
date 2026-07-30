@@ -68,6 +68,33 @@ const publish = (kind: number, opts: { keyArg?: bigint; shardSeq?: number; value
   body: cell(((opts.h ?? 1) + 1) & 255),
 });
 
+const ROW_BITS = 448;   // mirrors PS_ROW_BITS in contracts/PublicShard.tact and PUBLIC_ROW_BITS in the client
+
+// PS-TAG-01 lives here rather than in the client suite because the failure it guards is SILENT on both sides: a width
+// mismatch between the contract's packing and the client's decoder produces an empty or garbled feed, never an error.
+describe('PublicShard page row layout', () => {
+  it('PS-TAG-01: the contract and the client agree on the row width, bit for bit', async () => {
+    const { readFileSync } = await import('node:fs');
+    const contract = readFileSync('contracts/PublicShard.tact', 'utf8');
+    const client = readFileSync('web/public-shard-ton-rpc-provider.mjs', 'utf8');
+    const num = (src: string, re: RegExp, what: string) => {
+      const m = src.match(re);
+      if (!m) throw new Error(`${what} not found`);
+      return Number(m[1]);
+    };
+    // `\d` is doubled on purpose: inside a template literal a single backslash collapses and the pattern silently
+    // becomes `(d+)`, matching nothing — a trap this repo has now hit three times.
+    const psRowBits = num(contract, /const PS_ROW_BITS: Int = (\d+);/, 'PS_ROW_BITS');
+    const psPerCell = num(contract, /const PS_PAIRS_PER_CELL: Int = (\d+);/, 'PS_PAIRS_PER_CELL');
+    const clientBits = num(client, /export const PUBLIC_ROW_BITS = (\d+);/, 'PUBLIC_ROW_BITS');
+
+    expect(clientBits, 'the client decoder must read the width the contract writes').toBe(psRowBits);
+    expect(psRowBits).toBe(256 + 64 + 128);
+    expect(psRowBits * psPerCell, 'the packing must still fit one cell').toBeLessThanOrEqual(1023);
+    expect(psRowBits * (psPerCell + 1), 'and must be packed as tightly as it fits').toBeGreaterThan(1023);
+  });
+});
+
 describe('PUBLIC-SHARD — four domains, one self-verifying address', () => {
   it('PS-01: a CHANNEL post from the owner wallet lands, and the fee leaves for the sink', async () => {
     const bc = await Blockchain.create();
@@ -254,7 +281,7 @@ describe('PUBLIC-SHARD — four domains, one self-verifying address', () => {
 
   it('PS-PAGE-01: get_page returns the same authenticated commits as row-by-row get_entry, in one call', async () => {
     // The feed-read primitive: a page is ONE runGetMethod, not one per entry. This pins that the packed rows
-    // (3 per cell, ref-chained) decode to exactly the per-entry body_commit values, so the client's page decoder
+    // (2 per cell, ref-chained) decode to exactly the per-entry body_commit values, so the client's page decoder
     // and the point getter cannot disagree.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
@@ -279,12 +306,18 @@ describe('PUBLIC-SHARD — four domains, one self-verifying address', () => {
     // Walk the ref-chained rows and match each to the point getter.
     let slice = page.rows.beginParse();
     for (let i = 0; i < N; i++) {
-      if (slice.remainingBits < 320 && slice.remainingRefs > 0) slice = slice.loadRef().beginParse();
+      // [CHANGED 2026-07-30, wave-8 HIGH] The row is 448 bits now (commit + created_at + publisher_tag), 2 per cell.
+      if (slice.remainingBits < ROW_BITS && slice.remainingRefs > 0) slice = slice.loadRef().beginParse();
       const commit = slice.loadUintBig(256);
       const createdAt = slice.loadUintBig(64);
+      const publisherTag = slice.loadUintBig(128);
       const entry = await shard.getGetEntry(BigInt(i));
       expect(commit, `row ${i} commit matches get_entry`).toBe(entry.body_commit);
       expect(createdAt, `row ${i} created_at matches get_entry`).toBe(entry.created_at);
+      // The tag is what makes the page self-authenticating: a client can now CHECK the publisher rather than infer it
+      // from whichever /messages entry matched the commit first.
+      expect(publisherTag, `row ${i} publisher_tag is the low 128 bits of the authoritative publisher`)
+        .toBe(BigInt(`0x${entry.publisher.toRawString().split(':')[1]}`) % (1n << 128n));
     }
 
     // A page from the middle is clamped to the live range and reports the same cursor.

@@ -123,6 +123,51 @@ describe('PUBLIC-LANE — the read assembly', () => {
     expect(a.announcedAt, 'and it is chanA\'s NEWER announcement that survived').toBe(BigInt(CLOCK + 4 * 1000));
   }, 300_000);
 
+  it('PL-HIJACK-01: republishing an announcement BYTE FOR BYTE does not take over the catalogue entry', async () => {
+    // Wave-8 HIGH. Nothing binds sender() when an entry is appended to a BEACON view — gate 13702 folds only the
+    // bucket number — so anyone may resend another wallet's exact cells and create a SECOND entry with the SAME
+    // body_commit and publisher = themselves. The client keys rows by commit, collapses duplicates, and walks
+    // /messages NEWEST FIRST, so the attacker's copy was always the one that matched and their address became the
+    // channel's in the catalogue, for the price of one publish. The page row now carries the authoritative
+    // publisher's tag, so the client VERIFIES instead of inferring.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'pl-hijack-sink' });
+    const chanA = await bc.treasury('pl-hijack-chanA');
+    const attacker = await bc.treasury('pl-hijack-attacker');
+    const era = publicEraOf(KIND.BEACON, CLOCK);
+    const pk = await publicBeaconPartitionKey(7n);
+    const shard = bc.openContract(await PublicShard.fromInit(pk, publicEpochTag(KIND.BEACON, era)));
+    await shard.send(chanA.getSender(), { value: toNano('0.03') }, null);
+
+    // The genuine announcement, then the SAME header and body resent by a stranger one second later.
+    const header = cell(11); const body = cell(61);
+    for (const [who, at] of [[chanA, CLOCK + 1000], [attacker, CLOCK + 2000]] as const) {
+      bc.now = at;
+      const v = await shard.getGetView();
+      const due = v.entry_count === 0n ? v.deploy_min_value : v.min_value;
+      await shard.send(who.getSender(), { value: due + toNano('0.02') },
+        { $$type: 'PublicPublish', kind: 2n, key_arg: 7n, shard_seq: 0n, header, body } as any);
+    }
+    expect((await shard.getGetView()).entry_count, 'the shard accepted BOTH — the duplicate is not refused on chain').toBe(2n);
+
+    const k = addrKey(shard.address.toString());
+    const lane = makeLane(bc, {
+      pages: new Map([[k, shard]]),
+      // NEWEST FIRST, exactly as the real reader receives them: the attacker's copy comes first.
+      messages: new Map([[k, [
+        { bodyCell: publicPublishBody(KIND.BEACON, 7n, header, body), source: attacker.address.toString() },
+        { bodyCell: publicPublishBody(KIND.BEACON, 7n, header, body), source: chanA.address.toString() },
+      ]]]),
+      liveShards: [shard.address.toString()],
+    });
+
+    const catalog = await lane.sweepChannelCatalog({ topBuckets: 16 });
+    const wallets = catalog.map((c: any) => addrKey(c.channelWallet));
+    expect(wallets.includes(addrKey(attacker.address.toString())), 'the squatter must NOT own the entry').toBe(false);
+    expect(wallets.includes(addrKey(chanA.address.toString())), 'the genuine channel keeps its catalogue entry').toBe(true);
+  }, 300_000);
+
   it('PL-03: readThreadComments returns [] for a post whose thread shard was never deployed (no comments)', async () => {
     // The ordinary case: a post nobody has commented on has no THREAD shard, so a bare get_page would hit an
     // uninitialised account and throw exit -13. The liveness guard must turn that into a clean empty list. With the

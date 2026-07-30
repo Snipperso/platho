@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-30T09:07:53.596Z",
+  "generatedAt": "2026-07-30T10:19:42.909Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 219,
-    "totalBytes": 5556664,
-    "bundleSha256": "05de9f05fe0de927248698ba082a637f0eefd2f6eb03951ac0348df546195a19",
+    "totalBytes": 5559942,
+    "bundleSha256": "e8d826e1c9841e31be1d50c42c72062c192666913242d36194df8bbe7a559669",
     "files": [
       {
         "path": "app.js",
@@ -634,8 +634,8 @@
       },
       {
         "path": "public-shard-ton-rpc-provider.mjs",
-        "bytes": 17985,
-        "sha256": "ac56c1b8c88b07acc26ef253b7d260be5cf051520b7bcb8d8bc913cbbf71c82d"
+        "bytes": 20739,
+        "sha256": "7324e3708566f94a9643b3c07dde7db9184275ee7c1f601947aab753656c1997"
       },
       {
         "path": "publish-batch-orchestration.mjs",
@@ -644,8 +644,8 @@
       },
       {
         "path": "publish-price.mjs",
-        "bytes": 7463,
-        "sha256": "7675ba35e9b11b22b90060c5ae3dbd7dfe197cca6fa85914a9a26904cce85f2d"
+        "bytes": 7935,
+        "sha256": "aae69953202fd9cecaf336f4f956085024a5c634225f930b2ca5cf81f466a9a1"
       },
       {
         "path": "pwa-contract-transactions.mjs",
@@ -694,8 +694,8 @@
       },
       {
         "path": "shard-code.mjs",
-        "bytes": 12162,
-        "sha256": "74007cd9719dd66f638b67785e96524e740f84e8317a43161d0db2d6f8c98363"
+        "bytes": 12214,
+        "sha256": "0854ece4a86300b370a7f74e4521f5e0391a5a7106f75a6584acf930938e7620"
       },
       {
         "path": "shard-discovery.mjs",
