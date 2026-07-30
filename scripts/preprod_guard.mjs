@@ -565,10 +565,20 @@ function validatePublishReservePricingArtifact() {
 
   const currentText = readTextIfExists('artifacts/CURRENT_CODE_HASHES.txt');
   const currentCodeHashes = currentText ? parseKeyValueLines(currentText) : {};
+  // [FIXED 2026-07-30] This list named `vault` and `capsulehub` — two contracts clean-17 DELETED. Neither hash exists
+  // in CURRENT_CODE_HASHES.txt any more, so both lookups came back undefined and the check failed unconditionally:
+  // the LAST gate standing between this repo and a production deploy was UNPASSABLE BY CONSTRUCTION, and no report,
+  // however carefully generated, could ever have satisfied it. It would have been discovered at seal time.
+  //
+  // Replaced with the contracts that actually decide what a publish costs in clean-17: the three lanes a capsule can
+  // be written to, plus the ATH wallet that was already here. PREPROD-HASH-01 now fails if this list ever names a
+  // contract CURRENT_CODE_HASHES.txt does not carry — a guard aimed at something deleted is an ABSENT guard, and this
+  // repo has now shipped that three times.
   const codeChecks = [
-    ['vault', 'VAULT_CODE_HASH'],
-    ['capsulehub', 'CAPSULEHUB_CODE_HASH'],
     ['ath_wallet', 'ATH_WALLET_CODE_HASH'],
+    ['record_shard', 'RECORD_SHARD_CODE_HASH'],
+    ['intro_shard', 'INTRO_SHARD_CODE_HASH'],
+    ['public_shard', 'PUBLIC_SHARD_CODE_HASH'],
   ];
   for (const [reportKey, currentKey] of codeChecks) {
     const reportHash = normalizeHash(report.code_hashes?.[reportKey]);
