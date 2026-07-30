@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Address, contractAddress, toNano } from '@ton/core';
+import { ART_KEYS, sealArtAndCollectionMeta } from './helpers/username-registry-genesis';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import {
@@ -21,6 +22,13 @@ function fixtureAddress(label: string, workchain = 0): Address {
 
 
 
+
+/** Compute-phase exit codes of every transaction a send produced, so a refusal can be asserted by CODE. */
+function exitCodes(res: any): number[] {
+  return (res?.transactions ?? [])
+    .map((t: any) => t?.description?.computePhase?.exitCode)
+    .filter((c: any) => typeof c === 'number');
+}
 
 async function deployUnsealedUsernameRegistry() {
   const blockchain = await Blockchain.create();
@@ -109,6 +117,8 @@ describe('Deployment genesis controller auth', () => {
       official_ath_wallet_address: officialAthWallet,
     } as RegistryBindAth);
 
+    await sealArtAndCollectionMeta(registry, genesisController);
+
     await registry.send(attacker.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
       deployment_manifest_hash: MANIFEST_HASH,
@@ -131,6 +141,70 @@ describe('Deployment genesis controller auth', () => {
     const afterPostSealAttempt = await registry.getGetGlobal();
     expect(afterPostSealAttempt.official_ath_wallet_address.equals(officialAthWallet)).toBe(true);
     expect(afterPostSealAttempt.official_ath_wallet_address.equals(attackerAthWallet)).toBe(false);
+
+    // [ADDED 2026-07-30, tier-4 HIGH] This test claimed "controller has no post-seal authority" while checking exactly
+    // one path — the ATH wallet binding. Two others were wide open: requireGenesisController compares sender() to an
+    // init field the seal never clears, and UploadArt / UploadCollectionMeta were gated ONLY on their own art_sealed /
+    // meta_sealed flags. Skip SealArt at the ceremony and this hot wallet could rewrite the SVG every .ath NFT renders,
+    // forever, in a contract advertised as immutable. SealGenesis now demands both locks (19045 / 19046), which makes
+    // the two flags permanently true before the seal — and since nothing ever unsets them, the upload paths are dead.
+    //
+    // Asserted on the EXIT CODE rather than on unchanged state: an upload to an already-present key leaves art_count
+    // at 56 whether it was refused or silently applied, so a count check would pass either way and prove nothing.
+    const artRes = await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'UploadArt', key: BigInt(ART_KEYS[0]), data: beginCell().storeUint(0xDEAD, 16).endCell(),
+    });
+    expect(exitCodes(artRes), 'UploadArt must be refused with 19061 after the seal, not applied').toContain(19061);
+
+    const metaRes = await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'UploadCollectionMeta', key: 1n, data: beginCell().storeUint(0xDEAD, 16).endCell(),
+    });
+    expect(exitCodes(metaRes), 'UploadCollectionMeta must be refused with 19071 after the seal').toContain(19071);
+  });
+
+  it('DEPLOY-AUTH-07B: the genesis seal is refused while the art or the collection metadata is still unlocked', async () => {
+    const { genesisController, registry, registryAddress } = await deployUnsealedUsernameRegistry();
+    const officialAthWallet = await registry.getGetAthWalletAddress(registryAddress);
+
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'BindOfficialAthWallet',
+      deployment_manifest_hash: MANIFEST_HASH,
+      official_ath_wallet_address: officialAthWallet,
+    } as RegistryBindAth);
+
+    // Nothing uploaded yet: the seal must refuse on the art lock.
+    const noArt = await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH,
+    } as RegistrySeal);
+    expect(exitCodes(noArt)).toContain(19045);
+    expect((await registry.getGetGlobal()).sealed).toBe(false);
+
+    // Art locked, metadata still open: the seal must refuse on the metadata lock. Proves 19046 is reachable on its
+    // own rather than shadowed by 19045 — a second gate that only ever fires behind the first is not a gate.
+    for (const key of ART_KEYS) {
+      await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+        $$type: 'UploadArt', key: BigInt(key), data: beginCell().endCell(),
+      });
+    }
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, { $$type: 'SealArt' });
+    const noMeta = await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH,
+    } as RegistrySeal);
+    expect(exitCodes(noMeta)).toContain(19046);
+    expect((await registry.getGetGlobal()).sealed).toBe(false);
+
+    // Both locked: the seal goes through. Without this the two gates above could be satisfied by a contract that
+    // simply never seals.
+    for (const key of [1n, 2n, 3n]) {
+      await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+        $$type: 'UploadCollectionMeta', key, data: beginCell().endCell(),
+      });
+    }
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, { $$type: 'SealCollectionMeta' });
+    await registry.send(genesisController.getSender(), { value: toNano('0.05') }, {
+      $$type: 'SealGenesis', deployment_manifest_hash: MANIFEST_HASH,
+    } as RegistrySeal);
+    expect((await registry.getGetGlobal()).sealed).toBe(true);
   });
 
   it('DEPLOY-AUTH-08: arbitrary sender cannot bind/seal ProfileRegistry and controller has no post-seal authority', async () => {

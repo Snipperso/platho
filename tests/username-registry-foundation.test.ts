@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sealArtAndCollectionMeta } from './helpers/username-registry-genesis';
 import { Address, beginCell, contractAddress, Dictionary, toNano } from '@ton/core';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
@@ -98,6 +99,11 @@ async function deployRegistryReadyToSeal(options: {
     deployment_manifest_hash: MANIFEST_HASH,
     official_ath_wallet_address: officialAthWallet,
   } as BindOfficialAthWallet);
+
+  // "Ready to seal" now means the art and the collection metadata are locked too: SealGenesis throws 19045/19046
+  // otherwise. Without this the treasury-receiver negative tests below would stop at the art gate and pass for the
+  // wrong reason — they must still reach 19049/19050/19052, which is what they exist to prove.
+  await sealArtAndCollectionMeta(registry, deployer);
 
   return { registry, deployer, registryAddress, officialAthWallet, athMasterAddress, vaultAddress };
 }
@@ -211,6 +217,7 @@ describe('UsernameRegistry foundation milestone', () => {
     expect(state.deployment_manifest_hash).toBe(MANIFEST_HASH);
     expect(state.genesis_config_hash).toBe(1n);
 
+    await sealArtAndCollectionMeta(registry, deployer);
     await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
       $$type: 'SealGenesis',
       deployment_manifest_hash: MANIFEST_HASH,

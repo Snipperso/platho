@@ -13,7 +13,11 @@
  * The content bytes are BYTE-IDENTICAL to the GetGems-proven probe (scripts/probe_collection_meta_input.ts).
  *
  * Order in the ceremony: D09 (deploy registry) -> Bind* -> [UploadArt x56 + SealArt] -> [THIS: UploadCollectionMeta
- * x3 + SealCollectionMeta] -> SealGenesis. Genesis verify asserts meta_sealed == true.
+ * x3 + SealCollectionMeta] -> SealGenesis. This ordering is ENFORCED, not merely documented: SealGenesis throws 19046
+ * unless meta_sealed is already true (and 19045 unless art_sealed is). It has to be enforced, because the genesis
+ * controller's authority is NOT revoked by the seal — skipping SealCollectionMeta would have left this hot wallet able
+ * to rewrite the collection's name, description and images forever. This header used to claim genesis verify asserted
+ * meta_sealed; it did not, until 2026-07-30, and now both the contract gate and the verifier check it.
  *
  * DRY-RUN by default (also runs a byte-for-byte round-trip self-check); --broadcast sends; --seal locks.
  *

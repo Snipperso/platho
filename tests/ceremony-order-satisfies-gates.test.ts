@@ -39,10 +39,29 @@ function bindGraph(contract: string) {
     if (inSeal) {
       const need = raw.match(/throwUnless\(\d+, self\.(\w*_bound)\)/);
       if (need) sealNeeds.push(need[1]);
+      // [WIDENED 2026-07-30, tier-4 HIGH] `*_bound` was too narrow, and the gap was live. UsernameRegistry's seal now
+      // also demands `art_sealed` and `meta_sealed` — a precondition of exactly the same shape (a boolean another
+      // controller step must set first) that this sweep did not see, because the flag happens to be named otherwise.
+      // A guard that recognises a hazard only by its NAME misses the next instance by construction.
+      const needFlag = raw.match(/throwUnless\(\d+, self\.(\w+)\);/);
+      if (needFlag && !/_bound$/.test(needFlag[1])) sealNeeds.push(needFlag[1]);
     }
   }
   return { setters, sealNeeds };
 }
+
+/**
+ * Preconditions satisfied OUTSIDE the signed packet, each pointing at the tool that satisfies it.
+ *
+ * The art and metadata locks are 59 separate uploads — far too many to carry as packet steps — so they run from
+ * their own ceremony tools. That makes them exactly the kind of dependency an operator can skip, which is why the
+ * seal's own order_note has to name them and why this list is checked rather than assumed: an entry here must still
+ * prove the packet TELLS the operator, and an unlisted new flag fails CEREMONY-ORDER-01 outright.
+ */
+const EXTERNAL_PRECONDITIONS: Record<string, { tool: RegExp }> = {
+  'UsernameRegistry.art_sealed': { tool: /mainnet_upload_username_art/ },
+  'UsernameRegistry.meta_sealed': { tool: /mainnet_upload_collection_meta/ },
+};
 
 describe('ceremony order satisfies the on-chain gates', () => {
   it('CEREMONY-ORDER-01: every seal is preceded in the packet by the binds its own gates demand', () => {
@@ -75,6 +94,17 @@ describe('ceremony order satisfies the on-chain gates', () => {
       checkedSeals += 1;
 
       for (const flag of sealNeeds) {
+        const external = EXTERNAL_PRECONDITIONS[`${contract}.${flag}`];
+        if (external) {
+          // Satisfied by a ceremony tool rather than a packet step — so what this must prove is that the operator is
+          // TOLD. An unsigned precondition nobody wrote down is precisely how art_sealed nearly shipped unlocked.
+          const note = (steps[sealAt] as any).order_note ?? '';
+          if (!external.tool.test(note)) {
+            problems.push(`${contract}: ${sealName} refuses without ${flag}, which no packet step sets — and `
+              + `${steps[sealAt].id}'s order_note does not tell the operator to run ${external.tool.source} first`);
+          }
+          continue;
+        }
         const setter = setters.get(flag);
         if (!setter) { problems.push(`${contract}: nothing sets ${flag}, but ${sealName} demands it`); continue; }
         const bindAt = indexOf(contract, setter);

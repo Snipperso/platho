@@ -137,8 +137,8 @@ builder $M20TBuybackBurnHarness$_store(builder build_0, (int, slice, slice, int,
 
 ((int, slice, slice, int, int, int, int), (int, int, slice, int, int, int)) $M20TBuybackBurnHarness$_fun_get_state((int, slice, slice, int, int, int, int) $self) impure inline_ref {
     var (($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount)) = $self;
-    var $fresh$ret_0 = $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount($self'run_id, $self'fee_bound, $self'fee_accumulator_address, $self'accepted_count, $self'total_accepted, $self'last_amount);
-    return (($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount), $fresh$ret_0);
+    var $fresh$ret_190 = $M20TBuybackBurnHarnessStateView$_constructor_run_id_fee_bound_fee_accumulator_address_accepted_count_total_accepted_last_amount($self'run_id, $self'fee_bound, $self'fee_accumulator_address, $self'accepted_count, $self'total_accepted, $self'last_amount);
+    return (($self'run_id, $self'genesis_controller_address, $self'fee_accumulator_address, $self'fee_bound, $self'accepted_count, $self'total_accepted, $self'last_amount), $fresh$ret_190);
 }
 
 ;;

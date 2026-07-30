@@ -1,4 +1,5 @@
 import { Address, beginCell, contractAddress, external, toNano } from '@ton/core';
+import { sealArtAndCollectionMeta } from '../tests/helpers/username-registry-genesis';
 import { Blockchain, createShardAccount } from '@ton/sandbox';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
@@ -292,6 +293,8 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
     deployment_manifest_hash: USERNAME_MANIFEST_HASH,
     official_ath_wallet_address: officialAthWalletAddress,
   } as BindOfficialAthWallet);
+  // SealGenesis now requires the art and collection-metadata locks (19045 / 19046) — see the gate in the contract.
+  await sealArtAndCollectionMeta(registry, deployer);
   await registry.send(deployer.getSender(), { value: toNano('0.05') }, {
     $$type: 'SealGenesis',
     deployment_manifest_hash: USERNAME_MANIFEST_HASH,

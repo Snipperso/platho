@@ -81,6 +81,11 @@
             "output": "build/MockCheckSig"
         },
         {
+            "name": "MockForgedBounceSender",
+            "path": "contracts/MockForgedBounceSender.tact",
+            "output": "build/MockForgedBounceSender"
+        },
+        {
             "name": "UsernameRegistry",
             "path": "contracts/UsernameRegistry.tact",
             "output": "build/UsernameRegistry"

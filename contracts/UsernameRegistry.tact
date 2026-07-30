@@ -545,10 +545,35 @@ contract UsernameRegistry {
         throwUnless(19041, self.deployment_manifest_hash == msg.deployment_manifest_hash);
         throwUnless(19042, self.official_ath_wallet_bound);
         throwUnless(19043, self.official_ath_wallet_address == self.deriveAthWalletAddress(myAddress()));
+        // [ADDED 2026-07-30, tier-4 HIGH] The genesis seal is the ONLY one-way door this contract has, and until now it
+        // left the art and the collection metadata outside it.
+        //
+        // requireGenesisController compares sender() to an init field that SealGenesis never clears — unlike
+        // MarketStabilitySeller, which zeroes genesis_config_hash and kills its controller outright. So UploadArt
+        // (gated only on !art_sealed) and UploadCollectionMeta (gated only on !meta_sealed) stayed callable FOREVER
+        // after the seal if the ceremony skipped SealArt / SealCollectionMeta. The genesis controller is a hot wallet,
+        // and that left it permanent write authority over the SVG every .ath NFT renders and over the collection's
+        // name, description and images — an admin backdoor over user-visible content in a contract whose whole claim
+        // is that nothing can be changed after genesis.
+        //
+        // Nothing would have caught the skip: get_art_sealed / get_meta_sealed are read ONLY by the two upload scripts
+        // themselves, while the headers of both scripts assert "Genesis verify asserts art_sealed == true". That
+        // verification did not exist. Third time in this repo that prose claimed a guard nobody had built.
+        //
+        // Gating the seal — rather than gating the uploads on `sealed` — is what closes BOTH failure modes at once:
+        // forbidding uploads after the seal would have frozen an INCOMPLETE art set permanently if the ceremony sealed
+        // early, which is the opposite mistake and just as unrepairable. Demanding both locks up front means the art
+        // is complete and immutable before the seal, and afterwards neither flag can go back (nothing unsets them),
+        // so UploadArt dies on 19061 and UploadCollectionMeta on 19071 for good. Together with requireUnsealed on the
+        // remaining controller paths, `sealed == true` now means the genesis controller has NO authority left at all.
         throwUnless(19044, self.isBasechainAddress(self.treasury_ath_receiver_address));
         throwUnless(19049, self.treasury_ath_receiver_address != myAddress());
         throwUnless(19050, self.treasury_ath_receiver_address != self.official_ath_wallet_address);
         throwUnless(19052, self.treasury_ath_receiver_address != self.ath_master_address);
+        // Deliberately LAST, after every pre-existing gate: ordering a throw earlier would have made the treasury and
+        // wallet negative tests stop here and pass for the wrong reason, which is how a real gate gets hollowed out.
+        throwUnless(19045, self.art_sealed);
+        throwUnless(19046, self.meta_sealed);
         self.genesis_config_hash = msg.deployment_manifest_hash;
         self.sealed = true;
     }
@@ -826,7 +851,22 @@ contract UsernameRegistry {
         throwUnless(19302, pendingOpt != null);
         let pending: PendingUsernameMint = pendingOpt!!;
         throwUnless(19303, now() >= pending.created_at + USERNAME_PENDING_MINT_STALE_TTL);
-        // Conservative seam policy: do not refund a Vault-funded mint until UsernameNFTItem ACK/bounce proves item deployment finality.
+        // DELIBERATELY UNREACHABLE — this handler always refuses, and that is the design, not an oversight.
+        //
+        // The old note here said "do not refund a Vault-funded mint until item deployment finality". There is no
+        // Vault in clean-17, and describing a LIVE mechanism through a deleted one invites the wrong conclusion:
+        // that a pending mint has no exit and this stub is a gap someone forgot to fill. It has one, and a timeout
+        // prune would be strictly worse than it.
+        //
+        // Mint finality is ITEM-DRIVEN and complete. A pending mint clears on exactly one of:
+        //   * UsernameItemDeployedAck  — the item initialised (and ResendDeployedAck, permissionless, re-fires the
+        //                                ack if the first one was lost, so "the ack went missing" is recoverable);
+        //   * bounced<InitializeUsernameItem> — the item refused (18011: the name already exists), which refunds
+        //                                the ATH and returns the TON.
+        // Both outcomes are DETERMINISTIC facts about the item. A time-based prune would instead guess: refund on a
+        // schedule while the item may still be mid-deploy, and the same name could be minted twice — once by the
+        // prune's refund path and once by the ack that arrives afterwards. The gates above are kept so the refusal
+        // is 19307 (a stated policy) rather than 19302 (a missing record), which tells a caller which one it hit.
         throw(19307);
     }
 
