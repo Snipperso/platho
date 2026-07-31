@@ -271,10 +271,27 @@ Keep deploy order simple and auditable.
    runbook entirely, and nothing in the packet or the verifier enforces it):
    - `UsernameRegistry.UploadArt` parts, then `UsernameRegistry.SealArt`;
    - `UsernameRegistry.UploadCollectionMeta` parts, then `UsernameRegistry.SealCollectionMeta`.
-   - **Why it matters:** `SealGenesis` does NOT require `art_sealed` / `meta_sealed` — the registry seals happily
-     without them. But `get_collection_content` is gated by `throwUnless(19360, meta_sealed)`, so a collection sealed
-     without metadata serves NOTHING to wallets and marketplaces: the username NFTs ship with no image and no TEP-64
-     content, permanently. Confirm both getters report sealed before Phase 3 verification.
+   - **Why it matters:** `get_collection_content` is gated by `throwUnless(19360, meta_sealed)`, so a collection
+     sealed without metadata serves NOTHING to wallets and marketplaces: the username NFTs ship with no image and no
+     TEP-64 content, permanently. **[CORRECTED 2026-07-31]** This paragraph used to warn that `SealGenesis` does not
+     require `art_sealed` / `meta_sealed` and would seal happily without them. That is no longer true: the registry's
+     `SealGenesis` now carries `throwUnless(19045, art_sealed)` and `throwUnless(19046, meta_sealed)`, deliberately
+     placed after every pre-existing gate. Signing `S02` before this step now fails loudly instead of silently
+     producing an art-less collection — but confirm both getters report sealed anyway, because a seal that aborts
+     mid-ceremony on a one-shot controller message is still the thing to avoid.
+9c. Endow the four protocol-owned official ATHWallets — packet steps `W01`–`W04`, signed here, after the funding and
+   before the seals, so the Phase 3 verification reads the endowed balances rather than assuming them.
+   - Each is an `ATHWalletTopUpStorageReserve` of `600,000,000` nanoton sent **to the official ATHWallet itself**,
+     not to its owner contract. No authority is granted and no state changes; the value simply becomes storage float.
+   - The target must be signed **non-bounceable (`UQ`)**. `W01`'s wallet is created by the separate MSS reserve
+     funding script and `W04`'s not until BuybackBurn's first buyback, so two of the four addresses do not exist yet.
+     Value parked on an uninit address survives the later deploy (measured, `CEREMONY-W-01`); the bounceable form
+     returns it immediately while the send still reports success (`CEREMONY-W-02`).
+   - **Why it matters:** these four wallets hold 85,000,000 of the 100,000,000 ATH and can never be redeployed. The
+     ATH transfer leg that creates them carries only `20,000,000` of storage endowment — about 3.7 years of rent at
+     the measured 5,456,808/year, with the account frozen at roughly 22 years. `600,000,000` buys about 110.
+   - Unlike the seals this step is permissionless and repeatable after genesis, so a miss here is recoverable — it is
+     written down because until 2026-07-31 it appeared in no order, no runbook, and no `--phase` of the broadcaster.
 10. Seal staged contracts only after the funding checks above pass. Exactly five seals, matching packet steps
    `S01`–`S05` one for one — if the packet and this list ever disagree, stop and reconcile before signing:
    - `AirdropPool.AirdropSealGenesis` (`S01`) — this is where the real manifest hash is bound;

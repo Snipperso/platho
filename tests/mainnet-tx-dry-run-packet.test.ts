@@ -149,10 +149,20 @@ describe('mainnet transaction dry-run packet', () => {
     expect(at('off_chain_verification'), 'and verification comes before the seals — never seal-then-fund').toBeLessThan(at('seal'));
 
     // Every phase that real steps use must appear in the stated order, or the order silently omits work.
-    const usedPhases = new Set<string>([
-      ...(packet.control_messages ?? []).map((m: any) => m.phase),
-      ...(packet.funding_messages ?? []).map((m: any) => m.phase),
-    ].filter(Boolean));
+    //
+    // [CORRECTED 2026-07-31] This sentence was right and the code under it named TWO arrays by hand, so the check
+    // that exists to catch a silently omitted phase was itself blind to wallet_endowment_messages — the one phase
+    // execution_order actually omitted. Derive the arrays from the packet: a new array of steps is now covered the
+    // day it is generated, which is the only version of this check that survives the next contract added.
+    const messageArrays = Object.entries(packet).filter(([, v]) => Array.isArray(v)
+      && (v as any[]).length > 0 && (v as any[]).every((m: any) => m && typeof m === 'object' && 'target_address' in m));
+    expect(messageArrays.map(([k]) => k).sort(), 'the packet must expose exactly these message arrays; a new one '
+      + 'silently escapes every check below until it is named here')
+      .toEqual(['control_messages', 'deploy_contracts', 'funding_messages', 'wallet_endowment_messages']);
+    const usedPhases = new Set<string>(messageArrays
+      .flatMap(([, v]) => (v as any[]).map((m: any) => m.phase))
+      .filter(Boolean));
+    expect(usedPhases.has('official_wallet_endowment'), 'W01..W04 declare their own phase').toBe(true);
     for (const phase of usedPhases) expect(order, `phase ${phase} is used but not placed in execution_order`).toContain(phase);
 
     // The funding steps must name their own prerequisites, since the file layout argues the opposite.

@@ -946,6 +946,17 @@ async function buildDryRunPacket(draft: Draft) {
     safety_check: 'Permissionless receiver: no authority is granted, the value simply becomes the wallet storage float. Tonkeeper target must be the official ATHWallet itself, NOT its owner contract.',
   }));
 
+  // THE BOUNCE FLAG IS PART OF THE MESSAGE, AND UNTIL NOW ONLY THE BROADCASTER KNEW IT — by guessing.
+  //
+  // mainnet_ceremony_broadcast.mjs computed `bounce: !isDeploy`, which is right for the 32 control and funding steps
+  // (their targets are live contracts, and a rejected one-shot must come back rather than burn) and WRONG for the
+  // endowment: CEREMONY-W-02 measures that the same 600,000,000 sent bounceable to W01's or W04's not-yet-deployed
+  // wallet returns immediately while the send reports success. CEREMONY-W-03 could not catch that — it asserts the
+  // packet's target is UQ, but friendly() emits all 36 targets as UQ and the broadcaster drops the form at
+  // Address.parse anyway. So the one property the endowment depends on was decided in a place that could not see it.
+  // Declared here per step, and the broadcaster now refuses a message that does not carry it.
+  const withBounce = <T>(msgs: T[], bounce: boolean) => msgs.map((m) => ({ ...m, bounce }));
+
   return {
     document: 'PLATHO.V1.MAINNET_TX_DRY_RUN_PACKET',
     generated_at: new Date().toISOString(),
@@ -964,8 +975,15 @@ async function buildDryRunPacket(draft: Draft) {
       { step: 2, phase: 'deploy_treasury_supply', note: 'D02. The 100M genesis supply reaches the Treasury Owner ATHWallet.' },
       { step: 3, phase: 'pre_seal_binding', note: 'B01..B16. All one-shot. B06 must precede the funding: without ath_master_bound the pool refuses the deposit notification.' },
       { step: 4, phase: 'final_genesis_funding', note: 'F01..F02. AFTER B06, BEFORE S01 — not last, despite appearing last in this file.' },
-      { step: 5, phase: 'off_chain_verification', note: 'Read the official ATH wallet balances and AirdropPool.funded_amount. This is the last point at which a mistake is still correctable.' },
-      { step: 6, phase: 'seal', note: 'S01..S05. Irreversible. Never seal-then-fund: AirdropSealGenesis gate 26044 requires funded_amount == 15M.' },
+      // [ADDED 2026-07-31, ceremony reachability audit] W01..W04 were in the packet, tested, and in NO stated order:
+      // this array listed six steps and the endowment was not one of them, the broadcaster had no --phase that
+      // selects wallet_endowment_messages, and no operator document named the step. A ceremony run exactly as
+      // documented would have skipped it in silence, leaving the four wallets that hold 85,000,000 ATH on the
+      // ~20,000,000 float their ATH transfer leg carries — about 3.7 years of paid rent instead of ~110.
+      // Placed before the verification on purpose, so step 6 reads the endowed balances rather than trusting them.
+      { step: 5, phase: 'official_wallet_endowment', note: 'W01..W04. Permissionless top-up, so it is also the one step that stays repairable after the seal — but it is signed here, while the balances are still being read.' },
+      { step: 6, phase: 'off_chain_verification', note: 'Read the official ATH wallet balances (including the W01..W04 endowments) and AirdropPool.funded_amount. This is the last point at which a mistake is still correctable.' },
+      { step: 7, phase: 'seal', note: 'S01..S05. Irreversible. Never seal-then-fund: AirdropSealGenesis gate 26044 requires funded_amount == 15M.' },
     ],
     manifest_hash_hex: mh,
     treasury_owner_ath_wallet: {
@@ -974,10 +992,10 @@ async function buildDryRunPacket(draft: Draft) {
       state_init: stateInitArtifact(derived.officialWalletStateInits.ath_treasury_owner_ath_wallet.init),
       note: 'This wallet receives the 100M ATH genesis supply after ATHMaster.DeployTreasurySupply and is the target for later ATHTransferRequest funding messages.',
     },
-    deploy_contracts: deploys,
-    control_messages: controlMessages,
-    funding_messages: fundingMessages,
-    wallet_endowment_messages: walletEndowmentMessages,
+    deploy_contracts: withBounce(deploys, false),
+    control_messages: withBounce(controlMessages, true),
+    funding_messages: withBounce(fundingMessages, true),
+    wallet_endowment_messages: withBounce(walletEndowmentMessages, false),
     official_wallet_state_inits: Object.fromEntries(
       Object.entries(derived.officialWalletStateInits).map(([key, value]) => [
         key,
@@ -1071,6 +1089,7 @@ async function main() {
     deployContracts: packet.deploy_contracts.length,
     controlMessages: packet.control_messages.length,
     fundingMessages: packet.funding_messages.length,
+    walletEndowmentMessages: packet.wallet_endowment_messages.length,
     treasuryOwnerAthWallet: packet.treasury_owner_ath_wallet.address,
   }, null, 2));
 }

@@ -24,7 +24,10 @@
  * Usage:
  *   dry:   node scripts/mainnet_ceremony_broadcast.mjs --phase deploy
  *   send:  node scripts/mainnet_ceremony_broadcast.mjs --phase deploy --broadcast
- *   phases: deploy | treasury-supply | bind | fund | seal
+ *   phases: deploy | treasury-supply | bind | fund | endowment | seal
+ *
+ * The canonical ORDER of those phases is not this list — it is packet.execution_order, which places the endowment
+ * after the funding and before the off-chain verification, and the seals last.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { Address, Cell, beginCell, contractAddress, internal, loadStateInit, storeMessage, SendMode, toNano, fromNano } from '@ton/core';
@@ -127,7 +130,11 @@ function selectMessages(packet, phase) {
   if (phase === 'bind') return packet.control_messages.filter((c) => c.phase === 'pre_seal_binding').map((c) => ({ ...c, kind: 'control' }));
   if (phase === 'seal') return packet.control_messages.filter((c) => c.phase === 'seal').map((c) => ({ ...c, kind: 'control' }));
   if (phase === 'fund') return packet.funding_messages.map((f) => ({ ...f, kind: 'funding' }));
-  die(`unknown --phase ${phase} (use: deploy | treasury-supply | bind | fund | seal)`);
+  // [ADDED 2026-07-31] wallet_endowment_messages had no phase at all. The packet generated W01..W04, a test measured
+  // that they buy the four protocol-owned ATHWallets a century of rent, and this selector — the only thing that can
+  // send them — did not mention the array. Every documented way of running the ceremony skipped the step in silence.
+  if (phase === 'endowment') return packet.wallet_endowment_messages.map((w) => ({ ...w, kind: 'endowment' }));
+  die(`unknown --phase ${phase} (use: deploy | treasury-supply | bind | fund | endowment | seal)`);
 }
 
 async function main() {
@@ -157,7 +164,11 @@ async function main() {
     const fetched = await gwSeqno(wallet.address.toString());
     const seqno = Math.max(fetched, localSeqno[m.signer_role] || 0);
 
-    const intMsg = internal({ to: target, value, bounce: !m.isDeploy, init: init || undefined, body });
+    // The packet declares the bounce flag; this script used to infer it as `!isDeploy`. That inference is correct for
+    // every control and funding step and silently wrong for the endowment, whose targets may not exist yet — a
+    // bounceable 0.6 GRAM to an uninit wallet returns at once and the ceremony still prints OK. Refuse to guess.
+    if (typeof m.bounce !== 'boolean') die(`${m.id}: packet message carries no bounce flag — regenerate with npm run mainnet:tx:dry-run`);
+    const intMsg = internal({ to: target, value, bounce: m.bounce, init: init || undefined, body });
     const transfer = wallet.createTransfer({ seqno, secretKey: key.secretKey, sendMode: SendMode.PAY_GAS_SEPARATELY, messages: [intMsg], timeout: Math.floor(Date.now() / 1000) + 600 });
     const ext = beginCell().store(storeMessage({ info: { type: 'external-in', src: null, dest: wallet.address, importFee: 0n }, init: null, body: transfer })).endCell();
 

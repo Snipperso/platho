@@ -469,6 +469,29 @@ export function buildPacket(draft: Draft) {
     },
   ];
 
+  // [ADDED 2026-07-31, ceremony reachability audit] W01..W04 existed in the tx dry-run packet and in NO human-readable
+  // document: the operator sheet, the runbook and this packet all went straight from the funding to the seals. The
+  // step tops up the storage float of the four ATHWallets that hold 85,000,000 ATH and are never redeployable, taking
+  // them from the ~20,000,000 their transfer leg carries (≈3.7 years of rent, frozen at ≈22) to 600,000,000 (≈110
+  // years). Permissionless, so unlike the seals it stays repairable — but a step nobody has written down is a step
+  // nobody performs, and the account it protects has no second chance if it ever does freeze.
+  const officialWalletEndowmentSteps = ([
+    ['W01', 'market_stability_seller_official_ath_wallet', 'MarketStabilitySeller official ATHWallet (holds 60,000,000 ATH)'],
+    ['W02', 'airdrop_pool_official_ath_wallet', 'AirdropPool official ATHWallet (holds 15,000,000 ATH)'],
+    ['W03', 'ath_long_term_vesting_official_ath_wallet', 'ATHVesting official ATHWallet (holds 10,000,000 ATH)'],
+    ['W04', 'buyback_burn_official_ath_wallet', 'BuybackBurn official ATHWallet (holds bought ATH awaiting burn)'],
+  ] as Array<[string, string, string]>).map(([id, key, label]) => ({
+    id,
+    signer_role: 'ath_treasury_owner',
+    signer_address: role(draft, 'ath_treasury_owner'),
+    action: `Send ATHWalletTopUpStorageReserve to endow ${label}`,
+    target_address: address(draft, key),
+    target_is: label,
+    warning: 'Target is the official ATHWallet ITSELF, not its owner contract, and must be signed NON-BOUNCEABLE (UQ): '
+      + "W01's and W04's wallets do not exist yet, and the bounceable form returns the endowment while the send succeeds.",
+    stop_check: 'Wallet balance is at least 600,000,000 nanoton once the account exists; no ATH balance change, no state change.',
+  }));
+
   return {
     document: 'PLATHO.V1.MAINNET_DEPLOY_PACKET',
     generated_at: new Date().toISOString(),
@@ -486,6 +509,7 @@ export function buildPacket(draft: Draft) {
     phase_1_deploy_contracts: deploymentSteps,
     phase_2_pre_seal_bindings: bindingSteps,
     phase_3_pre_seal_funding: fundingSteps,
+    phase_3b_official_wallet_endowment: officialWalletEndowmentSteps,
     phase_4_seal_contracts: sealSteps,
     phase_5_final_genesis_verification: {
       template: 'artifacts/mainnet_genesis_verify_input_template.json',
@@ -562,6 +586,14 @@ function markdown(packet: ReturnType<typeof buildPacket>): string {
     lines.push(`| ${step.id} | ${step.signer_role} | ${step.action} | ${step.target_address} | ${step.recipient_owner_address} | ${step.expected_recipient_ath_wallet} | ${step.amount_atomic} | ${step.stop_check} |`);
   }
 
+  lines.push('', '## Phase 3b: Official Wallet Storage Endowment', '',
+    'Signed after the funding and before the seals, so Phase 5 reads the endowed balances instead of assuming them. '
+    + 'These four wallets hold 85,000,000 ATH and can never be redeployed.', '',
+    '| Step | Signer | Action | Target (the ATHWallet itself) | Stop Check |', '| --- | --- | --- | --- | --- |');
+  for (const step of packet.phase_3b_official_wallet_endowment) {
+    lines.push(`| ${step.id} | ${step.signer_role} | ${step.action} | ${step.target_address} | ${step.stop_check} |`);
+  }
+
   lines.push('', '## Phase 4: Seal Contracts', '', '| Step | Message | Target | Stop Check |', '| --- | --- | --- | --- |');
   for (const step of packet.phase_4_seal_contracts) {
     lines.push(`| ${step.id} | ${step.message} | ${step.target_address} | ${step.stop_check} |`);
@@ -603,6 +635,7 @@ function main() {
     deploySteps: packet.phase_1_deploy_contracts.length,
     bindingSteps: packet.phase_2_pre_seal_bindings.length,
     fundingSteps: packet.phase_3_pre_seal_funding.length,
+    endowmentSteps: packet.phase_3b_official_wallet_endowment.length,
     sealSteps: packet.phase_4_seal_contracts.length,
   }, null, 2));
 }

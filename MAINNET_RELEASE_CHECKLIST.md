@@ -31,6 +31,7 @@ fresh build and tests
 -> code hash and StateInit hash artifacts
 -> deploy and pre-seal bindings
 -> exact final genesis funding
+-> official wallet storage endowment (W01-W04)
 -> live getter snapshot
 -> mainnet:genesis:verify PASS
 -> production PWA mainnet release for activity airdrop
@@ -63,6 +64,7 @@ snapshot must prove this state:
 | ProfileRegistry official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
 | BuybackBurn official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
 | MarketStabilitySeller official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
+| Storage endowment of the four protocol-owned ATH wallets | Packet steps `W01`-`W04`: the `MarketStabilitySeller`, `AirdropPool`, `ATHVesting` and `BuybackBurn` official ATH wallets each carry at least `600,000,000` nanoton of TON storage float **once the account exists**. Checked by hand - `mainnet:genesis:verify` does not assert it, and for `W01`/`W04` the address is still uninit at genesis, which is expected: the parked value survives the later deploy. Missing this leaves the wallets holding 85,000,000 ATH on the `20,000,000` their transfer leg carries, about 3.7 years of rent instead of 110. Permissionless, so it stays repairable after the seal. |
 | `FeeAccumulator` | Split disabled, all buckets `0`. |
 | `BuybackBurn` | Sealed, route not frozen, launch controller retained, all due/pending/retry/totals `0`. |
 | `MarketStabilitySeller` | Sealed, pricing not frozen, launch controller retained, reserve/sale/tranche/treasury/pending state `0`. |
