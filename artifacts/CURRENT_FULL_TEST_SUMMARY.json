@@ -8,8 +8,8 @@
   "executed_test_files": 208,
   "passed_test_files": 208,
   "failed_test_files": 0,
-  "total_tests": 1514,
-  "passed_tests": 1514,
+  "total_tests": 1516,
+  "passed_tests": 1516,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"

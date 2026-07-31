@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Address } from '@ton/core';
+import { bindMessageKey, bindStepId } from './ceremony_bind_order';
 
 type Draft = {
   document: string;
@@ -407,14 +408,18 @@ export function buildPacket(draft: Draft) {
     },
   ];
 
-  const bindingSteps = draft.pre_seal_bindings.map(([message, value], index) => {
+  // [CORRECTED 2026-07-31] `index + 1` numbered the draft's seventeen bound FIELDS, while the ceremony signs sixteen
+  // MESSAGES — AirdropBindAthMaster carries two fields in one body. From the seventh row on, every id here pointed at
+  // a different step than the same id in the packet that gets signed, including B06, the one the runbook names as
+  // the gate before the funding. Ids now come from CEREMONY_BIND_ORDER, which both generators read.
+  const bindingSteps = draft.pre_seal_bindings.map(([message, value]) => {
     // clean-17: FeeAccumulator.BindAirdropPool is authorized by requireTreasury() (FeeAccumulator gate 15050,
     // sender == treasury_receiver_address == the ton_treasury_receiver role that deploys FeeAccumulator), NOT the
     // genesis controller. Signing it with genesis_controller_one_shot would BOUNCE on-chain (exit 15050). Every
     // AirdropPool.* binding + all other binds use requireController -> genesis_controller_one_shot.
     const signerRole = message.startsWith('FeeAccumulator.') ? 'ton_treasury_receiver' : 'genesis_controller_one_shot';
     return {
-      id: `B${String(index + 1).padStart(2, '0')}`,
+      id: bindStepId(bindMessageKey(message)),
       signer_role: signerRole,
       signer_address: role(draft, signerRole),
       message,
