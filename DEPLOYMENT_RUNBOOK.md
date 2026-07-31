@@ -32,7 +32,8 @@ extract it, and protocol revenue does not depend on anybody choosing to run evic
 
 An earlier revision pooled the fee inside each shard and remitted it once per shard. That existed solely to pay
 `FEEACCUMULATOR_DEPOSIT_EXEC_RESERVE` once instead of a million times — and that constant was wrong: sized for
-CapsuleHub's rare bulk flush at `2,000,000`, it was 18% of a per-capsule fee. Measured against the live mainnet
+the rare bulk flush of the clean-16 `CapsuleHub` (a contract clean-17 removed) at `2,000,000`, it was 18% of a
+per-capsule fee. Measured against the live mainnet
 gas config (config-21: flat 6667 for the first 100 units, then 66.667/unit), one deposit really costs `199,068`.
 The constant is now `400,000`, and `FeeAccumulator.SweepUnaccounted` reclaims whatever the gas does not burn.
 

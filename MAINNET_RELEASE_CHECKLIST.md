@@ -10,7 +10,7 @@ The canonical ATH allocation for this release is:
 
 | Bucket | Amount | Release handling |
 | --- | ---: | --- |
-| Activity airdrop | `15,000,000 ATH` | Pre-funded into the official Vault ATH wallet at final genesis. |
+| Activity airdrop | `15,000,000 ATH` | Pre-funded into the official **AirdropPool** ATH wallet at final genesis. [CORRECTED 2026-07-31 - said `Vault`, DELETED in clean-17.] |
 | Initial ATH/TON liquidity | `15,000,000 ATH` | Used for the initial pool launch against the target `100,000 TON` reference cap. |
 | Long-term protocol vesting | `10,000,000 ATH` | Locked in immutable `ATHVesting`, `100,000 ATH` unlock per 365-day period for `100` periods. |
 | MarketStabilitySeller reserve | `60,000,000 ATH` | Funded and locked at genesis (after seal) through the bound reserve-funder notify-flow; certified by `mainnet:genesis:verify`. Does not require the pricing freeze. |
@@ -34,8 +34,8 @@ fresh build and tests
 -> live getter snapshot
 -> mainnet:genesis:verify PASS
 -> production PWA mainnet release for activity airdrop
--> distribute the 15,000,000 ATH activity airdrop through Vault
--> verify Vault airdrop_remaining_ath == 0 and airdrop_distributed_ath == 15,000,000 ATH
+-> distribute the 15,000,000 ATH activity airdrop through AirdropPool
+-> verify AirdropPool remaining_budget == 0 and distributed_total == 15,000,000 ATH
 -> initial ATH/TON pool launch
 -> BuybackBurn route freeze preflight and route freeze
 -> MarketStabilitySeller pricing freeze
@@ -55,8 +55,8 @@ snapshot must prove this state:
 | Component | Required state |
 | --- | --- |
 | `ATHMaster` | `total_supply == 100,000,000 ATH`, treasury supply deployed exactly once. |
-| Official Vault ATH wallet | Balance exactly `15,000,000 ATH`. No underfunding, no overfunding. |
-| `Vault` | `airdrop_remaining_ath == 15,000,000 ATH`, distributed `0`, no users, no pending publish or withdrawal state. |
+| Official `AirdropPool` ATH wallet | Balance exactly `15,000,000 ATH`. No underfunding, no overfunding. |
+| `AirdropPool` | Sealed, `funded_amount >= 15,000,000 ATH`, `remaining_budget == 15,000,000 ATH`, `distributed_total == 0`, `claim_count == 0`, all three binds set. |
 | Official `ATHVesting` ATH wallet | Balance exactly `10,000,000 ATH`. |
 | `ATHVesting` | Correct beneficiary/schedule, claimed `0`, idle phase, no pending transfer. |
 | UsernameRegistry official ATH wallet | Balance `0`; may still be `uninit` at the deterministic StateInit address. |
@@ -66,10 +66,11 @@ snapshot must prove this state:
 | `FeeAccumulator` | Split disabled, all buckets `0`. |
 | `BuybackBurn` | Sealed, route not frozen, launch controller retained, all due/pending/retry/totals `0`. |
 | `MarketStabilitySeller` | Sealed, pricing not frozen, launch controller retained, reserve/sale/tranche/treasury/pending state `0`. |
-| `CapsuleHub` | Latest ids and accrued fees `0`. |
+| `UsernameRegistry` | Sealed, official ATH wallet bound, **`art_sealed` and `meta_sealed` both true** - `SealGenesis` refuses without them (19045/19046). |
+| Shards (Record/Intro/Public/Recovery/Key) | Not deployed at genesis by design: each is created lazily by the first client that writes to it. Their CODE hashes are what the ceremony binds into `FeeAccumulator`. [CORRECTED 2026-07-31 - this row asked the operator to verify getters on `CapsuleHub`, DELETED in clean-17.] |
 | Username/Profile registries | No records, pending mints, dues, or pending flushes. |
 
-The initial liquidity allocation is not a user balance and is not a protocol liability inside Vault,
+The initial liquidity allocation is not a user balance and is not a protocol liability inside AirdropPool,
 Vesting, BuybackBurn, or MarketStabilitySeller at final genesis. It must have its own transaction
 proof when the ATH/TON pool is launched.
 
@@ -111,14 +112,14 @@ After `mainnet:genesis:verify` passes:
 | Step | Required proof |
 | --- | --- |
 | Production PWA release | Mainnet config, production bundle, crypto review gate, and hosting headers pass. |
-| Activity airdrop distribution | Vault `airdrop_remaining_ath == 0` and `airdrop_distributed_ath == 15,000,000 ATH`. |
+| Activity airdrop distribution | `AirdropPool` `remaining_budget == 0` and `distributed_total == 15,000,000 ATH`. |
 | Initial pool launch | Only after activity airdrop distribution; `15,000,000 ATH` paired against the target `100,000 TON` reference cap. |
 | Buyback route freeze | M20F evidence from final mainnet STON.fi API/SDK params; no testnet route data. |
 | Buyback route state | `route_frozen == true`, route controller burned, frozen quote/minOut and route actors match evidence. |
 | Pricing freeze | `base_tranche_price_nanotons == evidence_x1_tranche_quote_nanotons`; pricing controller burned. |
 | Seller reserve funding | `reserve_due_ath == 60,000,000 ATH`, `reserve_funded_total_ath == 60,000,000 ATH`. |
 | Seller official ATH wallet | Balance at least `60,000,000 ATH`; official seller ATH wallet balance above the reserve is a warning, not sellable reserve, and can remain stuck. |
-| Buyback split enable | Vault airdrop remaining `== 0`, BuybackBurn route frozen and clean, M20F ready, FeeAccumulator split still disabled. |
+| Buyback split enable | `AirdropPool` `remaining_budget == 0`, BuybackBurn route frozen and clean, M20F ready, FeeAccumulator split still disabled. |
 
 MarketStabilitySeller may be partially funded at runtime, but partial funding is not release
 readiness. Manual ordinary ATH transfers into the official seller ATH wallet are unsupported and
@@ -143,7 +144,8 @@ become transferable.
 
 Username mint finality is intentionally conservative: production release evidence must verify the
 `UsernameNFTItem` code hash, deterministic item address derivation, and the registry item
-deployment ACK/bounce path before treating Vault-funded username mints as live.
+deployment ACK/bounce path before treating username mints as live. Under clean-17 direct pay a mint is paid from
+the buyer's own ATH wallet into the registry's official ATH wallet; there is no funding contract in that path.
 
 ## Command Gates Before Production PWA Release
 
