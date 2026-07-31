@@ -65,8 +65,8 @@ tuple $MockCheckSig$_contract_init() impure inline {
 
 (tuple, int) $MockCheckSig$_fun_check(tuple $self, int $hash, slice $signature, int $public_key) impure inline_ref {
     var ($self) = $self;
-    var $fresh$ret_333 = $global_checkSignature($hash, $signature, $public_key);
-    return ($self, $fresh$ret_333);
+    var $fresh$ret_0 = $global_checkSignature($hash, $signature, $public_key);
+    return ($self, $fresh$ret_0);
 }
 
 ;;

@@ -8,9 +8,14 @@
  * message in a wallet transfer from its role wallet, signs with the role seed, and sends
  * via the gateway (which fans out to toncenter v3 + Orbs v2 for delivery).
  *
- * D09 (UsernameRegistry, ~40KB) is EXCLUDED here — deploy it with the dedicated
- * scripts/mainnet_deploy_d09_username_registry.mjs (deployer2). The registry's controller
- * is still genesis_controller (baked into its init), so a different deployer is fine.
+ * THE BIG ONE. UsernameRegistry's StateInit is ~40KB. [CORRECTED 2026-07-31] This header used to call it "D09" and
+ * to say it was EXCLUDED from this script — both are now wrong and dangerous to read literally: in the clean-17
+ * packet UsernameRegistry is D08 and ProfileRegistry is D09, and NOTHING in selectMessages() has ever excluded
+ * either. What made the exclusion necessary was transport, not this script: toncenter and the gateway ACK a ~40KB
+ * external with 200 and never deliver it (proven 2026-07-04). gwSend() now tries tonapi FIRST for exactly that
+ * reason, and delivery is confirmed by the seqno-advance poll rather than by the ACK — so a drop stops the phase
+ * instead of being mistaken for success. scripts/mainnet_deploy_d09_username_registry.mjs remains as the fallback
+ * if the poll never advances; the registry's controller is baked into its init, so a different deployer is fine.
  *
  * SAFETY:
  *  - DRY-RUN by default; sends ONLY with --broadcast.
@@ -82,7 +87,34 @@ async function tcFetch(url, opts = {}, tries = 8) {
   return fetch(url, { ...opts, headers });
 }
 
-async function gwState(addr) { const r = await tcFetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } }); const j = await r.json().catch(() => ({})); return j && j.ok ? j.result : null; }
+// [FIXED 2026-07-31] This read the DECOMMISSIONED gateway and nothing else, so the very first state check of the
+// very first phase aborted with "fetch failed". The transport note 40 lines up already said rpc.platho.app is gone
+// and rerouted the SENDS to toncenter — the READS were left pointing at it. That is the whole defect: half a
+// migration, on the script that runs an irreversible ceremony.
+//
+// toncenter v3 accountStates first (same endpoint the preflight uses), v2 getAddressInformation second, the gateway
+// last and only if it happens to answer. Returns a normalised { state } or null, and null now stops the phase — see
+// the caller. A state read that fails must never be read as "not active yet", because for a deploy that means
+// deploying on top of a live contract.
+async function gwState(addr) {
+  try {
+    const r = await tcFetch(`https://toncenter.com/api/v3/accountStates?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } });
+    const j = await r.json().catch(() => ({}));
+    const a = j && Array.isArray(j.accounts) ? j.accounts[0] : null;
+    if (a && a.status) return { state: a.status === 'uninitialized' ? 'uninit' : a.status, balance: a.balance };
+  } catch {}
+  try {
+    const r = await tcFetch(`https://toncenter.com/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.ok && j.result && j.result.state) return { state: j.result.state === 'uninitialized' ? 'uninit' : j.result.state, balance: j.result.balance };
+  } catch {}
+  try {
+    const r = await tcFetch(`${GATEWAY}/api/v2/getAddressInformation?address=${encodeURIComponent(addr)}`, { headers: { accept: 'application/json' } });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.ok && j.result) return { state: j.result.state === 'uninitialized' ? 'uninit' : j.result.state, balance: j.result.balance };
+  } catch {}
+  return null;
+}
 async function gwSeqno(addr) {
   // toncenter v2 FIRST (gateway runGetMethod can return a load-balanced stale seqno).
   try { const r = await tcFetch('https://toncenter.com/api/v2/runGetMethod', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: addr, method: 'seqno', stack: [] }) }); const j = await r.json(); const v = j?.result?.stack?.[0]?.[1]; if (typeof v === 'string') return Number(BigInt(v)); } catch {}
@@ -155,7 +187,10 @@ async function main() {
 
     // idempotency: skip a deploy whose target is already active
     const st = await gwState(target.toString());
-    const state = st ? (st.state || st.account_state) : 'unreachable';
+    // An unreadable target used to fall through to 'unreachable', which is not 'active', which meant a deploy went
+    // ahead as if the address were empty. Every endpoint being down is not evidence that a contract is not there.
+    if (!st) die(`${m.id}: cannot read the state of ${m.target_address} from any endpoint — refusing to act blind`);
+    const state = st.state;
     if (m.isDeploy && state === 'active') { console.log(`  ${m.id} ${(m.contract || '').padEnd(20)} target already ACTIVE — skip`); continue; }
 
     const walletState = await gwState(wallet.address.toString());

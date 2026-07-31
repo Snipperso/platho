@@ -276,14 +276,14 @@ builder $AirdropTicket$_store(builder build_0, (slice, int, int, int) v) inline 
 ((slice, int, int, int), int) $AirdropTicket$_fun_isBasechainAddress((slice, int, int, int) $self, slice $a) impure inline_ref {
     var (($self'owner, $self'credits, $self'in_flight, $self'in_flight_at)) = $self;
     slice $s = $Address$_fun_asSlice($a);
-    var $fresh$ret_1019 = ($s~load_uint(11) == 1024);
-    return (($self'owner, $self'credits, $self'in_flight, $self'in_flight_at), $fresh$ret_1019);
+    var $fresh$ret_0 = ($s~load_uint(11) == 1024);
+    return (($self'owner, $self'credits, $self'in_flight, $self'in_flight_at), $fresh$ret_0);
 }
 
 ((slice, int, int, int), (slice, int, int, int, int, int, int, int)) $AirdropTicket$_fun_get_ticket((slice, int, int, int) $self) impure inline_ref {
     var (($self'owner, $self'credits, $self'in_flight, $self'in_flight_at)) = $self;
-    var $fresh$ret_1020 = $AirdropTicketView$_constructor_owner_credits_in_flight_in_flight_at_unjam_grace_seconds_min_claim_credits_max_credits_per_claim_claim_min_value($self'owner, $self'credits, $self'in_flight, $self'in_flight_at, 604800, 10, 1000, 63000000);
-    return (($self'owner, $self'credits, $self'in_flight, $self'in_flight_at), $fresh$ret_1020);
+    var $fresh$ret_1 = $AirdropTicketView$_constructor_owner_credits_in_flight_in_flight_at_unjam_grace_seconds_min_claim_credits_max_credits_per_claim_claim_min_value($self'owner, $self'credits, $self'in_flight, $self'in_flight_at, 604800, 10, 1000, 63000000);
+    return (($self'owner, $self'credits, $self'in_flight, $self'in_flight_at), $fresh$ret_1);
 }
 
 ;;
