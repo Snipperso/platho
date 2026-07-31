@@ -90,6 +90,28 @@ describe('every generated ceremony step is reachable and fully specified', () =>
     }
   });
 
+  it('CEREMONY-REACH-05: the broadcaster reads chain state from a live endpoint, and refuses to act when it cannot', () => {
+    // Found by running the dry run, 2026-07-31: the very first state check aborted with "fetch failed". gwState read
+    // ONLY rpc.platho.app, decommissioned months earlier — the same file's transport note said so and had already
+    // rerouted the SENDS to toncenter, while the READS were left behind. Half a migration, on the script that
+    // performs an irreversible ceremony.
+    //
+    // The second half is what the failure would have been if the endpoint had answered softly instead of throwing:
+    // an unreadable target fell through to 'unreachable', which is not 'active', which means a deploy proceeds as if
+    // the address were empty. Every endpoint being down is not evidence that a contract is not there.
+    const src = readFileSync(BROADCASTER, 'utf8');
+    const gwState = src.slice(src.indexOf('async function gwState'), src.indexOf('async function gwSeqno'));
+    expect(gwState, 'state reads must go through toncenter, not only the retired gateway').toContain('toncenter.com');
+    expect(gwState.indexOf('toncenter.com'), 'and toncenter must be tried BEFORE the gateway')
+      .toBeLessThan(gwState.indexOf('${GATEWAY}') >= 0 ? gwState.indexOf('${GATEWAY}') : Number.MAX_SAFE_INTEGER);
+    expect(src, 'an unreadable target must stop the phase, never be treated as an empty address')
+      .toMatch(/if \(!st\) die\(/);
+    // The pattern, not the word: the original was `st ? (st.state || st.account_state) : 'unreachable'`, and the
+    // comment recording that defect naturally contains the word too. Matching prose would make this pass the day
+    // someone deletes the explanation.
+    expect(src, 'the unreachable-as-not-active fallthrough must be gone').not.toMatch(/:\s*'unreachable'/);
+  });
+
   it('CEREMONY-REACH-04: the broadcaster obeys the declared flag instead of inferring it', () => {
     // Pins the fix itself. The inference read `bounce: !m.isDeploy` — a single expression, in the one place that
     // could not see which targets exist, deciding the property the endowment depends on.

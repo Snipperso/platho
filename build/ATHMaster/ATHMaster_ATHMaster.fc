@@ -460,21 +460,21 @@ builder $ATHMaster$_store(builder build_0, (int, slice, cell, int) v) inline {
     var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = $self;
     var ($owner_std'workchain, $owner_std'address) = $global_parseStdAddress($Address$_fun_asSlice($owner_address));
     var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $owner_address, $global_myAddress());
-    var $fresh$ret_36 = $global_contractAddressExt($owner_std'workchain, $wallet_init'code, $wallet_init'data);
-    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_36);
+    var $fresh$ret_25 = $global_contractAddressExt($owner_std'workchain, $wallet_init'code, $wallet_init'data);
+    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_25);
 }
 
 ((int, slice, cell, int), (int, int, slice, cell, cell)) $ATHMaster$_fun_get_jetton_data((int, slice, cell, int) $self) impure inline_ref {
     var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = $self;
     var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $self'treasury_owner, $global_myAddress());
-    var $fresh$ret_37 = $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code($self'total_supply, false, $self'treasury_owner, $self'content, $wallet_init'code);
-    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_37);
+    var $fresh$ret_26 = $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code($self'total_supply, false, $self'treasury_owner, $self'content, $wallet_init'code);
+    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_26);
 }
 
 ((int, slice, cell, int), slice) $ATHMaster$_fun_get_wallet_address((int, slice, cell, int) $self, slice $owner_address) impure inline_ref {
     var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = $self;
-    var $fresh$ret_38 = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($owner_address);
-    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_38);
+    var $fresh$ret_27 = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($owner_address);
+    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_27);
 }
 
 ;;

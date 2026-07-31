@@ -106,8 +106,8 @@ builder $MockRegistryNotificationNoAck$_store(builder build_0, (int, int, int) v
 
 ((int, int, int), (int, int, int)) $MockRegistryNotificationNoAck$_fun_get_state((int, int, int) $self) impure inline_ref {
     var (($self'profile_count, $self'username_count, $self'last_query_id)) = $self;
-    var $fresh$ret_331 = $MockRegistryNotificationNoAckStateView$_constructor_profile_count_username_count_last_query_id($self'profile_count, $self'username_count, $self'last_query_id);
-    return (($self'profile_count, $self'username_count, $self'last_query_id), $fresh$ret_331);
+    var $fresh$ret_0 = $MockRegistryNotificationNoAckStateView$_constructor_profile_count_username_count_last_query_id($self'profile_count, $self'username_count, $self'last_query_id);
+    return (($self'profile_count, $self'username_count, $self'last_query_id), $fresh$ret_0);
 }
 
 ;;

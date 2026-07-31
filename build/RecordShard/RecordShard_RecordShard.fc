@@ -469,26 +469,26 @@ builder $RecordShard$_store(builder build_0, (int, int, int, cell, int) v) inlin
 
 ((int, int, int, cell, int), int) $RecordShard$_fun_frameCommit((int, int, int, cell, int) $self, cell $h0, cell $h1, cell $body) impure inline_ref {
     var (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count)) = $self;
-    var $fresh$ret_988 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1381189187, 32), $Cell$_fun_hash($h0), 256), $Cell$_fun_hash($h1), 256), $Cell$_fun_hash($body), 256)));
-    return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_988);
+    var $fresh$ret_0 = $Cell$_fun_hash($Builder$_fun_endCell(store_uint(store_uint(store_uint(store_uint($global_beginCell(), 1381189187, 32), $Cell$_fun_hash($h0), 256), $Cell$_fun_hash($h1), 256), $Cell$_fun_hash($body), 256)));
+    return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_0);
 }
 
 ((int, int, int, cell, int), (int, int, int)) $RecordShard$_fun_get_record((int, int, int, cell, int) $self, int $entry_id) impure inline_ref {
     var (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count)) = $self;
     tuple $e = $RecordEntry$_load_opt(__tact_dict_get_int_cell($self'records, 257, $entry_id));
     if (null?($e)) {
-        var $fresh$ret_989 = $CapsuleRecordView$_constructor_exists_frame_commit_created_at(false, 0, 0);
-        return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_989);
+        var $fresh$ret_1 = $CapsuleRecordView$_constructor_exists_frame_commit_created_at(false, 0, 0);
+        return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_1);
     }
     var ($v'frame_commit, $v'created_at) = $RecordEntry$_not_null($e);
-    var $fresh$ret_990 = $CapsuleRecordView$_constructor_exists_frame_commit_created_at(true, $v'frame_commit, $v'created_at);
-    return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_990);
+    var $fresh$ret_2 = $CapsuleRecordView$_constructor_exists_frame_commit_created_at(true, $v'frame_commit, $v'created_at);
+    return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_2);
 }
 
 ((int, int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, slice)) $RecordShard$_fun_get_view((int, int, int, cell, int) $self) impure inline_ref {
     var (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count)) = $self;
-    var $fresh$ret_991 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_safe_cap_retention_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, 4096, 31536000, 15600000, 19100000, ((($self'epoch + 2) * 86400) + 31536000), 10000000, __gen_slice_address_d5c3503e45ebaa622eb24a99cd82f286d3042aaa65a54e47a6884db1859ecc06());
-    return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_991);
+    var $fresh$ret_3 = $RecordShardView$_constructor_write_pubkey_epoch_last_seq_record_count_safe_cap_retention_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'write_pubkey, $self'epoch, $self'last_seq, $self'record_count, 4096, 31536000, 15600000, 19100000, ((($self'epoch + 2) * 86400) + 31536000), 10000000, __gen_slice_address_d5c3503e45ebaa622eb24a99cd82f286d3042aaa65a54e47a6884db1859ecc06());
+    return (($self'write_pubkey, $self'epoch, $self'last_seq, $self'records, $self'record_count), $fresh$ret_3);
 }
 
 ;;
