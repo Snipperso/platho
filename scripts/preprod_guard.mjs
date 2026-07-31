@@ -12,13 +12,6 @@ import {
   TEST_DEPLOY_TARGET_RE,
 } from './release-gate-contract-map.mjs';
 
-import {
-  PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
-  PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
-  PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS,
-  PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS,
-} from '../web/message-pricing-policy.mjs';
-
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 const checks = [
@@ -599,27 +592,32 @@ function validatePublishReservePricingArtifact() {
     }
   }
 
-  const expectedCaseIds = [
-    'public_1k',
-    'public_2k',
-    'public_4k',
-    'public_8k',
-    'public_16k',
-    'public_32k',
-    'private_hybrid_1k',
-    'private_hybrid_2k',
-    'private_hybrid_4k',
-    'private_hybrid_8k',
-    'private_hybrid_16k',
-    'private_hybrid_32k',
+  // [REWRITTEN 2026-07-31] This block used to demand twelve cases keyed by capsule SIZE CLASS, each carrying a
+  // `canonical_max_charge_nanotons` hold and a `user_net_debit_nanotons` net, cross-checked against
+  // PUBLIC/PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS in web/message-pricing-policy.mjs.
+  //
+  // Every one of those concepts belongs to the VAULT batch-publish model, and clean-17 deleted it: there is no hold
+  // and no over-hold refund, no max_charge, no RJ_UNDERPRICED, and no size classes. A publish is a flat per-lane
+  // wallet send whose floor is the receiving shard's own gate, and the shard reserves its rent and returns the
+  // surplus. MEASURED: those hold/net tables are read by NOTHING in the shipped client — their only consumer in the
+  // entire repository was this function.
+  //
+  // So the LAST gate before a production deploy was demanding a report that certifies prices nobody pays, computed
+  // for a contract that does not exist. Satisfying it would have turned the gate green and proved nothing: the same
+  // defect as its codeChecks list naming vault/capsulehub, one field over.
+  const expectedLaneIds = [
+    'conv_first_publish', 'conv_steady_publish',
+    'intro_first_publish', 'intro_steady_publish',
+    'recovery_write', 'keyshard_register',
+    'public_channel_first', 'public_thread_first', 'public_beacon_first', 'public_avatar_first',
   ];
-  const actualCaseIds = (report.cases ?? []).map((item) => item?.id);
-  for (const caseId of expectedCaseIds) {
-    if (!actualCaseIds.includes(caseId)) {
+  const actualLaneIds = (report.cases ?? []).map((item) => item?.id);
+  for (const laneId of expectedLaneIds) {
+    if (!actualLaneIds.includes(laneId)) {
       failures.push({
         id: 'PUBLISH_RESERVE_PRICING_CASE_MISSING',
         file: 'artifacts/publish_reserve_pricing_report.json',
-        message: `Publish reserve pricing report must cover ${caseId}.`,
+        message: `Publish reserve pricing report must cover the ${laneId} direct-pay lane.`,
       });
     }
   }
@@ -644,31 +642,18 @@ function validatePublishReservePricingArtifact() {
     }
   }
 
-  const caseById = new Map((report.cases ?? []).map((item) => [item?.id, item]));
-  const expectedPwaCases = [
-    ...Object.entries(PUBLIC_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).map(([sizeClass, hold]) => ({
-      id: `public_${sizeClass}k`,
-      hold,
-      net: PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[sizeClass],
-    })),
-    ...Object.entries(PRIVATE_CAPSULE_HOLD_NANOTONS_BY_SIZE_CLASS).map(([sizeClass, hold]) => ({
-      id: `private_hybrid_${sizeClass}k`,
-      hold,
-      net: PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[sizeClass],
-    })),
-  ];
-
-  for (const expectedCase of expectedPwaCases) {
-    const actual = caseById.get(expectedCase.id);
-    if (
-      String(actual?.canonical_max_charge_nanotons ?? '') !== expectedCase.hold.toString()
-      || String(actual?.user_net_debit_nanotons ?? '') !== expectedCase.net.toString()
-      || String(actual?.protocol_fee_nanotons ?? '') !== '10000000'
-    ) {
+  // The property that actually matters: on every lane the value the CLIENT attaches must cover the floor the
+  // CONTRACT demands. Under it, the publish is refused in production while every contract test stays green — which
+  // is exactly how four figures in web/publish-price.mjs were once left behind and every publish refused.
+  for (const item of report.cases ?? []) {
+    const floor = BigInt(item?.contract_floor_nanotons ?? '-1');
+    const attached = BigInt(item?.client_attaches_nanotons ?? '0');
+    if (floor < 0n || attached < floor) {
       failures.push({
-        id: 'PUBLISH_RESERVE_PRICING_PWA_TABLE_MISMATCH',
+        id: 'PUBLISH_RESERVE_PRICING_LANE_UNDERFUNDED',
         file: 'artifacts/publish_reserve_pricing_report.json',
-        message: `Publish reserve pricing report ${expectedCase.id} must match the PWA hold/net table and 0.010 TON protocol fee.`,
+        message: `Publish reserve pricing lane ${item?.id}: the client attaches ${attached} against a contract floor `
+          + `of ${floor}. Every publish on that lane is refused.`,
       });
     }
   }
