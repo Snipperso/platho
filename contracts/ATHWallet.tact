@@ -49,10 +49,28 @@ const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
 const ATH_TRANSFER_NOTIFY_MIN_VALUE: Int = 45000000;
 // [COMMENT CORRECTED 2026-07-19] This used to be justified as rent for one `processed_notifications` entry — the
 // permanent replay tombstone, which was DELETED (see the state declaration below for why). What still justifies it
-// is the RECIPIENT wallet's own rent: an inbound transfer may DEPLOY that wallet (1 + code + data cells, paying
-// rent forever), and this endowment is the only thing funding it. The value is deliberately left unchanged here:
-// re-sizing it means measuring a wallet account's real storage phase, which is its own job, and it feeds gate
-// 14212 above — lowering it without that measurement would under-fund every freshly deployed wallet.
+// is the RECIPIENT wallet's own rent: an inbound transfer may DEPLOY that wallet, and this endowment is the only
+// thing funding it.
+//
+// That paragraph used to end "paying rent forever" and defer the sizing as "its own job". MEASURED 2026-07-31, so
+// the deferral is closed and the number is written down instead of promised:
+//
+//   81 deduplicated code cells + 3 for the account and data, at the frozen 64,962 per cell-year => 5,456,808/year.
+//   Cross-checks against this repo's own MSTAB-09 figure: the treasury wallet's 24,832,861 => 4.55 years.
+//   So 20,000,000 funds 3.67 years of positive balance, after which rent accrues as due_payment.
+//   basechain freeze_due_limit is 100,000,000 (config param 21, parsed to a zero-bit remainder; an earlier read of
+//   this took the fields one position short and reported 10,000,000, which is block_gas_limit).
+//   Freeze therefore lands at (20,000,000 + 100,000,000) / 5,456,808 = ~22 YEARS. Deletion is ~165 years after that.
+//
+// TWENTY-TWO YEARS IS A FLOOR, NOT AN EXPECTATION: every inbound transfer retains another 20,000,000, so the clock
+// only runs on a wallet that receives nothing whatsoever in that time.
+//
+// [Owner decision 2026-07-31: leave the value.] Buying the 100-year horizon this protocol uses for its permanent
+// accounts costs 446,000,000 here — a transfer goes from 0.048 to 0.474 GRAM and the airdrop's per-delivery leg
+// grows by the same factor across every recipient. That is a bad trade against a clock any single transfer resets.
+//
+// Lowering it still requires the measurement above: it feeds gate 14212 and would under-fund every freshly deployed
+// wallet. Raising it is an economics decision, not a safety one.
 const ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT: Int = 20000000;
 const ATH_INTERNAL_TRANSFER_EXEC_RESERVE: Int = 2000000;
 const ATH_BURN_NOTIFICATION_EXEC_RESERVE: Int = 2000000;
