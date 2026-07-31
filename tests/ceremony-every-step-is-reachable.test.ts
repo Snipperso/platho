@@ -112,6 +112,45 @@ describe('every generated ceremony step is reachable and fully specified', () =>
     expect(src, 'the unreachable-as-not-active fallthrough must be gone').not.toMatch(/:\s*'unreachable'/);
   });
 
+  it('CEREMONY-REACH-06: both operator documents mean the same step by the same Bnn id', () => {
+    // Found 2026-07-31, after the genesis deploy landed and before the binds were signed. The two generated
+    // documents disagreed about what B06 is:
+    //
+    //   tx dry-run packet (SIGNED)   B06 = AirdropPool.AirdropBindAthMaster
+    //   deploy packet (READ)         B06 = BuybackBurn.BindBuybackTreasury
+    //
+    // and B06 is the step the runbook and the packet's own execution_order both name out loud as the gate before
+    // the funding. The cause: the draft lists seventeen bound FIELDS, the ceremony signs sixteen MESSAGES, and the
+    // two generators numbered different things from row seven on. Ids now come from CEREMONY_BIND_ORDER.
+    if (!existsSync(PACKET) || !existsSync('artifacts/local/mainnet_deploy_packet.json')) return;
+    const tx = JSON.parse(readFileSync(PACKET, 'utf8'));
+    const sheet = JSON.parse(readFileSync('artifacts/local/mainnet_deploy_packet.json', 'utf8'));
+
+    const signed = new Map<string, string>();
+    for (const m of tx.control_messages ?? []) {
+      if (m.phase === 'pre_seal_binding') signed.set(m.id, String(m.body?.label ?? ''));
+    }
+    expect(signed.size, 'the tx packet must carry the binds').toBeGreaterThan(10);
+
+    const disagree: string[] = [];
+    for (const [id, label] of signed) {
+      const rows = (sheet.phase_2_pre_seal_bindings ?? []).filter((s: any) => s.id === id);
+      if (rows.length === 0) { disagree.push(`${id}: signed as ${label}, absent from the operator sheet`); continue; }
+      // A sheet row may name a FIELD of the message (`...AirdropBindAthMaster.ath_master_address`), so prefix-match.
+      for (const r of rows) {
+        if (!String(r.message).startsWith(label)) disagree.push(`${id}: signed ${label}, sheet says ${r.message}`);
+      }
+    }
+    expect(disagree, 'the same step id means different things in two documents an operator reads side by side, '
+      + `during a ceremony where several steps are one-shot:\n${disagree.join('\n')}`).toEqual([]);
+
+    // And the id the funding declares as its prerequisite must actually be the AthMaster bind, since that is the
+    // gate (26011) the claim rests on — not merely present in both files under the same name.
+    const prereq = (tx.funding_messages ?? [])[0]?.must_be_signed_after;
+    expect(signed.get(String(prereq)), `funding waits on ${prereq}; that step must be the AirdropPool ath_master bind`)
+      .toBe('AirdropPool.AirdropBindAthMaster');
+  });
+
   it('CEREMONY-REACH-04: the broadcaster obeys the declared flag instead of inferring it', () => {
     // Pins the fix itself. The inference read `bounce: !m.isDeploy` — a single expression, in the one place that
     // could not see which targets exist, deciding the property the endowment depends on.

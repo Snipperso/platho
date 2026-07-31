@@ -1,4 +1,5 @@
 import { Address, Builder, Cell, beginCell, contractAddress, storeStateInit } from '@ton/core';
+import { CEREMONY_BIND_ORDER, bindMessageKey, bindStepId } from './ceremony_bind_order';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -945,6 +946,26 @@ async function buildDryRunPacket(draft: Draft) {
       bodyCell(storeATHWalletTopUpStorageReserve({ $$type: 'ATHWalletTopUpStorageReserve' })), {}),
     safety_check: 'Permissionless receiver: no authority is granted, the value simply becomes the wallet storage float. Tonkeeper target must be the official ATHWallet itself, NOT its owner contract.',
   }));
+
+  // THIS ARRAY IS WHERE THE Bnn IDS COME FROM, so it must agree with the shared order the operator sheet also reads.
+  // Written out by hand above, one literal per message; CEREMONY_BIND_ORDER is what the deploy packet numbers from.
+  // Until 2026-07-31 the two were independent and had silently diverged from B06 onward. Fail here, at generation,
+  // rather than let an operator find it while holding two documents that disagree.
+  {
+    const signed = controlMessages
+      .filter((m: any) => m.phase === 'pre_seal_binding')
+      .map((m: any) => ({ id: m.id, label: m.body?.label }));
+    signed.forEach(({ id, label }) => {
+      const expected = bindStepId(bindMessageKey(String(label)));
+      if (expected !== id) {
+        throw new Error(`bind ${label} is signed as ${id} here but numbered ${expected} in CEREMONY_BIND_ORDER — `
+          + 'the two operator documents would disagree about which step this is');
+      }
+    });
+    if (signed.length !== CEREMONY_BIND_ORDER.length) {
+      throw new Error(`this packet signs ${signed.length} binds, CEREMONY_BIND_ORDER lists ${CEREMONY_BIND_ORDER.length}`);
+    }
+  }
 
   // THE BOUNCE FLAG IS PART OF THE MESSAGE, AND UNTIL NOW ONLY THE BROADCASTER KNEW IT — by guessing.
   //
