@@ -413,7 +413,9 @@ describe('PWA contract transaction builders', () => {
   it('PWA-TX-07: quotes exact ATHWallet generic values used by the PWA', () => {
     expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(48_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(69_000_000n);
+    // 30M notify + 1M notify-ack + 4M source-ack + 7M notify-exec + 20M endowment + 10M owner-exec. Was 69_000_000
+    // while the source-ack mirror sat at a stale 1M; see ATH-MIRROR-01, which derives this from the contract.
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequestWithNotify', { notify_value: 30_000_000n })).toBe(72_000_000n);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductMintUsername', { notify_value: 32_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     expect(() => estimateAthWalletAttachedValueNanotons('WalletProductProfileAvatar', { notify_value: 30_000_000n })).toThrow(/Unsupported ATHWallet message type/);
     // Raised 30M -> 45M on 2026-07-20: at 30M a refused registry purchase refunded only 24,037,796, under the 26M

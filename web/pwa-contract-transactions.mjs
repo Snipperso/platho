@@ -131,7 +131,12 @@ export const VAULT_RESERVES_NANOTONS = Object.freeze({
 export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   transferNotifyAckValue: 1_000_000n,
   internalTransferAckValue: 3_000_000n,
-  internalTransferSourceAckValue: 1_000_000n,
+  // [CORRECTED 2026-07-31] Mirrors ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE, which the contract raised 1M -> 4M on
+  // 2026-07-29 because it funds the only path that clears pending_outgoing_transfers. This copy was left at 1M, so
+  // athNotifyTransferValue() computed 3,000,000 less than gate 14307 demands and every quote it produced was
+  // unspendable. PWA-TX-07 stayed green because it compared this function to a hand-typed 69_000_000 derived from
+  // the same stale number — a literal agreeing with a literal. ATH-MIRROR-01 now reads the contract instead.
+  internalTransferSourceAckValue: 4_000_000n,
   internalTransferFwdFeeAllowance: 21_000_000n,
   // Mirrors ATH_TRANSFER_NOTIFY_MIN_VALUE. Raised 30M -> 45M on 2026-07-20: at 30M a REFUSED registry purchase
   // refunded only 24,037,796, below the 26M that gate 14212 demands on arrival, so the buyer's ATH was stranded.
