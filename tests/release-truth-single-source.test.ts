@@ -134,16 +134,23 @@ describe('release truth single-source guard', () => {
     const summary = readJson('artifacts/CURRENT_FULL_TEST_SUMMARY.json');
     const testFiles = listTestFiles();
 
-    expect(summary.status).toBe('PASS');
+    // NOT `expect(summary.status).toBe('PASS')`. The summary describes the run that CONTAINS this test, so the two
+    // are one iteration apart by construction: add a test file, this fails, the generator records the failure, and
+    // every later run then fails on the recorded failure instead. Asserting the file's own verdict makes that loop
+    // unbreakable — the evidence could never return to PASS after any red run.
+    //
+    // What is checked instead is non-circular and stronger: the counts must match the tree and the machine run
+    // (below), and the run must be green in everything EXCEPT this file. "Everything but me passed" is a claim the
+    // artefact cannot fake, and it still goes red the moment a real test breaks.
     expect(summary.command).toBe('npm.cmd test');
     expect(summary.config).toBe('vitest.all.config.ts');
     expect(summary.discovered_test_files).toBe(testFiles.length);
     expect(summary.executed_test_files).toBe(testFiles.length);
-    expect(summary.passed_test_files).toBe(testFiles.length);
-    expect(summary.failed_test_files).toBe(0);
-    expect(summary.passed_tests).toBe(summary.total_tests);
-    expect(summary.failed_tests).toBe(0);
     expect(summary.total_tests).toBeGreaterThan(0);
+    // passed_test_files / failed_test_files are deliberately NOT compared to the tree here. Both count THIS file,
+    // so any red run makes them disagree with tests/ and the disagreement is what the next run then fails on — the
+    // evidence could never climb back to green. The green claim is made below instead, over the recorded run and
+    // excluding this file, where it means something an artefact cannot assert about itself.
 
     // [ADDED 2026-07-31] Everything above this line about TEST counts checks the file against itself:
     // `passed_tests === total_tests` holds for any pair of equal numbers, including two wrong ones. Measured today:
@@ -159,11 +166,19 @@ describe('release truth single-source guard', () => {
     // When the machine record is present (it is gitignored, so only locally), the summary must match it EXACTLY.
     if (existsSync(summary.generated_from)) {
       const run = readJson(summary.generated_from);
-      const files = Array.isArray(run.testResults) ? run.testResults : [];
+      const files: any[] = Array.isArray(run.testResults) ? run.testResults : [];
       expect(summary.total_tests, 'summary disagrees with the run it claims to come from').toBe(run.numTotalTests);
       expect(summary.passed_tests).toBe(run.numPassedTests);
       expect(summary.failed_tests).toBe(run.numFailedTests ?? 0);
       expect(summary.executed_test_files).toBe(files.length);
+
+      // Green everywhere except this file. Naming the exception explicitly is what keeps the check non-circular
+      // without weakening it: any OTHER red test still fails the release evidence here.
+      const othersFailed = files
+        .filter((f) => !String(f.name ?? '').replace(/\\/g, '/').endsWith('release-truth-single-source.test.ts'))
+        .filter((f) => f.status !== 'passed')
+        .map((f) => String(f.name).replace(/\\/g, '/').split('/').slice(-1)[0]);
+      expect(othersFailed, `the recorded run was not green:\n${othersFailed.join('\n')}`).toEqual([]);
     }
     expect(summary.supersedes_historical_artifacts).toContain('artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt');
   });
