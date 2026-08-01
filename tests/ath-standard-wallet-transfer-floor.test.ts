@@ -110,6 +110,55 @@ describe('what an ordinary wallet must attach to move ATH', () => {
     }
   });
 
+  it('WALLETFLOOR-04: a transfer carrying a comment is accepted, and the notification reaches the recipient', async () => {
+    // A wallet attaches a comment by putting it in forward_payload with a TINY forward_ton_amount, so the recipient
+    // emits the notification that carries the text. Gates 14703 and 14713 used to refuse the whole range from 1 to
+    // 45,000,000, so ATH could not be sent with a message. That floor was measured, but for the custom notify lanes,
+    // where it lets a refused registry purchase refund itself past gate 14212; the standard lane is fire-and-forget
+    // and never needed it.
+    const { bc, owner, recipient, wallet, recipientWallet } = await setup();
+    const comment = beginCell().storeUint(0, 32).storeStringTail('hello').endCell();
+
+    const res = await wallet.send(owner.getSender(), { value: 60_000_000n }, {
+      $$type: 'JettonTransfer', query_id: 9201n, amount: 1_000n, destination: recipient,
+      response_destination: owner.address, custom_payload: null, forward_ton_amount: 1n,
+      forward_payload: comment.beginParse(),
+    } as JettonTransfer);
+
+    expect(findTransaction(res.transactions, { to: wallet.address, exitCode: 14703 }),
+      'a one-nanoton forward is how a comment is attached; refusing it means ATH cannot be sent with a message')
+      .toBeUndefined();
+    expect(res.transactions.some((t: any) => t.inMessage?.info?.dest?.equals?.(recipient)),
+      'and the notification carrying the comment must actually reach the recipient owner').toBe(true);
+    expect((await bc.openContract(ATHWallet.fromAddress(recipientWallet)).getGetWalletData()).balance).toBe(1_000n);
+  }, 180_000);
+
+  it('WALLETFLOOR-05: the change comes back instead of being buried in the recipient wallet', async () => {
+    // MEASURED BEFORE THE FIX: three transfers left 44,047,996 / 88,099,059 / 132,150,122 on the recipient — about
+    // 44,000,000 each, permanently, because the excess was a fixed 1,000,000 and an ATHWallet has NO entry point
+    // that pays TON back to its owner. Of 55,425,870 spent per transfer, only ~6,800,000 was fee.
+    //
+    // After: the wallet keeps the storage endowment it may have just been deployed with and returns the rest.
+    const { bc, owner, recipient, wallet, recipientWallet } = await setup();
+
+    const spent: bigint[] = [];
+    for (const n of [1, 2, 3]) {
+      const before = (await bc.getContract(owner.address)).balance;
+      await wallet.send(owner.getSender(), { value: FLOOR },
+        transfer(BigInt(9300 + n), recipient, owner.address, 0n));
+      spent.push(before - (await bc.getContract(owner.address)).balance);
+    }
+    const retained = (await bc.getContract(recipientWallet)).balance;
+    const perTransfer = retained / 3n;
+
+    expect(perTransfer, 'the recipient must not keep materially more than the storage endowment it is owed')
+      .toBeLessThan(NOTIFY_ENDOWMENT + 5_000_000n);
+    expect(perTransfer, 'and it must still keep the endowment — an under-funded wallet is the unrecoverable case')
+      .toBeGreaterThanOrEqual(NOTIFY_ENDOWMENT);
+    expect(spent[0], 'a transfer must cost the sender well under what it cost when the change was buried')
+      .toBeLessThan(40_000_000n);
+  }, 300_000);
+
   it('WALLETFLOOR-03: asking for a notification raises the floor by the forward amount plus the notify reserve', async () => {
     // The other shape a wallet sends: forward_ton_amount > 0 so the recipient gets a JettonTransferNotification.
     // The two branches do NOT share a floor, and the difference is not just the forward amount: the notifying branch

@@ -573,10 +573,22 @@ describe('BuybackBurn auth and negative matrix', () => {
     expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
     expect(state.pending_received_ath_atomic).toBe(0n);
 
+    // [CORRECTED 2026-08-01] This case used to assert the swap stays PENDING, and it did — but for a reason outside
+    // BuybackBurn: ATHWallet's gate 14703 refused every forward_ton_amount between 1 and 45,000,000, so a 0.02
+    // notification never left the sender's wallet. That floor has been removed from the standard lane (it belonged
+    // to the custom notify lanes, and it made ATH unsendable with a comment), so the notification now arrives and
+    // BuybackBurn's OWN under-funded branch runs — the one at `context().value < BUYBACK_ROUTE_NOTIFY_MIN_VALUE`.
+    //
+    // That branch is not a failure path: it books the ATH as burn-due for retry and closes the cycle, losing
+    // nothing. So the assertion changes from "nothing happened" to "the designed retry path happened", which is a
+    // stronger check — the branch was previously unreachable at this value and therefore never exercised end to end.
+    const beforeRetryDue = (await env.buyback.getGetBuybackBurnState()).ath_burn_retry_due_atomic;
     await sendStonfiAthNotify(env, env.stonfiAthSourceOwner.address, env.stonfiAthSourceOwner.getSender(), 100_000n, 1n, toNano('0.02'));
     state = await env.buyback.getGetBuybackBurnState();
-    expect(state.phase).toBe(PHASE_PENDING_STONFI_SWAP);
-    expect(state.pending_received_ath_atomic).toBe(0n);
+    expect(state.phase, 'an under-funded notification must close the cycle, not strand it').toBe(PHASE_IDLE);
+    expect(state.pending_received_ath_atomic, 'and must not be treated as a received swap').toBe(0n);
+    expect(state.ath_burn_retry_due_atomic - beforeRetryDue,
+      'the ATH must be booked as burn-due for retry rather than dropped').toBe(100_000n);
   });
 
   it('rejects premature route recovery and recycles only a full returned envelope with caller-funded reserve', async () => {
