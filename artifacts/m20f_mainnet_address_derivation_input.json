@@ -5,10 +5,10 @@
  "generation": "clean-17",
  "generation_note": "REBASELINED 2026-07-28, clean-15 -> clean-17, by owner decision: the release evidence describes the genesis being PREPARED, not the one on chain. The previous athMasterAddress (UQAMx3Pg...) was the LIVE clean-15 ATH Master, so every derivation here described a deployment we are superseding. clean-17 genesis is NOT deployed: MAINNET_GENESIS_VERIFIED.txt reads false until the ceremony runs and a live getter snapshot is verified.",
  "genesisControllerAddress": "UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
- "athMasterAddress": "EQCvsogx5ocjZuvrPrZ7V2Y2tFE8wCdKHDeD7ITz0xXD9GBe",
+ "athMasterAddress": "EQCwgUL-uUQ_4TH01KvNgXvTwwEqpyeUgPoZ8XxqvPEBJu2V",
  "proofRefs": {
   "finalGenesisControllerProof": "artifacts/local/mainnet_final_manifest_draft.json#manifest.addresses.genesis_controller_one_shot=UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH",
   "athDeploymentManifest": "artifacts/local/mainnet_final_manifest_draft.json#manifest.manifest_hash_hex=be358709aacff66de5ead923b69f8589254c2f273df9a40db576cd85fc7ae9bb",
-  "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=dd381314161f77ae2781a8e94c00ff2e451397e7bd43936e89244d0779865f88"
+  "buybackBurnBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#BUYBACKBURN_CODE_HASH=265eadd2806b7480f5783a6854b87f8fe14e907429c0122a1d93eab849bcfe68"
  }
 }

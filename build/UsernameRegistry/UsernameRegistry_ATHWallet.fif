@@ -94,6 +94,8 @@ PROGRAM{
   DECLPROC $SendParameters$_constructor_to_value_bounce_mode_code_data_body
   DECLPROC $ATHInternalTransfer$_constructor_query_id_amount_sender_owner_response_destination
   DECLPROC $ATHWallet$_fun_refund_pending_notification
+  DECLPROC $ATHTransferExcess$_constructor_query_id
+  DECLPROC $ATHWallet$_fun_return_notify_lane_excess
   DECLPROC $ATHWallet$_fun_refund_bounced_notification
   DECLPROC $ATHWalletDataView$_constructor_balance_owner_address_ath_master_address_jetton_wallet_code
   DECLPROC $ATHWallet$_fun_get_wallet_data
@@ -106,7 +108,6 @@ PROGRAM{
   DECLPROC $ATHInternalTransferRegistryMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username
   DECLPROC $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
   DECLPROC $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
-  DECLPROC $ATHTransferExcess$_constructor_query_id
   DECLPROC $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload
   DECLPROC $JettonExcesses$_constructor_query_id
   DECLPROC $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at
@@ -1156,6 +1157,64 @@ PROGRAM{
         SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
     s1 s0 s4 XCHG3
   }>
+  $ATHTransferExcess$_constructor_query_id PROCINLINE:<{
+  }>
+  $ATHWallet$_fun_return_notify_lane_excess PROCREF:<{
+    __tact_context_get INLINECALLDICT
+    $Context$_get_value INLINECALLDICT
+    SWAP
+    SUB
+    __tact_context_get INLINECALLDICT
+        LDMSGADDR   // load dest:MsgAddressInt
+        LDGRAMS     // load value:CurrencyCollection
+        ONE
+        SDSKIPFIRST // skip extra currency collection
+        LDGRAMS     // load ihr_fee
+        LDGRAMS     // load fwd_fee, we'll be using this!
+        DROP        // drop remaining Slice (with created_lt and created_at)
+        // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+        // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+        6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+        ZERO              // not masterchain
+        GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                          // first_frac is a value listed in config param 25
+                          // of the blockchain: https://tonviewer.com/config#25
+                          // this instruction effectively multiplies the fwd_fee by 1.5,
+                          // at least for the current value of first_frac, which is 21845
+    SUB
+    DUP
+    1000000 PUSHINT
+    LESS
+    IFJMP:<{
+      3 BLKDROP
+    }>
+    1 PUSHINT
+    FALSE
+    s0 s4 XCHG
+    $ATHTransferExcess$_constructor_query_id INLINECALLDICT
+    NEWC
+    $ATHTransferExcess$_store_cell INLINECALLDICT
+    s3 s4 XCHG
+    s1 s3 s0 XCHG3
+    $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+        NEWC
+        b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+        1 STI               // store `bounce`
+        b{000} STSLICECONST // store bounced = false and src = addr_none
+        STSLICE             // store `to`
+        SWAP
+        STGRAMS             // store `value`
+        106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+        STZEROES
+        // → Stack state
+        // s0: Builder
+        // s1: `body`
+        // s2: `mode`
+        STDICT
+        ENDC
+        SWAP
+        SENDRAWMSG
+  }>
   $ATHWallet$_fun_refund_bounced_notification PROCREF:<{
     s4 s6 XCHG
     s3 s5 XCHG
@@ -1243,8 +1302,6 @@ PROGRAM{
   $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format PROCINLINE:<{
   }>
   $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload PROCINLINE:<{
-  }>
-  $ATHTransferExcess$_constructor_query_id PROCINLINE:<{
   }>
   $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload PROCINLINE:<{
   }>
@@ -2900,9 +2957,10 @@ PROGRAM{
       $AthTransferNotification$_constructor_query_id_sender_key_amount_sender_wallet INLINECALLDICT
       NEWC
       $AthTransferNotification$_store_cell INLINECALLDICT
-      s4 s9 XCHG
-      s3 s8 XCHG
-      s11 s6 s0 XCHG3
+      s8 PUSH
+      s4 s10 XCHG
+      s12 s1 s3 XCHG3
+      s7 s7 XCHG2
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2924,11 +2982,12 @@ PROGRAM{
       1000000 PUSHINT
       0 PUSHINT
       FALSE
-      s5 s10 PUSH2
+      s6 s11 PUSH2
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC
       $ATHTransferAck$_store_cell INLINECALLDICT
-      s4 s9 XCHG
+      s10 PUSH
+      4 -ROLL
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2950,14 +3009,15 @@ PROGRAM{
       __tact_context_get_sender INLINECALLDICT
       4000000 PUSHINT
       1 PUSHINT
-      s0 s4 XCHG
+      s6 PUSH
       FALSE
-      s0 s10 XCHG
+      s0 s13 XCHG
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC
       $ATHTransferAck$_store_cell INLINECALLDICT
-      s4 s3 s0 XCHG3
-      s1 s9 XCHG
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      s1 s12 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2976,7 +3036,20 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      2 3 BLKSWAP
+      s0 s3 XCHG
+      1000000 PUSHINT
+      ADD
+      4000000 PUSHINT
+      ADD
+      7000000 PUSHINT
+      ADD
+      20000000 PUSHINT
+      ADD
+      s3 s7 XCHG
+      4 3 REVERSE
+      s1 s3 XCHG
+      s1 s4 XCHG
+      $ATHWallet$_fun_return_notify_lane_excess INLINECALLDICT
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
@@ -3059,35 +3132,34 @@ PROGRAM{
       3000000 PUSHINT
           NOW
       s10 PUSH
-      s0 s3 XCHG
-      s2 18 s() XCHG
-      s1 18 s() XCHG
-      s12 s(-1) PUXC
-      s0 19 s() XCHG
+      s0 s2 XCHG
+      18 s() PUSH
+      s13 s2 PUXC
       $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at INLINECALLDICT
       NEWC
       $PendingAthTransferNotification$_store_cell INLINECALLDICT
-      s15 s6 s0 XCHG3
+      s3 s4 XCHG
+      s1 s7 s0 XCHG3
       __tact_dict_set_int_cell INLINECALLDICT
       1 PUSHINT
       TRUE
           NEWC
-      s0 s11 XCHG2
+      s0 s12 XCHG2
           STSLICER
           ENDC
-      s9 PUSH
-      s5 s9 XCPU
-      s5 s8 XCHG
+      s10 PUSH
+      s5 s10 XCPU
+      s5 s9 XCHG
       s0 s4 XCHG
-      s3 s9 XCHG
-      s14 s13 s14 XCHG3
+      s3 s10 XCHG
+      s15 s14 s15 XCHG3
       $AthTransferNotificationRegistryMintUsername$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_username_len_username INLINECALLDICT
       NEWC
       $AthTransferNotificationRegistryMintUsername$_store_cell INLINECALLDICT
-      s7 PUSH
-      s0 s4 XCHG
-      s3 s10 XCHG
-      s0 s7 s7 XCHG3
+      s1 s0 s2 PUXC2
+      s11 PUSH
+      s0 s3 XCHG
+      s6 s9 s6 XCHG3
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -3109,13 +3181,15 @@ PROGRAM{
       __tact_context_get_sender INLINECALLDICT
       4000000 PUSHINT
       1 PUSHINT
-      s0 s4 XCHG
+      s6 PUSH
       FALSE
-      s0 s4 XCHG
+      s0 s7 XCHG
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC
       $ATHTransferAck$_store_cell INLINECALLDICT
-      s4 s3 s0 XCHG3
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      s1 s6 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -3134,7 +3208,19 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s3 s3 s4 XCHG3
+      s0 s6 XCHG
+      3000000 PUSHINT
+      ADD
+      4000000 PUSHINT
+      ADD
+      7000000 PUSHINT
+      ADD
+      20000000 PUSHINT
+      ADD
+      s3 s7 XCHG
+      s4 s5 XCHG
+      s1 s3 XCHG
+      $ATHWallet$_fun_return_notify_lane_excess INLINECALLDICT
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER
@@ -3225,30 +3311,35 @@ PROGRAM{
       3000000 PUSHINT
           NOW
       s13 PUSH
-      s13 s13 s3 XCHG3
-      s15 s13 PUXC
+      s13 s2 s(-1) PUXC2
+      16 s() PUSH
+      SWAP
       $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at INLINECALLDICT
       NEWC
       $PendingAthTransferNotification$_store_cell INLINECALLDICT
-      s10 s6 s0 XCHG3
+      s3 s4 XCHG
+      s1 s7 s0 XCHG3
       __tact_dict_set_int_cell INLINECALLDICT
       1 PUSHINT
       TRUE
-      s12 PUSH
-      s8 s12 XCPU
+      s13 PUSH
+      s0 s8 XCHG
+      s7 s13 XCPU
       s0 s7 XCHG
-      s6 s12 XCHG
-      s1 s5 XCHG
-      s4 19 s() XCHG
-      s3 18 s() XCHG
-      s2 17 s() XCHG
-      s1 16 s() XCHG
-      s0 s15 XCHG
+      s6 s13 XCHG
+      s5 s10 XCHG
+      s4 20 s() XCHG
+      s3 19 s() XCHG
+      s2 18 s() XCHG
+      s1 17 s() XCHG
+      s0 16 s() XCHG
       $AthTransferNotificationRegistryProfileAvatar$_constructor_query_id_sender_key_amount_payer_wallet_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format INLINECALLDICT
       NEWC
       $AthTransferNotificationRegistryProfileAvatar$_store_cell INLINECALLDICT
-      s2 s0 s3 XC2PU
-      s10 s9 s9 XCHG3
+      s7 PUSH
+      s3 s0 XCPU
+      s0 s3 XCHG
+      s12 s11 s12 XCHG3
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -3270,13 +3361,15 @@ PROGRAM{
       __tact_context_get_sender INLINECALLDICT
       4000000 PUSHINT
       1 PUSHINT
-      s0 s4 XCHG
+      s6 PUSH
       FALSE
-      s0 s4 XCHG
+      s0 s7 XCHG
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC
       $ATHTransferAck$_store_cell INLINECALLDICT
-      s4 s3 s0 XCHG3
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      s1 s6 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -3295,8 +3388,18 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s1 s4 s4 XCHG3
-      s0 s3 XCHG
+      s0 s5 XCHG
+      3000000 PUSHINT
+      ADD
+      4000000 PUSHINT
+      ADD
+      7000000 PUSHINT
+      ADD
+      20000000 PUSHINT
+      ADD
+      s4 s7 XCHG
+      s3 s6 XCHG
+      $ATHWallet$_fun_return_notify_lane_excess INLINECALLDICT
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER

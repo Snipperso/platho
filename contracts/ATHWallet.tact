@@ -710,6 +710,41 @@ contract ATHWallet {
         });
     }
 
+    // [ADDED 2026-08-01] Change on the three NOTIFY lanes — the ones a registry purchase travels.
+    //
+    // MEASURED: the client attaches 1,100,000,000 for a name mint with a notify_value of 1,000,000,000, while gate
+    // 14563 demands notify_value + 34,000,000 on arrival. About 53,000,000 was left on the registry's official ATH
+    // wallet on every name and every avatar, permanently — an ATHWallet has no path that pays TON to its owner.
+    //
+    // TWO THINGS THIS DELIBERATELY DOES NOT DO, because these lanes are not twins of the plain ones:
+    //
+    //   * it does not touch the GATES. Raising a floor on a lane whose refund path was calibrated by measurement is
+    //     how the 60,000,000 refund constant once came to refuse the very refunds it protected. Only spare value is
+    //     handed back, so no caller's floor moves and an underfunded arrival still fails where it always did.
+    //   * it does not assume the escrow is free. `required` is the lane's own gate expression, which already holds
+    //     back the response ack this wallet still owes when the registry settles or refuses.
+    //
+    // The refund of a REFUSED purchase is funded by the bounced notification (refund_pending_notification sends
+    // value: 0 with SendRemainingValue, i.e. the remainder of the message that bounced), not by this surplus — read
+    // and then measured, because a wrong answer here strands a buyer's ATH rather than costing them gas.
+    //
+    // readForwardFee() is subtracted for the same reason as on the standard lane: the notification leaves with
+    // SendPayFwdFeesSeparately and carries the username or avatar pointer verbatim, so this wallet pays its forward
+    // fee out of its own balance, and that cost scales with what the buyer typed.
+    fun return_notify_lane_excess(query_id: Int, destination: Address, required: Int) {
+        let excess: Int = context().value - required - context().readForwardFee();
+        if (excess < JETTON_EXCESSES_VALUE) {
+            return;
+        }
+        message(MessageParameters {
+            to: destination,
+            value: excess,
+            mode: SendPayFwdFeesSeparately,
+            bounce: false,
+            body: ATHTransferExcess { query_id: query_id }.toCell()
+        });
+    }
+
     fun refund_bounced_notification(query_id: Int, sender_key: Int) {
         let pending_key: Int = self.compute_pending_notification_key(query_id, sender_key);
         let pendingOpt: PendingAthTransferNotification? = self.pending_notifications.get(pending_key);
@@ -1213,6 +1248,10 @@ contract ATHWallet {
                 amount: msg.amount
             }.toCell()
         });
+
+        self.return_notify_lane_excess(msg.query_id, msg.response_destination,
+            msg.notify_value + ATH_TRANSFER_NOTIFY_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+            + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
     }
 
     receive(msg: ATHInternalTransferRegistryMintUsername) {
@@ -1265,6 +1304,10 @@ contract ATHWallet {
                 amount: msg.amount
             }.toCell()
         });
+
+        self.return_notify_lane_excess(msg.query_id, msg.response_destination,
+            msg.notify_value + ATH_REGISTRY_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+            + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
     }
 
     receive(msg: ATHInternalTransferRegistryProfileAvatar) {
@@ -1319,6 +1362,10 @@ contract ATHWallet {
                 amount: msg.amount
             }.toCell()
         });
+
+        self.return_notify_lane_excess(msg.query_id, msg.response_destination,
+            msg.notify_value + ATH_REGISTRY_RESPONSE_ACK_VALUE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+            + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
     }
 
     receive(msg: ATHTransferAck) {
