@@ -411,7 +411,9 @@ describe('PWA contract transaction builders', () => {
   });
 
   it('PWA-TX-07: quotes exact ATHWallet generic values used by the PWA', () => {
-    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(48_000_000n);
+    // 2M owner exec + 29M arrival floor (2+3+4+20) + 8M forward allowance. Was 48,000,000 while the forward
+    // allowance was an unmeasured 21,000,000; see ATH-MIRROR-04, which derives this from the contract.
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest')).toBe(39_000_000n);
     expect(estimateAthWalletAttachedValueNanotons('ATHBurn')).toBe(4_000_000n);
     // 30M notify + 1M notify-ack + 4M source-ack + 7M notify-exec + 20M endowment + 10M owner-exec. Was 69_000_000
     // while the source-ack mirror sat at a stale 1M; see ATH-MIRROR-01, which derives this from the contract.
@@ -433,7 +435,7 @@ describe('PWA contract transaction builders', () => {
       athWalletAddress: ATH_WALLET,
     });
     expect(athMessage.address).toBe(ATH_WALLET);
-    expect(athMessage.amount).toBe('48000000');
+    expect(athMessage.amount).toBe('39000000');
     expect(athMessage.payload).toBe(generatedBody(storeATHTransferRequest({
       $$type: 'ATHTransferRequest',
       query_id: 11n,

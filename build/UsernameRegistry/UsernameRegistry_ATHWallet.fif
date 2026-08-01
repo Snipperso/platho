@@ -1631,7 +1631,7 @@ PROGRAM{
       s5 s7 PUSH2
       GEQ
       THROWANYIFNOT
-      48000000 PUSHINT
+      39000000 PUSHINT
       14204 PUSHINT
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
@@ -2313,12 +2313,23 @@ PROGRAM{
         GEQ
       }>
       THROWANYIFNOT
-      33000000 PUSHINT
+      26000000 PUSHINT
       s10 PUSH
-      ADD
-      21000000 PUSHINT
-      ADD
+      0 GTINT
+      IF:<{
+        DROP
+        s9 PUSH
+        4000000 PUSHINT
+        ADD
+        7000000 PUSHINT
+        ADD
+        20000000 PUSHINT
+        ADD
+      }>
       2000000 PUSHINT
+      SWAP
+      ADD
+      8000000 PUSHINT
       ADD
       14704 PUSHINT
       __tact_context_get INLINECALLDICT

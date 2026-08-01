@@ -137,7 +137,9 @@ export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   // unspendable. PWA-TX-07 stayed green because it compared this function to a hand-typed 69_000_000 derived from
   // the same stale number — a literal agreeing with a literal. ATH-MIRROR-01 now reads the contract instead.
   internalTransferSourceAckValue: 4_000_000n,
-  internalTransferFwdFeeAllowance: 21_000_000n,
+  // Mirrors ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE, lowered 21M -> 8M on 2026-08-01 against the measurement in
+  // COST-01 (worst observed forward fee 4,111,321 at a 250-cell payload). ATH-MIRROR-01 reads the contract.
+  internalTransferFwdFeeAllowance: 8_000_000n,
   // Mirrors ATH_TRANSFER_NOTIFY_MIN_VALUE. Raised 30M -> 45M on 2026-07-20: at 30M a REFUSED registry purchase
   // refunded only 24,037,796, below the 26M that gate 14212 demands on arrival, so the buyer's ATH was stranded.
   transferNotifyMinValue: 45_000_000n,
@@ -610,6 +612,14 @@ export function estimateVaultAttachedValueNanotons(type, params = {}, context = 
   throw new Error(`Unsupported Vault message type ${type}`);
 }
 
+/** Mirrors ATH_INTERNAL_TRANSFER_ARRIVAL_MIN — what gate 14212 demands of an arriving ATHInternalTransfer. */
+function athInternalTransferArrivalMin() {
+  return ATH_WALLET_RESERVES_NANOTONS.internalTransferExec
+    + ATH_WALLET_RESERVES_NANOTONS.internalTransferAckValue
+    + ATH_WALLET_RESERVES_NANOTONS.internalTransferSourceAckValue
+    + ATH_WALLET_RESERVES_NANOTONS.transferNotifyStorageEndowment;
+}
+
 function athNotifyTransferValue(notifyValue) {
   return assertUint(notifyValue, 128, 'notify_value')
     + ATH_WALLET_RESERVES_NANOTONS.transferNotifyAckValue
@@ -621,11 +631,14 @@ function athNotifyTransferValue(notifyValue) {
 export function estimateAthWalletAttachedValueNanotons(type, params = {}) {
   assertString(type, 'type');
   if (type === 'ATHTransferRequest') {
-    return ATH_WALLET_RESERVES_NANOTONS.internalTransferExec
-      + ATH_WALLET_RESERVES_NANOTONS.internalTransferAckValue
-      + ATH_WALLET_RESERVES_NANOTONS.transferNotifyStorageEndowment
-      + ATH_WALLET_RESERVES_NANOTONS.internalTransferFwdFeeAllowance
-      + ATH_WALLET_RESERVES_NANOTONS.ownerRequestExec;
+    // [CORRECTED 2026-08-01] This restated gate 14204 term by term and inherited its omission: the contract's
+    // ARRIVAL floor includes internalTransferSourceAckValue and this sum did not. It matched only because the old
+    // 21,000,000 forward allowance was fat enough to absorb the missing 4,000,000. When that allowance came down to
+    // its measured size the quote fell to 35,000,000 against a 39,000,000 gate — every transfer from the app would
+    // have been refused. Composed the way the contract composes it: owner exec + arrival floor + forward allowance.
+    return ATH_WALLET_RESERVES_NANOTONS.ownerRequestExec
+      + athInternalTransferArrivalMin()
+      + ATH_WALLET_RESERVES_NANOTONS.internalTransferFwdFeeAllowance;
   }
   if (type === 'ATHBurn') {
     return ATH_WALLET_RESERVES_NANOTONS.burnNotificationExec

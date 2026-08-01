@@ -1,16 +1,16 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-07-31T18:40:45.872Z",
-  "mode": "preview",
+  "generatedAt": "2026-08-01T11:18:51.843Z",
+  "mode": "production",
   "domain": "platho.app",
-  "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
-  "status": "PREVIEW_STATIC_PACKAGE_READY",
+  "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
+  "status": "BLOCKED_BY_PREPROD",
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 219,
-    "totalBytes": 5561622,
-    "bundleSha256": "e698ad1700e76ee332d455c3d9ccc6b6d04c3a458fdd956456b43e3da8c095d8",
+    "totalBytes": 5562684,
+    "bundleSha256": "378c48a8c7a32989b979c72f888d9bc084d06165d156f09e11b3784ba957ee8f",
     "files": [
       {
         "path": "app.js",
@@ -649,8 +649,8 @@
       },
       {
         "path": "pwa-contract-transactions.mjs",
-        "bytes": 101720,
-        "sha256": "45592a503e6aa072de2883336d4d3d15f182a4bedaaa2de45c7a4036080df22a"
+        "bytes": 102782,
+        "sha256": "4e984867d1ddfc3a81e5bfffe6580f9801dda2995f7702c41f83a2353fce8251"
       },
       {
         "path": "qr-code.mjs",
@@ -695,7 +695,7 @@
       {
         "path": "shard-code.mjs",
         "bytes": 12214,
-        "sha256": "58cdf54b5d7485e7770175dd053a94859de63a381ed2c52b887243d34a034648"
+        "sha256": "e76268e0208365f961f2ab7442fede6ed8cb9835f218190a17ad3f740dbf342d"
       },
       {
         "path": "shard-discovery.mjs",
@@ -1365,11 +1365,10 @@
     "serverRuntimeIncluded": false,
     "productionMarkersCleared": false
   },
-  "blockers": [],
-  "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION",
+  "blockers": [
     "MAINNET_GENESIS_NOT_VERIFIED"
   ],
+  "warnings": [],
   "productionFindings": [
     {
       "id": "MAINNET_GENESIS_NOT_VERIFIED",
