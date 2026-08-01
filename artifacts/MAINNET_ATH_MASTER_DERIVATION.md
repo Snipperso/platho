@@ -12,20 +12,20 @@ Status: DERIVED_MAINNET_ATH_MASTER_ADDRESS
 
 ## Derived ATH Master
 
-- athMasterAddress: EQCvsogx5ocjZuvrPrZ7V2Y2tFE8wCdKHDeD7ITz0xXD9GBe
-- athMasterStateInitHash: afb28831e6872366ebeb3eb67b576636b4513cc0274a1c3783ec84f3d315c3f4
-- athMasterCodeHash: f675316b7490aaf3ec07f47815baacc4f34dbdf2fba14d5f37107e39e78428a7
+- athMasterAddress: EQCwgUL-uUQ_4TH01KvNgXvTwwEqpyeUgPoZ8XxqvPEBJu2V
+- athMasterStateInitHash: b08142feb9443fe131f4d4abcd817bd3c3012aa7279480fa19f17c6abcf10126
+- athMasterCodeHash: 11c19a1bc4eba30eda102cc5825c28732de909bde4d21a1db7e059093b2311f3
 - athMasterDataHash: 47817686d8e3a97527e6f0d19652ce52b80bb11c46cb7ac1e28d6b423718840a
-- treasuryOwnerAthWalletAddress: EQAbThPFCBKmBqMQnZKW7VtU_0A1zhBAnsDcwwJp61_Edvz8
-- treasuryOwnerAthWalletStateInitHash: 1b4e13c50812a606a3109d9296ed5b54ff4035ce10409ec0dcc30269eb5fc476
-- athWalletCodeHash: acd9da0504631016a6e20164e6f3d094de2385aa249bcf17e18dd709f8b698ee
+- treasuryOwnerAthWalletAddress: EQC5wi35EUtCu2ZyVKzPSTMtzDFs4bEhNyvjmQbearDwVhvt
+- treasuryOwnerAthWalletStateInitHash: b9c22df9114b42bb667254accf49332dcc316ce1b121372be39906de6ab0f056
+- athWalletCodeHash: 8ab0003bb57c01a359cb9d7642a3c15d7a1550d989fcf8bca6677f7da874e077
 
 ## Treasury Supply Deployment
 
 - required: true
 - messageType: DeployTreasurySupply
 - senderAddress: EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC
-- recipientAthWalletAddress: EQAbThPFCBKmBqMQnZKW7VtU_0A1zhBAnsDcwwJp61_Edvz8
+- recipientAthWalletAddress: EQC5wi35EUtCu2ZyVKzPSTMtzDFs4bEhNyvjmQbearDwVhvt
 - amountAtomic: 100000000000000000
 - requiredValueNanotons: 5000000
 - downstreamWalletValueNanotons: 3000000
@@ -38,6 +38,6 @@ Status: DERIVED_MAINNET_ATH_MASTER_ADDRESS
 
 ## M20F Inputs
 
-- athMasterAddress: EQCvsogx5ocjZuvrPrZ7V2Y2tFE8wCdKHDeD7ITz0xXD9GBe
-- athMasterCodeHash: f675316b7490aaf3ec07f47815baacc4f34dbdf2fba14d5f37107e39e78428a7
-- athDeploymentManifest: artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=f675316b7490aaf3ec07f47815baacc4f34dbdf2fba14d5f37107e39e78428a7
+- athMasterAddress: EQCwgUL-uUQ_4TH01KvNgXvTwwEqpyeUgPoZ8XxqvPEBJu2V
+- athMasterCodeHash: 11c19a1bc4eba30eda102cc5825c28732de909bde4d21a1db7e059093b2311f3
+- athDeploymentManifest: artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=11c19a1bc4eba30eda102cc5825c28732de909bde4d21a1db7e059093b2311f3

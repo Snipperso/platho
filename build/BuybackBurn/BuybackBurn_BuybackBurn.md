@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: BuybackBurn
-BoC Size: 18948 bytes
+BoC Size: 19190 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 63

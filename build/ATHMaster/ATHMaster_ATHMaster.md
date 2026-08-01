@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: ATHMaster
-BoC Size: 7567 bytes
+BoC Size: 7809 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 48

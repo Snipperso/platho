@@ -44,6 +44,36 @@ describe('the change from a payout has somewhere to land', () => {
       + `comes back, so every payout they make ends in a failed transaction:\n${deaf.join('\n')}`).toEqual([]);
   });
 
+  it('EXCESS-04: every inbound lane returns change — there are five, not two', () => {
+    // THE LESSON THAT COST THREE PASSES. ATHWallet has FIVE receivers that accept an inbound transfer and credit the
+    // balance, and the change fix reached them one at a time as each was rediscovered:
+    //
+    //     JettonInternalTransfer                       standard TEP-74, wallets and DEX routers
+    //     ATHInternalTransfer                          every protocol payout: vesting, MSS, airdrop, registries
+    //     ATHInternalTransferWithNotify                notify lane
+    //     ATHInternalTransferRegistryMintUsername      name purchases — ~53,000,000 buried per mint
+    //     ATHInternalTransferRegistryProfileAvatar     avatar purchases
+    //
+    // Listing them here would rot the moment a sixth appears, so they are derived: a receiver that credits
+    // self.balance is a lane, and a lane must hand back what it does not need.
+    const src = readFileSync(`${CONTRACT_DIR}/ATHWallet.tact`, 'utf8');
+    const lanes: string[] = [];
+    const deaf: string[] = [];
+    for (const m of src.matchAll(/receive\(msg: (\w*Internal\w*)\)\s*\{([\s\S]*?)\n    \}/g)) {
+      const [, name, body] = m;
+      if (!/self\.balance \+= msg\.amount/.test(body)) continue;
+      lanes.push(name);
+      const returns = /context\(\)\.value - ATH_INTERNAL_TRANSFER_ARRIVAL_MIN/.test(body)
+        || /return_notify_lane_excess\(/.test(body)
+        || /let excess: Int = context\(\)\.value - consumed/.test(body);
+      if (!returns) deaf.push(name);
+    }
+    expect(lanes.length, 'the derivation must find the inbound lanes; if this collapses the check went quiet')
+      .toBeGreaterThan(4);
+    expect(deaf, 'these lanes credit a balance and keep the surplus. An ATHWallet has no path that pays TON to its '
+      + `owner, so what they keep is buried for good:\n${deaf.join('\n')}`).toEqual([]);
+  });
+
   it('EXCESS-02: the mirrored declaration matches the wallet byte for byte', () => {
     // AirdropPool does not import ATHWallet.tact, so it carries its own copy of the message. A mirrored opcode whose
     // field WIDTH drifted is a defect this project has already had, and it surfaces as a silent wrong-receiver run
