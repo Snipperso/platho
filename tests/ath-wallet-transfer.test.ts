@@ -1362,8 +1362,12 @@ describe('ATH wallet transfer profile', () => {
 
     // Pin the CONTRACT, not just the measurement: without this the numbers below are a literal comparing to a
     // literal, and dropping the term from the gate would leave this test green.
+    // [CORRECTED 2026-08-01] The pattern used to end at `ENDOWMENT\)`, which quietly assumed the endowment was the
+    // LAST term of the gate. It stopped matching when 14714 gained context().readForwardFee() — the term that stops
+    // a heavy forward_payload from eating the very endowment this line exists to protect. The check now asks what it
+    // means to ask: that the term is present inside the gate expression, wherever it sits in the sum.
     expect(readFileSync('contracts/ATHWallet.tact', 'utf8'), 'gate 14714 must require the storage endowment')
-      .toMatch(/throwUnless\(14714,[^;]*ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT\)/);
+      .toMatch(/throwUnless\(14714,[^;]*ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT/);
 
     const inbound = (credit as any).inMessage.info.value.coins as bigint;
     const gate = 45_000_000n + 4_000_000n + 7_000_000n + 20_000_000n;   // forward + SOURCE_ACK + NOTIFY_EXEC + ENDOWMENT

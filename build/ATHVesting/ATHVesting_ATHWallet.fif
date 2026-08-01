@@ -2320,6 +2320,24 @@ PROGRAM{
         ADD
         20000000 PUSHINT
         ADD
+        __tact_context_get INLINECALLDICT
+            LDMSGADDR   // load dest:MsgAddressInt
+            LDGRAMS     // load value:CurrencyCollection
+            ONE
+            SDSKIPFIRST // skip extra currency collection
+            LDGRAMS     // load ihr_fee
+            LDGRAMS     // load fwd_fee, we'll be using this!
+            DROP        // drop remaining Slice (with created_lt and created_at)
+            // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+            // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+            6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+            ZERO              // not masterchain
+            GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                              // first_frac is a value listed in config param 25
+                              // of the blockchain: https://tonviewer.com/config#25
+                              // this instruction effectively multiplies the fwd_fee by 1.5,
+                              // at least for the current value of first_frac, which is 21845
+        ADD
       }>
       2000000 PUSHINT
       SWAP
@@ -2579,6 +2597,24 @@ PROGRAM{
         ADD
         20000000 PUSHINT
         ADD
+        __tact_context_get INLINECALLDICT
+            LDMSGADDR   // load dest:MsgAddressInt
+            LDGRAMS     // load value:CurrencyCollection
+            ONE
+            SDSKIPFIRST // skip extra currency collection
+            LDGRAMS     // load ihr_fee
+            LDGRAMS     // load fwd_fee, we'll be using this!
+            DROP        // drop remaining Slice (with created_lt and created_at)
+            // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+            // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+            6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+            ZERO              // not masterchain
+            GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                              // first_frac is a value listed in config param 25
+                              // of the blockchain: https://tonviewer.com/config#25
+                              // this instruction effectively multiplies the fwd_fee by 1.5,
+                              // at least for the current value of first_frac, which is 21845
+        ADD
         GEQ
         THROWANYIFNOT
         s3 s4 XCPU
@@ -2645,6 +2681,24 @@ PROGRAM{
         7000000 PUSHINT
         ADD
         20000000 PUSHINT
+        ADD
+        __tact_context_get INLINECALLDICT
+            LDMSGADDR   // load dest:MsgAddressInt
+            LDGRAMS     // load value:CurrencyCollection
+            ONE
+            SDSKIPFIRST // skip extra currency collection
+            LDGRAMS     // load ihr_fee
+            LDGRAMS     // load fwd_fee, we'll be using this!
+            DROP        // drop remaining Slice (with created_lt and created_at)
+            // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+            // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+            6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+            ZERO              // not masterchain
+            GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                              // first_frac is a value listed in config param 25
+                              // of the blockchain: https://tonviewer.com/config#25
+                              // this instruction effectively multiplies the fwd_fee by 1.5,
+                              // at least for the current value of first_frac, which is 21845
         ADD
         s0 s6 XCHG
       }>ELSE<{

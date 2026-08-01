@@ -566,6 +566,27 @@ int $Cell$_fun_hash(cell $self) impure asm """
 
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
 
+int $Context$_fun_readForwardFee((int, slice, int, slice) $self) impure asm """
+    LDMSGADDR   // load dest:MsgAddressInt
+    LDGRAMS     // load value:CurrencyCollection
+    ONE
+    SDSKIPFIRST // skip extra currency collection
+    LDGRAMS     // load ihr_fee
+    LDGRAMS     // load fwd_fee, we'll be using this!
+    DROP        // drop remaining Slice (with created_lt and created_at)
+
+    // There are 7 entries on the stack — first 3 fields of Context plus 4 loaded ones.
+    // The topmost is fwd_fee, which is the only one we're after, so let's drop 6 entries below:
+    6 1 BLKDROP2 // drop the loaded values as well as the first 3 fields of Context
+
+    ZERO              // not masterchain
+    GETORIGINALFWDFEE // floor(fwd_fee * 2^16 / (2^16 - first_frac)), where
+                      // first_frac is a value listed in config param 25
+                      // of the blockchain: https://tonviewer.com/config#25
+                      // this instruction effectively multiplies the fwd_fee by 1.5,
+                      // at least for the current value of first_frac, which is 21845
+""";
+
 ;; ATHMaster_ATHWallet.storage.fc
 ;;
 ;; Type: StateInit
@@ -1719,7 +1740,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14703, ($msg'forward_ton_amount < $Context$_get_value(__tact_context_get())));
         int $arrival_min = 26000000;
         if (($msg'forward_ton_amount > 0)) {
-            $arrival_min = ((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000);
+            $arrival_min = (((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000) + $Context$_fun_readForwardFee(__tact_context_get()));
         }
         int $required_value = ((2000000 + $arrival_min) + 8000000);
         throw_unless(14704, ($Context$_get_value(__tact_context_get()) >= $required_value));
@@ -1762,7 +1783,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14712, ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_is_basechain_address($msg'from));
         if (($msg'forward_ton_amount > 0)) {
             throw_unless(14713, ($msg'forward_ton_amount < $Context$_get_value(__tact_context_get())));
-            throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= ((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000)));
+            throw_unless(14714, ($Context$_get_value(__tact_context_get()) >= (((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000) + $Context$_fun_readForwardFee(__tact_context_get()))));
             $self'balance = $self'balance + $msg'amount;
             $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($self'owner_address, $msg'forward_ton_amount, 1, false, $JettonTransferNotification$_store_cell($JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload($msg'query_id, $msg'amount, $msg'from, $msg'forward_payload), begin_cell())));
         } else {
@@ -1772,7 +1793,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_send_source_wallet_ack($msg'query_id, $msg'amount, __tact_context_get_sender());
         int $consumed = 26000000;
         if (($msg'forward_ton_amount > 0)) {
-            $consumed = ((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000);
+            $consumed = (((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000) + $Context$_fun_readForwardFee(__tact_context_get()));
         }
         int $excess = ($Context$_get_value(__tact_context_get()) - $consumed);
         if (($excess >= 1000000)) {

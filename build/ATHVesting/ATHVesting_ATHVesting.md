@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: ATHVesting
-BoC Size: 8264 bytes
+BoC Size: 8367 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 48

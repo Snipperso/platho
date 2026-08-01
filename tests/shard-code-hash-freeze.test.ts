@@ -33,25 +33,25 @@ const FROZEN: Array<{ name: string; boc: string; hash: string; pinnedOnChain: st
   {
     name: 'RecordShard',
     boc: 'build/RecordShard/RecordShard_RecordShard.code.boc',
-    hash: '00600cbb9377330a78afbcf5b9c87b23d9c465a136691a13d67d35e4a1537916',
+    hash: '73b27f9ecc5cba9e4728976ecf87a21af6defb2fab33f08cf26b2444f924153a',
     pinnedOnChain: 'FeeAccumulator.BindShardCode (publish rejected at 15055 on drift)',
   },
   {
     name: 'IntroShard',
     boc: 'build/IntroShard/IntroShard_IntroShard.code.boc',
-    hash: 'd91e7b658543b441516d6145d9852e1340ab168d4de3db9e4b130bbd53a3021b',
+    hash: 'ea32906e717d65bc1da4bcbee9082ccb92bef2bd95a5846f7a6b4cc1166a1e81',
     pinnedOnChain: 'FeeAccumulator.BindIntroShardCode (publish rejected at 15055 on drift)',
   },
   {
     name: 'PublicShard',
     boc: 'build/PublicShard/PublicShard_PublicShard.code.boc',
-    hash: '55cbb05ffdc1c92c23441cefd9f4674619b59f822cff949464f761196c19f398',
+    hash: '2dd910d18b6f335c8ade3188b13572b7d5e6fcf4ec35d49cfef8fdedec9bda98',
     pinnedOnChain: 'FeeAccumulator.BindPublicShardCode (publish rejected at 15055 on drift)',
   },
   {
     name: 'AirdropTicket',
     boc: 'build/AirdropTicket/AirdropTicket_AirdropTicket.code.boc',
-    hash: '30d603d0d74faa83f876e1bd71dc7309c6bf64cdd148a3dacfd3dfc12f3b8a48',
+    hash: '4f262054f64c642548b02b6ca7da78a83844b9e0fd5297ebf7092bbf5aa44e71',
     pinnedOnChain: 'FeeAccumulator.BindTicketCode (redeem rejected at 15060 on drift)',
   },
   {

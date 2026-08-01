@@ -960,8 +960,12 @@ contract ATHWallet {
         let arrival_min: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
             + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
         if (msg.forward_ton_amount > 0) {
+            // The recipient's 14714 also charges the fee of forwarding the notification, which scales with the
+            // payload. Estimated here from the fee of the owner's own message, which carries the same payload — the
+            // sender must fund the notification it asked for, or the transfer bounces at the far end.
             arrival_min = msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
-                + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+                + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT
+                + context().readForwardFee();
         }
         let required_value: Int = ATH_OWNER_REQUEST_EXEC_RESERVE + arrival_min
             + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE;
@@ -1047,7 +1051,22 @@ contract ATHWallet {
             // deploying a fresh wallet on an immutable contract with well under half its intended endowment.
             // Adding the term makes that case BOUNCE instead, which is recoverable; an under-funded wallet is not.
             // The honest path is untouched — see ATH-ENDOW-14714 for the margin, measured rather than assumed.
-            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT);
+            // [ADDED 2026-08-01] + the fee this wallet is about to pay to FORWARD the notification.
+            //
+            // The notification goes out with SendPayFwdFeesSeparately, so its forward fee comes out of THIS wallet's
+            // balance — and it scales with forward_payload, which passes through verbatim. Until the 45,000,000
+            // floor was lifted from 14713 the case could not be reached; with a one-nanoton forward it can, and it
+            // was MEASURED to eat the endowment: at 100 payload cells the wallet finished on 18,390,462 against an
+            // endowment of 20,000,000. A fixed allowance cannot cover it — a message holds ~500 cells, i.e. ~24M of
+            // fee, and reserving that would push the comment floor above what a wallet attaches.
+            //
+            // context().readForwardFee() is the fee of the message that just arrived, which carries the SAME payload
+            // and a heavier header. Measured ratio of outgoing notification fee to incoming fee: 0.02 at an empty
+            // payload rising asymptotically to ~0.66 at 100 cells — always below 1, so this is an upper bound that
+            // costs the sender only what the payload actually costs. Same primitive, same shape as the allowance in
+            // UsernameNFTItem. Over the bound the transfer is REFUSED here and bounces, which is recoverable; an
+            // under-funded wallet is not.
+            throwUnless(14714, context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + context().readForwardFee());
 
             self.balance += msg.amount;
             message(MessageParameters {
@@ -1083,8 +1102,11 @@ contract ATHWallet {
         let consumed: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
             + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
         if (msg.forward_ton_amount > 0) {
+            // The same forward-fee term gate 14714 demands above: it was spent forwarding the notification, so it
+            // must NOT be handed back as change or the endowment leaves with it.
             consumed = msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
-                + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+                + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT
+                + context().readForwardFee();
         }
         let excess: Int = context().value - consumed;
         if (excess >= JETTON_EXCESSES_VALUE) {
