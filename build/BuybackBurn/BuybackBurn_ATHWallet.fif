@@ -2303,15 +2303,10 @@ PROGRAM{
       GEQ
       THROWANYIFNOT
       14703 PUSHINT
-      s10 PUSH
-      0 EQINT
-      IF:<{
-        TRUE
-      }>ELSE<{
-        s10 PUSH
-        45000000 PUSHINT
-        GEQ
-      }>
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      s11 s(-1) PUXC
+      LESS
       THROWANYIFNOT
       26000000 PUSHINT
       s10 PUSH
@@ -2569,9 +2564,10 @@ PROGRAM{
       0 GTINT
       IF:<{
         14713 PUSHINT
-        s8 PUSH
-        45000000 PUSHINT
-        GEQ
+        __tact_context_get INLINECALLDICT
+        $Context$_get_value INLINECALLDICT
+        s9 s(-1) PUXC
+        LESS
         THROWANYIFNOT
         14714 PUSHINT
         __tact_context_get INLINECALLDICT
@@ -2638,17 +2634,30 @@ PROGRAM{
       s1 s0 s9 PUXC2
       s3 s3 XCHG2
       $ATHWallet$_fun_send_source_wallet_ack INLINECALLDICT
+      26000000 PUSHINT
+      s7 PUSH
+      0 GTINT
+      IF:<{
+        DROP
+        s0 s6 XCHG
+        4000000 PUSHINT
+        ADD
+        7000000 PUSHINT
+        ADD
+        20000000 PUSHINT
+        ADD
+        s0 s6 XCHG
+      }>ELSE<{
+        s7 POP
+      }>
       __tact_context_get INLINECALLDICT
       $Context$_get_value INLINECALLDICT
-      s0 s7 XCHG
-      4000000 PUSHINT
-      ADD
+      s0 s7 XCHG2
+      SUB
+      DUP
       1000000 PUSHINT
-      ADD
-      s1 s7 XCHG
       GEQ
       IF:<{
-        1000000 PUSHINT
         1 PUSHINT
         FALSE
         s0 s9 XCHG
@@ -2678,6 +2687,7 @@ PROGRAM{
             SENDRAWMSG
         s2 s4 XCHG
       }>ELSE<{
+        DROP
         s4 POP
         s5 POP
       }>

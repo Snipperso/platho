@@ -933,7 +933,20 @@ contract ATHWallet {
         self.require_basechain_owner_path(msg.destination, msg.response_destination);
         throwUnless(14701, msg.amount > 0);
         throwUnless(14702, self.balance >= msg.amount);
-        throwUnless(14703, msg.forward_ton_amount == 0 || msg.forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
+        // [CHANGED 2026-08-01] This used to demand `forward == 0 || forward >= ATH_TRANSFER_NOTIFY_MIN_VALUE`, i.e.
+        // it REFUSED every forward amount between 1 and 45,000,000. That range is exactly how a wallet attaches a
+        // comment to a jetton transfer — a tiny forward so the recipient emits the notification carrying the text —
+        // so ATH could not be sent with a message at all.
+        //
+        // The 45,000,000 floor was measured, but for a different lane: it is what lets a REFUSED registry purchase
+        // refund itself past the payer's gate 14212. That machinery lives on the custom notify lanes, which keep the
+        // floor in their own gates (14306 and siblings). The standard lane is fire-and-forget with no escrow, so it
+        // never needed it. What actually has to hold here is that the recipient can afford to emit the
+        // notification, and required_value below demands exactly that via ATH_TRANSFER_NOTIFY_EXEC_RESERVE.
+        //
+        // The gate number is KEPT, not deleted, and now asserts something still true: a caller cannot forward more
+        // than it attached. Retiring a number outright is how a gate quietly stops existing.
+        throwUnless(14703, msg.forward_ton_amount < context().value);
         // [CORRECTED 2026-08-01] Two defects in one line, both measured.
         //
         // ATH_TRANSFER_NOTIFY_EXEC_RESERVE was charged UNCONDITIONALLY, including when forward_ton_amount is 0 and no
@@ -1014,7 +1027,12 @@ contract ATHWallet {
         throwUnless(14712, self.is_basechain_address(msg.from));
 
         if (msg.forward_ton_amount > 0) {
-            throwUnless(14713, msg.forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
+            // [CHANGED 2026-08-01] The twin of 14703 on the receiving side: it demanded forward >= 45,000,000 and so
+            // refused the small forward a wallet uses to attach a comment. The floor belongs to the custom notify
+            // lanes, which enforce it themselves; what has to hold HERE is that this wallet can afford to emit the
+            // notification, and 14714 below demands exactly that. Number kept, condition made true rather than
+            // arbitrary — a gate that stops existing is worse than a gate that checks less.
+            throwUnless(14713, msg.forward_ton_amount < context().value);
             // clean-12 Lane A (standard TEP-74): fire-and-forget standard JettonTransferNotification, NO custom
             // escrow/tombstone. Replay-safety now lives in each consumer's OWN idempotency map (Vault
             // processed_ath_deposits, BuybackBurn phase+query_id, MSS supply-cap). The forward_payload passes
@@ -1051,10 +1069,28 @@ contract ATHWallet {
 
         self.send_source_wallet_ack(msg.query_id, msg.amount, sender());
 
-        if (context().value >= msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + JETTON_EXCESSES_VALUE) {
+        // [CHANGED 2026-08-01] RETURN THE CHANGE, NOT A TOKEN GESTURE.
+        //
+        // This used to send a fixed JETTON_EXCESSES_VALUE of 1,000,000 and keep the rest. MEASURED before the fix:
+        // three consecutive transfers left 44,047,996 / 88,099,059 / 132,150,122 on the recipient's wallet — about
+        // 44,000,000 per transfer, forever. "Forever" is literal: every entry point of this contract was enumerated
+        // and NONE pays TON back to the wallet's owner, so the sender's change was not delayed, it was buried. Of
+        // the 55,425,870 an owner spent per transfer, roughly 6,800,000 was fee and the rest was immobilised.
+        //
+        // What must stay behind is the storage endowment — the rent float this wallet may have just been deployed
+        // with. Everything above that is the sender's, and goes home. The subtraction is the SAME expression the
+        // branch gates assert above, so the wallet can never promise away money it was required to keep.
+        let consumed: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+            + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+        if (msg.forward_ton_amount > 0) {
+            consumed = msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+                + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+        }
+        let excess: Int = context().value - consumed;
+        if (excess >= JETTON_EXCESSES_VALUE) {
             message(MessageParameters {
                 to: msg.response_address,
-                value: JETTON_EXCESSES_VALUE,
+                value: excess,
                 mode: SendPayFwdFeesSeparately,
                 bounce: false,
                 body: JettonExcesses {

@@ -15,21 +15,21 @@
     "contentHash": "3ca983ee125c3b0a0bb89307eb8b24d6499017e80c1cdcab390372aa8a65426e"
   },
   "derived": {
-    "athMasterAddress": "EQDu2C0DyneE5rsksFp26V0FC4ed9BW0qiXjV-NNHbbqmfNt",
-    "athMasterRawAddress": "0:eed82d03ca7784e6bb24b05a76e95d050b879df415b4aa25e357e34d1db6ea99",
-    "athMasterStateInitHash": "eed82d03ca7784e6bb24b05a76e95d050b879df415b4aa25e357e34d1db6ea99",
-    "athMasterCodeHash": "505ad76f54fadf986b384ebfba0cf751310e9589a64b70d1ee7228dd8da94f7f",
+    "athMasterAddress": "EQAgI5LDBV4bRZsRLXLA2702vWGLMWIDb5Y-mDfblkmZ10Ws",
+    "athMasterRawAddress": "0:202392c3055e1b459b112d72c0dbbd36bd618b3162036f963e9837db964999d7",
+    "athMasterStateInitHash": "202392c3055e1b459b112d72c0dbbd36bd618b3162036f963e9837db964999d7",
+    "athMasterCodeHash": "5be811775447e9fbd8e63d6188610243afb9783cd8a9ffa6a3a02b9b2f009f5f",
     "athMasterDataHash": "47817686d8e3a97527e6f0d19652ce52b80bb11c46cb7ac1e28d6b423718840a",
-    "treasuryOwnerAthWalletAddress": "EQDqUOO59hit9IzwjNC8L8NecVvvfcmzbGEIB13JFxfVqF85",
-    "treasuryOwnerAthWalletRawAddress": "0:ea50e3b9f618adf48cf08cd0bc2fc35e715bef7dc9b36c6108075dc91717d5a8",
-    "treasuryOwnerAthWalletStateInitHash": "ea50e3b9f618adf48cf08cd0bc2fc35e715bef7dc9b36c6108075dc91717d5a8",
-    "athWalletCodeHash": "844a125f5d950c7c965bbab08a1e523acf5186750f0c648bbd98b95f2378f719"
+    "treasuryOwnerAthWalletAddress": "EQBJWgGdZxxBwzuC9Sb6FYvHdIZHJuAIlg0DDbU9m6r-2MjJ",
+    "treasuryOwnerAthWalletRawAddress": "0:495a019d671c41c33b82f526fa158bc774864726e008960d030db53d9baafed8",
+    "treasuryOwnerAthWalletStateInitHash": "495a019d671c41c33b82f526fa158bc774864726e008960d030db53d9baafed8",
+    "athWalletCodeHash": "0ec124d7ad05428b347ef1615831f9e60e5c4df5d2f0a0127a9c9df7ccdd9b20"
   },
   "treasurySupplyDeployment": {
     "required": true,
     "messageType": "DeployTreasurySupply",
     "senderAddress": "EQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOFkC",
-    "recipientAthWalletAddress": "EQDqUOO59hit9IzwjNC8L8NecVvvfcmzbGEIB13JFxfVqF85",
+    "recipientAthWalletAddress": "EQBJWgGdZxxBwzuC9Sb6FYvHdIZHJuAIlg0DDbU9m6r-2MjJ",
     "amountAtomic": "100000000000000000",
     "requiredValueNanotons": "5000000",
     "downstreamWalletValueNanotons": "3000000",
@@ -37,13 +37,13 @@
     "proofRequired": "required: post-deploy transaction plus official treasury ATH wallet balance proof"
   },
   "nextM20FInputs": {
-    "athMasterAddress": "EQDu2C0DyneE5rsksFp26V0FC4ed9BW0qiXjV-NNHbbqmfNt",
-    "athMasterCodeHash": "505ad76f54fadf986b384ebfba0cf751310e9589a64b70d1ee7228dd8da94f7f",
-    "athDeploymentManifest": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=505ad76f54fadf986b384ebfba0cf751310e9589a64b70d1ee7228dd8da94f7f"
+    "athMasterAddress": "EQAgI5LDBV4bRZsRLXLA2702vWGLMWIDb5Y-mDfblkmZ10Ws",
+    "athMasterCodeHash": "5be811775447e9fbd8e63d6188610243afb9783cd8a9ffa6a3a02b9b2f009f5f",
+    "athDeploymentManifest": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=5be811775447e9fbd8e63d6188610243afb9783cd8a9ffa6a3a02b9b2f009f5f"
   },
   "proofRefs": {
     "treasuryOwnerProof": "artifacts/mainnet_genesis_verify_input.json#manifest.addresses.ath_treasury_owner=UQByyTVrBTugc5Hqc8Teo3jr0u21x3m9MADQV5bc9yfDOATH",
     "contentCellProof": "artifacts/ath_metadata_content.json#contentHashHex=3ca983ee125c3b0a0bb89307eb8b24d6499017e80c1cdcab390372aa8a65426e",
-    "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=505ad76f54fadf986b384ebfba0cf751310e9589a64b70d1ee7228dd8da94f7f"
+    "athMasterBuildArtifact": "artifacts/CURRENT_CODE_HASHES.txt#ATHMASTER_CODE_HASH=5be811775447e9fbd8e63d6188610243afb9783cd8a9ffa6a3a02b9b2f009f5f"
   }
 }
