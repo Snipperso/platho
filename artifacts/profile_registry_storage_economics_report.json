@@ -3,7 +3,7 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "profile_registry": "1aaab1b70efd60bef7195ed497ea7865bfea20dbc10a1675843a1d55e01881c8"
+    "profile_registry": "da23361e08b7bc05d3b096ecf1a0af015a7553e0d3e64eb3fe1792ef112906a8"
   },
   "note": "Sandbox evidence for the two properties that survived the 2026-07-21 pointer move: the registry account does NOT grow with the number of profiles (it used to grow 5.0000 cells each, capping the product at 13,076 profiles silently), and a settled purchase does not cost the registry TON. Per-profile storage endowments are gone with the state they funded; the buyer KeyShard funds its own rent, measured in tests/key-shard.test.ts KS-RENT-01. This is not a mainnet rent oracle; it is a release gate.",
   "constants": {
@@ -47,10 +47,10 @@
       "label": "DIRECT_MANY_OWNERS_12",
       "owners": 12,
       "updates": 12,
-      "raw_balance_delta_nanotons": "667852848",
+      "raw_balance_delta_nanotons": "667852824",
       "expected_permanent_endowment_nanotons": "0",
       "expected_retained_model_nanotons": "696000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "667852848",
+      "retained_margin_vs_permanent_endowment_nanotons": "667852824",
       "profile_count": "12",
       "pending_avatar_write_count": "0",
       "registry_data_cells": "3",
@@ -60,10 +60,10 @@
       "label": "DIRECT_MANY_UPDATES_ONE_OWNER_10",
       "owners": 1,
       "updates": 10,
-      "raw_balance_delta_nanotons": "556308834",
+      "raw_balance_delta_nanotons": "556308814",
       "expected_permanent_endowment_nanotons": "0",
       "expected_retained_model_nanotons": "580000000",
-      "retained_margin_vs_permanent_endowment_nanotons": "556308834",
+      "retained_margin_vs_permanent_endowment_nanotons": "556308814",
       "profile_count": "1",
       "pending_avatar_write_count": "0",
       "registry_data_cells": "3",

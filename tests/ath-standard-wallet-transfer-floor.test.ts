@@ -159,6 +159,50 @@ describe('what an ordinary wallet must attach to move ATH', () => {
       .toBeLessThan(40_000_000n);
   }, 300_000);
 
+  it('WALLETFLOOR-06: the recipient keeps its endowment whatever the comment weighs', async () => {
+    // THE DEFECT THIS FILE'S OWN FIX INTRODUCED, found by re-walking the tier from outside on 2026-08-01.
+    //
+    // Lifting the 45,000,000 floor from gate 14713 made one-nanoton forwards reachable — and the notification goes
+    // out with SendPayFwdFeesSeparately, so its forward fee comes out of the RECIPIENT wallet's balance and scales
+    // with the payload. MEASURED before the second fix, at a one-nanoton forward:
+    //     payload   0 cells -> wallet finished on 25,724,329
+    //     payload  64 cells -> 21,030,463
+    //     payload 100 cells -> 18,390,462   BELOW the 20,000,000 endowment
+    //
+    // Gates 14714/14704 now also charge context().readForwardFee(), which carries the same payload and measured as
+    // a strict upper bound on the notification's own fee (ratio 0.02 rising to 0.66). The sender funds the
+    // notification it asked for; over the bound the transfer is refused and bounces instead of quietly eroding.
+    const results: bigint[] = [];
+    for (const cells of [0, 32, 100]) {
+      const { bc, owner, recipient, wallet, recipientWallet } = await setup();
+      let payload = beginCell().endCell();
+      if (cells > 0) {
+        let chain = beginCell().storeUint(0, 1000).endCell();
+        for (let i = 1; i < cells; i += 1) chain = beginCell().storeUint(i % 2, 1000).storeRef(chain).endCell();
+        payload = beginCell().storeUint(0, 8).storeRef(chain).endCell();
+      }
+      const res = await wallet.send(owner.getSender(), { value: 120_000_000n }, {
+        $$type: 'JettonTransfer', query_id: BigInt(9400 + cells), amount: 1_000n, destination: recipient,
+        response_destination: owner.address, custom_payload: null, forward_ton_amount: 1n,
+        forward_payload: payload.beginParse(),
+      } as JettonTransfer);
+
+      const refused = findTransaction(res.transactions, { to: wallet.address, exitCode: 14704 });
+      if (refused) continue;                       // refusing is the acceptable outcome; eroding is not
+      const balance = (await bc.getContract(recipientWallet)).balance;
+      expect(balance, `payload ${cells} cells: an accepted transfer must leave the endowment whole`)
+        .toBeGreaterThanOrEqual(NOTIFY_ENDOWMENT);
+      results.push(balance);
+    }
+    expect(results.length, 'the honest comment sizes must be accepted, not all refused').toBeGreaterThan(1);
+    // The defect was a PROPORTIONAL drift — 7,300,000 lost between an empty payload and 100 cells. What remains is
+    // rounding: measured spread of one nanoton across 0/32/100 cells. Assert the absence of drift, not bit equality,
+    // or this fails on a rounding change that costs nobody anything.
+    const spread = results.reduce((m, v) => (v > m ? v : m)) - results.reduce((m, v) => (v < m ? v : m));
+    expect(spread, `what the wallet keeps still moves with the payload (spread ${spread}) — that dependence was the `
+      + 'defect, and a fee schedule change must not be able to reintroduce it quietly').toBeLessThan(1_000n);
+  }, 300_000);
+
   it('WALLETFLOOR-03: asking for a notification raises the floor by the forward amount plus the notify reserve', async () => {
     // The other shape a wallet sends: forward_ton_amount > 0 so the recipient gets a JettonTransferNotification.
     // The two branches do NOT share a floor, and the difference is not just the forward amount: the notifying branch
@@ -167,17 +211,21 @@ describe('what an ordinary wallet must attach to move ATH', () => {
     const NOTIFY_FLOOR = OWNER_REQUEST_EXEC + (NOTIFY_MIN + SOURCE_ACK + NOTIFY_EXEC + NOTIFY_ENDOWMENT)
       + FWD_FEE_ALLOWANCE;
 
+    // NOTIFY_FLOOR is the fixed part. Since 2026-08-01 the gate also charges context().readForwardFee(), which is
+    // payload-proportional and therefore NOT expressible as a literal here — with an empty payload it measured at
+    // ~119,000. So the fixed part must be refused, and the fixed part plus a small allowance accepted; pinning an
+    // exact number would be pinning today's fee schedule.
     const a = await setup();
-    const short = await a.wallet.send(a.owner.getSender(), { value: NOTIFY_FLOOR - 1n },
+    const short = await a.wallet.send(a.owner.getSender(), { value: NOTIFY_FLOOR },
       transfer(9101n, a.recipient, a.owner.address, NOTIFY_MIN));
     expect(findTransaction(short.transactions, { to: a.wallet.address, exitCode: 14704 }),
-      `${NOTIFY_FLOOR - 1n} must be refused once a notification is requested`).toBeDefined();
+      `${NOTIFY_FLOOR} covers every fixed term but not the forward fee, and must be refused`).toBeDefined();
 
     const b = await setup();
-    const ok = await b.wallet.send(b.owner.getSender(), { value: NOTIFY_FLOOR },
+    const ok = await b.wallet.send(b.owner.getSender(), { value: NOTIFY_FLOOR + 1_000_000n },
       transfer(9102n, b.recipient, b.owner.address, NOTIFY_MIN));
     expect(findTransaction(ok.transactions, { to: b.wallet.address, exitCode: 14704 }),
-      `${NOTIFY_FLOOR} is the notifying floor and must be accepted`).toBeUndefined();
+      'the fixed floor plus a small forward-fee allowance must be accepted').toBeUndefined();
     expect((await b.bc.openContract(ATHWallet.fromAddress(b.recipientWallet)).getGetWalletData()).balance)
       .toBe(1_000n);
   }, 180_000);

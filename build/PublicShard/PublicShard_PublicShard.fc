@@ -340,9 +340,9 @@ int $Cell$_fun_hash(cell $self) impure asm """
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
 
 ;; PublicShard_PublicShard.constants.fc
-;; EQCUGcA_oRY_phar3Ncaq29hrfg01g8Mb9O_yjkFn7weKFU-
-slice __gen_slice_address_182fa478cedb74dd60145ff5d6b3dd883ebc36fb2c394be97b1cbd7fe89453e4() asm """
-    B{b5ee9c724101010100240000438012833807f422c7f4c2d57b9ae3556dec35bf069ac1e18dfa77f94720b3f783c51058d6e209} B>boc <s PUSHSLICE
+;; EQDoT9ZLM99vhtWZEJLQAKWDSn7NSq39H6lE2ZBwFC2EOopp
+slice __gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf() asm """
+    B{b5ee9c72410101010024000043801d09fac9667bedf0dab322125a0014b0694fd9a955bfa3f5289b320e0285b087503ef6ac9d} B>boc <s PUSHSLICE
 """;
 
 ;; PublicShard_PublicShard.storage.fc
@@ -748,7 +748,7 @@ builder $PublicShard$_store(builder build_0, (int, int, cell, int) v) inline {
 
 ((int, int, cell, int), (int, int, int, int, int, int, int, int, int, int, int, int, slice)) $PublicShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)) = $self;
-    var $fresh$ret_26 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_182fa478cedb74dd60145ff5d6b3dd883ebc36fb2c394be97b1cbd7fe89453e4());
+    var $fresh$ret_26 = $PublicShardView$_constructor_partition_key_epoch_tag_kind_era_index_entry_count_safe_cap_era_seconds_retention_min_value_deploy_min_value_protocol_fee_retire_at_fee_sink($self'partition_key, $self'epoch_tag, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_kindOf(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraIndex(), $self'entry_count, 4096, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_eraSeconds(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retention(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_minValue(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_deployMinValue(), 10000000, ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_retireAt(), __gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf());
     return (($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count), $fresh$ret_26);
 }
 
@@ -810,7 +810,7 @@ _ %get_view() method_id(76114) {
         ;; Bounced handler for DepositCapsuleFee message
         if (op == 0x52535046) {
             var ($msg'amount, $msg'lane) = in_msg~$DepositCapsuleFee$_load_bounced();
-            throw_unless(13709, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_182fa478cedb74dd60145ff5d6b3dd883ebc36fb2c394be97b1cbd7fe89453e4()) ));
+            throw_unless(13709, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf()) ));
             throw_unless(13710, ($msg'amount > 0));
             $PublicShard$_contract_store(($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count));
             return ();
@@ -839,7 +839,7 @@ _ %get_view() method_id(76114) {
         throw_unless(13708, ($self'entry_count < 4294967295));
         $self'entries~__tact_dict_set_int_cell(257, $self'entry_count, $PublicEntry$_store_cell($PublicEntry$_constructor_publisher_body_commit_created_at(__tact_context_get_sender(), ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_bodyCommit($msg'header, $msg'body), $global_now()), begin_cell()));
         $self'entry_count = ($self'entry_count + 1);
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_182fa478cedb74dd60145ff5d6b3dd883ebc36fb2c394be97b1cbd7fe89453e4(), 12600000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 2, $self'partition_key, $self'epoch_tag, __tact_context_get_sender()), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf(), 12600000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 2, $self'partition_key, $self'epoch_tag, __tact_context_get_sender()), begin_cell())));
         $global_nativeReserve((($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_entryEndowment() + (($self'entry_count == 1) ? ($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count)~$PublicShard$_fun_baseEndowment() : 0)), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $PublicShard$_contract_store(($self'partition_key, $self'epoch_tag, $self'entries, $self'entry_count));
