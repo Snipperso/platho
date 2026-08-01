@@ -1495,6 +1495,13 @@ _ %get_pending_burn_flush(int $query_id) method_id(109631) {
         return ();
     }
     
+    ;; Receive ATHTransferExcess message
+    if (op == 0x4154481f) {
+        var $_'query_id = in_msg~load_uint(64);
+        $ProfileRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'genesis_controller_address, $self'profile_count, $self'treasury_due_ath, $self'burn_due_ath, $self'pending_avatar_writes, $self'pending_avatar_write_count, $self'next_avatar_write_id, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(21400);

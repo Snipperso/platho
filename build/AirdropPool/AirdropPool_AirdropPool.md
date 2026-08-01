@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: AirdropPool
-BoC Size: 2619 bytes
+BoC Size: 2646 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 23
+Total structures: 24
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -80,6 +80,10 @@ Signature: `AirdropSweepResidualToTreasury{}`
 ### AirdropSweepUnaccountedTon
 TL-B: `airdrop_sweep_unaccounted_ton#41445213  = AirdropSweepUnaccountedTon`
 Signature: `AirdropSweepUnaccountedTon{}`
+
+### ATHTransferExcess
+TL-B: `ath_transfer_excess#4154481f query_id:uint64 = ATHTransferExcess`
+Signature: `ATHTransferExcess{query_id:uint64}`
 
 ### ATHTransferRequest
 TL-B: `ath_transfer_request#41544810 query_id:uint64 amount:uint128 recipient:address response_destination:address = ATHTransferRequest`

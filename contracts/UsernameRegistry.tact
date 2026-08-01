@@ -879,6 +879,12 @@ contract UsernameRegistry {
         // Accept TON for storage reserve only. Grants no authority and mutates no protocol state.
     }
 
+    // [ADDED 2026-08-01] Change from the ATH transfer leg, which this contract funds at 48,000,000 against a
+    // 39,000,000 gate. ATHWallet now returns the difference to the response_destination, which is this contract;
+    // without a receiver every name purchase left a failed transaction behind. No authority, no state change.
+    receive(_: ATHTransferExcess) {
+    }
+
     fun appendUsernameSvgChar(b: StringBuilder, ch: Int): StringBuilder {
         if (ch == 45) { return b.concat("-"); }
         if (ch == 48) { return b.concat("0"); }

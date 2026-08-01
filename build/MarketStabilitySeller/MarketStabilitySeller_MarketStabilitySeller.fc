@@ -969,6 +969,13 @@ _ %get_quote_ton_for_amount(int $amount) method_id(118943) {
         return ();
     }
     
+    ;; Receive ATHTransferExcess message
+    if (op == 0x4154481f) {
+        var $_'query_id = in_msg~load_uint(64);
+        $MarketStabilitySeller$_contract_store(($self'genesis_config_hash, $self'deployment_manifest_hash, $self'ath_master_address, $self'reserve_funder_address, $self'official_ath_wallet_address, $self'ton_treasury_receiver_address, $self'reserve_funder_bound, $self'official_ath_wallet_bound, $self'treasury_bound, $self'sealed, $self'phase, $self'reserve_due_ath, $self'treasury_due_ton, $self'pending_query_id, $self'pending_amount_ath, $self'pending_paid_ton, $self'pending_buyer, $self'pending_recipient, $self'pending_recipient_ath_wallet, $self'completed_tranche_count, $self'current_tranche_sold_ath, $self'last_terminal_query_id, $self'reserve_funded_total_ath, $self'sold_ath_total, $self'treasury_flushed_ton_total));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(23999);

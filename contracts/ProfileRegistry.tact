@@ -609,6 +609,12 @@ contract ProfileRegistry {
         // ATH due buckets, and deployment bindings are unchanged.
     }
 
+    // [ADDED 2026-08-01] Change from the ATH transfer leg, funded here at 48,000,000 against a 39,000,000 gate.
+    // ATHWallet returns the difference to the response_destination, which is this contract; without a receiver
+    // every avatar purchase left a failed transaction behind. No authority, no state change.
+    receive(_: ATHTransferExcess) {
+    }
+
     receive() {
         throw(21400);
     }

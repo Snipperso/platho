@@ -1874,6 +1874,24 @@ PROGRAM{
       2 14 BLKSWAP
       $MarketStabilitySeller$_contract_store INLINECALLDICT
     }>
+    DUP
+    1096042527 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      24 s() POP
+      22 s() 24 s() XCHG
+      21 s() 23 s() XCHG
+      20 s() 22 s() XCHG
+      19 s() 21 s() XCHG
+      18 s() 20 s() XCHG
+      17 s() 19 s() XCHG
+      16 s() 18 s() XCHG
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      2 14 BLKSWAP
+      $MarketStabilitySeller$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 25 s() XCHG
     33 LESSINT

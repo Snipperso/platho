@@ -3,7 +3,7 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "username_registry": "c58175217e8184a593fd19b82ef1044f385a8e236fcfd6fc734facda7f146cd9",
+    "username_registry": "68f859065107af684f976e827424541ecb54b9217187a9ac72023fbb3f37edf8",
     "username_nft_item": "0df553413c4e61177c4a49ced30e509caeb6280b1879c29a6a71ded94b70622a"
   },
   "note": "Sandbox evidence that username mint and item recovery paths retain enough TON against the explicit V1 endowment model. This is not a mainnet rent oracle; it is a release gate against underfunded permanent UsernameRegistry records and UsernameNFTItem state.",

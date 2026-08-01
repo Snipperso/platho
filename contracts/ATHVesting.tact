@@ -234,6 +234,15 @@ contract ATHVesting {
         // Accept TON for storage reserve only. Vesting schedule and beneficiary are immutable.
     }
 
+    // [ADDED 2026-08-01] Its own change coming home. This contract names ITSELF as response_destination on every
+    // claim, so once ATHWallet started returning the surplus instead of burying it, that surplus arrives here — and
+    // without a receiver Tact threw 130 on it. MEASURED: exit 130, value still credited (the message is sent
+    // bounce:false, so a failed compute phase keeps the coins), which means nothing was lost but every single claim
+    // left a FAILED transaction on the vesting contract. Money arriving through a failure is not a property to rely
+    // on. No auth and no state change: value is the entire point, exactly like the top-up above.
+    receive(_: ATHTransferExcess) {
+    }
+
     receive() {
         throw(24999);
     }
