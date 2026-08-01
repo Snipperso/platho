@@ -880,6 +880,18 @@ PROGRAM{
       $AirdropPool$_contract_store INLINECALLDICT
     }>
     DUP
+    1096042527 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      17 s() POP
+      s15 17 s() XCHG
+      s14 16 s() XCHG
+      s13 s15 XCHG
+      2 13 BLKSWAP
+      $AirdropPool$_contract_store INLINECALLDICT
+    }>
+    DUP
     1094996498 PUSHINT
     EQUAL
     IFJMP:<{

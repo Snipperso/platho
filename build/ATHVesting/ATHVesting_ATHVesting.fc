@@ -669,6 +669,13 @@ _ %get_ath_wallet_address(slice $owner) method_id(108577) {
         return ();
     }
     
+    ;; Receive ATHTransferExcess message
+    if (op == 0x4154481f) {
+        var $_'query_id = in_msg~load_uint(64);
+        $ATHVesting$_contract_store(($self'ath_master_address, $self'beneficiary_address, $self'start_time, $self'claimed_ath, $self'phase, $self'pending_query_id, $self'pending_amount, $self'pending_recipient_ath_wallet, $self'pending_created_at, $self'last_terminal_query_id));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(24999);

@@ -493,6 +493,13 @@ contract MarketStabilitySeller {
         // Accept TON for storage reserve only. It is not buyer payment or treasury due.
     }
 
+    // [ADDED 2026-08-01] Change from the sale leg. This contract is its own response_destination, so the surplus
+    // ATHWallet now returns lands here; without a receiver every sale left a failed transaction behind (exit 130,
+    // value still credited). Deliberately NOT counted as treasury due or buyer payment — it is unspent gas coming
+    // back, and FlushMarketStabilityTreasuryTon is what moves the contract's TON on.
+    receive(_: ATHTransferExcess) {
+    }
+
     receive() {
         throw(23999);
     }

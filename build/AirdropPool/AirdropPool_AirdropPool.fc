@@ -604,6 +604,14 @@ _ %get_global() method_id(126899) {
         return ();
     }
     
+    ;; Receive ATHTransferExcess message
+    if (op == 0x4154481f) {
+        in_msg~skip_bits(32);
+        var $_'query_id = in_msg~load_uint(64);
+        $AirdropPool$_contract_store(($self'sealed, $self'genesis_controller_address, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'ath_master_address, $self'pool_ath_wallet_address, $self'ath_master_bound, $self'credit_issuer_address, $self'credit_issuer_bound, $self'treasury_address, $self'treasury_bound, $self'funded_amount, $self'remaining_budget, $self'distributed_total, $self'claim_count, $self'sealed_at, $self'payout_seq, $self'last_accrual_at));
+        return ();
+    }
+    
     ;; Receive AirdropSweepResidualToTreasury message
     if (op == 0x41445212) {
         in_msg~skip_bits(32);

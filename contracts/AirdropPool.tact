@@ -148,6 +148,14 @@ message(0x41445212) AirdropSweepResidualToTreasury {}   // permissionless dead-m
 message(0x41445213) AirdropSweepUnaccountedTon {}
 
 // Mirror of ATHWallet's interface (op + layout MUST match).
+// [MIRRORED 2026-08-01] Declared locally because this contract does NOT import ATHWallet.tact, unlike the four other
+// payout contracts. The definition must match ATHWallet's byte for byte — a mirrored opcode whose field WIDTH drifted
+// is a defect this project has already had, and it surfaces as a silent wrong-receiver run, not a compile error.
+// Pinned by the mirrored-opcode guard alongside ATHTransferRequest below.
+message(0x4154481F) ATHTransferExcess {
+    query_id: Int as uint64;
+}
+
 message(0x41544810) ATHTransferRequest {
     query_id: Int as uint64;
     amount: Int as uint128;
@@ -412,6 +420,13 @@ contract AirdropPool {
 
     receive(_: AirdropTopUpStorageReserve) {
         // Permissionless: anyone may keep this contract alive. No auth, no state change — value is the point.
+    }
+
+    // [ADDED 2026-08-01] Change from a delivery leg. The pool names itself as response_destination when it pays a
+    // claimant, so the surplus ATHWallet now returns arrives here; without a receiver every delivery left a failed
+    // transaction behind. This is the flow the airdrop already accounted for as irrecoverable per delivery — it now
+    // comes back, and AirdropSweepUnaccountedTon is what moves it on. No auth, no state change.
+    receive(_: ATHTransferExcess) {
     }
 
     // Dead-man residual sweep. Only the UNDISTRIBUTED budget moves, and only to the frozen treasury bound at

@@ -3543,6 +3543,13 @@ _ %get_global() method_id(126899) {
         return ();
     }
     
+    ;; Receive ATHTransferExcess message
+    if (op == 0x4154481f) {
+        var $_'query_id = in_msg~load_uint(64);
+        $UsernameRegistry$_contract_store(($self'official_ath_wallet_address, $self'ath_master_address, $self'treasury_ath_receiver_address, $self'official_ath_wallet_bound, $self'sealed, $self'deployment_manifest_hash, $self'genesis_config_hash, $self'pending_mint_count, $self'mint_seq, $self'treasury_due_ath, $self'burn_due_ath, $self'pending_mints, $self'pending_item_to_name_hash, $self'pending_treasury_flushes, $self'pending_treasury_flush_count, $self'pending_burn_flushes, $self'pending_burn_flush_count, $self'genesis_controller_address, $self'art, $self'art_count, $self'art_sealed, $self'meta, $self'meta_count, $self'meta_sealed));
+        return ();
+    }
+    
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(19099);

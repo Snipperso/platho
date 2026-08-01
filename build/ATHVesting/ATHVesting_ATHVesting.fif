@@ -713,6 +713,16 @@ PROGRAM{
       2 7 BLKSWAP
       $ATHVesting$_contract_store INLINECALLDICT
     }>
+    DUP
+    1096042527 PUSHINT
+    EQUAL
+    IFJMP:<{
+      DROP
+      s9 POP
+      s7 s9 XCHG
+      2 7 BLKSWAP
+      $ATHVesting$_contract_store INLINECALLDICT
+    }>
     0 EQINT
     s0 s10 XCHG
     33 LESSINT
