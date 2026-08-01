@@ -140,6 +140,12 @@ builder $JettonExcesses$_store(builder build_0, (int) v) inline;
 ;; $JettonExcesses$_store_cell
 cell $JettonExcesses$_store_cell((int) v, builder b) inline;
 
+;; $ATHTransferExcess$_store
+builder $ATHTransferExcess$_store(builder build_0, (int) v) inline;
+
+;; $ATHTransferExcess$_store_cell
+cell $ATHTransferExcess$_store_cell((int) v, builder b) inline;
+
 ;; $PendingAthTransferNotification$_store
 builder $PendingAthTransferNotification$_store(builder build_0, (slice, slice, int, int, int) v) inline;
 
@@ -319,6 +325,9 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 
 ;; $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
 ((int, int, slice, slice, int, slice)) $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload(int $query_id, int $amount, slice $from, slice $response_address, int $forward_ton_amount, slice $forward_payload) inline;
+
+;; $ATHTransferExcess$_constructor_query_id
+((int)) $ATHTransferExcess$_constructor_query_id(int $query_id) inline;
 
 ;; $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload
 ((int, int, slice, slice)) $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload(int $query_id, int $amount, slice $sender, slice $forward_payload) inline;
@@ -1067,6 +1076,27 @@ cell $JettonExcesses$_store_cell((int) v, builder b) inline {
 }
 
 ;;
+;; Type: ATHTransferExcess
+;; Header: 0x4154481f
+;; TLB: ath_transfer_excess#4154481f query_id:uint64 = ATHTransferExcess
+;;
+
+builder $ATHTransferExcess$_store(builder build_0, (int) v) inline {
+    var (v'query_id) = v;
+    build_0 = store_uint(build_0, 1096042527, 32);
+    build_0 = build_0.store_uint(v'query_id, 64);
+    return build_0;
+}
+
+cell $ATHTransferExcess$_store_cell((int) v, builder b) inline {
+    return $ATHTransferExcess$_store(b, v).end_cell();
+}
+
+((int)) $ATHTransferExcess$_constructor_query_id(int $query_id) inline {
+    return ($query_id);
+}
+
+;;
 ;; Type: ATHWalletDataView
 ;; TLB: _ balance:int257 owner_address:address ath_master_address:address jetton_wallet_code:^cell = ATHWalletDataView
 ;;
@@ -1766,6 +1796,10 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         $self'balance = $self'balance + $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 3000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__tact_context_get_sender(), 4000000, 1, false, $ATHTransferAck$_store_cell($ATHTransferAck$_constructor_query_id_amount($msg'query_id, $msg'amount), begin_cell())));
+        int $excess = ($Context$_get_value(__tact_context_get()) - 29000000);
+        if (($excess >= 1000000)) {
+            $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, $excess, 1, false, $ATHTransferExcess$_store_cell($ATHTransferExcess$_constructor_query_id($msg'query_id), begin_cell())));
+        }
         $ATHWallet$_contract_store(($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers));
         return ();
     }

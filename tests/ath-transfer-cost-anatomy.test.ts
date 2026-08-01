@@ -143,6 +143,43 @@ describe('what an ATH transfer really costs', () => {
     expect(true).toBe(true);
   }, 600_000);
 
+  it('COST-05: the custom lane returns change too, not only the standard one', async () => {
+    // [ADDED 2026-08-01, tier 2/3 outside-in pass] The change fix landed on JettonInternalTransfer and skipped
+    // ATHInternalTransfer — and the custom lane is the one every protocol PAYOUT uses: vesting claims,
+    // MarketStabilitySeller sales, airdrop deliveries, both registries. Each funds the leg from a hand-set constant
+    // far above the gate (58,000,000 from vesting and MSS, 48,000,000 from the registries, against 39,000,000), so
+    // the surplus was landing on the recipient's wallet and staying — the same burial, on the larger flows.
+    const { storeATHInternalTransfer } = await import('../build/ATHWallet/ATHWallet_ATHWallet');
+    const bc = await fresh();
+    const owner = await bc.treasury('cost-owner-a');
+    const sourceWallet = await placeWallet(bc, owner.address, 1_000_000n, toNano('1'));
+    const target = await placeWallet(bc, OWNER_B, 0n, 0n);
+    const responder = await bc.treasury('cost-responder');
+
+    const ARRIVAL_MIN = 29_000_000n;          // gate 14212: EXEC + ACK + SOURCE_ACK + ENDOWMENT
+    const sent = 53_000_000n;                 // what a 58,000,000 payout leg delivers after the sender's own reserve
+    const before = (await bc.getContract(responder.address)).balance;
+    await bc.sendMessage(internal({
+      from: sourceWallet, to: target, value: sent, bounce: true,
+      body: beginCell().store(storeATHInternalTransfer({
+        $$type: 'ATHInternalTransfer', query_id: 1n, amount: 1_000n, sender_owner: owner.address,
+        response_destination: responder.address,
+      } as any)).endCell(),
+    }));
+
+    const returned = (await bc.getContract(responder.address)).balance - before;
+    const kept = (await bc.getContract(target)).balance;
+    console.log(`  кастомная полоса: прислали ${sent}  вернулось ${returned}  осталось у получателя ${kept}`);
+
+    expect(returned, 'the payer must get the surplus back rather than have it buried on the recipient wallet')
+      .toBeGreaterThan(10_000_000n);
+    expect(kept, 'and the recipient must still keep what gate 14212 required it to keep')
+      .toBeGreaterThanOrEqual(ARRIVAL_MIN - 10_000_000n);
+    expect(readFileSync('contracts/ATHWallet.tact', 'utf8'),
+      'the subtraction must stay tied to the gate, not to a copy of its value')
+      .toMatch(/let excess: Int = context\(\)\.value - ATH_INTERNAL_TRANSFER_ARRIVAL_MIN/);
+  }, 300_000);
+
   it('COST-03: end to end at the current floor — what is delivered, what is kept, what comes back', async () => {
     const bc = await fresh();
     const owner = await bc.treasury('cost-owner-a');

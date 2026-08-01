@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: UsernameRegistry
-BoC Size: 40564 bytes
+BoC Size: 40622 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 80
+Total structures: 81
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -208,6 +208,10 @@ Signature: `JettonTransferNotification{query_id:uint64,amount:coins,sender:addre
 ### JettonExcesses
 TL-B: `jetton_excesses#d53276db query_id:uint64 = JettonExcesses`
 Signature: `JettonExcesses{query_id:uint64}`
+
+### ATHTransferExcess
+TL-B: `ath_transfer_excess#4154481f query_id:uint64 = ATHTransferExcess`
+Signature: `ATHTransferExcess{query_id:uint64}`
 
 ### ATHWalletTopUpStorageReserve
 TL-B: `ath_wallet_top_up_storage_reserve#41544807  = ATHWalletTopUpStorageReserve`

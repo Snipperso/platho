@@ -4,14 +4,14 @@ Status: **PASS**
 
 Sandbox evidence for the two properties that survived the 2026-07-21 pointer move: the registry account does NOT grow with the number of profiles (it used to grow 5.0000 cells each, capping the product at 13,076 profiles silently), and a settled purchase does not cost the registry TON. Per-profile storage endowments are gone with the state they funded; the buyer KeyShard funds its own rent, measured in tests/key-shard.test.ts KS-RENT-01. This is not a mainnet rent oracle; it is a release gate.
 
-ProfileRegistry code hash: `da23361e08b7bc05d3b096ecf1a0af015a7553e0d3e64eb3fe1792ef112906a8`
+ProfileRegistry code hash: `9ad03e810668dcd41ecf0605ff31a63c7ee7c7beaca50edd2c70012dca8cdf8b`
 
 | Case | Owners | Updates | Retained delta | Registry cells | Cells per owner |
 |---|---:|---:|---:|---:|---:|
 | DIRECT_FIRST_AVATAR | 1 | 1 | 55654729 | 3 | 0 |
 | DIRECT_REPEAT_AVATAR | 1 | 1 | 55628595 | 3 | 0 |
-| DIRECT_MANY_OWNERS_12 | 12 | 12 | 667852824 | 3 | 0 |
-| DIRECT_MANY_UPDATES_ONE_OWNER_10 | 1 | 10 | 556308814 | 3 | 0 |
+| DIRECT_MANY_OWNERS_12 | 12 | 12 | 667852812 | 3 | 0 |
+| DIRECT_MANY_UPDATES_ONE_OWNER_10 | 1 | 10 | 556308804 | 3 | 0 |
 
 Minimum retained margin gate: **1000000 nanotons**.
 Worst retained margin: **55628595 nanotons**.

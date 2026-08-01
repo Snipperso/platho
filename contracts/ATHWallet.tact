@@ -378,6 +378,18 @@ message(0xD53276DB) JettonExcesses {
     query_id: Int as uint64;
 }
 
+// "ATH"+0x1F — [ADDED 2026-08-01] change from a custom-lane transfer, returned to the response_destination the
+// sender named. A distinct opcode rather than reusing JettonExcesses: the counterparties on this lane are CONTRACTS
+// with strict receivers, and an unknown opcode arriving at one of them throws. Sent bounce:false so a refusal costs
+// nothing — but it must not collide with something they already handle.
+//
+// 0x1F chosen after enumerating the whole ATH space: 01..0A and 10..15, 1A..1E are taken. The first number that
+// looked natural, 0x41544809, is ATHMaster.DeployTreasurySupply — an opcode collision is a defect this project has
+// already had once, and it is invisible until the wrong receiver runs.
+message(0x4154481F) ATHTransferExcess {
+    query_id: Int as uint64;
+}
+
 message(0x41544807) ATHWalletTopUpStorageReserve {} // "ATH"+0x07 — F11/#2: no-authority storage-reserve top-up
 
 // "ATH"+0x08 — [ADDED 2026-07-29, wave-8 HIGH] unwind an outgoing transfer that can no longer terminate.
@@ -1023,6 +1035,28 @@ contract ATHWallet {
                 amount: msg.amount
             }.toCell()
         });
+
+        // [ADDED 2026-08-01] RETURN THE CHANGE HERE TOO. The standard lane below was taught to hand back what it
+        // does not need; this one was left burying it, and this is the lane every protocol PAYOUT uses — vesting
+        // claims, MarketStabilitySeller sales, airdrop deliveries, both registries. Each of those callers funds the
+        // leg from a hand-set constant well above the gate (58,000,000 from vesting and MSS, 48,000,000 from the
+        // registries, against a requirement of 39,000,000), so the surplus was landing on the recipient's wallet
+        // and staying there — an ATHWallet has no path that pays TON to its owner. It is the same money the airdrop
+        // already accounts for as irrecoverable per delivery.
+        //
+        // Subtracted with ATH_INTERNAL_TRANSFER_ARRIVAL_MIN, which IS gate 14212 above, so the wallet can never
+        // give away what it was required to keep. No payload travels on this lane and both acks are fixed size, so
+        // unlike the standard lane there is no payload-proportional fee to reserve.
+        let excess: Int = context().value - ATH_INTERNAL_TRANSFER_ARRIVAL_MIN;
+        if (excess >= JETTON_EXCESSES_VALUE) {
+            message(MessageParameters {
+                to: msg.response_destination,
+                value: excess,
+                mode: SendPayFwdFeesSeparately,
+                bounce: false,
+                body: ATHTransferExcess { query_id: msg.query_id }.toCell()
+            });
+        }
     }
 
     receive(msg: JettonInternalTransfer) {

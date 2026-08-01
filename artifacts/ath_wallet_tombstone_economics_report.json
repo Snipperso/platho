@@ -3,7 +3,7 @@
   "status": "PASS",
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "code_hashes": {
-    "ath_wallet": "00ab75605fedbb0240160d015c9c820fa4b6b40c972dd458f4896beadac391f6"
+    "ath_wallet": "acd9da0504631016a6e20164e6f3d094de2385aa249bcf17e18dd709f8b698ee"
   },
   "note": "Sandbox evidence that finalized/pruned ATH notification tombstones retain at least ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT after conservatively subtracting the terminal ACK/prune caller value. This is not a mainnet rent oracle; it is release evidence that the value envelope preserves tombstone backing across supported notification variants.",
   "required_tombstone_endowment_nanotons": "20000000",
@@ -55,10 +55,10 @@
       "terminal": "prune",
       "inbound_value_nanotons": "77000000",
       "terminal_caller_value_nanotons": "2000000",
-      "raw_balance_delta_nanotons": "27008906",
-      "retained_excluding_terminal_value_nanotons": "25008906",
+      "raw_balance_delta_nanotons": "27008315",
+      "retained_excluding_terminal_value_nanotons": "25008315",
       "required_tombstone_endowment_nanotons": "20000000",
-      "retained_margin_nanotons": "5008906",
+      "retained_margin_nanotons": "5008315",
       "pending_exists_after_terminal": false,
       "wallet_token_balance_atomic": "100000000",
       "tx_count": 6,
