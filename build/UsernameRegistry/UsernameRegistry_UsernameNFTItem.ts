@@ -3347,6 +3347,53 @@ export function dictValueParserJettonExcesses(): DictionaryValue<JettonExcesses>
     }
 }
 
+export type ATHTransferExcess = {
+    $$type: 'ATHTransferExcess';
+    query_id: bigint;
+}
+
+export function storeATHTransferExcess(src: ATHTransferExcess) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1096042527, 32);
+        b_0.storeUint(src.query_id, 64);
+    };
+}
+
+export function loadATHTransferExcess(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1096042527) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    return { $$type: 'ATHTransferExcess' as const, query_id: _query_id };
+}
+
+export function loadTupleATHTransferExcess(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'ATHTransferExcess' as const, query_id: _query_id };
+}
+
+export function loadGetterTupleATHTransferExcess(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    return { $$type: 'ATHTransferExcess' as const, query_id: _query_id };
+}
+
+export function storeTupleATHTransferExcess(source: ATHTransferExcess) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    return builder.build();
+}
+
+export function dictValueParserATHTransferExcess(): DictionaryValue<ATHTransferExcess> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeATHTransferExcess(src)).endCell());
+        },
+        parse: (src) => {
+            return loadATHTransferExcess(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type ATHWalletTopUpStorageReserve = {
     $$type: 'ATHWalletTopUpStorageReserve';
 }
@@ -5349,6 +5396,7 @@ const UsernameNFTItem_types: ABIType[] = [
     {"name":"JettonInternalTransfer","header":395134233,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"from","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_ton_amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonTransferNotification","header":1935855772,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":"coins"}},{"name":"sender","type":{"kind":"simple","type":"address","optional":false}},{"name":"forward_payload","type":{"kind":"simple","type":"slice","optional":false,"format":"remainder"}}]},
     {"name":"JettonExcesses","header":3576854235,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"ATHTransferExcess","header":1096042527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHWalletTopUpStorageReserve","header":1096042503,"fields":[]},
     {"name":"ATHRecoverStuckOutgoing","header":1096042504,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"recipient_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHWalletDataView","header":null,"fields":[{"name":"balance","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"owner_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"jetton_wallet_code","type":{"kind":"simple","type":"cell","optional":false}}]},
@@ -5418,6 +5466,7 @@ const UsernameNFTItem_opcodes = {
     "JettonInternalTransfer": 395134233,
     "JettonTransferNotification": 1935855772,
     "JettonExcesses": 3576854235,
+    "ATHTransferExcess": 1096042527,
     "ATHWalletTopUpStorageReserve": 1096042503,
     "ATHRecoverStuckOutgoing": 1096042504,
     "BindOfficialAthWallet": 1715335229,

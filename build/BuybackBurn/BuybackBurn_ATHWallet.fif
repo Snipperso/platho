@@ -44,6 +44,8 @@ PROGRAM{
   DECLPROC $JettonTransferNotification$_store_cell
   DECLPROC $JettonExcesses$_store
   DECLPROC $JettonExcesses$_store_cell
+  DECLPROC $ATHTransferExcess$_store
+  DECLPROC $ATHTransferExcess$_store_cell
   DECLPROC $PendingAthTransferNotification$_store
   DECLPROC $PendingAthTransferNotification$_store_cell
   DECLPROC $PendingAthTransferNotification$_load
@@ -104,6 +106,7 @@ PROGRAM{
   DECLPROC $ATHInternalTransferRegistryMintUsername$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_username_len_username
   DECLPROC $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format
   DECLPROC $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload
+  DECLPROC $ATHTransferExcess$_constructor_query_id
   DECLPROC $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload
   DECLPROC $JettonExcesses$_constructor_query_id
   DECLPROC $PendingAthTransferNotification$_constructor_sender_owner_response_destination_response_ack_value_amount_created_at
@@ -470,6 +473,17 @@ PROGRAM{
   $JettonExcesses$_store_cell PROCINLINE:<{
     SWAP
     $JettonExcesses$_store INLINECALLDICT
+    ENDC
+  }>
+  $ATHTransferExcess$_store PROCINLINE:<{
+    1096042527 PUSHINT
+    ROT
+    32 STU
+    64 STU
+  }>
+  $ATHTransferExcess$_store_cell PROCINLINE:<{
+    SWAP
+    $ATHTransferExcess$_store INLINECALLDICT
     ENDC
   }>
   $PendingAthTransferNotification$_store PROCINLINE:<{
@@ -1229,6 +1243,8 @@ PROGRAM{
   $ATHInternalTransferRegistryProfileAvatar$_constructor_query_id_amount_sender_owner_response_destination_notify_value_owner_wallet_avatar_hash_avatar_entry_id_avatar_stream_id_avatar_part_count_media_format PROCINLINE:<{
   }>
   $JettonInternalTransfer$_constructor_query_id_amount_from_response_address_forward_ton_amount_forward_payload PROCINLINE:<{
+  }>
+  $ATHTransferExcess$_constructor_query_id PROCINLINE:<{
   }>
   $JettonTransferNotification$_constructor_query_id_amount_sender_forward_payload PROCINLINE:<{
   }>
@@ -2493,7 +2509,8 @@ PROGRAM{
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC
       $ATHTransferAck$_store_cell INLINECALLDICT
-      s4 s10 XCHG
+      s10 PUSH
+      4 -ROLL
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2515,14 +2532,15 @@ PROGRAM{
       __tact_context_get_sender INLINECALLDICT
       4000000 PUSHINT
       1 PUSHINT
-      s0 s7 XCHG
+      s8 PUSH
       FALSE
-      s0 s7 XCHG
+      s0 s9 XCHG
       $ATHTransferAck$_constructor_query_id_amount INLINECALLDICT
       NEWC
       $ATHTransferAck$_store_cell INLINECALLDICT
-      s4 s3 s0 XCHG3
-      s7 s6 s0 XCHG3
+      s3 s4 XCHG
+      s1 s3 s0 XCHG3
+      s1 s8 XCHG
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -2541,8 +2559,47 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s1 s3 XCHG
-      s1 s4 XCHG
+      __tact_context_get INLINECALLDICT
+      $Context$_get_value INLINECALLDICT
+      29000000 PUSHINT
+      SUB
+      DUP
+      1000000 PUSHINT
+      GEQ
+      IF:<{
+        1 PUSHINT
+        FALSE
+        s0 s7 XCHG
+        $ATHTransferExcess$_constructor_query_id INLINECALLDICT
+        NEWC
+        $ATHTransferExcess$_store_cell INLINECALLDICT
+        s4 s8 XCHG
+        s1 s3 s0 XCHG3
+        s1 s7 XCHG
+        $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
+            NEWC
+            b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+            1 STI               // store `bounce`
+            b{000} STSLICECONST // store bounced = false and src = addr_none
+            STSLICE             // store `to`
+            SWAP
+            STGRAMS             // store `value`
+            106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+            STZEROES
+            // → Stack state
+            // s0: Builder
+            // s1: `body`
+            // s2: `mode`
+            STDICT
+            ENDC
+            SWAP
+            SENDRAWMSG
+      }>ELSE<{
+        DROP
+        s4 POP
+        s4 POP
+      }>
+      4 1 REVERSE
       $ATHWallet$_contract_store INLINECALLDICT
     }>
     OVER

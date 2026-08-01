@@ -288,9 +288,9 @@ int $Cell$_fun_hash(cell $self) impure asm """
 """;
 
 ;; IntroShard_IntroShard.constants.fc
-;; EQDoT9ZLM99vhtWZEJLQAKWDSn7NSq39H6lE2ZBwFC2EOopp
-slice __gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf() asm """
-    B{b5ee9c72410101010024000043801d09fac9667bedf0dab322125a0014b0694fd9a955bfa3f5289b320e0285b087503ef6ac9d} B>boc <s PUSHSLICE
+;; EQDACU3RTsklkK8f53lDLbI82sTwYZ9Gu8wEA5uM5QRpmzXF
+slice __gen_slice_address_76976426d2f5ac0b3b002cea805016839aedc8ffba92100809a4164a67dc0f2e() asm """
+    B{b5ee9c7241010101002400004380180129ba29d924b215e3fcef2865b6479b589e0c33e8d779808073719ca08d3370c45bfdee} B>boc <s PUSHSLICE
 """;
 
 ;; IntroShard_IntroShard.storage.fc
@@ -573,7 +573,7 @@ builder $IntroShard$_store(builder build_0, (int, int, cell, int) v) inline {
 
 ((int, int, cell, int), (int, int, int, int, int, int, int, int, int, slice)) $IntroShard$_fun_get_view((int, int, cell, int) $self) impure inline_ref {
     var (($self'epoch, $self'bucket, $self'intros, $self'next_id)) = $self;
-    var $fresh$ret_5 = $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'epoch, $self'bucket, $self'next_id, 604800, 8000, 15310000, 17810000, (((($self'epoch + 2) * 86400) + 604800) + 345600), 10000000, __gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf());
+    var $fresh$ret_5 = $IntroShardView$_constructor_epoch_bucket_next_id_retention_safe_cap_min_value_deploy_min_value_retire_at_protocol_fee_fee_sink($self'epoch, $self'bucket, $self'next_id, 604800, 8000, 15310000, 17810000, (((($self'epoch + 2) * 86400) + 604800) + 345600), 10000000, __gen_slice_address_76976426d2f5ac0b3b002cea805016839aedc8ffba92100809a4164a67dc0f2e());
     return (($self'epoch, $self'bucket, $self'intros, $self'next_id), $fresh$ret_5);
 }
 
@@ -635,7 +635,7 @@ _ %get_view() method_id(76114) {
         ;; Bounced handler for DepositCapsuleFee message
         if (op == 0x52535046) {
             var ($msg'amount, $msg'lane) = in_msg~$DepositCapsuleFee$_load_bounced();
-            throw_unless(13685, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf()) ));
+            throw_unless(13685, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_76976426d2f5ac0b3b002cea805016839aedc8ffba92100809a4164a67dc0f2e()) ));
             throw_unless(13686, ($msg'amount > 0));
             $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id));
             return ();
@@ -660,7 +660,7 @@ _ %get_view() method_id(76114) {
         throw_unless(13680, ($self'next_id < 8000));
         $self'intros~__tact_dict_set_int_cell(257, $self'next_id, $IntroEntry$_store_cell($IntroEntry$_constructor_r_view_tag_body_commit_created_at($msg'r, $msg'view_tag, ($self'epoch, $self'bucket, $self'intros, $self'next_id)~$IntroShard$_fun_bodyCommit($msg'header_0, $msg'body), $global_now()), begin_cell()));
         $self'next_id = ($self'next_id + 1);
-        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_27526a095774c16f50221b5b892bd77a566732a2a1470e29e8c7cb84d7463fdf(), 12600000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 1, $self'epoch, $self'bucket, __tact_context_get_sender()), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_bounce_mode_body(__gen_slice_address_76976426d2f5ac0b3b002cea805016839aedc8ffba92100809a4164a67dc0f2e(), 12600000, true, 1, $DepositCapsuleFee$_store_cell($DepositCapsuleFee$_constructor_amount_lane_init_arg0_init_arg1_publisher(10000000, 1, $self'epoch, $self'bucket, __tact_context_get_sender()), begin_cell())));
         $global_nativeReserve((10000 + (($self'next_id == 1) ? 2500000 : 0)), 6);
         $global_send($SendParameters$_constructor_to_value_mode_bounce(__tact_context_get_sender(), 0, 130, false));
         $IntroShard$_contract_store(($self'epoch, $self'bucket, $self'intros, $self'next_id));
