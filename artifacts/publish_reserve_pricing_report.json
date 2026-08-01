@@ -4,10 +4,10 @@
   "generated_at": "DETERMINISTIC_ARTIFACT",
   "model": "clean-17 direct-pay: a flat per-lane wallet send whose floor is the receiving shard gate; the shard reserves its rent and returns the surplus. No hold, no max_charge, no size classes — those belonged to the deleted Vault batch model.",
   "code_hashes": {
-    "ath_wallet": "968b7aad44576ed0a4c109bb25a2df8bd8f897f2e14247dd37155bb4b2ca84cf",
-    "record_shard": "550542854295453269d45c3e07ad4f9ae61d63ddb9797c0d0b337710ae97b0df",
-    "intro_shard": "5bbcb51d28e57aa2ed4fea8b5a29afd44ec723ddd1c5816378784a2144e68dca",
-    "public_shard": "2962f9b132d569f55623403fcf24afc2f70a1b369111fde1d56464714baa7802",
+    "ath_wallet": "844a125f5d950c7c965bbab08a1e523acf5186750f0c648bbd98b95f2378f719",
+    "record_shard": "157a41332299fd38545c0b28a0c8e57e9991bc237c40a0d585e51c3ce13ca520",
+    "intro_shard": "b3f68bcd7c8fde4bbaa993ac7faa9c6446226a895a9a49a1d386a75662142622",
+    "public_shard": "6c823541c038176f5044e2a8914ae127134e9fd5eca3d825067663c61c607f26",
     "recovery_shard": "a73538d916df635a126354bfa8f53c9f43c75085002977911f4c7e4228d4e0d3",
     "key_shard": "81761197119847160003106cbbe7d9751f80d6683e0f5f609a61c9c8f9857dbd"
   },

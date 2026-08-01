@@ -99,18 +99,22 @@ describe('every ATH transfer leg covers the wallet gate it is aimed at', () => {
       .toEqual([]);
   });
 
-  it('ATHLEG-03: the two zero-margin callers are still exactly the two this file expects', () => {
-    // UsernameRegistry and ProfileRegistry deliver EXACTLY the requirement. That is legal — a message with fees paid
-    // separately arrives whole — but it means they have no room at all, so their names are worth stating out loud
-    // rather than leaving to be rediscovered. If a third caller joins them, or one of these gains margin, the note
-    // above stops being true and this fails so the note gets corrected.
+  it('ATHLEG-03: no caller sits exactly on the wallet gate any more', () => {
+    // [UPDATED 2026-08-01] This used to record UsernameRegistry and ProfileRegistry as delivering EXACTLY the
+    // requirement — legal, since fees paid separately arrive whole, but with no room at all. Both gained margin when
+    // gate 14204 was rebuilt from ATH_INTERNAL_TRANSFER_ARRIVAL_MIN and the forward allowance came down to its
+    // measured size: they still send 48,000,000 against a requirement of 39,000,000.
+    //
+    // The check is kept and inverted rather than deleted. Zero margin is not a defect by itself, but it is the state
+    // in which any later change to a wallet constant silently breaks a caller, and it should never be reached
+    // without someone deciding to. If a caller lands exactly on the gate again, this says so.
     const required = walletRequiredValue();
     const zeroMargin = CALLERS
       .filter((c) => c.deliver(readFileSync(`contracts/${c.contract}.tact`, 'utf8')) === required)
       .map((c) => c.contract)
       .sort();
-    expect(zeroMargin, 'the zero-margin set changed — re-read the note at the top of this file')
-      .toEqual(['ProfileRegistry', 'UsernameRegistry']);
+    expect(zeroMargin, 'a caller is funding the wallet gate to the nanoton again. That is not wrong today, but it '
+      + 'leaves no room, and the next change to any term in 14204 breaks it with no warning').toEqual([]);
   });
 });
 

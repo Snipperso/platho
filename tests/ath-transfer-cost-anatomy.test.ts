@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Address, beginCell, contractAddress, toNano } from '@ton/core';
 import { Blockchain, createShardAccount, internal } from '@ton/sandbox';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { ATHWallet, JettonTransfer, storeJettonInternalTransfer } from '../build/ATHWallet/ATHWallet_ATHWallet';
 
 // WHAT AN ATH TRANSFER ACTUALLY COSTS, measured rather than declared.
@@ -69,10 +70,16 @@ describe('what an ATH transfer really costs', () => {
       }
     }
 
+    // Read the allowance out of the contract rather than restating it: this test exists to compare the ALLOWANCE
+    // against the measured FEE, and a copy of the allowance here would compare a literal to a literal.
+    const src = readFileSync('contracts/ATHWallet.tact', 'utf8');
+    const declared = BigInt(src.match(/const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = (\d+);/)![1]);
     const worst = rows.reduce((m, r) => (r[2] > m ? r[2] : m), 0n);
-    console.log(`\n  ХУДШИЙ ЗАМЕРЕННЫЙ forward = ${worst}   запас в контракте = 21000000  (${(21_000_000 / Number(worst)).toFixed(1)}x)`);
-    expect(worst, 'the forward fee must stay far below the allowance sized for it; if this ever fails the '
-      + 'allowance is no longer generous and must be re-derived, not merely raised').toBeLessThan(21_000_000n);
+    console.log(`\n  ХУДШИЙ ЗАМЕРЕННЫЙ forward = ${worst}   запас в контракте = ${declared}  (${(Number(declared) / Number(worst)).toFixed(2)}x)`);
+    expect(worst, 'the forward fee must stay below the allowance sized for it, or ordinary transfers arrive short '
+      + 'and bounce').toBeLessThan(declared);
+    expect(declared, 'and the allowance must keep a real margin over the worst measured case — at least 1.5x, or a '
+      + 'slightly larger payload than anything measured here starts bouncing').toBeGreaterThan(worst * 3n / 2n);
   }, 900_000);
 
   it('COST-02: the smallest value an EXISTING recipient wallet really accepts, per branch', async () => {

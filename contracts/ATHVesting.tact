@@ -8,7 +8,12 @@ const ATH_VESTING_TOTAL_AMOUNT: Int = 10000000000000000; // 10,000,000 ATH atomi
 const ATH_VESTING_PERIOD_UNLOCK_AMOUNT: Int = 100000000000000; // 100,000 ATH atomic units
 const ATH_VESTING_PERIOD_COUNT: Int = 100;
 const ATH_VESTING_PERIOD_SECONDS: Int = 31536000;
-const ATH_VESTING_TRANSFER_REQUEST_VALUE: Int = 58000000; // raised 40M->58M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the beneficiary ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M, +10M margin.
+// [COMMENT CORRECTED 2026-08-01] The arithmetic quoted here described gate 14204 as EXEC(2M)+ACK(3M)+ENDOWMENT(20M)
+// +FWD(21M)+OWNER_EXEC(2M) = 48M with 10M of margin. That gate is now ATH_OWNER_REQUEST_EXEC_RESERVE(2M) +
+// ATH_INTERNAL_TRANSFER_ARRIVAL_MIN(29M) + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE(8M) = 39,000,000, so this leg
+// now carries 19,000,000 of margin. Left at 58M on purpose: this is the vesting payout, it runs for years on an
+// immutable contract, and margin against a future rise in config-25 forward fees is worth more than the saving.
+const ATH_VESTING_TRANSFER_REQUEST_VALUE: Int = 58000000;
 // [RAISED 2026-07-29, wave-8 MED: 2M -> 10M] This is what a claim LEAVES BEHIND, and it is the only inflow this
 // contract has. MEASURED from build/ATHVesting/ATHVesting_ATHVesting.code.boc: 113 distinct code cells plus a data
 // cell that spills at 1321 bits of fields, so ~115 account cells; at the project's frozen 64,962 nanoton per cell-year

@@ -62,6 +62,35 @@ describe('the client quotes what the contract actually demands', () => {
       + unmapped.join('\n')).toEqual([]);
   });
 
+  it('ATH-MIRROR-04: the plain transfer quote clears gate 14204, computed from the contract', () => {
+    // [ADDED 2026-08-01] ATH-MIRROR-01 compares constants one by one and was green while the COMPOSED quote was
+    // wrong: the client's ATHTransferRequest sum omitted the source-ack that ATH_INTERNAL_TRANSFER_ARRIVAL_MIN
+    // includes, and the oversized forward allowance hid the gap until it was measured down. Checking terms is not
+    // checking the sum — this rebuilds gate 14204 from the contract and requires the quote to reach it.
+    const required = contractConst('ATH_OWNER_REQUEST_EXEC_RESERVE')
+      + contractConst('ATH_INTERNAL_TRANSFER_EXEC_RESERVE')
+      + contractConst('ATH_INTERNAL_TRANSFER_ACK_VALUE')
+      + contractConst('ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE')
+      + contractConst('ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT')
+      + contractConst('ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE');
+
+    // And the gate must still be built from those pieces, or this rebuilds an expression the contract abandoned.
+    const gate = SRC.match(/receive\(msg: ATHTransferRequest\)[\s\S]*?let required_value: Int = ([^;]+);/);
+    expect(gate, 'ATHTransferRequest must still compute a required_value').toBeTruthy();
+    for (const term of ['ATH_OWNER_REQUEST_EXEC_RESERVE', 'ATH_INTERNAL_TRANSFER_ARRIVAL_MIN',
+      'ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE']) {
+      expect(gate![1], `gate 14204 must still be composed from ${term}`).toContain(term);
+    }
+    const arrival = SRC.match(/const ATH_INTERNAL_TRANSFER_ARRIVAL_MIN: Int = ([^;]+);/);
+    expect(arrival, 'the arrival floor must still be a named quantity').toBeTruthy();
+    expect(arrival![1], 'and it must still include the source ack — the term the client copy once dropped')
+      .toContain('ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE');
+
+    expect(estimateAthWalletAttachedValueNanotons('ATHTransferRequest'),
+      'the app attaches this for an ordinary ATH transfer; below gate 14204 every one of them is refused')
+      .toBe(required);
+  });
+
   it('ATH-MIRROR-03: the notify quote clears gate 14307, computed from the contract', () => {
     // The sum, not the parts. notify_transfer_value() + ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE is what 14307 compares
     // against, so rebuild that expression from the contract source and require the client's quote to reach it.

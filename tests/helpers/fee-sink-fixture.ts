@@ -25,7 +25,9 @@ export const FA_TREASURY = Address.parse('UQDoCopn5mJ2r1iXlKkMF9bIguCeTGrY5x9cZA
 // tests/fee-sink-fixture-source.test.ts pins this constant to it whenever that scaffolding is present. Baking the
 // FEE_SINK from a TEST literal instead of from the ceremony is a mistake this project has already made once, and it
 // killed the airdrop while PT-04b proved a self-consistent fiction — hence the pin rather than another hand-edit.
-export const FA_BUYBACK = Address.parse('UQAN3GQIkfjJ8ZAufZepdaAY_tdGwIOtOXHxmNtLi3uXcSzh');
+// [REBAKED 2026-08-01, transfer-floor cascade] BuybackBurn embeds ATHWallet's code, so lowering the wallet's forward
+// allowance moved this address again — exactly the drift the note above describes, arriving on schedule.
+export const FA_BUYBACK = Address.parse('UQDArkLDL-QPt_fVgcA1sL4C38VOx1dPxRKSUH5D92jOvKzy');
 export const FA_POOL = Address.parse('UQBZ8Lh9AuO1e9XcFBJ0NmE10IY9FoVpQeoABd9V5ninPATH');
 
 /**

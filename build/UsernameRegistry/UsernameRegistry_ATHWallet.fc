@@ -1594,7 +1594,7 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_require_basechain_owner_path($msg'recipient, $msg'response_destination);
         throw_unless(14202, ($msg'amount > 0));
         throw_unless(14203, ($self'balance >= $msg'amount));
-        int $required_value = 48000000;
+        int $required_value = 39000000;
         throw_unless(14204, ($Context$_get_value(__tact_context_get()) >= $required_value));
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 2000000);
         slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'recipient);
@@ -1717,7 +1717,11 @@ _ %get_pending_notification(int $query_id, int $sender_key) method_id(78277) {
         throw_unless(14701, ($msg'amount > 0));
         throw_unless(14702, ($self'balance >= $msg'amount));
         throw_unless(14703, ( (($msg'forward_ton_amount == 0)) ? (true) : (($msg'forward_ton_amount >= 45000000)) ));
-        int $required_value = (((33000000 + $msg'forward_ton_amount) + 21000000) + 2000000);
+        int $arrival_min = 26000000;
+        if (($msg'forward_ton_amount > 0)) {
+            $arrival_min = ((($msg'forward_ton_amount + 4000000) + 7000000) + 20000000);
+        }
+        int $required_value = ((2000000 + $arrival_min) + 8000000);
         throw_unless(14704, ($Context$_get_value(__tact_context_get()) >= $required_value));
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 2000000);
         slice $recipient_wallet = ($self'balance, $self'owner_address, $self'ath_master_address, $self'pending_notifications, $self'pending_outgoing_transfers)~$ATHWallet$_fun_derive_wallet_address($msg'destination);

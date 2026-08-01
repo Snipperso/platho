@@ -22,7 +22,21 @@ const ATH_INTERNAL_TRANSFER_ACK_VALUE: Int = 3000000;
 // Raising it costs the caller: the constant is composed into gates 14212/14314/14563/14663/14714/14717 and into
 // required_value, so every funding floor moves with it by construction — which is exactly why it is safe to raise.
 const ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE: Int = 4000000;
-const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 21000000;
+// [MEASURED 2026-08-01, lowered 21M -> 8M] What it costs to carry the sender's leg to the recipient wallet. This was
+// the one large constant in this contract with no measurement recorded against it, and it was the single biggest term
+// in a transfer floor that sat ABOVE what an ordinary wallet attaches: at 21,000,000 the plain TEP-74 floor was
+// 56,000,000, Tonkeeper attaches 50,000,000, and ATH could not be sent from any standard wallet at all.
+//
+// Measured in tests/ath-transfer-cost-anatomy.test.ts (COST-01), through the real sender, which attaches the wallet
+// code on EVERY transfer whether or not the recipient already exists — so both cases cost the same:
+//     empty forward_payload   2 650 155
+//     8 cells                 2 691 577
+//     100 cells               3 231 314
+//     250 cells               4 111 321      <- worst measured, growth ~5 844 per cell
+// 8,000,000 is 1.95x the worst measured and ~3x the ordinary case, and leaves room for ~900 further payload cells.
+// Beyond that the arrival simply falls short of gate 14717/14212 and BOUNCES, restoring the sender's balance — the
+// failure mode is a refusal, not a loss, which is why a generous-but-finite allowance is the right shape here.
+const ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE: Int = 8000000;
 const ATH_REGISTRY_PROFILE_AVATAR_FWD_FEE_ALLOWANCE: Int = 2000000;
 // [MEASURED 2026-07-20, raised 30M -> 45M] This floor is what keeps a REFUSED registry purchase refundable.
 // When a registry throws, the notification bounces and the ATH goes home as an ATHInternalTransfer funded by
@@ -762,7 +776,13 @@ contract ATHWallet {
         self.require_basechain_owner_path(msg.recipient, msg.response_destination);
         throwUnless(14202, msg.amount > 0);
         throwUnless(14203, self.balance >= msg.amount);
-        let required_value: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        // [CORRECTED 2026-08-01] Built from what the ARRIVAL actually needs, not from a second hand-written list of
+        // terms. The old sum was EXEC + ACK + ENDOWMENT + FWD + OWNER_EXEC and omitted ATH_INTERNAL_TRANSFER_SOURCE_
+        // ACK_VALUE, which gate 14212 demands on arrival — measured at 29,000,000 in COST-04. The omission was
+        // invisible only because the forward allowance was fat enough to cover it, so shrinking that allowance
+        // without this line would have broken the lane exactly the way the 60,000,000 refund floor once did.
+        let required_value: Int = ATH_OWNER_REQUEST_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_ARRIVAL_MIN
+            + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE;
         throwUnless(14204, context().value >= required_value);
         let downstream_value: Int = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE;
 
@@ -914,7 +934,24 @@ contract ATHWallet {
         throwUnless(14701, msg.amount > 0);
         throwUnless(14702, self.balance >= msg.amount);
         throwUnless(14703, msg.forward_ton_amount == 0 || msg.forward_ton_amount >= ATH_TRANSFER_NOTIFY_MIN_VALUE);
-        let required_value: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE + ATH_OWNER_REQUEST_EXEC_RESERVE;
+        // [CORRECTED 2026-08-01] Two defects in one line, both measured.
+        //
+        // ATH_TRANSFER_NOTIFY_EXEC_RESERVE was charged UNCONDITIONALLY, including when forward_ton_amount is 0 and no
+        // notification is ever emitted. The receiving side already knew better: its own gate on that branch, 14717,
+        // does not ask for it. The sender was billed 7,000,000 for work that does not happen — and that alone is
+        // most of the gap between this floor and what an ordinary wallet attaches.
+        //
+        // The floor is now composed from what the arrival really demands, measured by bisection in COST-02:
+        //     no notification   26,000,000 = EXEC + SOURCE_ACK + ENDOWMENT          (gate 14717)
+        //     notification F    F + 31,000,000 = F + SOURCE_ACK + NOTIFY_EXEC + ENDOWMENT (gate 14714)
+        let arrival_min: Int = ATH_INTERNAL_TRANSFER_EXEC_RESERVE + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+            + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+        if (msg.forward_ton_amount > 0) {
+            arrival_min = msg.forward_ton_amount + ATH_INTERNAL_TRANSFER_SOURCE_ACK_VALUE
+                + ATH_TRANSFER_NOTIFY_EXEC_RESERVE + ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT;
+        }
+        let required_value: Int = ATH_OWNER_REQUEST_EXEC_RESERVE + arrival_min
+            + ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE;
         throwUnless(14704, context().value >= required_value);
         let downstream_value: Int = context().value - ATH_OWNER_REQUEST_EXEC_RESERVE;
 

@@ -69,7 +69,12 @@ const USERNAME_STATE_GROWTH_EXEC_RESERVE: Int = 4000000;
 // onto a dead rate, on immutable contracts. See [[ton-storage-rate-frozen]].
 const USERNAME_REGISTRY_SELF_RENT_CONTRIBUTION: Int = 100000000;
 const USERNAME_NFT_ITEM_DEPLOY_RESERVE: Int = 829000000; // clean-16 L2/#14 (owner: mint = EXACTLY 1 TON): sized so client usernameMintTonCharge = 1_000_000_000 exactly. ~412 yr at the REAL rate 64962/cell/yr for the ~31-cell item (the earlier 240,631-rate figures were the STALE pre-2026 config-18 — corrected 2026-07-15). Minter funds once; NFT lives centuries, forever when used. G8-provisional (finalize NFT cell count via computeDataSize). (A masterchain library code-cell would cut per-item rent ~7× — deferred, Фаза-5.)
-const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000; // raised 30M->48M to track the ATH_TRANSFER_NOTIFY_STORAGE_ENDOWMENT raise (2M->20M, +18M): the official ATH wallet's ATHTransferRequest required_value = EXEC_RESERVE(2M)+INTERNAL_TRANSFER_ACK(3M)+STORAGE_ENDOWMENT(20M)+FWD_FEE_ALLOWANCE(21M)+OWNER_REQUEST_EXEC(2M) = 48M.
+// [COMMENT CORRECTED 2026-08-01] Was documented as sitting EXACTLY on the wallet's gate. It no longer does: gate
+// 14204 is now built from ATH_OWNER_REQUEST_EXEC_RESERVE(2M) + ATH_INTERNAL_TRANSFER_ARRIVAL_MIN(29M) +
+// ATH_INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE(8M) = 39,000,000, so this leg carries 9,000,000 of margin. The value is
+// deliberately NOT trimmed to the new requirement — landing on a gate to the nanoton is what made the old wallet
+// constants dangerous to touch, and this contract is immutable once sealed. Pinned by ATHLEG-01..03.
+const USERNAME_ATH_TRANSFER_EXEC_RESERVE: Int = 48000000;
 const USERNAME_ATH_BURN_EXEC_RESERVE: Int = 5000000;
 const USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE: Int = 2000000;
 const USERNAME_PRUNE_PENDING_MINT_EXEC_RESERVE: Int = 2000000;
