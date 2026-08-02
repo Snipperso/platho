@@ -164,7 +164,7 @@ import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
 import { createConvReadLane } from './conv-lane.mjs?v=1';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=1';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=2';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=1';
 import { readAccountStates } from './shard-reader.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=1';
@@ -174,11 +174,11 @@ import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=1';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=2';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
 import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
 import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=1';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=1';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=2';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,

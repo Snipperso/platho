@@ -14,7 +14,8 @@
 // the client's own records, parsed by its own reader — see web/intro-codec.mjs and web/shard-address.mjs, each
 // pinned against the reference implementation because a divergence here fails silently.
 import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=1';
-import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=1';
+import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=2';
+import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 import { parseBocBase64, computeCellHashAndDepth, beginCell } from './pwa-contract-transactions.mjs?v=33';
 
 /**
@@ -88,7 +89,7 @@ function isStructurallyAbsent(error) {
  */
 export function parseScanPageStack(stack) {
   if (!Array.isArray(stack) || stack.length < 4) throw new Error(`get_scan_page returned ${stack?.length ?? 0} stack items, expected 4`);
-  const num = (i) => BigInt(stack[i]?.value ?? 0);
+  const num = (i) => stackNumOr0(stack[i]?.value, `get_scan_page[${i}]`);
   const cell = (i) => {
     const value = stack[i]?.value;
     if (!value) return beginCell().endCell();

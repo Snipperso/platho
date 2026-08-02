@@ -12,6 +12,8 @@
 // Two independent implementations agreeing is the only evidence worth having — see shard-address.mjs for why
 // that standard applies to this whole client path.
 
+import { stackNum } from './ton-stack-num.mjs?v=1';
+
 /** Message opcode of IntroPublish — mirrors `message(0x49535031) IntroPublish` in contracts/IntroShard.tact. */
 export const INTRO_PUBLISH_OPCODE = 0x49535031;
 
@@ -79,11 +81,9 @@ export function parseIntroEntryStack(stack) {
   if (!Array.isArray(stack) || stack.length < 5) {
     throw new Error(`get_entry returned ${stack?.length ?? 0} stack items, expected 5`);
   }
-  const num = (i, name) => {
-    const raw = stack[i]?.value;
-    if (raw === undefined || raw === null) throw new Error(`get_entry: ${name} missing`);
-    return BigInt(raw);
-  };
+  // `exists` is a Tact Bool, so a TRUE one arrives as the string "-0x1" — see ton-stack-num.mjs. BigInt() refuses it,
+  // which threw on every entry that DID exist and broke first contact on the live chain.
+  const num = (i, name) => stackNum(stack[i]?.value, `get_entry: ${name}`);
   return {
     exists: num(0, 'exists') !== 0n,
     r: num(1, 'r'),
