@@ -30,7 +30,7 @@ async function main() {
   if (!wallet) throw new Error('treasury_owner seed mismatch');
   const opened = client.open(wallet);
 
-  // treasury owner clean-15 ATH wallet + balance (master read from the live manifest, not hardcoded)
+  // treasury owner ATH wallet + balance (master read from the live manifest, not hardcoded)
   const r = await client.runMethod(Address.parse(A.ath_master), 'get_wallet_address', [{ type: 'slice', cell: beginCell().storeAddress(Address.parse(TREASURY)).endCell() }]);
   const treasuryAth = r.stack.readAddress();
   const b = await client.runMethod(treasuryAth, 'get_wallet_data'); const treasuryBal = b.stack.readBigNumber();
@@ -42,7 +42,7 @@ async function main() {
   const fundedNow = BigInt((totals.reserve_funded_total_ath ?? 0n).toString());
 
   console.log('SIGNER (reserve_funder = treasury owner):', wallet.address.toString({ bounceable: false }).slice(0, 18));
-  console.log('SOURCE clean-15 ATH wallet:', treasuryAth.toString({ bounceable: true }).slice(0, 20), '=', (Number(treasuryBal) / 1e9).toLocaleString(), 'ATH');
+  console.log('SOURCE treasury owner ATH wallet:', treasuryAth.toString({ bounceable: true }).slice(0, 20), '=', (Number(treasuryBal) / 1e9).toLocaleString(), 'ATH');
   console.log('RECIPIENT = MarketStabilitySeller', MSS.toString({ bounceable: true }));
   console.log('AMOUNT to lock into reserve:', (Number(RESERVE_ATOMIC) / 1e9).toLocaleString(), 'ATH');
   console.log('MSS reserve_funded_total NOW:', (Number(fundedNow) / 1e9).toLocaleString(), '| sealed:', cfg.sealed, '| reserve_funder_bound:', cfg.reserve_funder_bound);

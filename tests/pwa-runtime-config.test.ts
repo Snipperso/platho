@@ -198,11 +198,14 @@ describe('PWA runtime config guard', () => {
     // RELEASE property, not a contract one, so it moved to its own block and stays pinned here.
     expect(PLATHO_APP_CONFIG.vault).toBeUndefined();
     expect(PLATHO_APP_CONFIG.capsuleHub).toBeUndefined();
+    // [CUTOVER 2026-08-02] clean-17, sealed on mainnet. Pinned as literals rather than imported from the config they
+    // guard: a pin that reads its expectation from the thing under test agrees with any value that thing holds.
     expect(PLATHO_APP_CONFIG.genesis.deploymentManifestHash).toBe(
-      'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
+      'ccee504c6b94773e68550dff3a071107f34609b0fdb17be9fad8ab224d482f49',
     );
-    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b');
+    expect(PLATHO_APP_CONFIG.feeAccumulator.address).toBe('UQAgWSAucibv2D3SOIhL1wKFwg27wIRkeiObu5uxgOfNpLNB');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQCThzitzPXm2dH9psaVkZlkAcHqzCJjcBpD29b5closNbd7');
+    expect(PLATHO_APP_CONFIG.usernameRegistry.address).toBe('UQBR-Ujp5676B3xTiqQ77R2OIjZYBn1GxUvI8V3bmHVV0F_W');
     expect(PLATHO_APP_CONFIG.tonDns.rootAddress).toBe(
       '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     );
@@ -660,8 +663,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/plathoTonRpcTransport/);
     expect(app).toMatch(/plathoTonRpcEndpoint/);
     expect(app).toMatch(/plathoTonSendBocEndpoint/);
-    expect(PLATHO_APP_CONFIG.profileRegistry.address).toBe('UQAkt_x_FRJxT0TevI5KTcExz1wTp412Hq47h4F3F1z2u3Jr');
-    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b');
+    expect(PLATHO_APP_CONFIG.profileRegistry.address).toBe('UQD6tZwZRgWhKv0jzTSN2qyq00ANGR29LVInsFkXwALRKL31');
+    expect(PLATHO_APP_CONFIG.ath.masterAddress).toBe('UQCThzitzPXm2dH9psaVkZlkAcHqzCJjcBpD29b5closNbd7');
     expect(app).not.toMatch(/https:\/\/testnet\.toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).not.toMatch(/https:\/\/toncenter\.com\/api\/v2\/getAddressInformation/);
     expect(app).toMatch(/fetchTonWalletBalance\(address\)/);

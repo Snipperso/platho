@@ -58,7 +58,9 @@ type ManifestLike = {
 type BaseSnapshot = {
   address: string;
   code_hash: string;
-  account_state?: 'active' | 'uninit';
+  // 'nonexist' is what an address the chain has NEVER seen reports; 'uninit' is one that was touched but carries no
+  // code. Both mean "not deployed" — see the widened branch in the ATHWallet check.
+  account_state?: 'active' | 'uninit' | 'nonexist';
   sealed?: boolean;
   deployment_manifest_hash?: string;
 };
@@ -676,13 +678,20 @@ function checkZeroOfficialAthWallet(
   addAddressEq(issues, `${contractKey.toUpperCase()}_ADDRESS_MISMATCH`, snapshot.address, manifest.addresses[addressKey], `${contractKey}.address`);
   addDecimalEq(issues, fundedIssueCode, snapshot.balance_atomic, '0', `${contractKey}.balance_atomic`);
 
-  if (snapshot.account_state === 'uninit') {
+  // [WIDENED 2026-08-02] `nonexist` joins `uninit`. They are the same genesis condition — no wallet, no ATH, only a
+  // predicted address — and the split is an artefact of how the chain reports it: toncenter returns a record for an
+  // address that was merely TOUCHED and omits one it has never seen at all. In clean-15 both registry wallets had been
+  // touched, so only 'uninit' ever appeared and the branch was written to that sample. In clean-17 the registry wallets
+  // are born from the first name or avatar purchase and are endowed by ordinary traffic rather than by the ceremony, so
+  // at genesis they are genuinely never-seen. Treating that as invalid would block a correct genesis; treating it as
+  // active would skip the state_init check that is the only thing pinning where those wallets will appear.
+  if (snapshot.account_state === 'uninit' || snapshot.account_state === 'nonexist') {
     checkRequiredStateInitHash(issues, manifest, addressKey, contractKey);
     return;
   }
 
   if (snapshot.account_state !== undefined && snapshot.account_state !== 'active') {
-    issues.push(issue(`${contractKey.toUpperCase()}_ACCOUNT_STATE_INVALID`, `${contractKey}.account_state must be active or uninit.`));
+    issues.push(issue(`${contractKey.toUpperCase()}_ACCOUNT_STATE_INVALID`, `${contractKey}.account_state must be active, uninit or nonexist.`));
   }
   checkBase(issues, manifest, snapshot, contractKey, addressKey, 'ath_wallet');
   addAddressEq(issues, ownerMismatchCode, snapshot.owner_address ?? '', ownerAddress, `${contractKey}.owner_address`);
@@ -1385,16 +1394,18 @@ export function verifyMainnetGenesisSnapshot(
   if (marketSeller.pricing_frozen !== true) {
     issues.push(issue('MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN_AT_GENESIS', 'market_stability_seller.pricing_frozen must be true from genesis in clean-17: the price is a compile-time constant, not a stored input that a ceremony sets.'));
   }
-  if (!isHex64(marketSeller.genesis_config_hash) || /^0{64}$/i.test(marketSeller.genesis_config_hash)) {
-    issues.push(issue('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING', 'market_stability_seller.genesis_config_hash must retain the non-zero one-time launch controller hash until post-pool pricing freeze.'));
-  } else {
-    addAddressHashEq(
-      issues,
-      'MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISMATCH',
-      marketSeller.genesis_config_hash,
-      manifest.addresses.market_stability_seller_initial_genesis_controller,
-      'market_stability_seller.genesis_config_hash',
-    );
+  // [CORRECTED 2026-08-02, clean-17 genesis] This demanded the OPPOSITE: a NON-zero genesis_config_hash, "retained
+  // until post-pool pricing freeze". That was right for clean-15, where the price was stored state a launch controller
+  // set once the pool existed. clean-17 made the price a compile-time constant, so there is no later ceremony to
+  // authorize — and SealMarketStabilityGenesis therefore ZEROES this field on purpose, which is how this contract, alone
+  // among the five, revokes its controller outright rather than relying on requireUnsealed.
+  //
+  // Left as-is, the check would have blocked a healthy clean-17 genesis. Inverted, it proves something stronger than it
+  // used to: not "the launch key is still the expected one" but "there is no launch key any more". Same failure shape as
+  // the pricing_frozen expectation three lines up, one field over — a stale verifier is a guard that tests the previous
+  // generation and reports on this one.
+  if (!/^0{64}$/i.test(String(marketSeller.genesis_config_hash ?? ''))) {
+    issues.push(issue('MARKET_STABILITY_SELLER_CONTROLLER_NOT_REVOKED', 'market_stability_seller.genesis_config_hash must be zero after SealMarketStabilityGenesis: clean-17 revokes the launch controller at the seal instead of retaining its hash.'));
   }
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_RESERVE_FUNDER_MISMATCH', marketSeller.reserve_funder_address, manifest.addresses.market_stability_reserve_funder, 'market_stability_seller.reserve_funder_address');
   addAddressEq(issues, 'MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_MISMATCH', marketSeller.official_ath_wallet_address, manifest.addresses.market_stability_seller_official_ath_wallet, 'market_stability_seller.official_ath_wallet_address');
@@ -1452,7 +1463,14 @@ export function verifyMainnetGenesisSnapshot(
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_OFFICIAL_ATH_WALLET', s.username_registry.treasury_ath_receiver, manifest.addresses.username_registry_official_ath_wallet, 'username_registry.treasury_ath_receiver', 'username_registry_official_ath_wallet');
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_AIRDROP_POOL', s.username_registry.treasury_ath_receiver, manifest.addresses.airdrop_pool, 'username_registry.treasury_ath_receiver', 'airdrop_pool');
   addAddressNotEq(issues, 'USERNAME_REGISTRY_TREASURY_RECEIVER_IS_ATH_MASTER', s.username_registry.treasury_ath_receiver, manifest.addresses.ath_master, 'username_registry.treasury_ath_receiver', 'ath_master');
-  addDecimalZero(issues, 'USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS', s.username_registry.name_record_count, 'username_registry.name_record_count');
+  // [REMOVED 2026-08-02, clean-17 genesis] This asserted `name_record_count == 0`. clean-17 deleted that field with the
+  // name dictionary it counted: names are NFT items at derived addresses now, and the registry holds no roster to count
+  // — that removal is what lifted the 13,076-name ceiling. The check therefore evaluated `undefined` and fired forever.
+  //
+  // NOT dropping the property, because a guard deleted quietly is how this repo has lost gates three times. "No name was
+  // minted before the seal" stays observable, through evidence that already has its own codes: minting moves ATH through
+  // the registry's official wallet, so a pre-genesis mint would leave treasury_due_ath or burn_due_ath non-zero (both
+  // asserted below) and would have deployed that wallet, whose account state is asserted uninit-or-nonexist above.
   addDecimalZero(issues, 'USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS', s.username_registry.pending_mint_count, 'username_registry.pending_mint_count');
   addDecimalZero(issues, 'USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.treasury_due_ath, 'username_registry.treasury_due_ath');
   addDecimalZero(issues, 'USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS', s.username_registry.burn_due_ath, 'username_registry.burn_due_ath');

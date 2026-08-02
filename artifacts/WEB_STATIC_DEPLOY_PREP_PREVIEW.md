@@ -9,8 +9,8 @@ Output: C:\platho\artifacts\platho-web-static-preview
 
 ```text
 fileCount=219
-totalBytes=5562684
-bundleSha256=8fe64030f502542328a67ad04c92b2d6686fe69ed80d5f8fada9d4df4cd749c6
+totalBytes=5563022
+bundleSha256=b657aba2e5c52437a8961c59c6b09fd668945820dc130b8b320bf9b1c96bbd6f
 noBackendRuntime=true
 ```
 
@@ -21,7 +21,7 @@ noBackendRuntime=true
 - pwaScopeIsStatic: true
 - envFilesIncluded: false
 - serverRuntimeIncluded: false
-- productionMarkersCleared: false
+- productionMarkersCleared: true
 
 ## Blockers
 
@@ -30,8 +30,7 @@ None
 ## Warnings
 
 - STATIC_PACKAGE_IS_NON_PRODUCTION
-- MAINNET_GENESIS_NOT_VERIFIED
 
 ## Production Findings
 
-- MAINNET_GENESIS_NOT_VERIFIED: Current release candidate has no verified final mainnet genesis evidence. (artifacts/MAINNET_GENESIS_VERIFIED.txt)
+None

@@ -16,9 +16,16 @@
  * DRY-RUN by default; --broadcast actually sends. Mnemonic read from a file, never logged.
  *
  * Usage:
- *   dry run:   ts-node scripts/mainnet_upload_username_art.ts --registry <UQ|raw> --mnemonic-file artifacts/local/deployer.secret
+ *   dry run:   ts-node scripts/mainnet_upload_username_art.ts --registry <UQ|raw> --mnemonic-file artifacts/local/genesis_controller.secret.txt
  *   upload:    ... --broadcast
  *   + seal:    ... --broadcast --seal
+ *
+ * [CORRECTED 2026-08-02, mid-ceremony] This line used to name artifacts/local/deployer.secret. UploadArt is gated on
+ * requireGenesisController, and the genesis controller's seed is genesis_controller.secret.txt — the mapping the
+ * broadcaster uses for every other controller step. An operator following this line would have signed all 56 uploads
+ * from the wrong wallet and had each one thrown, on a tool whose whole job is a step that must precede SealGenesis.
+ * The twin script, mainnet_upload_collection_meta.ts, already named the right file, which is how the two disagreeing
+ * documents were noticed at all.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { Address, beginCell, Cell, internal, storeMessage, SendMode, toNano } from '@ton/core';
