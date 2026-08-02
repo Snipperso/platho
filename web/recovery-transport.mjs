@@ -8,6 +8,7 @@
 // pump are shared with the other lanes (toWireAddress / the injected runGetMethod).
 
 import { toWireAddress } from './shard-reader.mjs?v=1';
+import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=33';
 
 /**
@@ -19,7 +20,9 @@ export function decodeRecoveryViewStack(stack) {
   if (!Array.isArray(stack) || stack.length < 12) {
     throw new Error(`get_view returned ${stack?.length ?? 0} stack items, expected 12`);
   }
-  const num = (i) => BigInt(stack[i]?.value ?? 0);
+  // The comment below was right about the -1 and the parser still used BigInt(), which THROWS on the "-0x1" toncenter
+  // actually sends. Knowing the value and mis-parsing it are independent mistakes; see ton-stack-num.mjs.
+  const num = (i) => stackNumOr0(stack[i]?.value, `get_view[${i}]`);
   return {
     self_bucket_key: num(0),
     bound: num(1) !== 0n,      // Tact Bool → TVM int (-1 true / 0 false)

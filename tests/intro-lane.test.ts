@@ -64,6 +64,17 @@ function fakeToncenter(bc: Blockchain, shardAddress: string, inbound: any[]) {
   };
 }
 
+/**
+ * [CORRECTED 2026-08-02] Encode stack integers the way toncenter ACTUALLY does: hex, with the sign OUTSIDE the radix
+ * prefix. This stub used to emit `String(item.value)` — decimal — so a Tact Bool arrived as "-1", which BigInt()
+ * happily parses. Production receives "-0x1", which BigInt() throws on. The stub was faithful in every respect except
+ * the one that mattered, and it certified a first-contact path that could not read a single existing entry on the live
+ * chain. Measured against toncenter v3 on the clean-17 IntroShard; see web/ton-stack-num.mjs.
+ */
+function toncenterInt(value: bigint): string {
+  return value < 0n ? `-0x${(-value).toString(16)}` : `0x${value.toString(16)}`;
+}
+
 /** The app's transport shape: one get-method call, raw toncenter-style response. */
 function runGetMethodFrom(bc: Blockchain) {
   return async ({ address, method, stack }: any) => {
@@ -74,7 +85,7 @@ function runGetMethodFrom(bc: Blockchain) {
       exit_code: res.exitCode,
       stack: (res.stack as any[]).map((item: any) => (item.type === 'cell' || item.type === 'slice'
         ? { type: 'cell', value: item.cell.toBoc().toString('base64') }
-        : { type: 'int', value: String(item.value) })),
+        : { type: 'int', value: toncenterInt(item.value) })),
     };
   };
 }

@@ -72,6 +72,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'intro-receive-handler.mjs',
   'intro-send-coords.mjs',
   'intro-transport.mjs',
+  'ton-stack-num.mjs',
   'recovery-lane.mjs',
   'notes-lane.mjs',
   'recovery-transport.mjs',

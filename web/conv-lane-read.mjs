@@ -17,6 +17,7 @@
 
 import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
 import { toWireAddress } from './shard-reader.mjs?v=1';
+import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 // MUST equal conv-publish-browser + RecordShard.tact — mirrored (not imported) so a drift is caught by the round-trip
@@ -146,7 +147,7 @@ export function decodeRecordShardLastSeq(stack) {
   if (!Array.isArray(stack) || stack.length < 3) {
     throw new Error(`RecordShard get_view returned ${stack?.length ?? 0} stack items, expected >= 3`);
   }
-  return Number(BigInt(stack[2]?.value ?? 0));
+  return Number(stackNumOr0(stack[2]?.value, 'get_view: last_seq'));
 }
 
 /** Decode a RecordShardView getter stack to { lastSeq, recordCount } — record_count is index 3, the number of records
@@ -155,19 +156,24 @@ export function decodeRecordShardView(stack) {
   if (!Array.isArray(stack) || stack.length < 4) {
     throw new Error(`RecordShard get_view returned ${stack?.length ?? 0} stack items, expected >= 4`);
   }
-  return { lastSeq: Number(BigInt(stack[2]?.value ?? 0)), recordCount: Number(BigInt(stack[3]?.value ?? 0)) };
+  return {
+    lastSeq: Number(stackNumOr0(stack[2]?.value, 'get_view: last_seq')),
+    recordCount: Number(stackNumOr0(stack[3]?.value, 'get_view: record_count')),
+  };
 }
 
 /** Decode a CapsuleRecordView getter stack — get_record returns { exists: Bool, frame_commit: Int, created_at: Int }.
- *  The Bool comes back as an int (0/1) on the stack; frame_commit is the per-record commitment the confirm matches. */
+ *  [CORRECTED 2026-08-02] This line used to claim the Bool "comes back as an int (0/1)". It does not: a Tact Bool is
+ *  TVM -1 when true, and toncenter renders that as "-0x1", which BigInt() throws on. The identical mistake in the
+ *  INTRO codec broke first contact on the live chain — the confirm read failed on every entry that existed. */
 export function decodeCapsuleRecordView(stack) {
   if (!Array.isArray(stack) || stack.length < 3) {
     throw new Error(`RecordShard get_record returned ${stack?.length ?? 0} stack items, expected >= 3`);
   }
   return {
-    exists: BigInt(stack[0]?.value ?? 0) !== 0n,
-    frameCommit: BigInt(stack[1]?.value ?? 0),
-    createdAt: Number(BigInt(stack[2]?.value ?? 0)),
+    exists: stackNumOr0(stack[0]?.value, 'get_record: exists') !== 0n,
+    frameCommit: stackNumOr0(stack[1]?.value, 'get_record: frame_commit'),
+    createdAt: Number(stackNumOr0(stack[2]?.value, 'get_record: created_at')),
   };
 }
 

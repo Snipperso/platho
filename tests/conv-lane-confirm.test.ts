@@ -70,7 +70,10 @@ function sandboxRunGetMethod(blockchain: any) {
       return {
         exit_code: 0,
         stack: [
-          { type: 'num', value: r.exists ? '-1' : '0' },
+          // [CORRECTED 2026-08-02] "-0x1", not "-1". toncenter renders stack integers in hex with the sign outside the
+          // prefix, and BigInt() throws on that form — which is exactly how the INTRO lane shipped broken past a green
+          // suite. A stub that is wrong about the wire proves nothing about the wire.
+          { type: 'num', value: r.exists ? '-0x1' : '0x0' },
           { type: 'num', value: '0x' + r.frame_commit.toString(16) },
           { type: 'num', value: '0x' + r.created_at.toString(16) },
         ],
