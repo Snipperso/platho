@@ -297,11 +297,14 @@ function scanMainnetGenesisFindings(root = ROOT) {
     }
   }
 
-  if (normalizeHash(PLATHO_APP_CONFIG?.vault?.deploymentManifestHash) !== normalizeHash(input?.manifest?.manifest_hash_hex)) {
+  // [CORRECTED 2026-08-02] Read `genesis`, not the deleted `vault` block — see the twin correction in
+  // scripts/preprod_guard.mjs. Both copies of this check drifted the same way, which is the argument against the
+  // second copy existing at all.
+  if (normalizeHash(PLATHO_APP_CONFIG?.genesis?.deploymentManifestHash) !== normalizeHash(input?.manifest?.manifest_hash_hex)) {
     findings.push({
       id: 'PWA_FINAL_MANIFEST_HASH_MISMATCH',
       file: 'web/platho-config.mjs',
-      message: 'PWA vault.deploymentManifestHash must match the verified final genesis manifest hash.',
+      message: 'PWA genesis.deploymentManifestHash must match the verified final genesis manifest hash.',
     });
   }
 

@@ -304,11 +304,16 @@ function validateCurrentCodeHashesMatchFinalManifest(input) {
 function validatePwaConfigMatchesFinalManifest(input) {
   const manifest = input?.manifest;
   const manifestHash = normalizeHash(manifest?.manifest_hash_hex);
-  if (normalizeHash(PLATHO_APP_CONFIG?.vault?.deploymentManifestHash) !== manifestHash) {
+  // [CORRECTED 2026-08-02] Read `genesis`, not `vault`. The Vault contract was deleted and its block with it, but the
+  // genesis binding is a RELEASE property that merely LIVED there, so it moved to its own block — and this guard kept
+  // aiming at the old address. `PLATHO_APP_CONFIG.vault` is undefined, normalizeHash turns that into '', and '' never
+  // equals a manifest hash: the check has been reporting a mismatch for a reason of its own making, which means the
+  // binding it exists to enforce has not actually been enforced since the cutover.
+  if (normalizeHash(PLATHO_APP_CONFIG?.genesis?.deploymentManifestHash) !== manifestHash) {
     failures.push({
       id: 'PWA_FINAL_MANIFEST_HASH_MISMATCH',
       file: 'web/platho-config.mjs',
-      message: 'PWA vault.deploymentManifestHash must match the verified final genesis manifest hash.',
+      message: 'PWA genesis.deploymentManifestHash must match the verified final genesis manifest hash.',
     });
   }
 

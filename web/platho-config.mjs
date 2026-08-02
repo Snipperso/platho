@@ -137,20 +137,23 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   // guard binds to the verified-genesis evidence (artifacts/mainnet_genesis_verify_input.json): a production bundle
   // that names a different genesis than the one that was verified must not ship. It used to live under `vault` —
   // the contract is gone, the release property is not, so it moved to its own block.
+  // [CUTOVER 2026-08-02] Repointed from the clean-15 genesis to clean-17, sealed on mainnet the same day. These five
+  // values are not derived from anything the build can recompute — they name a chain that exists — so they move by
+  // hand, once, after the seals land, and tests/pwa-runtime-config.test.ts pins every one of them.
   genesis: {
-    deploymentManifestHash: 'd9ca407acd7a9cdb5b3ee26cbd122b73fea79e6f7f12fb7445c1a64516e57a16',
+    deploymentManifestHash: 'ccee504c6b94773e68550dff3a071107f34609b0fdb17be9fad8ab224d482f49',
   },
   feeAccumulator: {
-    address: 'UQASbM-7--CIRVhLUSvT9E5JVxTwURQ20AoAqNj9IPP-Ponr',
+    address: 'UQAgWSAucibv2D3SOIhL1wKFwg27wIRkeiObu5uxgOfNpLNB',
   },
   ath: {
-    masterAddress: 'UQAMx3PgZCEDrGtsOcfK82wONP8RkMRHSR-4DDTUuEIFcF6b',
+    masterAddress: 'UQCThzitzPXm2dH9psaVkZlkAcHqzCJjcBpD29b5closNbd7',
   },
   usernameRegistry: {
-    address: 'UQBhlvF4qNpc6PLN2-X9hgVqlq-6k2DJRtxkGbrgBkZL-nMI',
+    address: 'UQBR-Ujp5676B3xTiqQ77R2OIjZYBn1GxUvI8V3bmHVV0F_W',
   },
   profileRegistry: {
-    address: 'UQAkt_x_FRJxT0TevI5KTcExz1wTp412Hq47h4F3F1z2u3Jr',
+    address: 'UQD6tZwZRgWhKv0jzTSN2qyq00ANGR29LVInsFkXwALRKL31',
   },
   crypto: {
     signedBundlePurpose: 'pwa-production',

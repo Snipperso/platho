@@ -205,7 +205,9 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.market_stability_seller_official_ath_wallet,
         ton_treasury_receiver_address: addresses.market_stability_ton_treasury_receiver,
         ath_master_address: addresses.ath_master,
-        genesis_config_hash: addressHashHex(addresses.market_stability_seller_initial_genesis_controller),
+        // [CUTOVER 2026-08-02] Zero, not the launch controller's hash. clean-17's SealMarketStabilityGenesis clears
+        // this field to revoke the controller — see the inverted check in the verifier.
+        genesis_config_hash: '0'.repeat(64),
         pricing_frozen: true,
         reserve_due_ath: '60000000000000000',
         reserve_funded_total_ath: '60000000000000000',
@@ -236,7 +238,9 @@ function finalInput(): MainnetGenesisVerifyInput {
         official_ath_wallet_address: addresses.username_registry_official_ath_wallet,
         ath_master_address: addresses.ath_master,
         treasury_ath_receiver: addresses.treasury_ath_receiver,
-        name_record_count: '0',
+        // name_record_count is gone with the name dictionary clean-17 deleted — that removal is what lifted the
+        // 13,076-name ceiling. "No name minted before the seal" is now proved by treasury_due/burn_due below plus the
+        // registry's official wallet never having been deployed.
         pending_mint_count: '0',
         treasury_due_ath: '0',
         burn_due_ath: '0',
@@ -1008,7 +1012,6 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
   it('rejects final genesis when registries or FeeAccumulator already hold records or due buckets', () => {
     const input = finalInput();
-    input.snapshot.username_registry.name_record_count = '1';
     input.snapshot.username_registry.pending_mint_count = '1';
     input.snapshot.username_registry.treasury_due_ath = '1';
     input.snapshot.username_registry.burn_due_ath = '1';
@@ -1027,7 +1030,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     const report = verifyMainnetGenesisSnapshot(input);
 
     expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('USERNAME_REGISTRY_NAME_RECORDS_NOT_ZERO_AT_GENESIS');
+    expect(report.issue_codes).toContain('USERNAME_REGISTRY_PENDING_MINTS_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('USERNAME_REGISTRY_BURN_DUE_NOT_ZERO_AT_GENESIS');
     expect(report.issue_codes).toContain('PROFILE_REGISTRY_PENDING_AVATAR_WRITES_NOT_ZERO_AT_GENESIS');
@@ -1209,7 +1212,9 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     const input = finalInput();
     // clean-17 flips this: frozen is the HEALTHY state, so the negative case is a seller reporting NOT frozen.
     input.snapshot.market_stability_seller.pricing_frozen = false;
-    input.snapshot.market_stability_seller.genesis_config_hash = '0'.repeat(64);
+    // [CUTOVER 2026-08-02] Also flipped: zero is now the healthy state, so the unhealthy case is a seller that STILL
+    // carries a controller hash after the seal — i.e. a controller that was never revoked.
+    input.snapshot.market_stability_seller.genesis_config_hash = addressHashHex(input.manifest.addresses.market_stability_seller_initial_genesis_controller);
     input.snapshot.market_stability_seller.reserve_due_ath = '1';
     input.snapshot.market_stability_seller.reserve_funded_total_ath = '1';
     input.snapshot.market_stability_seller.treasury_due_ton = '1';
@@ -1228,7 +1233,7 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
 
     expect(report.mainnet_genesis_verified).toBe(false);
     expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_PRICING_NOT_FROZEN_AT_GENESIS');
-    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISSING');
+    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_CONTROLLER_NOT_REVOKED');
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_DUE_NOT_FULLY_CAPITALIZED');
     expect(report.issue_codes).toContain('MARKET_STABILITY_RESERVE_FUNDED_TOTAL_NOT_FULLY_CAPITALIZED');
     expect(report.issue_codes).toContain('MARKET_STABILITY_TREASURY_DUE_NOT_ZERO_AT_GENESIS');
@@ -1256,14 +1261,27 @@ describe('mainnet genesis getter-vs-manifest verifier', () => {
     expect(report.issue_codes).toContain('MISSING_MARKET_STABILITY_SELLER_OFFICIAL_ATH_WALLET_SNAPSHOT');
   });
 
-  it('rejects final genesis when MarketStabilitySeller retained launch controller hash does not match the manifest address', () => {
-    const input = finalInput();
-    input.snapshot.market_stability_seller.genesis_config_hash = hash('wrong_market_stability_launch_controller');
+  // [REWRITTEN 2026-08-02] This used to assert that a retained launch-controller hash must MATCH the manifest address,
+  // which was the clean-15 model: the price was stored state, a controller set it once the pool existed, and the hash
+  // was how you knew which key still held that right. clean-17 made the price a compile-time constant and made the seal
+  // ZERO this field, so there is no legitimate holder left — and "matching" buys nothing.
+  //
+  // Kept as a test rather than deleted, because the property it guards got STRONGER and a deleted test would have left
+  // the strongest of the five revocations unasserted. Both cases are checked, precisely because the matching one is the
+  // tempting exception: a snapshot carrying the RIGHT controller's hash still means that controller was never revoked.
+  it('rejects final genesis when MarketStabilitySeller retained ANY launch controller hash, matching or not', () => {
+    for (const which of ['the manifest controller', 'some other key'] as const) {
+      const input = finalInput();
+      input.snapshot.market_stability_seller.genesis_config_hash = which === 'the manifest controller'
+        ? addressHashHex(input.manifest.addresses.market_stability_seller_initial_genesis_controller)
+        : hash('wrong_market_stability_launch_controller');
+      const label = which;
 
-    const report = verifyMainnetGenesisSnapshot(input);
+      const report = verifyMainnetGenesisSnapshot(input);
 
-    expect(report.mainnet_genesis_verified).toBe(false);
-    expect(report.issue_codes).toContain('MARKET_STABILITY_SELLER_LAUNCH_CONTROLLER_HASH_MISMATCH');
+      expect(report.mainnet_genesis_verified, label).toBe(false);
+      expect(report.issue_codes, label).toContain('MARKET_STABILITY_SELLER_CONTROLLER_NOT_REVOKED');
+    }
   });
 
   it('rejects final genesis when FeeAccumulator buyback split is already enabled', () => {

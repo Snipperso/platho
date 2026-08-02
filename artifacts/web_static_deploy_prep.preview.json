@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-02T10:04:04.099Z",
+  "generatedAt": "2026-08-02T16:15:42.826Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 219,
-    "totalBytes": 5562684,
-    "bundleSha256": "8fe64030f502542328a67ad04c92b2d6686fe69ed80d5f8fada9d4df4cd749c6",
+    "totalBytes": 5563022,
+    "bundleSha256": "b657aba2e5c52437a8961c59c6b09fd668945820dc130b8b320bf9b1c96bbd6f",
     "files": [
       {
         "path": "app.js",
@@ -594,8 +594,8 @@
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 19294,
-        "sha256": "083c2939d4abc86086db61ae10ed1d842a5fb49c6aadaa4238db63fe122c67a8"
+        "bytes": 19632,
+        "sha256": "fa89f82ee8bca5845c7e2b5b8ceabe01492d67ab162f0954d8fbe2927b3071ea"
       },
       {
         "path": "platho-wallet.mjs",
@@ -1363,18 +1363,11 @@
     "pwaScopeIsStatic": true,
     "envFilesIncluded": false,
     "serverRuntimeIncluded": false,
-    "productionMarkersCleared": false
+    "productionMarkersCleared": true
   },
   "blockers": [],
   "warnings": [
-    "STATIC_PACKAGE_IS_NON_PRODUCTION",
-    "MAINNET_GENESIS_NOT_VERIFIED"
+    "STATIC_PACKAGE_IS_NON_PRODUCTION"
   ],
-  "productionFindings": [
-    {
-      "id": "MAINNET_GENESIS_NOT_VERIFIED",
-      "file": "artifacts/MAINNET_GENESIS_VERIFIED.txt",
-      "message": "Current release candidate has no verified final mainnet genesis evidence."
-    }
-  ]
+  "productionFindings": []
 }
