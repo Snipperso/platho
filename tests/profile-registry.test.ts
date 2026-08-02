@@ -146,7 +146,7 @@ async function deployProfileRegistryWithAthSystem(options: { officialWalletBalan
   const masterTreasuryOwner = fixtureAddress('ATH_PROFILE_MASTER_TREASURY');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
 
-  const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
+  const masterInit = await ATHMaster.init(masterTreasuryOwner, content, 0n);
   const athMasterAddress = contractAddress(0, masterInit);
   const registryInit = await ProfileRegistry.init(
     placeholderAthWallet,

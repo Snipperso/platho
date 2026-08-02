@@ -77,18 +77,21 @@ PROGRAM{
     -ROT
   }>
   $ATHMaster$_store PROCINLINE:<{
-    s3 s4 XCHG2
+    s4 s5 XCHG2
     128 STU
+    s1 s2 XCHG
     STSLICE
     STREF
     1 STI
+    32 STU
   }>
   $ATHMaster$_load PROCINLINE:<{
     128 LDU
     LDMSGADDR
     LDREF
     1 LDI
-    4 -ROLL
+    32 LDU
+    5 -ROLL
   }>
   $Context$_get_value PROCINLINE:<{
     s1 s3 XCHG
@@ -106,10 +109,12 @@ PROGRAM{
   $ATHMaster$init$_load PROCINLINE:<{
     LDMSGADDR
     LDREF
-    -ROT
+    257 PUSHINT
+    LDIX
+    3 -ROLL
   }>
   $ATHMaster$_contract_init PROCINLINE:<{
-    OVER
+    s2 PUSH
         REWRITESTDADDR
     DROP
     14104 PUSHINT
@@ -117,8 +122,9 @@ PROGRAM{
     0 EQINT
     THROWANYIFNOT
     100000000000000000 PUSHINT
-    -ROT
+    3 -ROLL
     FALSE
+    SWAP
   }>
   $ATHMaster$_contract_load PROCINLINE:<{
     c4 PUSH
@@ -127,12 +133,12 @@ PROGRAM{
     SWAP
     IF:<{
       $ATHMaster$_load INLINECALLDICT
-      1 4 BLKDROP2
+      1 5 BLKDROP2
     }>ELSE<{
       $ATHMaster$init$_load INLINECALLDICT
-      s0 s2 XCHG
+      s0 s3 XCHG
       ENDS
-      SWAP
+      ROT
       $ATHMaster$_contract_init INLINECALLDICT
     }>
   }>
@@ -141,7 +147,7 @@ PROGRAM{
     TRUE
     SWAP
     1 STI
-    4 -ROLL
+    5 -ROLL
     $ATHMaster$_store INLINECALLDICT
     ENDC
     c4 POP
@@ -216,12 +222,12 @@ PROGRAM{
   $ATHMaster$_fun_get_jetton_data PROCREF:<{
     0 PUSHINT
         MYADDR
-    s4 s(-1) PUXC
+    s5 s(-1) PUXC
     $ATHWallet$_init_child INLINECALLDICT
     DROP
     FALSE
-    s5 PUSH
-    s5 s4 s2 PU2XC
+    s6 PUSH
+    s6 s5 s2 PU2XC
     $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code INLINECALLDICT
   }>
   $ATHMaster$_fun_get_wallet_address PROCREF:<{
@@ -234,14 +240,14 @@ PROGRAM{
   %get_jetton_data PROC:<{
     $ATHMaster$_contract_load INLINECALLDICT
     $ATHMaster$_fun_get_jetton_data INLINECALLDICT
-    4 5 BLKDROP2
+    5 5 BLKDROP2
     $ATHJettonDataView$_to_external INLINECALLDICT
   }>
   %get_wallet_address PROC:<{
     $ATHMaster$_contract_load INLINECALLDICT
-    4 ROLL
+    5 ROLL
     $ATHMaster$_fun_get_wallet_address INLINECALLDICT
-    4 1 BLKDROP2
+    5 1 BLKDROP2
   }>
   recv_internal PROC:<{
     SWAP
@@ -259,9 +265,9 @@ PROGRAM{
     s0 s2 XCHG
     __tact_context_sender SETGLOB
     $ATHMaster$_contract_load INLINECALLDICT
-    s0 s5 XCHG
+    s0 s6 XCHG
     IFJMP:<{
-      s0 s3 XCHG
+      s0 s4 XCHG
       32 PUSHINT
       SDSKIPFIRST
       0 PUSHINT
@@ -280,20 +286,21 @@ PROGRAM{
         2 1 BLKDROP2
         14130 PUSHINT
         __tact_context_get_sender INLINECALLDICT
-        s3 PUSH
-        s4 s5 XCHG
-        s6 s1 s3 XCHG3
-        s7 s5 XCHG2
+        s4 PUSH
+        s5 s6 XCHG
+        s0 s4 XCHG
+        s7 s1 s3 XCHG3
+        s8 s6 XCHG2
         $ATHMaster$_fun_derive_wallet_address INLINECALLDICT
-        NIP
-        s1 s6 XCHG
+        s2 POP
+        s7 s7 XCHG2
         SDEQ
-        s1 s4 XCHG
+        s1 s5 XCHG
         THROWANYIFNOT
         14131 PUSHINT
-        s2 s1 XCPU
+        s3 s2 XCPU
         EQUAL
-        s1 s2 XCHG
+        s1 s3 XCHG
         THROWANYIFNOT
         FALSE
         __tact_context_get INLINECALLDICT
@@ -325,28 +332,28 @@ PROGRAM{
               SWAP
               SENDRAWMSG
         }>
-        s1 s3 XCHG
+        s3 s0 s4 XCHG3
         $ATHMaster$_contract_store INLINECALLDICT
       }>
-      5 BLKDROP
+      6 BLKDROP
     }>
     0 PUSHINT
-    s4 PUSH
+    s5 PUSH
     SBITS
     DUP
     31 GTINT
     IF:<{
       NIP
-      s0 s4 XCHG
-      32 LDU
       s0 s5 XCHG
+      32 LDU
+      s0 s6 XCHG
     }>
     OVER
     1096042498 PUSHINT
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s3 XCHG
+      s0 s4 XCHG
       64 LDU
       128 LDU
       LDMSGADDR
@@ -358,16 +365,17 @@ PROGRAM{
       THROWANYIFNOT
       14101 PUSHINT
       __tact_context_get_sender INLINECALLDICT
+      s4 s8 XCHG
       s3 s7 XCHG
-      s6 s8 s9 XCHG3
+      s6 s9 s10 XCHG3
       s7 PUSH
       $ATHMaster$_fun_derive_wallet_address INLINECALLDICT
-      s1 s10 XCHG
+      s1 s11 XCHG
       SDEQ
-      s1 s8 XCHG
+      s1 s9 XCHG
       THROWANYIFNOT
       14102 PUSHINT
-      s2 s3 PUSH2
+      s3 s7 PUSH2
       GEQ
       THROWANYIFNOT
       14103 PUSHINT
@@ -376,11 +384,11 @@ PROGRAM{
       2000000 PUSHINT
       GEQ
       THROWANYIFNOT
-      s1 s2 XCPU
+      s2 s6 XCPU
       SUB
       0 PUSHINT
       64 PUSHINT
-      s5 s4 XCHG2
+      s5 s8 XCHG2
       TRUE
       s0 s8 XCHG
       $ATHBurnFinalized$_constructor_query_id_amount_owner_address INLINECALLDICT
@@ -388,7 +396,7 @@ PROGRAM{
       $ATHBurnFinalized$_store_cell INLINECALLDICT
       s4 s5 XCHG
       s3 s5 XCHG
-      s5 s6 s0 XCHG3
+      s7 s6 s0 XCHG3
       $MessageParameters$_constructor_to_value_mode_bounce_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -407,7 +415,8 @@ PROGRAM{
           ENDC
           SWAP
           SENDRAWMSG
-      s0 s0 s3 XCHG3
+      s0 s3 s3 XCHG3
+      s0 s4 XCHG
       $ATHMaster$_contract_store INLINECALLDICT
     }>
     OVER
@@ -415,13 +424,13 @@ PROGRAM{
     EQUAL
     IFJMP:<{
       2DROP
-      s0 s3 XCHG
+      s0 s4 XCHG
       64 LDU
       LDMSGADDR
       DROP
       14120 PUSHINT
       __tact_context_get_sender INLINECALLDICT
-      s4 PUSH
+      s5 PUSH
       SDEQ
       THROWANYIFNOT
       14121 PUSHINT
@@ -430,11 +439,11 @@ PROGRAM{
       s1 s6 XCHG
       THROWANYIFNOT
       14122 PUSHINT
-      s5 s2 PUSH2
+      s5 s3 PUSH2
       SDEQ
       THROWANYIFNOT
       14123 PUSHINT
-      s3 PUSH
+      s4 PUSH
       100000000000000000 PUSHINT
       EQUAL
       THROWANYIFNOT
@@ -452,15 +461,16 @@ PROGRAM{
       TRUE
       0 PUSHINT
           MYADDR
-      s5 s(-1) PUXC
+      s6 s(-1) PUXC
       $ATHWallet$_init_child INLINECALLDICT
-      s5 PUSH
-      s4 s7 XCHG
-      s8 s3 s3 XCHG3
-      s0 s6 XCHG
+      s6 PUSH
+      s5 s8 XCHG
+      s0 s4 XCHG
+      s3 s6 XCHG
+      s6 s10 s7 XCHG3
       $ATHMaster$_fun_derive_wallet_address INLINECALLDICT
       TRUE
-      s6 s5 XCPU
+      s9 s6 XCPU
       1 PUSHINT
       s0 s12 XCHG
       $ATHGenesisSupplyCredit$_constructor_query_id_amount_response_destination INLINECALLDICT
@@ -468,9 +478,9 @@ PROGRAM{
       $ATHGenesisSupplyCredit$_store_cell INLINECALLDICT
       s1 s6 XCHG
       s5 s8 XCHG
-      s1 s4 XCHG
+      s4 s9 XCHG
       s3 s10 XCHG
-      s9 s7 s0 XCHG3
+      s7 s11 s0 XCHG3
       $SendParameters$_constructor_to_value_bounce_mode_code_data_body INLINECALLDICT
           NEWC
           b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
@@ -538,31 +548,31 @@ PROGRAM{
           // Group 5: Sending the message, with `mode` on top
           SWAP
           SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-      2SWAP
+      s1 s3 XCHG
       $ATHMaster$_contract_store INLINECALLDICT
     }>
-    s5 POP
+    s6 POP
     DUP
     1096042506 PUSHINT
     EQUAL
     IFJMP:<{
       DROP
-      s3 POP
-      s0 s0 s3 XCHG3
+      s4 POP
+      s0 s3 s4 XCHG3
       $ATHMaster$_contract_store INLINECALLDICT
     }>
     0 EQINT
-    s0 s4 XCHG
+    s0 s5 XCHG
     33 LESSINT
-    s1 s4 XCHG
+    s1 s5 XCHG
     AND
     IFJMP:<{
       13001 PUSHINT
       THROWANY
-      s0 s0 s3 XCHG3
+      s0 s3 s4 XCHG3
       $ATHMaster$_contract_store INLINECALLDICT
     }>
-    4 BLKDROP
+    5 BLKDROP
     130 THROW
   }>
 }END>c

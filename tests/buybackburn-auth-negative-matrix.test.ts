@@ -104,7 +104,7 @@ async function setup(options: { deployAthMaster?: boolean } = {}) {
 
   const athMasterInit = await ATHMaster.init(
     treasuryOwner.address,
-    beginCell().storeBuffer(Buffer.from('ATH')).endCell(),
+    beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n,
   );
   const athMasterAddress = contractAddress(0, athMasterInit);
   if (options.deployAthMaster !== false) {

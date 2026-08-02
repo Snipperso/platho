@@ -51,7 +51,7 @@ describe('AIRDROP-ACCRUE-WIRE — FeeAccumulator and AirdropPool must agree on o
 
     const sink = bc.openContract(await FeeAccumulator.fromInit(FA_TREASURY, FA_BUYBACK));
 
-    const pool = bc.openContract(await AirdropPool.fromInit(controller.address, MANIFEST, 0n, false));
+    const pool = bc.openContract(await AirdropPool.fromInit(controller.address, MANIFEST, 0n, false, 0n));
     await pool.send(funder.getSender(), { value: toNano('5') }, { $$type: 'AirdropTopUpStorageReserve' } as any);
     const gen = (body: any, v = '0.1') => pool.send(controller.getSender(), { value: toNano(v) }, body);
     await gen({ $$type: 'AirdropBindAthMaster', ath_master_address: athMaster.address, pool_ath_wallet_address: poolWallet.address });

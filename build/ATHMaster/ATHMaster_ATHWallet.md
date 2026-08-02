@@ -194,8 +194,8 @@ TL-B: `_ total_supply:int257 mintable:bool admin_address:address jetton_content:
 Signature: `ATHJettonDataView{total_supply:int257,mintable:bool,admin_address:address,jetton_content:^cell,jetton_wallet_code:^cell}`
 
 ### ATHMaster$Data
-TL-B: `_ total_supply:uint128 treasury_owner:address content:^cell treasury_supply_deployed:bool = ATHMaster`
-Signature: `ATHMaster{total_supply:uint128,treasury_owner:address,content:^cell,treasury_supply_deployed:bool}`
+TL-B: `_ total_supply:uint128 treasury_owner:address content:^cell treasury_supply_deployed:bool deployment_id:uint32 = ATHMaster`
+Signature: `ATHMaster{total_supply:uint128,treasury_owner:address,content:^cell,treasury_supply_deployed:bool,deployment_id:uint32}`
 
 ## Get methods
 Total get methods: 2

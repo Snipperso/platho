@@ -139,7 +139,7 @@ describe('AIRDROP DELIVERY COST — what paying one user 10 ATH really costs', (
       const user = await bc.treasury('aircost-recipient');
       const athMaster = fixtureAddress('POOL_MASTER');
 
-      const pool = bc.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+      const pool = bc.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false, 0n));
       await pool.send(deployer.getSender(), { value: toNano('1') }, null);
 
       // The pool's OWN ATHWallet, real, holding the whole budget — the leg that actually moves ATH.

@@ -39,7 +39,7 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
   const masterTreasuryOwner = fixtureAddress('USERNAME_REGISTRY_ATH_MASTER_TREASURY_M12');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
 
-  const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
+  const masterInit = await ATHMaster.init(masterTreasuryOwner, content, 0n);
   const athMasterAddress = contractAddress(0, masterInit);
 
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);

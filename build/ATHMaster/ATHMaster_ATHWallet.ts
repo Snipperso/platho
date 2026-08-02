@@ -3104,6 +3104,7 @@ export type ATHMaster$Data = {
     treasury_owner: Address;
     content: Cell;
     treasury_supply_deployed: boolean;
+    deployment_id: bigint;
 }
 
 export function storeATHMaster$Data(src: ATHMaster$Data) {
@@ -3113,6 +3114,7 @@ export function storeATHMaster$Data(src: ATHMaster$Data) {
         b_0.storeAddress(src.treasury_owner);
         b_0.storeRef(src.content);
         b_0.storeBit(src.treasury_supply_deployed);
+        b_0.storeUint(src.deployment_id, 32);
     };
 }
 
@@ -3122,7 +3124,8 @@ export function loadATHMaster$Data(slice: Slice) {
     const _treasury_owner = sc_0.loadAddress();
     const _content = sc_0.loadRef();
     const _treasury_supply_deployed = sc_0.loadBit();
-    return { $$type: 'ATHMaster$Data' as const, total_supply: _total_supply, treasury_owner: _treasury_owner, content: _content, treasury_supply_deployed: _treasury_supply_deployed };
+    const _deployment_id = sc_0.loadUintBig(32);
+    return { $$type: 'ATHMaster$Data' as const, total_supply: _total_supply, treasury_owner: _treasury_owner, content: _content, treasury_supply_deployed: _treasury_supply_deployed, deployment_id: _deployment_id };
 }
 
 export function loadTupleATHMaster$Data(source: TupleReader) {
@@ -3130,7 +3133,8 @@ export function loadTupleATHMaster$Data(source: TupleReader) {
     const _treasury_owner = source.readAddress();
     const _content = source.readCell();
     const _treasury_supply_deployed = source.readBoolean();
-    return { $$type: 'ATHMaster$Data' as const, total_supply: _total_supply, treasury_owner: _treasury_owner, content: _content, treasury_supply_deployed: _treasury_supply_deployed };
+    const _deployment_id = source.readBigNumber();
+    return { $$type: 'ATHMaster$Data' as const, total_supply: _total_supply, treasury_owner: _treasury_owner, content: _content, treasury_supply_deployed: _treasury_supply_deployed, deployment_id: _deployment_id };
 }
 
 export function loadGetterTupleATHMaster$Data(source: TupleReader) {
@@ -3138,7 +3142,8 @@ export function loadGetterTupleATHMaster$Data(source: TupleReader) {
     const _treasury_owner = source.readAddress();
     const _content = source.readCell();
     const _treasury_supply_deployed = source.readBoolean();
-    return { $$type: 'ATHMaster$Data' as const, total_supply: _total_supply, treasury_owner: _treasury_owner, content: _content, treasury_supply_deployed: _treasury_supply_deployed };
+    const _deployment_id = source.readBigNumber();
+    return { $$type: 'ATHMaster$Data' as const, total_supply: _total_supply, treasury_owner: _treasury_owner, content: _content, treasury_supply_deployed: _treasury_supply_deployed, deployment_id: _deployment_id };
 }
 
 export function storeTupleATHMaster$Data(source: ATHMaster$Data) {
@@ -3147,6 +3152,7 @@ export function storeTupleATHMaster$Data(source: ATHMaster$Data) {
     builder.writeAddress(source.treasury_owner);
     builder.writeCell(source.content);
     builder.writeBoolean(source.treasury_supply_deployed);
+    builder.writeNumber(source.deployment_id);
     return builder.build();
 }
 
@@ -3312,7 +3318,7 @@ const ATHWallet_types: ABIType[] = [
     {"name":"DeployTreasurySupply","header":1096042505,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"ATHMasterTopUpStorageReserve","header":1096042506,"fields":[]},
     {"name":"ATHJettonDataView","header":null,"fields":[{"name":"total_supply","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"mintable","type":{"kind":"simple","type":"bool","optional":false}},{"name":"admin_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"jetton_content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"jetton_wallet_code","type":{"kind":"simple","type":"cell","optional":false}}]},
-    {"name":"ATHMaster$Data","header":null,"fields":[{"name":"total_supply","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"treasury_supply_deployed","type":{"kind":"simple","type":"bool","optional":false}}]},
+    {"name":"ATHMaster$Data","header":null,"fields":[{"name":"total_supply","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"treasury_owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"content","type":{"kind":"simple","type":"cell","optional":false}},{"name":"treasury_supply_deployed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}}]},
 ]
 
 const ATHWallet_opcodes = {

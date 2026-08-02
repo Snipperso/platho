@@ -1215,6 +1215,65 @@ export function dictValueParserAthTransferNotification(): DictionaryValue<AthTra
     }
 }
 
+export type AthTransferNotificationAck = {
+    $$type: 'AthTransferNotificationAck';
+    query_id: bigint;
+    amount: bigint;
+    sender_key: bigint;
+}
+
+export function storeAthTransferNotificationAck(src: AthTransferNotificationAck) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(1194171774, 32);
+        b_0.storeUint(src.query_id, 64);
+        b_0.storeUint(src.amount, 128);
+        b_0.storeUint(src.sender_key, 160);
+    };
+}
+
+export function loadAthTransferNotificationAck(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 1194171774) { throw Error('Invalid prefix'); }
+    const _query_id = sc_0.loadUintBig(64);
+    const _amount = sc_0.loadUintBig(128);
+    const _sender_key = sc_0.loadUintBig(160);
+    return { $$type: 'AthTransferNotificationAck' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
+}
+
+export function loadTupleAthTransferNotificationAck(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationAck' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
+}
+
+export function loadGetterTupleAthTransferNotificationAck(source: TupleReader) {
+    const _query_id = source.readBigNumber();
+    const _amount = source.readBigNumber();
+    const _sender_key = source.readBigNumber();
+    return { $$type: 'AthTransferNotificationAck' as const, query_id: _query_id, amount: _amount, sender_key: _sender_key };
+}
+
+export function storeTupleAthTransferNotificationAck(source: AthTransferNotificationAck) {
+    const builder = new TupleBuilder();
+    builder.writeNumber(source.query_id);
+    builder.writeNumber(source.amount);
+    builder.writeNumber(source.sender_key);
+    return builder.build();
+}
+
+export function dictValueParserAthTransferNotificationAck(): DictionaryValue<AthTransferNotificationAck> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAthTransferNotificationAck(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAthTransferNotificationAck(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type AirdropGlobalView = {
     $$type: 'AirdropGlobalView';
     sealed: boolean;
@@ -1381,6 +1440,7 @@ export type AirdropPool$Data = {
     genesis_controller_address: Address;
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
+    deployment_id: bigint;
     ath_master_address: Address;
     pool_ath_wallet_address: Address;
     ath_master_bound: boolean;
@@ -1404,6 +1464,7 @@ export function storeAirdropPool$Data(src: AirdropPool$Data) {
         b_0.storeAddress(src.genesis_controller_address);
         b_0.storeUint(src.deployment_manifest_hash, 256);
         b_0.storeUint(src.genesis_config_hash, 256);
+        b_0.storeUint(src.deployment_id, 32);
         const b_1 = new Builder();
         b_1.storeAddress(src.ath_master_address);
         b_1.storeAddress(src.pool_ath_wallet_address);
@@ -1431,6 +1492,7 @@ export function loadAirdropPool$Data(slice: Slice) {
     const _genesis_controller_address = sc_0.loadAddress();
     const _deployment_manifest_hash = sc_0.loadUintBig(256);
     const _genesis_config_hash = sc_0.loadUintBig(256);
+    const _deployment_id = sc_0.loadUintBig(32);
     const sc_1 = sc_0.loadRef().beginParse();
     const _ath_master_address = sc_1.loadAddress();
     const _pool_ath_wallet_address = sc_1.loadAddress();
@@ -1447,7 +1509,7 @@ export function loadAirdropPool$Data(slice: Slice) {
     const _sealed_at = sc_2.loadUintBig(64);
     const _payout_seq = sc_2.loadUintBig(64);
     const _last_accrual_at = sc_2.loadUintBig(64);
-    return { $$type: 'AirdropPool$Data' as const, sealed: _sealed, genesis_controller_address: _genesis_controller_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, pool_ath_wallet_address: _pool_ath_wallet_address, ath_master_bound: _ath_master_bound, credit_issuer_address: _credit_issuer_address, credit_issuer_bound: _credit_issuer_bound, treasury_address: _treasury_address, treasury_bound: _treasury_bound, funded_amount: _funded_amount, remaining_budget: _remaining_budget, distributed_total: _distributed_total, claim_count: _claim_count, sealed_at: _sealed_at, payout_seq: _payout_seq, last_accrual_at: _last_accrual_at };
+    return { $$type: 'AirdropPool$Data' as const, sealed: _sealed, genesis_controller_address: _genesis_controller_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, deployment_id: _deployment_id, ath_master_address: _ath_master_address, pool_ath_wallet_address: _pool_ath_wallet_address, ath_master_bound: _ath_master_bound, credit_issuer_address: _credit_issuer_address, credit_issuer_bound: _credit_issuer_bound, treasury_address: _treasury_address, treasury_bound: _treasury_bound, funded_amount: _funded_amount, remaining_budget: _remaining_budget, distributed_total: _distributed_total, claim_count: _claim_count, sealed_at: _sealed_at, payout_seq: _payout_seq, last_accrual_at: _last_accrual_at };
 }
 
 export function loadTupleAirdropPool$Data(source: TupleReader) {
@@ -1455,6 +1517,7 @@ export function loadTupleAirdropPool$Data(source: TupleReader) {
     const _genesis_controller_address = source.readAddress();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
+    const _deployment_id = source.readBigNumber();
     const _ath_master_address = source.readAddress();
     const _pool_ath_wallet_address = source.readAddress();
     const _ath_master_bound = source.readBoolean();
@@ -1464,13 +1527,13 @@ export function loadTupleAirdropPool$Data(source: TupleReader) {
     const _treasury_bound = source.readBoolean();
     const _funded_amount = source.readBigNumber();
     const _remaining_budget = source.readBigNumber();
-    const _distributed_total = source.readBigNumber();
     source = source.readTuple();
+    const _distributed_total = source.readBigNumber();
     const _claim_count = source.readBigNumber();
     const _sealed_at = source.readBigNumber();
     const _payout_seq = source.readBigNumber();
     const _last_accrual_at = source.readBigNumber();
-    return { $$type: 'AirdropPool$Data' as const, sealed: _sealed, genesis_controller_address: _genesis_controller_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, pool_ath_wallet_address: _pool_ath_wallet_address, ath_master_bound: _ath_master_bound, credit_issuer_address: _credit_issuer_address, credit_issuer_bound: _credit_issuer_bound, treasury_address: _treasury_address, treasury_bound: _treasury_bound, funded_amount: _funded_amount, remaining_budget: _remaining_budget, distributed_total: _distributed_total, claim_count: _claim_count, sealed_at: _sealed_at, payout_seq: _payout_seq, last_accrual_at: _last_accrual_at };
+    return { $$type: 'AirdropPool$Data' as const, sealed: _sealed, genesis_controller_address: _genesis_controller_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, deployment_id: _deployment_id, ath_master_address: _ath_master_address, pool_ath_wallet_address: _pool_ath_wallet_address, ath_master_bound: _ath_master_bound, credit_issuer_address: _credit_issuer_address, credit_issuer_bound: _credit_issuer_bound, treasury_address: _treasury_address, treasury_bound: _treasury_bound, funded_amount: _funded_amount, remaining_budget: _remaining_budget, distributed_total: _distributed_total, claim_count: _claim_count, sealed_at: _sealed_at, payout_seq: _payout_seq, last_accrual_at: _last_accrual_at };
 }
 
 export function loadGetterTupleAirdropPool$Data(source: TupleReader) {
@@ -1478,6 +1541,7 @@ export function loadGetterTupleAirdropPool$Data(source: TupleReader) {
     const _genesis_controller_address = source.readAddress();
     const _deployment_manifest_hash = source.readBigNumber();
     const _genesis_config_hash = source.readBigNumber();
+    const _deployment_id = source.readBigNumber();
     const _ath_master_address = source.readAddress();
     const _pool_ath_wallet_address = source.readAddress();
     const _ath_master_bound = source.readBoolean();
@@ -1492,7 +1556,7 @@ export function loadGetterTupleAirdropPool$Data(source: TupleReader) {
     const _sealed_at = source.readBigNumber();
     const _payout_seq = source.readBigNumber();
     const _last_accrual_at = source.readBigNumber();
-    return { $$type: 'AirdropPool$Data' as const, sealed: _sealed, genesis_controller_address: _genesis_controller_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, ath_master_address: _ath_master_address, pool_ath_wallet_address: _pool_ath_wallet_address, ath_master_bound: _ath_master_bound, credit_issuer_address: _credit_issuer_address, credit_issuer_bound: _credit_issuer_bound, treasury_address: _treasury_address, treasury_bound: _treasury_bound, funded_amount: _funded_amount, remaining_budget: _remaining_budget, distributed_total: _distributed_total, claim_count: _claim_count, sealed_at: _sealed_at, payout_seq: _payout_seq, last_accrual_at: _last_accrual_at };
+    return { $$type: 'AirdropPool$Data' as const, sealed: _sealed, genesis_controller_address: _genesis_controller_address, deployment_manifest_hash: _deployment_manifest_hash, genesis_config_hash: _genesis_config_hash, deployment_id: _deployment_id, ath_master_address: _ath_master_address, pool_ath_wallet_address: _pool_ath_wallet_address, ath_master_bound: _ath_master_bound, credit_issuer_address: _credit_issuer_address, credit_issuer_bound: _credit_issuer_bound, treasury_address: _treasury_address, treasury_bound: _treasury_bound, funded_amount: _funded_amount, remaining_budget: _remaining_budget, distributed_total: _distributed_total, claim_count: _claim_count, sealed_at: _sealed_at, payout_seq: _payout_seq, last_accrual_at: _last_accrual_at };
 }
 
 export function storeTupleAirdropPool$Data(source: AirdropPool$Data) {
@@ -1501,6 +1565,7 @@ export function storeTupleAirdropPool$Data(source: AirdropPool$Data) {
     builder.writeAddress(source.genesis_controller_address);
     builder.writeNumber(source.deployment_manifest_hash);
     builder.writeNumber(source.genesis_config_hash);
+    builder.writeNumber(source.deployment_id);
     builder.writeAddress(source.ath_master_address);
     builder.writeAddress(source.pool_ath_wallet_address);
     builder.writeBoolean(source.ath_master_bound);
@@ -1535,6 +1600,7 @@ export function dictValueParserAirdropPool$Data(): DictionaryValue<AirdropPool$D
     deployment_manifest_hash: bigint;
     genesis_config_hash: bigint;
     sealed: boolean;
+    deployment_id: bigint;
 }
 
 function initAirdropPool_init_args(src: AirdropPool_init_args) {
@@ -1544,14 +1610,17 @@ function initAirdropPool_init_args(src: AirdropPool_init_args) {
         b_0.storeInt(src.deployment_manifest_hash, 257);
         b_0.storeInt(src.genesis_config_hash, 257);
         b_0.storeBit(src.sealed);
+        const b_1 = new Builder();
+        b_1.storeInt(src.deployment_id, 257);
+        b_0.storeRef(b_1.endCell());
     };
 }
 
-async function AirdropPool_init(genesis_controller_address: Address, deployment_manifest_hash: bigint, genesis_config_hash: bigint, sealed: boolean) {
-    const __code = Cell.fromHex('b5ee9c7241022001000a4a000114ff00f4a413f4bcf2c80b01020162021d03f6d0eda2edfb01d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e38fa40810101d700810101d700d200553004d1550254733370277070705470005470000e11110e0d11100d10df10de10cd10bc10ab109a1089e30d1113e302705612d74920c21f97315612d70b1f01de21821041445201ba1e030400f211118020d7217021d749c21f9430d31f309131e2821041544810ba8e570f11110f0e11100e10df551cc87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed54e05f0f5f0304908fbd5b11118020d721fa40fa4030011112011113db3cdb3c3c3c81659a0ab31af2f40e11100e10df10ce10bd10bc7f0b108a10791068105710461035440302e021821041445202ba0b0c1c0504cc8fdb5b11118020d721fa40301110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411124130db3cdb3c3a81659c09b319f2f40f11100f10ef10de10cd10bc10ab109a7f09107810671056104510344130e021821041445203ba0b0c1c0604cc8fdb5b11118020d721fa40301110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411124130db3cdb3c388165a107b317f2f40f11100f10ef10de10cd10bc10ab109a108910787f071056104510344130e021821041445239ba0b0c1c0704fee302218210472d9d7dba8f715b11118020d721d33f31d39f31d37f301110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411124130db3c81659b2cf2f48165a3f8422ec705f2f4065612a0111215a01110111111100f11100f10ef10de10cd10bc10ab109a1089107810670510344130e021080b1c0904bc5b11118020d721d3fffa4030011112011113db3cdb3c81659d11135610ba01111301f2f481659e29f2f481659f11125613db3c3b011112010af2f48165a0f828561301c705b3f2f40f11110f0e11100e10df10ce10bd10ac109b109a5517190c0f1c03f6821041445204bae30221821041445210bae302571320821041445211ba8e5a3057110f11110f0e11100e10df551cc87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed54e0200a0e1403f85b11118020d721d3ff301110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411124130db3cdb3c323e3f8165b85610c201f2f48165b929f2f48165ba27f2f48165bb25f2f48165bc248228354a6ba7a18000bef2f4228228354a6ba7a18000bc9a8228354a6ba7a1800033de7ff8230b0c0d00108165b25612b3f2f400168165b1f8425612c705f2f400d8011111010f11100f1f10de10cd10bc10ab109a1089107810671056104510344033c87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed5404fa5b11118020d721d33f31fa40d31f30011112011113db3c8165fef8422cc705f2f41110111111100f11110f0e11110e0d11110d0c11110c0b11110b0a11110a09111109111108070655408165ff11125613db3c01111301f2f48166005614c2009656148103e8bb9170e2f2f411138212540be400a85340b9925711e30d190f1011000cd30a308309ba00e830238212540be400a9048212540be400a8208e5d3057110e11110e0d11100d10cf552b12c87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed54db31e1571102f8816602f8416f24135f03820b938700bef2f4035610a1025610a001a41112a4f823820afaf0807170f828250302111602111701c855308210415448105005cb1f13cb3fcb7fcecec92d43140211150211140110246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf818ae2f400c901fb001213001a58cf8680cf8480f400f400cf8100d40e11110e0d11100d10cf10be10ad109c108b107a1069105810471036505413c87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed5403fc82104154481fba8e5a3057110f11110f0e11100e10df551cc87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed54e020821041445212bae30220821041445213bae302c0001112c12115181b03fc3057110f11110f0e11100e10df551cdb3c81661cf82324821012cc0300a0bef2f481661ff823228209e13380a0bef2f481661d26c200f2f47002a481661ef8416f24135f03820b938700bef2f4820afaf0807170f8285444b052ecc855308210415448105005cb1f13cb3fcb7fcecec956100450aa10246d50436d03c88919161700016000f4cf16ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0015c87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed5403943057110f11110f0e11100e10df551cdb3c81662628f2f4821005f5e100f8276f108166275312bcf2f401a17071882c55304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00191a1c000e8165f45612f2f400420000000061697264726f702d756e6163636f756e7465642d746f6e2d737765657001d601111201b08e570f11110f0e11100e10df551cc87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed54e00f11110f0e11100e10df551c1c0096c87f01ca0011121111111055e0011111011112ca001fce1dcbff1bcbff09c8ce18ce16ca0014ce12ca0001c8ce12ca0012cb7f12cb7f13cb7f13cb3f13cb3f13cb3f13cb3f12cdcdc9ed5402d5a1df67da89a1a400031c71f481020203ae01020203ae01a400aa6009a2aa04a8e666e04ee0e0e0a8e000a8e0001c22221c1a22201a21be21bc219a2178215621342113c61bb678ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae251e1f008ed200fa40d3ffd3ffd401d0fa40fa40d200fa40d200d430d0fa40d200d37fd37fd37fd33fd33fd33fd33f300e11120e0e11110e0e11100e10ef57121110111111100f11100f550e006e8212540be4008228354a6ba7a1800056130256120256120256150256130256130256120256110256105610561056105610561a56195618ae588569');
+async function AirdropPool_init(genesis_controller_address: Address, deployment_manifest_hash: bigint, genesis_config_hash: bigint, sealed: boolean, deployment_id: bigint) {
+    const __code = Cell.fromHex('b5ee9c7241022501000af4000114ff00f4a413f4bcf2c80b01020162022104f4d0eda2edfb01d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e45fa40810101d700810101d700d200d401d0810101d700301514433005d1550354744470287070705470005470000f11120f0d11110d0d11100d10df10cd10bc10ab109a1089e30d1114e302705613d74920c21fe300212203050601fe11128020d7217021d749c21f9430d31f309131e2821041544810ba8e611110111211100f11110f0e11100e551dc87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed54e00400085f0f5f04000e315613d70b1f0104a2821041445201ba8fbf5b11128020d721fa40fa4030011113011114db3cdb3c3c3c81659a0ab31af2f40f11110f0e11100e10df10ce10bd7f0b108a10791068105710461035440302e021821041445202ba0e0f200704e48fe75b11128020d721fa40301111111211111110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411134130db3cdb3c3a81659c09b319f2f41110111111100f11100f10ef10de10cd10bc10ab109a7f09107810671056104510344130e021821041445203ba0e0f200804e48fe75b11128020d721fa40301111111211111110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411134130db3cdb3c388165a107b317f2f41110111111100f11100f10ef10de10cd10bc10ab109a108910787f071056104510344130e021821041445239ba0e0f2009043ce302218210472d9d7dbae30221821041445204bae30221821041445210ba0a0b0d1204c45b11128020d721d3fffa4030011113011114db3cdb3c81659d11145611ba01111401f2f481659e29f2f481659f11135614db3c3b011113010af2f48165a0f828561401c705b3f2f41110111211100f11110f0e11100e10df10ce10bd10ac109b55171d0f142002fe5b11128020d721d33fd39fd37f301112111311121111111311111110111311100f11130f0e11130e0d11130d0c11130c0b11130b0a11130a0911130908111308071113070611130605111305041113040311130302111302011114011115db3c81659b2cf2f48165a3f8422ec705f2f4065615a0055615a0f84282080f42400e0c01ca1115701118701118c855208210472d9d7e5004cb1f12cb3fcb7fcb9fc9140311150302111702011116014343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000f11120f0e11110e0d11100d10cf10be10ad109c108b107a106910581047102655222004fa5b11128020d721d3ff301111111211111110111111100f11100f10ef10de10cd10bc10ab109a10891078106710561045103411134130db3cdb3c323f57108165b85611c201f2f48165b929f2f48165ba27f2f48165bb25f2f48165bc248228354a6ba7a18000bef2f4228228354a6ba7a18000bce3007ff823011112010e0f101100108165b25613b3f2f400168165b1f8425613c705f2f400148228354a6ba7a180003300ea1110111111100111100110ef10de10cd10bc10ab109a1089107810671056104510344033c87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed5403fce302571420821041445211ba8e643057121110111211100f11110f0e11100e551dc87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed54e02082104154481fbae3022013181903fc5b11128020d721d33f31fa40d31f30011113011114db3c8165fef8422cc705f2f41111111211111110111211100f11120f0e11120e0d11120d0c11120c0b11120b0a11120a09111209111208070655408165ff11135614db3c01111401f2f48166005615c2009656158103e8bb9170e2f2f411148212540be400a85340b91d1415000cd30a308309ba02fe8e9630238212540be400a9048212540be400a820e3035712925712e2816602f8416f24135f03820b938700bef2f4035611a1025611a001a41113a4f823820afaf0807170f828250302111702111801c855308210415448105005cb1f13cb3fcb7fcecec92d43140211160211150110246d50436d03c8cf8580ca00cf8440ce161700f23057120f11120f0e11110e0d11100d10cf10be10ad109c108b107a1069105810471036453304c87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed54db31019201fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb000f11120f0e11110e0d11100d10cf10be10ad109c108b107a10691058104710365044052000c83057121110111211100f11110f0e11100e551dc87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed540460821041445212bae30220821041445213bae302c0001113c12101111301b0e3021110111211100f11110f0e11100e551d1a1c1f2002f23057121110111211100f11110f0e11100e551ddb3c81661cf82324821012cc0300a0bef2f481661ff823228209e13380a0bef2f481661d26c200f2f47002a481661ef8416f24135f03820b938700bef2f4820afaf0807170f8285444b052ecc855308210415448105005cb1f13cb3fcb7fcecec956100450aa1d1b017010246d50436d03c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb001520039c3057121110111211100f11110f0e11100e551ddb3c81662628f2f4821005f5e100f8276f108166275312bcf2f401a17071882c55304343c8cf8580ca00cf8440ce01fa02806acf40f400c901fb001d1e20000e8165f45613f2f400420000000061697264726f702d756e6163636f756e7465642d746f6e2d737765657000c21110111211100f11110f0e11100e551dc87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed5400a2c87f01ca00111311121111111055e0011112011113ca0001111001ce1ecbff1ccbff1acb1f08c8ce17ce15ca0013ceca0001c8ce12ca0012cb7f13cb7f13cb7f13cb3f13cb3f13cb3f13cb3fcdcdc9ed5403fba1df67da89a1a400031c8bf481020203ae01020203ae01a401a803a1020203ae00602a2886600ba2aa06a8e888e050e0e0e0a8e000a8e0001e22241e1a22221a1a22201a21be219a2178215621342113c61bb678ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae24ae26ae221e22201f22232400a6d200fa40d3ffd3ffd31fd401d0fa40fa40d200fa40d200d430d0fa40d200d37fd37fd37fd33fd33fd33fd33f300e11130e0e11120e0e11110e0e11100e10ef57131111111211111110111111100f11100f550e006e8212540be4008228354a6ba7a1800056140256130256130256160256130256130256120256110256105610561056105610561a561956180004550e09a11e81');
     const builder = beginCell();
     builder.storeUint(0, 1);
-    initAirdropPool_init_args({ $$type: 'AirdropPool_init_args', genesis_controller_address, deployment_manifest_hash, genesis_config_hash, sealed })(builder);
+    initAirdropPool_init_args({ $$type: 'AirdropPool_init_args', genesis_controller_address, deployment_manifest_hash, genesis_config_hash, sealed, deployment_id })(builder);
     const __data = builder.endCell();
     return { code: __code, data: __data };
 }
@@ -1657,8 +1726,9 @@ const AirdropPool_types: ABIType[] = [
     {"name":"ATHTransferExcess","header":1096042527,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
     {"name":"ATHTransferRequest","header":1096042512,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"recipient","type":{"kind":"simple","type":"address","optional":false}},{"name":"response_destination","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"AthTransferNotification","header":1194171773,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_wallet","type":{"kind":"simple","type":"address","optional":false}}]},
+    {"name":"AthTransferNotificationAck","header":1194171774,"fields":[{"name":"query_id","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"sender_key","type":{"kind":"simple","type":"uint","optional":false,"format":160}}]},
     {"name":"AirdropGlobalView","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pool_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"credit_issuer_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_per_credit","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"total_pool","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"funded_amount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"remaining_budget","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"distributed_total","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"claim_count","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"sealed_at","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"ath_master_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"credit_issuer_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}}]},
-    {"name":"AirdropPool$Data","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pool_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"credit_issuer_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"credit_issuer_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"funded_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"remaining_budget","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"distributed_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"claim_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sealed_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"payout_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"last_accrual_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
+    {"name":"AirdropPool$Data","header":null,"fields":[{"name":"sealed","type":{"kind":"simple","type":"bool","optional":false}},{"name":"genesis_controller_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"deployment_manifest_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"genesis_config_hash","type":{"kind":"simple","type":"uint","optional":false,"format":256}},{"name":"deployment_id","type":{"kind":"simple","type":"uint","optional":false,"format":32}},{"name":"ath_master_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"pool_ath_wallet_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"ath_master_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"credit_issuer_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"credit_issuer_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"treasury_address","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury_bound","type":{"kind":"simple","type":"bool","optional":false}},{"name":"funded_amount","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"remaining_budget","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"distributed_total","type":{"kind":"simple","type":"uint","optional":false,"format":128}},{"name":"claim_count","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"sealed_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"payout_seq","type":{"kind":"simple","type":"uint","optional":false,"format":64}},{"name":"last_accrual_at","type":{"kind":"simple","type":"uint","optional":false,"format":64}}]},
 ]
 
 const AirdropPool_opcodes = {
@@ -1674,6 +1744,7 @@ const AirdropPool_opcodes = {
     "ATHTransferExcess": 1096042527,
     "ATHTransferRequest": 1096042512,
     "AthTransferNotification": 1194171773,
+    "AthTransferNotificationAck": 1194171774,
 }
 
 const AirdropPool_getters: ABIGetter[] = [
@@ -1704,6 +1775,7 @@ export const AIRDROP_TOTAL_POOL = 15000000000000000n;
 export const AIRDROP_ATH_PER_CREDIT = 10000000000n;
 export const AIRDROP_MAX_CREDITS_PER_ACCRUAL = 1000n;
 export const AIRDROP_BASE_STORAGE_ENDOWMENT = 100000000n;
+export const AIRDROP_NOTIFICATION_ACK_VALUE = 1000000n;
 export const AIRDROP_ATHWALLET_LEG_GAS = 50000000n;
 export const AIRDROP_PAYOUT_PATH_GAS = 60000000n;
 export const AIRDROP_SWEEP_GRACE = 315360000n;
@@ -1715,12 +1787,12 @@ export class AirdropPool implements Contract {
     public static readonly errors = AirdropPool_errors_backward;
     public static readonly opcodes = AirdropPool_opcodes;
     
-    static async init(genesis_controller_address: Address, deployment_manifest_hash: bigint, genesis_config_hash: bigint, sealed: boolean) {
-        return await AirdropPool_init(genesis_controller_address, deployment_manifest_hash, genesis_config_hash, sealed);
+    static async init(genesis_controller_address: Address, deployment_manifest_hash: bigint, genesis_config_hash: bigint, sealed: boolean, deployment_id: bigint) {
+        return await AirdropPool_init(genesis_controller_address, deployment_manifest_hash, genesis_config_hash, sealed, deployment_id);
     }
     
-    static async fromInit(genesis_controller_address: Address, deployment_manifest_hash: bigint, genesis_config_hash: bigint, sealed: boolean) {
-        const __gen_init = await AirdropPool_init(genesis_controller_address, deployment_manifest_hash, genesis_config_hash, sealed);
+    static async fromInit(genesis_controller_address: Address, deployment_manifest_hash: bigint, genesis_config_hash: bigint, sealed: boolean, deployment_id: bigint) {
+        const __gen_init = await AirdropPool_init(genesis_controller_address, deployment_manifest_hash, genesis_config_hash, sealed, deployment_id);
         const address = contractAddress(0, __gen_init);
         return new AirdropPool(address, __gen_init);
     }

@@ -63,7 +63,7 @@ async function setup(blockchain: Blockchain) {
   const athMaster = await blockchain.treasury('adr-ath-master');
   const distributor = await blockchain.treasury('adr-distributor');   // stands in for the bound FeeAccumulator distributor
 
-  const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+  const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false, 0n));
   await pool.send(deployer.getSender(), { value: toNano('1') }, null);
 
   const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
@@ -92,7 +92,7 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     const deployer = await blockchain.treasury('g-deployer');
     const poolWallet = await blockchain.treasury('g-pool-wallet');
     const other = await blockchain.treasury('g-other');
-    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false, 0n));
     await pool.send(deployer.getSender(), { value: toNano('1') }, null);
     const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
 
@@ -135,7 +135,7 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     const ciAddr = (await blockchain.treasury('g2-ci')).address;
     const treasuryAddr = (await blockchain.treasury('g2-treasury')).address;
     const athMasterAddr = (await blockchain.treasury('g2-ath-master')).address;
-    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, 0n, 0n, false));
+    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, 0n, 0n, false, 0n));
     await pool.send(deployer.getSender(), { value: toNano('1') }, null);
     const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
 
@@ -279,7 +279,7 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     const treasury = await blockchain.treasury('ovf-treasury');
     const athMaster = await blockchain.treasury('ovf-ath-master');
     const distributor = await blockchain.treasury('ovf-distributor');
-    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+    const pool = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false, 0n));
     await pool.send(deployer.getSender(), { value: toNano('1') }, null);
     const dep = (body: any, v = '0.05') => pool.send(deployer.getSender(), { value: toNano(v) }, body);
     await dep({ $$type: 'AirdropBindAthMaster', ath_master_address: athMaster.address, pool_ath_wallet_address: poolWallet.address });
@@ -355,7 +355,7 @@ describe('AIRDROP — 15M ATH pool on settled credit purchases', () => {
     const poolWallet = await blockchain.treasury('gas-pw');
     const other = await blockchain.treasury('gas-other');
 
-    const p2 = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false));
+    const p2 = blockchain.openContract(await AirdropPool.fromInit(deployer.address, MANIFEST, 0n, false, 0n));
     await p2.send(deployer.getSender(), { value: toNano('1') }, null);
     const d2 = (body: any, v = '0.05') => p2.send(deployer.getSender(), { value: toNano(v) }, body);
     await d2({ $$type: 'AirdropBindAthMaster', ath_master_address: other.address, pool_ath_wallet_address: poolWallet.address });

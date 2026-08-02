@@ -29,6 +29,9 @@ const AIRDROP_TOTAL_POOL: Int = 15000000000000000;      // 15M ATH at 9 decimals
 const AIRDROP_ATH_PER_CREDIT: Int = 10000000000;        // 10 ATH per credit (owner's fixed math)
 const AIRDROP_MAX_CREDITS_PER_ACCRUAL: Int = 1000;      // mirrors CREDIT_MAX_CREDITS_PER_BUY — bounds one payout
 const AIRDROP_BASE_STORAGE_ENDOWMENT: Int = 100000000;  // #19 singleton base code-rent (mirrors CreditIssuer)
+// Mirrors USERNAME_ATH_NOTIFICATION_ACK_VALUE. The ack carries no money and no obligation — it exists to clear the
+// wallet's pending entry — so the figure only has to cover the hop, exactly as the registries fund theirs.
+const AIRDROP_NOTIFICATION_ACK_VALUE: Int = 1000000;
 // [G8 MEASURED 2026-07-17] The value the ATHWallet payout leg is sent with, and the minimum incoming value that
 // makes emitting it safe. These are MEASURED, and the first cut of them was wrong in the nastiest possible way:
 // the payout used nativeReserve(base, ReserveAtMost|ReserveAddOriginalBalance) + SendRemainingBalance, which
@@ -170,6 +173,15 @@ message(0x472D9D7D) AthTransferNotification {           // genesis funding lands
     sender_wallet: Address;
 }
 
+// [MIRRORED 2026-08-02] The reply half of the funding handshake. Field order and widths must match ATHWallet's
+// declaration byte for byte — this contract does not import ATHWallet.tact, and a mirrored opcode whose width
+// drifted is a defect this project has already had, surfacing as a wrong-receiver run rather than a build error.
+message(0x472D9D7E) AthTransferNotificationAck {
+    query_id: Int as uint64;
+    amount: Int as uint128;
+    sender_key: Int as uint160;
+}
+
 struct AirdropGlobalView {
     sealed: Bool;
     deployment_manifest_hash: Int;
@@ -196,6 +208,11 @@ contract AirdropPool {
     genesis_controller_address: Address;
     deployment_manifest_hash: Int as uint256;
     genesis_config_hash: Int as uint256;
+    // [ADDED 2026-08-02] The second of the two genesis roots — see the long note on ATHMaster.deployment_id.
+    // Everything else in the ceremony derives its address from ATHMaster or from BuybackBurn; this contract derives
+    // from nothing, so without an id of its own a fork would leave it standing on the old address with the old
+    // state. Init data only, read by no handler, carrying no authority.
+    deployment_id: Int as uint32;
 
     ath_master_address: Address;
     pool_ath_wallet_address: Address;
@@ -217,11 +234,12 @@ contract AirdropPool {
     // getters positionally, and a field inserted into a published view hands callers the wrong slot.
     last_accrual_at: Int as uint64;
 
-    init(genesis_controller_address: Address, deployment_manifest_hash: Int, genesis_config_hash: Int, sealed: Bool) {
+    init(genesis_controller_address: Address, deployment_manifest_hash: Int, genesis_config_hash: Int, sealed: Bool, deployment_id: Int) {
         self.sealed = sealed;
         self.genesis_controller_address = genesis_controller_address;
         self.deployment_manifest_hash = deployment_manifest_hash;
         self.genesis_config_hash = genesis_config_hash;
+        self.deployment_id = deployment_id;
         self.ath_master_address = genesis_controller_address;
         self.pool_ath_wallet_address = genesis_controller_address;
         self.ath_master_bound = false;
@@ -313,6 +331,26 @@ contract AirdropPool {
         throwUnless(26019, sender() == self.pool_ath_wallet_address);
         self.funded_amount = self.funded_amount + msg.amount;
         self.remaining_budget = self.remaining_budget + msg.amount;
+
+        // [ADDED 2026-08-02] ANSWER THE WALLET. This handler credited the deposit and said nothing back, so the
+        // escrow entry the wallet writes before delivering a notification stayed open — every registry acks, this
+        // contract was the only counterparty that did not. The entry is not dangerous (PruneStaleNotification frees
+        // it after the TTL and refunds nothing), but leaving a wallet holding an open pending on the ONE deposit
+        // that funds the whole airdrop means the ceremony ends with a loose end nobody owns.
+        //
+        // Sent from the pool, which is the wallet's owner, so it satisfies gate 14340. A late or duplicate ack is a
+        // tolerated no-op on the wallet side, so this is safe to send unconditionally.
+        message(MessageParameters {
+            to: sender(),
+            value: AIRDROP_NOTIFICATION_ACK_VALUE,
+            bounce: false,
+            mode: SendDefaultMode,
+            body: AthTransferNotificationAck {
+                query_id: msg.query_id,
+                amount: msg.amount,
+                sender_key: msg.sender_key
+            }.toCell()
+        });
     }
 
     receive(msg: AirdropSealGenesis) {

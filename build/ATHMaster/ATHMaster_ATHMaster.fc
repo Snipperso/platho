@@ -30,10 +30,10 @@ cell $ATHGenesisSupplyCredit$_store_cell((int, int, slice) v, builder b) inline;
 (slice, ((int, int))) $ATHGenesisSupplyCredit$_load_bounced(slice sc_0) inline;
 
 ;; $ATHMaster$_store
-builder $ATHMaster$_store(builder build_0, (int, slice, cell, int) v) inline;
+builder $ATHMaster$_store(builder build_0, (int, slice, cell, int, int) v) inline;
 
 ;; $ATHMaster$_load
-(slice, ((int, slice, cell, int))) $ATHMaster$_load(slice sc_0) inline;
+(slice, ((int, slice, cell, int, int))) $ATHMaster$_load(slice sc_0) inline;
 
 ;; $Context$_get_value
 _ $Context$_get_value((int, slice, int, slice) v) inline;
@@ -45,16 +45,16 @@ _ $Context$_get_value((int, slice, int, slice) v) inline;
 builder $ATHWallet$init$_store(builder build_0, (int, slice, slice) v) inline;
 
 ;; $ATHMaster$init$_load
-(slice, ((slice, cell))) $ATHMaster$init$_load(slice sc_0) inline;
+(slice, ((slice, cell, int))) $ATHMaster$init$_load(slice sc_0) inline;
 
 ;; $ATHMaster$_contract_init
-(int, slice, cell, int) $ATHMaster$_contract_init(slice $treasury_owner, cell $content) impure inline;
+(int, slice, cell, int, int) $ATHMaster$_contract_init(slice $treasury_owner, cell $content, int $deployment_id) impure inline;
 
 ;; $ATHMaster$_contract_load
-(int, slice, cell, int) $ATHMaster$_contract_load() impure inline;
+(int, slice, cell, int, int) $ATHMaster$_contract_load() impure inline;
 
 ;; $ATHMaster$_contract_store
-() $ATHMaster$_contract_store((int, slice, cell, int) v) impure inline;
+() $ATHMaster$_contract_store((int, slice, cell, int, int) v) impure inline;
 
 ;; $Cell$_fun_asSlice
 slice $Cell$_fun_asSlice(cell $self) impure inline;
@@ -78,16 +78,16 @@ slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inli
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_bounce_mode_code_data_body(slice $to, int $value, int $bounce, int $mode, cell $code, cell $data, cell $body) inline;
 
 ;; $ATHMaster$_fun_derive_wallet_address
-((int, slice, cell, int), slice) $ATHMaster$_fun_derive_wallet_address((int, slice, cell, int) $self, slice $owner_address) impure inline_ref;
+((int, slice, cell, int, int), slice) $ATHMaster$_fun_derive_wallet_address((int, slice, cell, int, int) $self, slice $owner_address) impure inline_ref;
 
 ;; $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code
 ((int, int, slice, cell, cell)) $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code(int $total_supply, int $mintable, slice $admin_address, cell $jetton_content, cell $jetton_wallet_code) inline;
 
 ;; $ATHMaster$_fun_get_jetton_data
-((int, slice, cell, int), (int, int, slice, cell, cell)) $ATHMaster$_fun_get_jetton_data((int, slice, cell, int) $self) impure inline_ref;
+((int, slice, cell, int, int), (int, int, slice, cell, cell)) $ATHMaster$_fun_get_jetton_data((int, slice, cell, int, int) $self) impure inline_ref;
 
 ;; $ATHMaster$_fun_get_wallet_address
-((int, slice, cell, int), slice) $ATHMaster$_fun_get_wallet_address((int, slice, cell, int) $self, slice $owner_address) impure inline_ref;
+((int, slice, cell, int, int), slice) $ATHMaster$_fun_get_wallet_address((int, slice, cell, int, int) $self, slice $owner_address) impure inline_ref;
 
 ;; $ATHBurnFinalized$_constructor_query_id_amount_owner_address
 ((int, int, slice)) $ATHBurnFinalized$_constructor_query_id_amount_owner_address(int $query_id, int $amount, slice $owner_address) inline;
@@ -395,46 +395,49 @@ cell $ATHWallet$_child_get_code() impure asm """
 
 ;;
 ;; Type: ATHMaster
-;; TLB: _ total_supply:uint128 treasury_owner:address content:^cell treasury_supply_deployed:bool = ATHMaster
+;; TLB: _ total_supply:uint128 treasury_owner:address content:^cell treasury_supply_deployed:bool deployment_id:uint32 = ATHMaster
 ;;
 
-builder $ATHMaster$_store(builder build_0, (int, slice, cell, int) v) inline {
-    var (v'total_supply, v'treasury_owner, v'content, v'treasury_supply_deployed) = v;
+builder $ATHMaster$_store(builder build_0, (int, slice, cell, int, int) v) inline {
+    var (v'total_supply, v'treasury_owner, v'content, v'treasury_supply_deployed, v'deployment_id) = v;
     build_0 = build_0.store_uint(v'total_supply, 128);
     build_0 = build_0.store_slice(v'treasury_owner);
     build_0 = build_0.store_ref(v'content);
     build_0 = build_0.store_int(v'treasury_supply_deployed, 1);
+    build_0 = build_0.store_uint(v'deployment_id, 32);
     return build_0;
 }
 
-(slice, ((int, slice, cell, int))) $ATHMaster$_load(slice sc_0) inline {
+(slice, ((int, slice, cell, int, int))) $ATHMaster$_load(slice sc_0) inline {
     var v'total_supply = sc_0~load_uint(128);
     var v'treasury_owner = sc_0~load_msg_addr();
     var v'content = sc_0~load_ref();
     var v'treasury_supply_deployed = sc_0~load_int(1);
-    return (sc_0, (v'total_supply, v'treasury_owner, v'content, v'treasury_supply_deployed));
+    var v'deployment_id = sc_0~load_uint(32);
+    return (sc_0, (v'total_supply, v'treasury_owner, v'content, v'treasury_supply_deployed, v'deployment_id));
 }
 
-(slice, ((slice, cell))) $ATHMaster$init$_load(slice sc_0) inline {
+(slice, ((slice, cell, int))) $ATHMaster$init$_load(slice sc_0) inline {
     var v'treasury_owner = sc_0~load_msg_addr();
     var v'content = sc_0~load_ref();
-    return (sc_0, (v'treasury_owner, v'content));
+    var v'deployment_id = sc_0~load_int(257);
+    return (sc_0, (v'treasury_owner, v'content, v'deployment_id));
 }
 
-(int, slice, cell, int) $ATHMaster$_contract_load() impure inline {
+(int, slice, cell, int, int) $ATHMaster$_contract_load() impure inline {
     slice $sc = get_data().begin_parse();
     int $loaded = $sc~load_int(1);
     if ($loaded) {
         return $sc~$ATHMaster$_load();
     }
     else {
-        (slice $treasury_owner, cell $content) = $sc~$ATHMaster$init$_load();
+        (slice $treasury_owner, cell $content, int $deployment_id) = $sc~$ATHMaster$init$_load();
         $sc.end_parse();
-        return $ATHMaster$_contract_init($treasury_owner, $content);
+        return $ATHMaster$_contract_init($treasury_owner, $content, $deployment_id);
     }
 }
 
-() $ATHMaster$_contract_store((int, slice, cell, int) v) impure inline {
+() $ATHMaster$_contract_store((int, slice, cell, int, int) v) impure inline {
     builder b = begin_cell();
     b = b.store_int(true, 1);
     b = $ATHMaster$_store(b, v);
@@ -445,36 +448,37 @@ builder $ATHMaster$_store(builder build_0, (int, slice, cell, int) v) inline {
 ;; Contract ATHMaster functions
 ;;
 
-(int, slice, cell, int) $ATHMaster$_contract_init(slice $treasury_owner, cell $content) impure inline {
-    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = (null(), null(), null(), null());
+(int, slice, cell, int, int) $ATHMaster$_contract_init(slice $treasury_owner, cell $content, int $deployment_id) impure inline {
+    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)) = (null(), null(), null(), null(), null());
     var ($treasury_std'workchain, $treasury_std'address) = $global_parseStdAddress($Address$_fun_asSlice($treasury_owner));
     throw_unless(14104, ($treasury_std'workchain == 0));
     $self'total_supply = 100000000000000000;
     $self'treasury_owner = $treasury_owner;
     $self'content = $content;
     $self'treasury_supply_deployed = false;
-    return ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed);
+    $self'deployment_id = $deployment_id;
+    return ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id);
 }
 
-((int, slice, cell, int), slice) $ATHMaster$_fun_derive_wallet_address((int, slice, cell, int) $self, slice $owner_address) impure inline_ref {
-    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = $self;
+((int, slice, cell, int, int), slice) $ATHMaster$_fun_derive_wallet_address((int, slice, cell, int, int) $self, slice $owner_address) impure inline_ref {
+    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)) = $self;
     var ($owner_std'workchain, $owner_std'address) = $global_parseStdAddress($Address$_fun_asSlice($owner_address));
     var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $owner_address, $global_myAddress());
     var $fresh$ret_25 = $global_contractAddressExt($owner_std'workchain, $wallet_init'code, $wallet_init'data);
-    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_25);
+    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id), $fresh$ret_25);
 }
 
-((int, slice, cell, int), (int, int, slice, cell, cell)) $ATHMaster$_fun_get_jetton_data((int, slice, cell, int) $self) impure inline_ref {
-    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = $self;
+((int, slice, cell, int, int), (int, int, slice, cell, cell)) $ATHMaster$_fun_get_jetton_data((int, slice, cell, int, int) $self) impure inline_ref {
+    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)) = $self;
     var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $self'treasury_owner, $global_myAddress());
     var $fresh$ret_26 = $ATHJettonDataView$_constructor_total_supply_mintable_admin_address_jetton_content_jetton_wallet_code($self'total_supply, false, $self'treasury_owner, $self'content, $wallet_init'code);
-    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_26);
+    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id), $fresh$ret_26);
 }
 
-((int, slice, cell, int), slice) $ATHMaster$_fun_get_wallet_address((int, slice, cell, int) $self, slice $owner_address) impure inline_ref {
-    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)) = $self;
-    var $fresh$ret_27 = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($owner_address);
-    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed), $fresh$ret_27);
+((int, slice, cell, int, int), slice) $ATHMaster$_fun_get_wallet_address((int, slice, cell, int, int) $self, slice $owner_address) impure inline_ref {
+    var (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)) = $self;
+    var $fresh$ret_27 = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)~$ATHMaster$_fun_derive_wallet_address($owner_address);
+    return (($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id), $fresh$ret_27);
 }
 
 ;;
@@ -514,7 +518,7 @@ _ %get_wallet_address(slice $owner_address) method_id(103289) {
     __tact_context_sender = msg_sender_addr;
     
     ;; Load contract data
-    var ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed) = $ATHMaster$_contract_load();
+    var ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id) = $ATHMaster$_contract_load();
     
     ;; Handle bounced messages
     if (msg_bounced) {
@@ -527,13 +531,13 @@ _ %get_wallet_address(slice $owner_address) method_id(103289) {
         ;; Bounced handler for ATHGenesisSupplyCredit message
         if (op == 0x41544805) {
             var ($msg'query_id, $msg'amount) = in_msg~$ATHGenesisSupplyCredit$_load_bounced();
-            throw_unless(14130, ( equal_slices_bits(__tact_context_get_sender(), ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($self'treasury_owner)) ));
+            throw_unless(14130, ( equal_slices_bits(__tact_context_get_sender(), ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)~$ATHMaster$_fun_derive_wallet_address($self'treasury_owner)) ));
             throw_unless(14131, ($msg'amount == $self'total_supply));
             $self'treasury_supply_deployed = false;
             if (($Context$_get_value(__tact_context_get()) >= 100000)) {
                 $global_message($MessageParameters$_constructor_to_value_bounce_mode_body($self'treasury_owner, 0, false, 64, null()));
             }
-            $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
+            $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id));
             return ();
         }
         
@@ -551,12 +555,12 @@ _ %get_wallet_address(slice $owner_address) method_id(103289) {
         var $msg'owner_address = in_msg~load_msg_addr();
         var $msg'response_destination = in_msg~load_msg_addr();
         throw_unless(14100, ($msg'amount > 0));
-        throw_unless(14101, ( equal_slices_bits(__tact_context_get_sender(), ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($msg'owner_address)) ));
+        throw_unless(14101, ( equal_slices_bits(__tact_context_get_sender(), ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)~$ATHMaster$_fun_derive_wallet_address($msg'owner_address)) ));
         throw_unless(14102, ($self'total_supply >= $msg'amount));
         throw_unless(14103, ($Context$_get_value(__tact_context_get()) >= 2000000));
         $self'total_supply = $self'total_supply - $msg'amount;
         $global_message($MessageParameters$_constructor_to_value_mode_bounce_body($msg'response_destination, 0, 64, true, $ATHBurnFinalized$_store_cell($ATHBurnFinalized$_constructor_query_id_amount_owner_address($msg'query_id, $msg'amount, $msg'owner_address), begin_cell())));
-        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
+        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id));
         return ();
     }
     
@@ -573,23 +577,23 @@ _ %get_wallet_address(slice $owner_address) method_id(103289) {
         int $downstream_value = ($Context$_get_value(__tact_context_get()) - 8000000);
         $self'treasury_supply_deployed = true;
         var ($wallet_init'code, $wallet_init'data) = $ATHWallet$_init_child(0, $self'treasury_owner, $global_myAddress());
-        slice $treasury_wallet = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed)~$ATHMaster$_fun_derive_wallet_address($self'treasury_owner);
+        slice $treasury_wallet = ($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id)~$ATHMaster$_fun_derive_wallet_address($self'treasury_owner);
         $global_send($SendParameters$_constructor_to_value_bounce_mode_code_data_body($treasury_wallet, $downstream_value, true, 1, $wallet_init'code, $wallet_init'data, $ATHGenesisSupplyCredit$_store_cell($ATHGenesisSupplyCredit$_constructor_query_id_amount_response_destination($msg'query_id, $self'total_supply, $msg'response_destination), begin_cell())));
-        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
+        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id));
         return ();
     }
     
     ;; Receive ATHMasterTopUpStorageReserve message
     if (op == 0x4154480a) {
         var $_ = empty_tuple();
-        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
+        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id));
         return ();
     }
     
     ;; Receive empty message
     if ((op == 0) & (in_msg_length <= 32)) {
         throw(13001);
-        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed));
+        $ATHMaster$_contract_store(($self'total_supply, $self'treasury_owner, $self'content, $self'treasury_supply_deployed, $self'deployment_id));
         return ();
     }
     ;; Throw if not handled

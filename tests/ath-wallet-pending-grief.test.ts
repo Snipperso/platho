@@ -119,7 +119,7 @@ describe('ATHWALLET PENDING GRIEF — a stuck registry pending, and who it can b
     const attackerOwner = await bc.treasury('grief-attacker-owner-2');
     const deployer = await bc.treasury('grief-deployer');
 
-    const ownerContract = bc.openContract(await ATHMaster.fromInit(deployer.address, beginCell().endCell()));
+    const ownerContract = bc.openContract(await ATHMaster.fromInit(deployer.address, beginCell().endCell(), 0n));
     await ownerContract.send(deployer.getSender(), { value: toNano('1') }, null as any);
 
     const { address: victimAddress, wallet: victim } = await provisionWallet(bc, ownerContract.address, master, 0n);

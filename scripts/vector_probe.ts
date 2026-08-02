@@ -6,7 +6,7 @@ import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
 async function main() {
   const treasury = Address.parse('EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c');
   const content = beginCell().endCell();
-  const masterInit = await ATHMaster.init(treasury, content);
+  const masterInit = await ATHMaster.init(treasury, content, 0n);
   const masterAddress = contractAddress(0, masterInit);
   const blockchain = await Blockchain.create();
   const master = blockchain.openContract(new ATHMaster(masterAddress, masterInit));

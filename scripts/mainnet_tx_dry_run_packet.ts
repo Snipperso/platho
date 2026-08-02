@@ -1,11 +1,12 @@
 import { Address, Builder, Cell, beginCell, contractAddress, storeStateInit } from '@ton/core';
+import { GENESIS_DEPLOYMENT_ID } from './genesis_deployment_id';
 import { CEREMONY_BIND_ORDER, bindMessageKey, bindStepId } from './ceremony_bind_order';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ATHMaster, storeDeployTreasurySupply } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHVesting } from '../build/ATHVesting/ATHVesting_ATHVesting';
-import { ATHWallet, storeATHTransferRequest, storeATHWalletTopUpStorageReserve } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { ATHWallet, storeATHTransferRequest, storeATHTransferRequestWithNotify, storeATHWalletTopUpStorageReserve } from '../build/ATHWallet/ATHWallet_ATHWallet';
 import {
   BuybackBurn,
   storeBindBuybackFeeAccumulator,
@@ -140,6 +141,15 @@ const ATH_TRANSFER_REQUEST_VALUE_MIN_NANOTONS = '48000000';
 // carries. 600,000,000 is 100 years of measured rent with room over.
 const OFFICIAL_WALLET_ENDOWMENT_NANOTONS = '600000000';
 const ATH_TRANSFER_REQUEST_VALUE_RECOMMENDED_NANOTONS = '58000000';
+// [ADDED 2026-08-02] The notify lane's own figures, for F01 only.
+//
+// notify_value is what the wallet forwards to AirdropPool as AthTransferNotification, and gate 14306 refuses
+// anything under ATH_TRANSFER_NOTIFY_MIN_VALUE (45,000,000). The attached value must clear gate 14307:
+//     notify_value + NOTIFY_ACK(1M) + SOURCE_ACK(4M) + NOTIFY_EXEC(7M) + ENDOWMENT(20M) + OWNER_EXEC(10M)
+//   = 45,000,000 + 42,000,000 = 87,000,000, plus the payload-proportional readForwardFee the gate now also charges.
+// 110,000,000 leaves ~23,000,000 of margin on a leg that runs ONCE and whose failure costs a whole ceremony.
+const ATH_FUNDING_NOTIFY_VALUE_NANOTONS = 45_000_000n;
+const ATH_FUNDING_NOTIFY_REQUEST_VALUE_NANOTONS = '110000000';
 
 function sha256Hex(data: Buffer | string): string {
   return createHash('sha256').update(data).digest('hex');
@@ -319,7 +329,7 @@ async function deriveState(draft: Draft) {
   const usernameAthPlaceholder = placeholderAddress('USERNAME_REGISTRY_INITIAL_ATH_WALLET');
   const profileAthPlaceholder = placeholderAddress('PROFILE_REGISTRY_INITIAL_ATH_WALLET');
 
-  const athMaster = await ATHMaster.init(athTreasuryOwner, athContent);
+  const athMaster = await ATHMaster.init(athTreasuryOwner, athContent, GENESIS_DEPLOYMENT_ID);
   const athMasterAddress = contractAddress(0, athMaster);
 
   const athLongTermVesting = await ATHVesting.init(athMasterAddress, vestingBeneficiary, vestingStartTime);
@@ -337,7 +347,7 @@ async function deriveState(draft: Draft) {
 
   // clean-17: AirdropPool replaces Vault (15M airdrop custodian), CapsuleHub is removed. Staged deploy — manifest
   // hash 0, config 0, unsealed; the real manifest hash is bound at AirdropSealGenesis (must run AFTER funding).
-  const airdropPool = await AirdropPool.init(genesisController, 0n, 0n, false);
+  const airdropPool = await AirdropPool.init(genesisController, 0n, 0n, false, GENESIS_DEPLOYMENT_ID);
   const airdropPoolAddress = contractAddress(0, airdropPool);
 
   const usernameRegistry = await UsernameRegistry.init(usernameAthPlaceholder, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, genesisController);
@@ -864,6 +874,7 @@ async function buildDryRunPacket(draft: Draft) {
       recipient_owner: derived.addresses.airdropPool,
       expected_recipient_ath_wallet: derived.addresses.airdropPoolOfficialAthWallet,
       amount_atomic: constantBigInt(draft, 'vault_activity_airdrop_total_atomic'),
+      notify: true,          // AirdropPool must be TOLD; funded_amount gates its seal
     },
     {
       id: 'F02',
@@ -872,15 +883,41 @@ async function buildDryRunPacket(draft: Draft) {
       recipient_owner: derived.addresses.athLongTermVesting,
       expected_recipient_ath_wallet: derived.addresses.athLongTermVestingOfficialAthWallet,
       amount_atomic: constantBigInt(draft, 'ath_long_term_vesting_allocation_atomic'),
+      notify: false,         // ATHVesting has no notification receiver and nothing gates on it knowing
     },
   ].map((funding) => {
-    const cell = bodyCell(storeATHTransferRequest({
-      $$type: 'ATHTransferRequest',
-      query_id: funding.query_id,
-      amount: funding.amount_atomic,
-      recipient: funding.recipient_owner,
-      response_destination: derived.addresses.athTreasuryOwner,
-    }));
+    // [CORRECTED 2026-08-02, DURING THE CEREMONY] F01 used the PLAIN lane, and the plain lane cannot tell AirdropPool
+    // anything. It credits the recipient wallet's balance and sends an ack to the RESPONSE DESTINATION — the pool
+    // itself receives no message at all, so funded_amount stays 0 and S01 dies on gate 26044 forever.
+    //
+    // MEASURED on mainnet: F01 landed, the pool's official wallet held exactly 15,000,000 ATH, and get_global still
+    // read funded_amount = 0. The seal was refused. The comment below this line asserted the opposite — that the
+    // plain lane's notification "hits gate 26011/26019" — which is what a lane that emits no notification looks like
+    // to someone reading instead of measuring.
+    //
+    // Only the notify lane makes the wallet emit AthTransferNotification, which is the ONLY thing that raises
+    // funded_amount. AirdropPool does not ack it, unlike the registries; that is safe here because an unacked entry
+    // is merely prunable after its TTL and PruneStaleNotification only frees the map slot — it does not refund.
+    //
+    // F02 stays on the plain lane deliberately: ATHVesting has no AthTransferNotification receiver and nothing gates
+    // on it knowing. Its requirement is that the ATH is ON its official wallet, which the plain lane satisfies.
+    const cell = funding.notify
+      ? bodyCell(storeATHTransferRequestWithNotify({
+        $$type: 'ATHTransferRequestWithNotify',
+        query_id: funding.query_id,
+        amount: funding.amount_atomic,
+        recipient: funding.recipient_owner,
+        response_destination: derived.addresses.athTreasuryOwner,
+        notify_destination: funding.recipient_owner,          // gate 14302: must equal the recipient
+        notify_value: ATH_FUNDING_NOTIFY_VALUE_NANOTONS,
+      }))
+      : bodyCell(storeATHTransferRequest({
+        $$type: 'ATHTransferRequest',
+        query_id: funding.query_id,
+        amount: funding.amount_atomic,
+        recipient: funding.recipient_owner,
+        response_destination: derived.addresses.athTreasuryOwner,
+      }));
     return {
       id: funding.id,
       // NOT last, despite living in a separate array printed after the seals. The real constraint is a SANDWICH,
@@ -888,7 +925,9 @@ async function buildDryRunPacket(draft: Draft) {
       //   B06 (AirdropBindAthMaster) -> THIS -> off-chain balance verify -> S01 (AirdropSealGenesis)
       // Too early: the pool's AthTransferNotification hits gate 26011 (ath_master_bound) / 26019 (sender must be the
       // pool's OWN bound wallet), the notification bounces, and funded_amount stays 0 while 15M ATH sits in the
-      // wallet — after which S01 throws 26044 forever and the pool can never be sealed.
+      // wallet — after which S01 throws 26044 forever and the pool can never be sealed. [The sandwich is real, but
+      // note it only bites on the NOTIFY lane: on the plain lane there is no notification to arrive early or late,
+      // which is precisely how F01 came to be unable to fund the pool at all.]
       // Too late: S01 throws 26044 (funded_amount == AIRDROP_TOTAL_POOL) — loud, but mid-ceremony on a one-shot
       // controller message.
       // The phase NAME says "final" only in the sense of final genesis; it does not mean "sign these last".
@@ -899,15 +938,26 @@ async function buildDryRunPacket(draft: Draft) {
       signer_address: friendly(derived.addresses.athTreasuryOwner),
       target_address: friendly(derived.addresses.treasuryOwnerAthWallet),
       target_is: 'Treasury Owner ATHWallet, not the recipient official wallet',
-      value_nanotons_min: ATH_TRANSFER_REQUEST_VALUE_MIN_NANOTONS,
-      value_nanotons_recommended: ATH_TRANSFER_REQUEST_VALUE_RECOMMENDED_NANOTONS,
-      body: txBody(`ATHWallet.ATHTransferRequest.${funding.id}`, cell, {
-        query_id: funding.query_id.toString(),
-        amount_atomic: funding.amount_atomic.toString(),
-        recipient_owner_address: friendly(funding.recipient_owner),
-        expected_recipient_ath_wallet: friendly(funding.expected_recipient_ath_wallet),
-        response_destination: friendly(derived.addresses.athTreasuryOwner),
-      }),
+      value_nanotons_min: funding.notify
+        ? ATH_FUNDING_NOTIFY_REQUEST_VALUE_NANOTONS : ATH_TRANSFER_REQUEST_VALUE_MIN_NANOTONS,
+      value_nanotons_recommended: funding.notify
+        ? ATH_FUNDING_NOTIFY_REQUEST_VALUE_NANOTONS : ATH_TRANSFER_REQUEST_VALUE_RECOMMENDED_NANOTONS,
+      lane: funding.notify ? 'ATHTransferRequestWithNotify' : 'ATHTransferRequest',
+      body: txBody(
+        `ATHWallet.${funding.notify ? 'ATHTransferRequestWithNotify' : 'ATHTransferRequest'}.${funding.id}`,
+        cell,
+        {
+          query_id: funding.query_id.toString(),
+          amount_atomic: funding.amount_atomic.toString(),
+          recipient_owner_address: friendly(funding.recipient_owner),
+          expected_recipient_ath_wallet: friendly(funding.expected_recipient_ath_wallet),
+          response_destination: friendly(derived.addresses.athTreasuryOwner),
+          ...(funding.notify ? {
+            notify_destination: friendly(funding.recipient_owner),
+            notify_value_nanotons: ATH_FUNDING_NOTIFY_VALUE_NANOTONS.toString(),
+          } : {}),
+        },
+      ),
       safety_check: 'Tonkeeper target must be the Treasury Owner ATHWallet. The message recipient field must be the recipient OWNER contract; the recipient official ATHWallet is derived inside ATHWallet.',
     };
   });

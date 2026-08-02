@@ -5,9 +5,9 @@
   "model": "clean-17 direct-pay: a flat per-lane wallet send whose floor is the receiving shard gate; the shard reserves its rent and returns the surplus. No hold, no max_charge, no size classes — those belonged to the deleted Vault batch model.",
   "code_hashes": {
     "ath_wallet": "8ab0003bb57c01a359cb9d7642a3c15d7a1550d989fcf8bca6677f7da874e077",
-    "record_shard": "e3f3be17c948042cfbdff37d52b68fd96e924e01a11db568707f49b93bb4aef1",
-    "intro_shard": "56d427c9fae6b7f9cf6230976cb25227cd402169813ec4984d5089f854bcfdbf",
-    "public_shard": "f7649ebfa6062b8379f46736cb23c0409c8a48aad4ec3bdd50ec0b54b013401d",
+    "record_shard": "255fbc8d0830bb205be87570ddb8afbb75c59f7768c90dff4fbb14fe494a269a",
+    "intro_shard": "449745b73f829d89139d777ada29e8d9f85a416bbcf798b51dc16d4b6fd378de",
+    "public_shard": "23c541bdd0bac25a63a49be0096f06d217e93ac5b23502f0db81c0a4a10a0a57",
     "recovery_shard": "a73538d916df635a126354bfa8f53c9f43c75085002977911f4c7e4228d4e0d3",
     "key_shard": "81761197119847160003106cbbe7d9751f80d6683e0f5f609a61c9c8f9857dbd"
   },

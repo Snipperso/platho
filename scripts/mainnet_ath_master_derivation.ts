@@ -1,4 +1,5 @@
 import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/core';
+import { GENESIS_DEPLOYMENT_ID } from './genesis_deployment_id';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
@@ -274,7 +275,7 @@ export async function createMainnetAthMasterDerivationReport(options: {
     };
   }
 
-  const athMasterInit = await ATHMaster.init(treasuryOwner, content);
+  const athMasterInit = await ATHMaster.init(treasuryOwner, content, GENESIS_DEPLOYMENT_ID);
   const athMasterAddress = contractAddress(0, athMasterInit);
   const treasuryOwnerAthWalletInit = await ATHWallet.init(0n, treasuryOwner, athMasterAddress);
   const treasuryOwnerAthWalletAddress = contractAddress(treasuryOwner.workChain, treasuryOwnerAthWalletInit);

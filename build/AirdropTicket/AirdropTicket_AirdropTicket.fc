@@ -120,9 +120,9 @@ int $global_now() impure asm """
 slice $Address$_fun_asSlice(slice $self) impure asm "NOP";
 
 ;; AirdropTicket_AirdropTicket.constants.fc
-;; EQAR18BgQFmmqV1GAhgSOay8YyXLAQU_TfVGrW9UF7RvxPbY
-slice __gen_slice_address_87321af407418aa6d4f715b88f86aeff9c1fea24fc1392287d2a6e88ca8fafd7() asm """
-    B{b5ee9c7241010101002400004380023af80c080b34d52ba8c043024735978c64b96020a7e9bea8d5adea82f68df8900f74e88f} B>boc <s PUSHSLICE
+;; EQAgWSAucibv2D3SOIhL1wKFwg27wIRkeiObu5uxgOfNpO6E
+slice __gen_slice_address_69ccb68037a7b43259471af9de0376ca5314f396ca552016b537b3ac5e1d89c5() asm """
+    B{b5ee9c7241010101002400004380040b2405ce44ddfb07ba4711097ae050b841b778108c8f4473777376301cf9b490a494a290} B>boc <s PUSHSLICE
 """;
 
 ;; AirdropTicket_AirdropTicket.storage.fc
@@ -355,7 +355,7 @@ _ %get_ticket() method_id(104158) {
     if (op == 0x41544331) {
         in_msg~skip_bits(32);
         var $_ = empty_tuple();
-        throw_unless(27001, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_87321af407418aa6d4f715b88f86aeff9c1fea24fc1392287d2a6e88ca8fafd7()) ));
+        throw_unless(27001, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_69ccb68037a7b43259471af9de0376ca5314f396ca552016b537b3ac5e1d89c5()) ));
         throw_unless(27003, ($self'owner, $self'credits, $self'in_flight, $self'in_flight_at)~$AirdropTicket$_fun_isBasechainAddress($self'owner));
         throw_unless(27002, ($self'credits < 4294967295));
         $self'credits = $self'credits + 1;
@@ -378,7 +378,7 @@ _ %get_ticket() method_id(104158) {
         $self'credits = $self'credits - $k;
         $self'in_flight = $k;
         $self'in_flight_at = $global_now();
-        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__gen_slice_address_87321af407418aa6d4f715b88f86aeff9c1fea24fc1392287d2a6e88ca8fafd7(), 0, 64, true, $TicketRedeem$_store_cell($TicketRedeem$_constructor_credits_k_owner($k, $self'owner), begin_cell())));
+        $global_message($MessageParameters$_constructor_to_value_mode_bounce_body(__gen_slice_address_69ccb68037a7b43259471af9de0376ca5314f396ca552016b537b3ac5e1d89c5(), 0, 64, true, $TicketRedeem$_store_cell($TicketRedeem$_constructor_credits_k_owner($k, $self'owner), begin_cell())));
         $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight, $self'in_flight_at));
         return ();
     }
@@ -404,7 +404,7 @@ _ %get_ticket() method_id(104158) {
     if (op == 0x41544334) {
         in_msg~skip_bits(32);
         var $_'credits_k = in_msg~load_uint(32);
-        throw_unless(27020, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_87321af407418aa6d4f715b88f86aeff9c1fea24fc1392287d2a6e88ca8fafd7()) ));
+        throw_unless(27020, ( equal_slices_bits(__tact_context_get_sender(), __gen_slice_address_69ccb68037a7b43259471af9de0376ca5314f396ca552016b537b3ac5e1d89c5()) ));
         $self'in_flight = 0;
         $self'in_flight_at = 0;
         $AirdropTicket$_contract_store(($self'owner, $self'credits, $self'in_flight, $self'in_flight_at));

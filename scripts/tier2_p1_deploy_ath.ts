@@ -45,7 +45,7 @@ async function main() {
   console.log('my wallet:', fr(me));
 
   const content = beginCell().storeUint(0, 8).endCell();
-  const master = await ATHMaster.fromInit(me, content);
+  const master = await ATHMaster.fromInit(me, content, 0n);
   const athWallet = await ATHWallet.fromInit(0n, me, master.address);
   console.log('ATHMaster:', fr(master.address));
   console.log('my ATH wallet (derived):', fr(athWallet.address));

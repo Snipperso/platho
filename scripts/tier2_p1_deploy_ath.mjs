@@ -21,7 +21,7 @@ console.log('my wallet:', fr(me));
 
 // minimal onchain-ish content cell (ATHMaster init only stores it; STON.fi reads wallet mechanics, not metadata)
 const content = beginCell().storeUint(0, 8).endCell();
-const master = await ATHMaster.fromInit(me, content);
+const master = await ATHMaster.fromInit(me, content, 0n);
 const masterAddr = master.address;
 console.log('ATHMaster (to deploy):', fr(masterAddr));
 

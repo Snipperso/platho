@@ -50,14 +50,35 @@ contract ATHMaster {
     treasury_owner: Address;
     content: Cell;
     treasury_supply_deployed: Bool;
+    // [ADDED 2026-08-02] THE ONLY THING THAT MAKES A GENESIS FORK POSSIBLE.
+    //
+    // An abandoned ceremony leaves live contracts holding state that must never be inherited: a spent one-shot
+    // supply mint, a FeeAccumulator permanently bound to a dead AirdropPool. A restart therefore needs FRESH
+    // addresses for everything — and an address here is a pure function of code and init data, with no
+    // discriminator to turn.
+    //
+    // Three times in one day the addresses moved anyway, because the wallet's code happened to change and the
+    // wallet's code is embedded in almost everything. The fourth time it did not: a change confined to AirdropPool
+    // moved AirdropPool and nothing else, and the redeploy would have skipped seven live contracts as "already
+    // ACTIVE" and inherited exactly the state the restart existed to escape. Relying on an incidental code edit to
+    // fork a genesis is relying on a side effect that is invisible until it is absent.
+    //
+    // ATHMaster and AirdropPool are the two roots: everything else derives from one of them (ATHVesting,
+    // BuybackBurn, MarketStabilitySeller and both registries take ath_master; FeeAccumulator takes BuybackBurn),
+    // and AirdropPool depends on nothing. So the id lives in exactly those two, and one number forks the whole set.
+    //
+    // It is init data, never read by any handler, and it has no authority. That is the point: it changes the
+    // address and nothing else.
+    deployment_id: Int as uint32;
 
-    init(treasury_owner: Address, content: Cell) {
+    init(treasury_owner: Address, content: Cell, deployment_id: Int) {
         let treasury_std: StdAddress = parseStdAddress(treasury_owner.asSlice());
         throwUnless(14104, treasury_std.workchain == 0);
         self.total_supply = ATH_TOTAL_SUPPLY_ATOMIC;
         self.treasury_owner = treasury_owner;
         self.content = content;
         self.treasury_supply_deployed = false;
+        self.deployment_id = deployment_id;
     }
 
     fun derive_wallet_address(owner_address: Address): Address {

@@ -19,7 +19,7 @@ async function main() {
   const treasuryOwner = fixtureAddress('TREASURY_OWNER');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
 
-  const masterInit = await ATHMaster.init(treasuryOwner, content);
+  const masterInit = await ATHMaster.init(treasuryOwner, content, 0n);
   const masterAddress = contractAddress(0, masterInit);
 
   const walletCodeBoc = readFileSync('build/ATHWallet/ATHWallet_ATHWallet.code.boc');
