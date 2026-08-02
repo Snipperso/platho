@@ -1,4 +1,5 @@
 import { Address, Cell, beginCell, contractAddress, storeStateInit } from '@ton/core';
+import { GENESIS_DEPLOYMENT_ID } from './genesis_deployment_id';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -190,7 +191,7 @@ async function buildDraft(rolesPath: string) {
   const usernameAthPlaceholder = placeholderAddress('USERNAME_REGISTRY_INITIAL_ATH_WALLET');
   const profileAthPlaceholder = placeholderAddress('PROFILE_REGISTRY_INITIAL_ATH_WALLET');
 
-  const athMaster = await ATHMaster.init(athTreasuryOwner, athContent.cell);
+  const athMaster = await ATHMaster.init(athTreasuryOwner, athContent.cell, GENESIS_DEPLOYMENT_ID);
   const athMasterAddress = contractAddress(0, athMaster);
 
   const treasuryOwnerAthWallet = await ATHWallet.init(0n, athTreasuryOwner, athMasterAddress);
@@ -212,7 +213,7 @@ async function buildDraft(rolesPath: string) {
   // config_hash=0, unsealed) — its address must not depend on the manifest hash that commits to its address; the real
   // manifest hash is bound at AirdropSealGenesis (contract change b0d771cb, mirrors ProfileRegistry). CapsuleHub is
   // removed entirely (the public lane is the lazy PublicShard, not a genesis contract).
-  const airdropPool = await AirdropPool.init(genesisController, 0n, 0n, false);
+  const airdropPool = await AirdropPool.init(genesisController, 0n, 0n, false, GENESIS_DEPLOYMENT_ID);
   const airdropPoolAddress = contractAddress(0, airdropPool);
 
   const usernameRegistry = await UsernameRegistry.init(usernameAthPlaceholder, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, genesisController);

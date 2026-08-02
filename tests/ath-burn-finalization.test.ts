@@ -23,7 +23,7 @@ async function setup(initialWalletBalance: bigint = 1_000_000_000n, deployMaster
   const attackerTreasury = await blockchain.treasury('attacker');
   const tokenOwner = ownerTreasury.address;
 
-  const masterInit = await ATHMaster.init(treasuryOwner, content);
+  const masterInit = await ATHMaster.init(treasuryOwner, content, 0n);
   const masterAddress = contractAddress(0, masterInit);
 
   const walletInit = await ATHWallet.init(0n, tokenOwner, masterAddress);
@@ -87,7 +87,7 @@ describe('ATH burn finalization', () => {
     const blockchain = await Blockchain.create();
     const tokenOwner = fixtureAddress('BURN_FINALIZED_BOUNCE_OWNER');
     const treasuryOwner = fixtureAddress('BURN_FINALIZED_BOUNCE_TREASURY');
-    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(
       masterAddress,

@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { ATHMaster } from '../build/ATHMaster/ATHMaster_ATHMaster';
 import { ATHWallet } from '../build/ATHWallet/ATHWallet_ATHWallet';
+import { GENESIS_DEPLOYMENT_ID } from '../scripts/genesis_deployment_id';
 import {
   createMainnetAthMasterDerivationReport,
   MainnetAthMasterDerivationInput,
@@ -107,7 +108,11 @@ describe('Mainnet ATH Master derivation', () => {
     const report = await createMainnetAthMasterDerivationReport({ input });
     const treasuryOwner = Address.parse(input.treasuryOwnerAddress);
     const content = Cell.fromBoc(Buffer.from(input.contentBocBase64, 'base64'))[0];
-    const expectedInit = await ATHMaster.init(treasuryOwner, content);
+    // The REAL id, not a placeholder. Most suites may pass anything here — deployment_id is init data that no
+    // handler reads, so it cannot change behaviour — but this one checks a CEREMONY ARTEFACT, and an artefact
+    // derived with a different id describes a different mainnet deployment. The line that divides the two is not
+    // "test vs script", it is "does this assertion speak about the chain we are about to deploy to".
+    const expectedInit = await ATHMaster.init(treasuryOwner, content, GENESIS_DEPLOYMENT_ID);
     const expectedAddress = contractAddress(0, expectedInit);
     const expectedTreasuryWalletInit = await ATHWallet.init(0n, treasuryOwner, expectedAddress);
     const expectedTreasuryWalletAddress = contractAddress(treasuryOwner.workChain, expectedTreasuryWalletInit);

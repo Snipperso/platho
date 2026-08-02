@@ -49,6 +49,18 @@ const TONCENTER_KEY = (process.env.TONCENTER_API_KEY || (existsSync('artifacts/l
 const TONAPI_KEY = (process.env.TONAPI_KEY || (existsSync('artifacts/local/tonapi.txt') ? readFileSync('artifacts/local/tonapi.txt', 'utf8') : '')).trim();
 const PACKET = arg('--packet', 'artifacts/local/mainnet_tx_dry_run_packet.json');
 const PHASE = arg('--phase');
+// [ADDED 2026-08-02, mid-ceremony] --only <id[,id]> narrows a phase to named steps.
+//
+// The seal phase holds all FIVE irreversible seals, and --phase seal fires them back to back with no way to stop
+// between. Two things make that wrong. The operator is supposed to confirm each seal on its own — a phase that
+// cannot be halved turns five decisions into one. And the order is not free: S02 throws 19045 unless the username
+// art and TEP-64 metadata are already sealed, so an all-at-once run would seal S01, die on S02, and leave the
+// genesis half sealed with the controller still holding power over the rest.
+const ONLY = (() => {
+  const raw = arg('--only');
+  if (!raw || raw === true) return null;
+  return new Set(String(raw).split(',').map((s) => s.trim().toUpperCase()).filter(Boolean));
+})();
 const DO_BROADCAST = process.argv.includes('--broadcast');
 const SEED_DIR = 'artifacts/local';
 const ROLE_SEED = {
@@ -172,7 +184,15 @@ function selectMessages(packet, phase) {
 async function main() {
   if (!PHASE) die('pass --phase <deploy|treasury-supply|bind|fund|seal>');
   const packet = JSON.parse(readFileSync(PACKET, 'utf8'));
-  const msgs = selectMessages(packet, PHASE);
+  const selected = selectMessages(packet, PHASE);
+  const msgs = ONLY ? selected.filter((m) => ONLY.has(String(m.id).toUpperCase())) : selected;
+  if (ONLY) {
+    // Refuse a filter that matches nothing, and one that names a step this phase does not contain. A typo that
+    // silently sends zero messages reads exactly like a successful run.
+    const unknown = [...ONLY].filter((id) => !selected.some((m) => String(m.id).toUpperCase() === id));
+    if (unknown.length) die(`--only names steps that are not in phase ${PHASE}: ${unknown.join(', ')}`);
+    console.log(`\n  --only ${[...ONLY].join(',')} — ${msgs.length} of ${selected.length} step(s) in this phase\n`);
+  }
   console.log(`\n=== CEREMONY ${PHASE.toUpperCase()} — ${msgs.length} message(s) | manifest ${packet.manifest_hash_hex.slice(0, 16)} | ${DO_BROADCAST ? 'BROADCAST' : 'DRY-RUN'} ===\n`);
 
   const targetsToPoll = [];

@@ -51,7 +51,7 @@ describe('clean-17 genesis — full-phase AirdropPool <-> FeeAccumulator replay'
     // ── PHASE: deploy ────────────────────────────────────────────────────────────────────────────────────────
     // The pool deploys with deployment_manifest_hash = 0 (clean-17 breaks the manifest circularity; seal binds the
     // real hash later). FeeAccumulator deploys with its two roles and no deployment_id.
-    const pool = blockchain.openContract(await AirdropPool.fromInit(controller.address, 0n, 0n, false));
+    const pool = blockchain.openContract(await AirdropPool.fromInit(controller.address, 0n, 0n, false, 0n));
     await pool.send(controller.getSender(), { value: toNano('1') }, null);
     const feeAcc = blockchain.openContract(await FeeAccumulator.fromInit(treasury.address, buyback.address));
     await feeAcc.send(controller.getSender(), { value: toNano('1') }, null);
@@ -78,6 +78,16 @@ describe('clean-17 genesis — full-phase AirdropPool <-> FeeAccumulator replay'
     expect(exitOf(bindReciprocal, feeAcc.address), 'treasury-signed reciprocal bind succeeds').toBe(0);
 
     // ── PHASE: fund (only the pool's own wallet may report a deposit — gate 26019) ───────────────────────────
+    //
+    // [SCOPE CORRECTED 2026-08-02] `poolWallet` here is a STAND-IN treasury, not a real ATHWallet, and this line
+    // hand-delivers the notification. That is legitimate for what this file is about — the reciprocal bind and the
+    // signer roles — but it is NOT evidence that the ceremony's funding message produces a notification, and it was
+    // read as such. On mainnet F01 was built on the plain lane, which emits nothing to the pool; the ATH arrived,
+    // funded_amount stayed 0, and S01 was refused by gate 26044.
+    //
+    // The end-to-end claim now lives in tests/genesis-funding-really-funds-the-pool.test.ts, which routes the real
+    // F01 body through a real ATHMaster and a real ATHWallet and lets the contracts do the talking. Keep this line
+    // as the shortcut it is, and do not let it stand in for that one again.
     await pool.send(poolWallet.getSender(), { value: toNano('0.1') }, {
       $$type: 'AthTransferNotification', query_id: 1n, sender_key: 0n, amount: TOTAL_POOL, sender_wallet: treasury.address,
     } as any);
@@ -132,7 +142,7 @@ describe('clean-17 genesis — full-phase AirdropPool <-> FeeAccumulator replay'
     const athMaster = await blockchain.treasury('fp3-ath-master');
     const poolWallet = await blockchain.treasury('fp3-pool-wallet');
 
-    const pool = blockchain.openContract(await AirdropPool.fromInit(controller.address, 0n, 0n, false));
+    const pool = blockchain.openContract(await AirdropPool.fromInit(controller.address, 0n, 0n, false, 0n));
     await pool.send(controller.getSender(), { value: toNano('1') }, null);
     const ctl = (body: any, v = '0.05') => pool.send(controller.getSender(), { value: toNano(v) }, body);
 

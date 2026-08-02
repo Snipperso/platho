@@ -41,7 +41,7 @@ describe('AIRDROP-REBIND — the distributor can be repointed after seal, and no
     issuerB = (await blockchain.treasury('issuer-b')).address;
 
     poolWallet = await blockchain.treasury('rebind-pool-wallet');
-    pool = blockchain.openContract(await AirdropPool.fromInit(controller.address, MANIFEST, 0n, false));
+    pool = blockchain.openContract(await AirdropPool.fromInit(controller.address, MANIFEST, 0n, false, 0n));
     await pool.send(controller.getSender(), { value: toNano('1') }, null as any);
     await pool.send(controller.getSender(), { value: toNano('0.05') }, {
       $$type: 'AirdropBindAthMaster',

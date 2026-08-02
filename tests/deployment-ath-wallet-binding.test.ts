@@ -33,7 +33,7 @@ describe('Deployment ATH wallet binding profile', () => {
     const placeholderAthWallet = fixtureAddress('PROFILE_DEPLOY_ATH_PLACEHOLDER_WALLET');
     const treasuryAthReceiver = fixtureAddress('PROFILE_DEPLOY_TREASURY_RECEIVER');
 
-    const athMasterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const athMasterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const athMasterAddress = contractAddress(0, athMasterInit);
 
     const profileInit = await ProfileRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);

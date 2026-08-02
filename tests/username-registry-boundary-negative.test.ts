@@ -155,7 +155,7 @@ async function deployRegistryWithAthSystem(officialWalletBalance: bigint) {
   const vaultAddress = fixtureAddress('ATH_VAULT');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
 
-  const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
+  const masterInit = await ATHMaster.init(masterTreasuryOwner, content, 0n);
   const athMasterAddress = contractAddress(0, masterInit);
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);

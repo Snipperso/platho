@@ -13,6 +13,15 @@ const EXPECTED_VAULT_ACTIVITY_AIRDROP_TOTAL_ATOMIC = '15000000000000000';
 // as part of genesis, so the treasury owner retains exactly the 15M liquidity allocation
 // (100M - 15M AirdropPool - 10M Vesting - 60M MSS reserve). The 15M activity airdrop is custodied in
 // the AirdropPool (not the treasury owner); the treasury-owner remaining 15M is the separate liquidity bucket.
+//
+// [REVERTED 2026-08-02, same day] This briefly read 15M minus one ATH, to account for an acceptance test of the
+// standard transfer the owner ran straight after D02. That accommodation died with its premise: the ceremony it
+// described was abandoned when F01 turned out unable to fund the pool, and the restart mints a fresh supply into a
+// fresh treasury wallet that will hold the full allocation.
+//
+// Worth keeping the episode in view, because the accommodation was RIGHT when made and WRONG four hours later, and
+// only the verifier's own fixtures noticed. A constant bent to fit an observed chain state has a lifetime, and it
+// is exactly as long as the chain state it was bent for.
 const EXPECTED_ATH_TREASURY_OWNER_REMAINING_ATOMIC = '15000000000000000';
 const EXPECTED_MARKET_STABILITY_RESERVE_ATOMIC = '60000000000000000';
 const EXPECTED_ATH_LONG_TERM_VESTING_ATOMIC = '10000000000000000';

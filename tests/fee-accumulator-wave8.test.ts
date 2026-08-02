@@ -175,7 +175,7 @@ describe('FeeAccumulator wave-8', () => {
     // Replace the stub pool with the real AirdropPool, unsealed — so AirdropAccrue is refused and bounces back.
     // Before this change the generated router took the unmatched-bounce path and returned, and the publisher's
     // already-debited credits vanished with no trace anywhere on chain.
-    const poolInit = await AirdropPool.init(env.treasury.address, 0n, 0n, false);
+    const poolInit = await AirdropPool.init(env.treasury.address, 0n, 0n, false, 0n);
     await env.bc.setShardAccount(env.pool.address, createShardAccount({
       address: env.pool.address, code: poolInit.code, data: poolInit.data, balance: toNano('1'), workchain: 0,
     }));

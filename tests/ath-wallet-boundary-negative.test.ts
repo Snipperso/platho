@@ -137,7 +137,7 @@ describe('ATH wallet/master value boundary negative matrix', () => {
     const blockchain = await Blockchain.create();
     const owner = fixtureAddress('BURN_OWNER');
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');
-    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(masterAddress, createShardAccount({
       address: masterAddress,
@@ -259,7 +259,7 @@ describe('ATH wallet/master value boundary negative matrix', () => {
     const blockchain = await Blockchain.create();
     const owner = await blockchain.treasury('ath-bnd-owner-burn-source');
     const treasuryOwner = fixtureAddress('OWNER_BURN_TREASURY');
-    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(masterAddress, createShardAccount({
       address: masterAddress,

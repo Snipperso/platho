@@ -79,7 +79,7 @@ async function genesis(now = 1_700_000_000) {
   const bc = await Blockchain.create();
   bc.now = now;
   const deployer = await bc.treasury('pav-deployer');
-  const athMasterInit = await ATHMaster.init(fixture('MASTER_TREASURY'), beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+  const athMasterInit = await ATHMaster.init(fixture('MASTER_TREASURY'), beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
   const athMaster = contractAddress(0, athMasterInit);
 
   const registryInit = await ProfileRegistry.init(

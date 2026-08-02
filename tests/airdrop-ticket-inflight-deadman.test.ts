@@ -61,7 +61,7 @@ async function chain(tag: string) {
   const poolWallet = await bc.treasury(`${tag}-pool-wallet`);
   const treasuryWallet = await bc.treasury(`${tag}-treasury`);
   const controller = await bc.treasury(`${tag}-controller`);
-  const pool = bc.openContract(await AirdropPool.fromInit(controller.address, MANIFEST, 0n, false));
+  const pool = bc.openContract(await AirdropPool.fromInit(controller.address, MANIFEST, 0n, false, 0n));
   await pool.send(funder.getSender(), { value: toNano('5') }, { $$type: 'AirdropTopUpStorageReserve' } as any);
   const gen = (body: any) => pool.send(controller.getSender(), { value: toNano('0.1') }, body);
   await gen({ $$type: 'AirdropBindAthMaster', ath_master_address: athMaster.address, pool_ath_wallet_address: poolWallet.address });

@@ -23,7 +23,7 @@ async function contractBalance(blockchain: Blockchain, address: Address): Promis
 describe('ATH wallet derivation profile', () => {
   it('compiled wallet code hash comes from the ATH Wallet artifact', async () => {
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');
-    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     const wrapperWalletInit = await ATHWallet.init(0n, treasuryOwner, masterAddress);
     const artifactWalletCode = Cell.fromBoc(readFileSync('build/ATHWallet/ATHWallet_ATHWallet.code.boc'))[0];
@@ -33,7 +33,7 @@ describe('ATH wallet derivation profile', () => {
 
   it('TEP-74: get_wallet_data returns the standard 4-tuple {balance, owner, jetton_master, jetton_wallet_code} — the clean-12 indexer/Tonkeeper-visibility fix', async () => {
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');
-    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     const owner = fixtureAddress('RANDOM_USER_WALLET');
     const walletInit = await ATHWallet.init(1234n, owner, masterAddress);
@@ -66,7 +66,7 @@ describe('ATH wallet derivation profile', () => {
 
   it('ATH Master get_wallet_address(owner) equals local StateInit derivation', async () => {
     const treasuryOwner = fixtureAddress('TREASURY_OWNER');
-    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
 
     const blockchain = await Blockchain.create();
@@ -106,7 +106,7 @@ describe('ATH wallet derivation profile', () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-treasury-owner');
     const attacker = await blockchain.treasury('ath-genesis-attacker');
-    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(
       masterAddress,
@@ -182,7 +182,7 @@ describe('ATH wallet derivation profile', () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-forged-bounce-owner');
     const attacker = await blockchain.treasury('ath-genesis-forged-bounce-attacker');
-    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(
       masterAddress,
@@ -252,7 +252,7 @@ describe('ATH wallet derivation profile', () => {
   it('ATH Master forwards DeployTreasurySupply overpayment INTO the treasury ATH wallet as its rent endowment', async () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-overpay-treasury-owner');
-    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(
       masterAddress,
@@ -284,7 +284,7 @@ describe('ATH wallet derivation profile', () => {
   it('ATH Master tiny DeployTreasurySupply overpayment does not cancel genesis credit', async () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-dust-overpay-owner');
-    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(
       masterAddress,
@@ -319,7 +319,7 @@ describe('ATH wallet derivation profile', () => {
   it('ATH Master refunds bounced treasury genesis credit envelope when treasury wallet rejects', async () => {
     const blockchain = await Blockchain.create();
     const treasuryOwner = await blockchain.treasury('ath-genesis-bounce-refund-owner');
-    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell());
+    const masterInit = await ATHMaster.init(treasuryOwner.address, beginCell().storeBuffer(Buffer.from('ATH')).endCell(), 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(
       masterAddress,
@@ -434,7 +434,7 @@ async function runGenesisSupply(masterOwnBalance: bigint, sentValue: bigint) {
   blockchain.now = 1_790_000_000;
   const treasuryOwner = await blockchain.treasury('genesis-action-owner');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
-  const masterInit = await ATHMaster.init(treasuryOwner.address, content);
+  const masterInit = await ATHMaster.init(treasuryOwner.address, content, 0n);
   const masterAddress = contractAddress(0, masterInit);
 
   await blockchain.setShardAccount(masterAddress, createShardAccount({
@@ -467,7 +467,7 @@ describe('ATHMaster storage top-up', () => {
     blockchain.now = 1_790_000_000;
     const funder = await blockchain.treasury('ath-master-topup-funder');
     const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
-    const masterInit = await ATHMaster.init(funder.address, content);
+    const masterInit = await ATHMaster.init(funder.address, content, 0n);
     const masterAddress = contractAddress(0, masterInit);
     await blockchain.setShardAccount(masterAddress, createShardAccount({
       address: masterAddress, code: masterInit.code, data: masterInit.data,

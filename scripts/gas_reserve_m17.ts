@@ -192,7 +192,7 @@ async function athBurnScenario(): Promise<M17ScenarioMetric> {
   const owner = await blockchain.treasury('m17-ath-burn-owner');
   const treasuryOwner = fixtureAddress('M17_ATH_MASTER_TREASURY');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
-  const masterInit = await ATHMaster.init(treasuryOwner, content);
+  const masterInit = await ATHMaster.init(treasuryOwner, content, 0n);
   const masterAddress = contractAddress(0, masterInit);
   await blockchain.setShardAccount(masterAddress, createShardAccount({
     address: masterAddress,
@@ -270,7 +270,7 @@ async function deployRegistryWithAthSystem(options: { officialWalletBalance: big
   const vaultAddress = fixtureAddress('M17_REGISTRY_VAULT');
   const masterTreasuryOwner = fixtureAddress('M17_REGISTRY_ATH_MASTER_TREASURY');
   const content = beginCell().storeBuffer(Buffer.from('ATH')).endCell();
-  const masterInit = await ATHMaster.init(masterTreasuryOwner, content);
+  const masterInit = await ATHMaster.init(masterTreasuryOwner, content, 0n);
   const athMasterAddress = contractAddress(0, masterInit);
   const registryInit = await UsernameRegistry.init(placeholderAthWallet, athMasterAddress, treasuryAthReceiver, false, 0n, 0n, deployer.address);
   const registryAddress = contractAddress(0, registryInit);
