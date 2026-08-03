@@ -95,7 +95,9 @@ function u32be(value) {
   return new Uint8Array([(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]);
 }
 
-function base64urlDecode(value) {
+// Exported because conv-key-store.mjs needs the SAME decoder. It used to hex-decode keyId strings while this module
+// base64url-decoded them, so the one identifier the two modules pass to each other had two incompatible string forms.
+export function base64urlDecode(value) {
   if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(value, 'base64url'));
   const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
   const binary = atob(padded);

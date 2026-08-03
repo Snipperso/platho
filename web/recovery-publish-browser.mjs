@@ -16,7 +16,7 @@
 import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
 import { recoveryShardAddressBytes, recoveryShardStateInit, rawAddress } from './shard-address.mjs?v=3';
 import { recoveryOwnerSlotKey } from './shard-discovery.mjs?v=3';
-import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=1';
+import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=2';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 // MUST equal the RecoveryShard.tact constants; mirrored here (not imported) so this browser builder is the
