@@ -3394,7 +3394,10 @@ button.feed-item:hover {
 
 .wallet-ton-group {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  /* [OWNER 2026-08-03] TWO columns, not three. The balance button used to hold the first (1.2fr) slot; removing it
+     left the row declaring a column nothing occupies, so the two remaining actions sat squeezed into the left
+     two-thirds while every row below them ran the full width. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
 }
 

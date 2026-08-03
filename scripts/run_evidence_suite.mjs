@@ -20,6 +20,7 @@
 // that is the whole reason this is a script and not a `;` in package.json: `;` would swallow it, and `&&`/`;` behave
 // differently under cmd.exe and sh anyway.
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 // Overridable ONLY so the guard can drive this against a deliberately failing fixture — the property under test is
 // "a red suite still writes evidence", and that cannot be observed on a suite that passes. Defaults are canonical.
@@ -48,8 +49,48 @@ if (suite.error) {
 
 const summary = spawnSync(process.execPath, ['scripts/write_full_test_summary.mjs', RUN_JSON], { stdio: 'inherit' });
 
+// THE ONE GUARD THAT CANNOT SEE ITS OWN RUN.
+//
+// release-truth-single-source compares the evidence artefact against the current test tree — but the artefact is
+// written by the line ABOVE, after every test has already finished. So ANY run that adds or removes a test file makes
+// that guard read the PREVIOUS run's numbers and fail, through no fault of the tree. The artefact written moments
+// later is correct, and a second full pass then goes green with nothing changed in between.
+//
+// That is a real second pass and it is the honest price — the artefact must describe a run in which every test,
+// including this guard, actually passed. What is NOT acceptable is paying it as a manual round-trip: it cost two
+// ten-minute runs on 2026-08-02 and two more on 2026-08-03, every time discovered by a human reading a failure that
+// had already fixed itself. So do it here, automatically, and ONLY under a condition that cannot launder a red tree:
+// the whole run had EXACTLY ONE failing test and it was this guard.
+const RECHECK = 'release-truth-single-source';
+let suiteCode = suite.status ?? 1;
+
+function soleFailureIsTheConvergenceGuard() {
+  let report;
+  try { report = JSON.parse(readFileSync(RUN_JSON, 'utf8')); } catch { return false; }
+  const failures = [];
+  for (const file of report?.testResults ?? []) {
+    for (const assertion of file?.assertionResults ?? []) {
+      if (assertion?.status === 'failed') failures.push(String(file?.name ?? ''));
+    }
+  }
+  return failures.length === 1 && failures[0].includes(RECHECK);
+}
+
+if (suiteCode !== 0 && summary.status === 0 && soleFailureIsTheConvergenceGuard()) {
+  console.log(`[evidence] the only failure was ${RECHECK}, which read the PREVIOUS artefact. Re-running the suite`);
+  console.log('[evidence] against the one this run just wrote. A second failure here is a real one.');
+  const again = spawnSync(process.execPath, [
+    VITEST_BIN, 'run', '--config', CONFIG, '--reporter=json', `--outputFile=${RUN_JSON}`,
+  ], { stdio: 'inherit' });
+  if (again.error) {
+    console.error(`could not restart the suite: ${again.error.message}`);
+    process.exit(1);
+  }
+  spawnSync(process.execPath, ['scripts/write_full_test_summary.mjs', RUN_JSON], { stdio: 'inherit' });
+  suiteCode = again.status ?? 1;
+}
+
 // The suite's verdict is the one that matters; a generator failure is still worth surfacing, but it must not turn a
 // red suite green.
-const suiteCode = suite.status ?? 1;
 if (suiteCode !== 0) process.exit(suiteCode);
 process.exit(summary.status ?? 1);

@@ -28,7 +28,9 @@ function versionedModules(): Map<string, string> {
       if (/\.(mjs|js)$/.test(name)) sources.push(`${dir}/${name}`);
     }
   }
-  const RE = /['"`](\.[^'"`]*?\/?([A-Za-z0-9._-]+\.(?:mjs|js)))\?v=(\d+)['"`]/g;
+  // .css TOO. A stylesheet is cached exactly like a module, and this scan used to skip it: on 2026-08-03 styles.css
+  // changed while its ?v= stayed at 276, which is the same defect this file exists for, one file type over.
+  const RE = /['"`](\.[^'"`]*?\/?([A-Za-z0-9._-]+\.(?:mjs|js|css)))\?v=(\d+)['"`]/g;
   for (const file of [...new Set(sources)]) {
     if (!existsSync(file)) continue;
     for (const m of readFileSync(file, 'utf8').matchAll(RE)) out.set(m[2], m[3]);
