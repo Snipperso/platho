@@ -14,8 +14,8 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole read lane
 // runs against a stub transport and fixed key-ids, the way the public and intro lanes do.
 
-import { incomingRecordShards } from './conv-discovery.mjs?v=2';
-import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=3';
+import { incomingRecordShards } from './conv-discovery.mjs?v=4';
+import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=5';
 
 // Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,
 // it MAY hold older ones the newest-page read did not return. The reader now pages, but only to get PAST junk when an

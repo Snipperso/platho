@@ -44,7 +44,8 @@ describe('public publish heal driver guard', () => {
     const handlerStart = app.indexOf("publicComposer?.addEventListener('submit'");
     const handler = app.slice(handlerStart, handlerStart + 4000);
     const clearIndex = handler.indexOf("publicMessageInput.value = '';");
-    const awaitIndex = handler.indexOf('await submitPublic');
+    // The submit now goes through the shared outgoing-publish queue, so the await names the lane, not the helper.
+    const awaitIndex = handler.indexOf('await enqueueOutgoingPublish(');
     expect(clearIndex).toBeGreaterThan(-1);
     expect(clearIndex).toBeLessThan(awaitIndex);
     expect(handler).toMatch(/publicMessageInput\.value = text;/);

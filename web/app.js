@@ -30,7 +30,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=19';
+} from './platho-wallet.mjs?v=21';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
@@ -152,37 +152,37 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=45';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=2';
+import { createPublicLane } from './public-lane.mjs?v=4';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=2';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=4';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=2';
-import { createIntroLane } from './intro-lane.mjs?v=2';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=4';
+import { createIntroLane } from './intro-lane.mjs?v=4';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard } from './conv-discovery.mjs?v=2';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=2';
+import { outgoingRecordShard } from './conv-discovery.mjs?v=4';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=4';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=2';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=3';
+import { createConvReadLane } from './conv-lane.mjs?v=4';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=5';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=2';
-import { readAccountStates } from './shard-reader.mjs?v=2';
+import { readAccountStates } from './shard-reader.mjs?v=4';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=2';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=4';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=2';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=3';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=2';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=4';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=5';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=4';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=2';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=2';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=3';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=4';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=4';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=5';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -194,7 +194,7 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=4';
+} from './shard-discovery.mjs?v=6';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=41';
 import {
   computeUsernameNameHash,
@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v813';
+const PLATHO_APP_RUNTIME_VERSION = 'v817';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -806,6 +806,16 @@ function copyPrivateThreadDiagnostic() {
         lastError: plathoIntroScanLastError,
       },
       lastIntroSend: globalThis.plathoLastIntroDirectSend ?? null,
+      // SEND SIDE — added 2026-08-03 after a burst wedged and NOTHING in this dump could say why.
+      //
+      // The direct lane creates no publishState, so plathoDebugPendingPublishes returns an empty array for it, and the
+      // per-message `m` above shows the literal word "sending" for BOTH "the call has not returned yet" and "it threw
+      // a transient RPC error and is being retried". Those need completely different fixes, and there was no way to
+      // tell them apart from a screenshot — which is exactly how I spent an evening confidently diagnosing the wrong
+      // cause. `lastSend` records the outcome of the most recent CONV publish attempt, `inFlight` counts the calls
+      // that have not returned, and `seqno` is what we last signed against.
+      send: globalThis.plathoLastConvSend ?? null,
+      sendInFlight: globalThis.plathoConvSendInFlight ?? 0,
       convs: (() => {
         try {
           return [...(convKeyStore?.snapshot?.() ?? new Map()).entries()].map(([id, record]) => ({
@@ -968,6 +978,23 @@ let publicFileAttachments = [];
 let pendingProfileAvatarModeId = 'good';
 let localProfileAvatarPointer = null;
 let profileAvatarLoadPromises = new Map();
+
+/**
+ * ONE TASK AT A TIME, IN ORDER.
+ *
+ * This was written by hand three times (the avatar read lane, the username-hygiene lane, and then sends) before it
+ * became a primitive; the copies are gone. The predecessor's OUTCOME never blocks the successor — a rejected chain
+ * would wedge the lane for the rest of the session — while the caller still sees its own task's rejection.
+ */
+function createSerialLane() {
+  let tail = Promise.resolve();
+  return function enqueue(task) {
+    const run = tail.then(() => task());
+    tail = run.then(() => undefined, () => undefined);
+    return run;
+  };
+}
+
 // iOS-WebKit stalls its run loop under 2+ CONCURRENT toncenter reads (the v509 freeze class). Avatar
 // hydration is the worst remaining offender: the public feed, the channel list, restored history, and
 // per-message append each fan out many getAvatar/getAvatarVersion/readAvatarParts reads through the one
@@ -976,13 +1003,31 @@ let profileAvatarLoadPromises = new Map();
 // most one runs at a time. The transport queue already spaces toncenter reads ~1.5s apart, so a serial
 // lane costs ~no wall-clock (the reads were already effectively serial at the network) while removing
 // the concurrent-pending run-loop stall on iOS.
-let avatarChainReadLane = Promise.resolve();
-function enqueueAvatarChainRead(task) {
-  const run = avatarChainReadLane.then(() => task());
-  // Keep the lane alive (never rejecting) regardless of this task's outcome so the next read still runs.
-  avatarChainReadLane = run.then(() => undefined, () => undefined);
-  return run;
-}
+const enqueueAvatarChainRead = createSerialLane();
+
+/**
+ * EVERY OUTGOING MESSAGE LEAVES ONE AFTER ANOTHER — private, public, comments, notes to self, first contact.
+ *
+ * OBSERVED 2026-08-03: single messages flew, but a burst hung instantly and something re-sent them minutes later.
+ * Both composer submit handlers are `async` and nothing serialised them, so eight taps started eight independent
+ * publishes AT ONCE. Each one costs several chain reads (the peer bundle from their KeyShard, the shard's cold-floor
+ * last_seq, the wallet balance, the wallet seqno) before it even broadcasts, so a burst puts dozens of requests into
+ * the shared pump in one go. Requests age out, the transport answers transient, every message drops into the retry
+ * ladder — and that ladder is the "backup path" that eventually gets them out.
+ *
+ * ONE lane for all of them, not one per surface: they share a wallet, a seqno and an RPC budget, so two publishes
+ * overlapping is the same pile-up whichever composer started them.
+ *
+ * It holds ONLY the publish attempt. Both composers clear the input and insert the optimistic record BEFORE entering
+ * the lane, so typing the next message never waits; the delivery confirm runs in the background, so a send never
+ * waits on the previous message's confirmation. Retries enter the SAME lane — a retry storm is the same apocalypse
+ * arriving later.
+ *
+ * NOT on this lane, deliberately: wallet operations that are not messages (ATH claim/flush, avatar registration,
+ * username mint, GRAM transfer). They are user-initiated one at a time and some hold minute-long confirm loops that
+ * would block sending. Their overlap risk is the wallet seqno, which platho-wallet's own monotonic floor covers.
+ */
+const enqueueOutgoingPublish = createSerialLane();
 let deferredInstallPrompt = null;
 let installedRelatedPwaDetected = false;
 let walletIdentityFlashTimer = null;
@@ -1084,7 +1129,9 @@ const SEND_LOCK_MAX_GRACE_MS = 600 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
-const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000, 90_000, 180_000];
+// Starts at 2s: a claim/flush executes within a couple of TON blocks, and the owner watches the number the whole
+// time. The long tail stays for a chain that is slow to include.
+const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000];
 const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
 // Foreground IDLE fast tier. There is no push in a no-backend messenger — the recipient must poll to
@@ -1306,7 +1353,9 @@ let athTicketState = { credits: null, minClaimCredits: null, inFlight: 0n, claim
 // `athPerCredit` is what turns an internal credit count into the figure a user can act on — 10 credits is not
 // "10 of something", it is 100 ATH.
 let athPoolState = { distributedTotal: null, totalPool: null, athPerCredit: null };
-let athClaimState = { busy: false, error: null, errorCode: null };
+// pendingSince: a claim was broadcast and the chain has not shown it yet. Distinct from `busy` (which covers only the
+// signing/broadcast itself) — the gap between those two is where the button used to re-enable on a live claim.
+let athClaimState = { busy: false, error: null, errorCode: null, pendingSince: null };
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
@@ -9993,10 +10042,11 @@ async function revalidateThreadUsernameVariants(thread) {
 // one chain so a catch-up sync spanning many dialogs never fires N concurrent resolvePlathoUsernameOwner reads —
 // concurrent app-level toncenter reads are the v509-class iOS run-loop freeze. One resolve at a time; each task is
 // still throttled internally, so this only bounds the fan-out, it adds no latency to anything user-facing.
-let usernameHygieneChain = Promise.resolve();
+const enqueueUsernameHygiene = createSerialLane();
 function queueUsernameHygiene(task) {
-  usernameHygieneChain = usernameHygieneChain.catch(() => {}).then(() => task()).catch(() => {});
-  return usernameHygieneChain;
+  // Fire-and-forget by contract: every caller drops the promise, so a rejection here would surface as an unhandled
+  // rejection rather than reaching anyone who could act on it. Swallowed at THIS boundary, not inside the lane.
+  return enqueueUsernameHygiene(task).catch(() => {});
 }
 
 // Sender-side mirror of revalidateThreadUsernameVariants: reconcile the wallet's OWN linked .ath against the chain.
@@ -16680,7 +16730,7 @@ async function submitAirdropClaim() {
     throw error;
   }
 
-  athClaimState = { busy: true, error: null, errorCode: null };
+  athClaimState = { busy: true, error: null, errorCode: null, pendingSince: null };
   renderAthClaimStatus();
   const transaction = createWalletTransaction([{
     address: athTicketState.address,
@@ -16691,8 +16741,10 @@ async function submitAirdropClaim() {
   // Reflect the in-flight state immediately: the ticket moves the credits the moment it executes, and a user who
   // sees the old number would reasonably press again into gate 27011.
   athTicketState = { ...athTicketState, inFlight: athTicketState.credits ?? 0n, credits: 0n };
-  athClaimState = { busy: false, error: null, errorCode: null };
+  // Not `busy` any more (the external is away), but NOT claimable either until the chain shows it — see athClaimReady.
+  athClaimState = { busy: false, error: null, errorCode: null, pendingSince: Date.now() };
   renderAthProfileStats();
+  renderAthClaimStatus();
   queueAthFlushPostTransactionRefresh();
 }
 
@@ -16705,6 +16757,10 @@ claimAirdropButton?.addEventListener('click', async () => {
       busy: false,
       error: String(error?.message ?? error ?? 'Airdrop claim blocked'),
       errorCode: error?.code ?? null,
+      // KEEP any pending marker. A throw AFTER the broadcast (an ambiguous send, a confirm read that failed) leaves a
+      // claim that may well be executing; clearing the lock here would re-offer the button and invite a second claim
+      // into gate 27011. The grace releases it either way.
+      pendingSince: athClaimState.pendingSince ?? null,
     };
     flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
       ? t('profile.flushNeedsWalletGram')
@@ -17531,15 +17587,17 @@ publicComposer?.addEventListener('submit', async (event) => {
   updatePublicFileAttachmentUi();
   refreshComposerCostStatus();
   try {
+    // Same lane as private sends: a burst of posts or comments overlaps exactly like a burst of messages, and they
+    // share one wallet, one seqno and one RPC budget.
     if (draftCommentTarget) {
-      await submitPublicCommentDirect(draftCommentTarget, text, attachments, fileAttachments);
+      await enqueueOutgoingPublish(() => submitPublicCommentDirect(draftCommentTarget, text, attachments, fileAttachments));
     } else {
-      await submitPublicPostDirect({
+      await enqueueOutgoingPublish(() => submitPublicPostDirect({
         text,
         attachments,
         fileAttachments,
         commentsAllowed,
-      });
+      }));
     }
     // On the post detail screen the composer stays in comment mode for the SAME post (so a follow-up message is
     // another comment, not a public post). Only the inline/feed flow resets the target.
@@ -17737,7 +17795,7 @@ composer?.addEventListener('submit', async (event) => {
         delay(PRIVATE_SEND_SYNC_WAIT_CAP_MS),
       ]);
     }
-    await attemptPrivateComposerMessagePublish(sendContext);
+    await enqueueOutgoingPublish(() => attemptPrivateComposerMessagePublish(sendContext));
   } catch (error) {
     await settlePrivateComposerSendError(sendContext, error);
   } finally {
@@ -18196,7 +18254,22 @@ function athSupplyDisplayValue() {
 }
 
 /** Whether a claim can be signed right now, and why not when it cannot. */
+// How long a submitted claim keeps the button locked while we wait for the chain to show it. Bounded so a claim that
+// never lands cannot disable the button forever — past this the on-chain state is believed again.
+const ATH_CLAIM_PENDING_GRACE_MS = 180_000;
+
+/** A claim we broadcast but have not yet seen on chain. */
+function athClaimPending() {
+  const since = athClaimState.pendingSince;
+  return Number.isFinite(since) && (Date.now() - since) < ATH_CLAIM_PENDING_GRACE_MS;
+}
+
 function athClaimReady() {
+  // [OWNER 2026-08-03] The button went ACTIVE AGAIN moments after a claim was submitted. A claim broadcasts in a
+  // second but executes a few seconds later, and the +5s ticket re-read still returned the OLD credits — which read
+  // as "claimable" and re-enabled the button on a claim already in flight. Pressing it again walks straight into
+  // gate 27011. The submitted-but-unseen window is now a state of its own rather than a gap between two truths.
+  if (athClaimPending()) return false;
   const credits = athTicketState.credits;
   const need = athTicketState.minClaimCredits;
   if (credits === null || need === null) return false;
@@ -19668,6 +19741,14 @@ async function refreshAthTicketState() {
         address: ticket.address,
       }
       : { credits: 0n, minClaimCredits: null, inFlight: 0n, claimMinValue: null, address: ticket.address };
+    // The claim we broadcast is now VISIBLE on chain (credits consumed, or the ticket reports it in flight), so the
+    // submitted-but-unseen lock is over. Without this the button would stay disabled for the full grace even after
+    // settlement — which matters the moment new credits are earned inside that window.
+    if (athClaimState.pendingSince
+      && (nonNegativeBigInt(athTicketState.inFlight) > 0n || nonNegativeBigInt(athTicketState.credits) === 0n)) {
+      athClaimState = { ...athClaimState, pendingSince: null };
+    }
+    renderAthClaimStatus();
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] ticket read failed', error);
   }
@@ -19721,10 +19802,16 @@ async function refreshAthProtocolStatsRun() {
 }
 
 function queueAthFlushPostTransactionRefresh() {
-  refreshAthProtocolStats().catch(() => {});
-  for (const delayMs of ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS) {
-    setTimeout(() => refreshAthProtocolStats().catch(() => {}), delayMs);
-  }
+  // [OWNER 2026-08-03] Claimed 100 ATH and the balance did not appear for a long time. The ticket stats were re-read
+  // on this schedule, but the ATH BALANCE CARD is fed by a DIFFERENT path (refreshVaultNavBalanceInBackground), which
+  // nobody told about the claim — so the number the user was actually watching waited for the next background tick.
+  // Refresh BOTH, and start at 2s rather than 5s: post-April TON settles a transaction in well under a second.
+  const tick = () => {
+    refreshAthProtocolStats().catch(() => {});
+    refreshVaultNavBalanceInBackground().catch(() => {});
+  };
+  tick();
+  for (const delayMs of ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS) setTimeout(tick, delayMs);
 }
 
 function isVaultViewActive() {
@@ -21644,8 +21731,15 @@ async function attemptConvMessagePublishDirect(context) {
   await assertWalletGramAtLeast(CONV_PUBLISH_VALUE * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'send');
 
   let result;
+  // Diagnostics for the send path, which had none. `sendInFlight` is what tells "the call never returned" apart from
+  // "it threw and is retrying" — the dump could not distinguish those, and both render as the word "sending".
+  globalThis.plathoConvSendInFlight = (globalThis.plathoConvSendInFlight ?? 0) + 1;
+  const sendStartedAt = Date.now();
   try {
     result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
+    globalThis.plathoLastConvSend = {
+      ok: true, parts: parts.length, seqno: result?.seqno ?? null, ms: Date.now() - sendStartedAt,
+    };
     message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now() };
     // Record the parts' frame_commits + shard address + my highest seq for the delivery confirm (below). commits come
     // from the built parts, so a message that later reddens does so on the SAME per-record identity the shard stores.
@@ -21657,7 +21751,21 @@ async function attemptConvMessagePublishDirect(context) {
     // success can arm the confirm on them.
     if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, at: Date.now() };
     if (Array.isArray(error?.preparedParts)) captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: error.preparedParts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
+    // `broadcast` distinguishes the two outcomes that matter and that nothing recorded before: a throw with a signed
+    // external attached means the request DID go out and the answer was lost (an ambiguous broadcast — the external
+    // may well have landed), whereas no external means we failed before anything left the device.
+    globalThis.plathoLastConvSend = {
+      ok: false,
+      parts: parts.length,
+      ms: Date.now() - sendStartedAt,
+      broadcast: error?.builtBoc ? 'ambiguous' : 'none',
+      status: error?.status ?? null,
+      code: error?.code ?? null,
+      error: String(error?.message ?? error).slice(0, 160),
+    };
     throw error;
+  } finally {
+    globalThis.plathoConvSendInFlight = Math.max(0, (globalThis.plathoConvSendInFlight ?? 1) - 1);
   }
 
   globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
@@ -21807,10 +21915,10 @@ async function runPrivateSendRetry(context) {
     return;
   }
   try {
-    await attemptPrivateComposerMessagePublish({
-      ...context,
-
-    });
+    // Same lane as a fresh send: a burst that failed once would otherwise retry all of itself at once and rebuild
+    // exactly the pile-up the queue exists to prevent. Only the ATTEMPT is queued — the backoff already elapsed in
+    // the setTimeout that got us here, so a waiting retry never holds the lane.
+    await enqueueOutgoingPublish(() => attemptPrivateComposerMessagePublish({ ...context }));
   } catch (error) {
     await settlePrivateComposerSendError(context, error);
   } finally {

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { __resetWalletSeqnoFloorsForTests } from '../web/platho-wallet.mjs';
 import { Address, Cell, toNano } from '@ton/core';
 import { Blockchain } from '@ton/sandbox';
 import { WalletContractV5R1 } from '@ton/ton';
@@ -41,6 +42,11 @@ const bobMnemonic = [
 ];
 
 describe('embedded Platho wallet', () => {
+  // The per-wallet seqno floor is MODULE state and every case here shares one mnemonic, so a floor left by an earlier
+  // case leaks into the next. That is how the floor's own bug hid: it overrode the seqno-0 of an uninitialized wallet
+  // (PLATHO-WALLET-04E/04G went red with 44 where the chain said 0).
+  beforeEach(() => __resetWalletSeqnoFloorsForTests());
+
   it('PLATHO-WALLET-01: derives the same v5r1 wallet address as @ton/ton', async () => {
     const wallet = await derivePlathoWalletFromMnemonic(mnemonic);
     const reference = WalletContractV5R1.create({
