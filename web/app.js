@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v806';
+const PLATHO_APP_RUNTIME_VERSION = 'v809';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -657,7 +657,6 @@ const flushAthButton = document.querySelector('#flushAthButton');
 const flushAthStatus = document.querySelector('#flushAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
-const athActivityCreditsStatus = document.querySelector('#athActivityCreditsStatus');
 const claimAirdropButton = document.querySelector('#claimAirdropButton');
 const claimAirdropStatus = document.querySelector('#claimAirdropStatus');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
@@ -772,6 +771,10 @@ function copyPrivateThreadDiagnostic() {
       threads: (threads ?? []).filter((thread) => !thread.publicChannelId).map((thread) => ({
         id: thread.id,
         name: thread.name ?? null,
+        // [ADDED 2026-08-03] The peer keyId this dialog is bound to. Without it a "no messages arrive" report cannot
+        // be told apart from "they arrive for a different identity" — the two look identical from outside and need
+        // opposite fixes.
+        convPeer: thread.convPeerKeyId ?? null,
         isSaved: isSavedMessagesThread(thread),
         pending: thread.pendingIdentityResolution === true,
         primaryRaw: threadPrimaryWalletRaw(thread),
@@ -796,6 +799,23 @@ function copyPrivateThreadDiagnostic() {
         })),
       })),
       senderResolve: plathoSenderResolveDebug,
+      // RECEIVE SIDE. The intro scan is a background loop whose errors go to console.warn — invisible on a phone.
+      // These four fields are what turns "I see no messages" into a diagnosis.
+      introLane: {
+        armed: introReceiveLane !== null,
+        identity: localRecipientKeyPair?.keyId ? String(localRecipientKeyPair.keyId).slice(0, 12) : null,
+        lastError: plathoIntroScanLastError,
+      },
+      lastIntroSend: globalThis.plathoLastIntroDirectSend ?? null,
+      convs: (() => {
+        try {
+          return [...(convKeyStore?.snapshot?.() ?? new Map()).entries()].map(([id, record]) => ({
+            id: String(id).slice(0, 16),
+            peer: record?.peerKeyId ? introKeyIdString(record.peerKeyId).slice(0, 12) : null,
+            epochs: Object.keys(record?.outgoingSeq ?? {}),
+          }));
+        } catch { return 'unreadable'; }
+      })(),
     };
     copyTextToClipboard(JSON.stringify(dump, null, 1)).then(() => flashWalletIdentityStatus('diag copied')).catch(() => {});
   } catch (error) { console.error(error); }
@@ -881,6 +901,9 @@ let localVaultDraft = null;
 let convKeyStore = null;
 let introReplayGuard = null;
 let introReceiveLane = null;
+// Last error the intro scan reported. It used to go only to console.warn, which is unreachable on a phone — the
+// device that has the problem is exactly the one whose console nobody can read.
+let plathoIntroScanLastError = null;
 const knownVaultKeyOwnerBySignPubkey = new Map();
 const knownVaultKeyRecordByWallet = new Map();
 const verifiedPlathoUsernameOwnerCache = new Map();
@@ -9235,7 +9258,10 @@ async function armIntroReceiveLane() {
       scanSecretKey: localIdentity.scanSecretKey,
       runGetMethod: (call) => transport.runGetMethod(call),
       onIntro,
-      onError: (error) => { if (!noteTonRpcRateLimit(error)) console.warn('[intro] scan error', error); },
+      onError: (error) => {
+        plathoIntroScanLastError = String(error?.message ?? error ?? 'intro scan error').slice(0, 200);
+        if (!noteTonRpcRateLimit(error)) console.warn('[intro] scan error', error);
+      },
     });
     introReceiveLane.start();
   } catch (error) {
@@ -17906,7 +17932,16 @@ function groupDecimalText(text) {
 
 function formatAthProfileAmount(value) {
   if (value === null || value === undefined) return '-';
-  return `${groupDecimalText(formatAthAtomic(value))} ATH`;
+  return `${formatAthAtomicGrouped(value)} ATH`;
+}
+
+/**
+ * The same amount WITHOUT the unit, for the left half of an "x / y ATH" pair — naming the unit twice reads as
+ * "100 ATH / 100 ATH ATH", which is what shipped in v806 because this helper did not exist and the caller appended
+ * a second " ATH" to a string that already carried one.
+ */
+function formatAthAtomicGrouped(value) {
+  return groupDecimalText(formatAthAtomic(value));
 }
 
 // Merge the in-flight flush overlay into a fresh chain read (see athFlushOptimisticFlush). Per bucket: while
@@ -18000,30 +18035,6 @@ function athSupplyDisplayValue() {
   return adjusted < 0n ? 0n : adjusted;
 }
 
-/**
- * This wallet's accrual, IN ATH — not in credits.
- *
- * A credit is an internal unit: the pool pays `ath_per_credit` for each, currently 10 ATH. Showing "10 / 10" told the
- * owner nothing he could act on, which is fair — it names a quantity of something unnamed. The same state reads
- * "100 / 100 ATH", and the unit is spelled out in the value rather than left to the section heading.
- *
- * Falls back to the raw credit count only if the pool multiplier could not be read, because a wrong ATH figure would
- * be worse than an honest internal one.
- */
-function renderAthActivityCredits() {
-  const credits = athTicketState.credits;
-  if (credits === null) { setText(athActivityCreditsStatus, t('profile.statusChecking')); return; }
-  const perCredit = athPoolState.athPerCredit ?? null;
-  const need = athTicketState.minClaimCredits ?? 0n;
-  if (perCredit === null || perCredit <= 0n) {
-    setText(athActivityCreditsStatus, need > 0n ? `${credits} / ${need}` : String(credits));
-    return;
-  }
-  const have = formatAthProfileAmount(credits * perCredit);
-  if (need <= 0n) { setText(athActivityCreditsStatus, `${have} ATH`); return; }
-  setText(athActivityCreditsStatus, `${have} / ${formatAthProfileAmount(need * perCredit)} ATH`);
-}
-
 /** Whether a claim can be signed right now, and why not when it cannot. */
 function athClaimReady() {
   const credits = athTicketState.credits;
@@ -18047,12 +18058,12 @@ function renderAthClaimStatus() {
   if (!athClaimReady()) {
     const need = athTicketState.minClaimCredits ?? 0n;
     setText(claimAirdropStatus, perCredit && perCredit > 0n && need > 0n
-      ? `${formatAthProfileAmount(credits * perCredit)} / ${formatAthProfileAmount(need * perCredit)} ATH`
+      ? `${formatAthAtomicGrouped(credits * perCredit)} / ${formatAthProfileAmount(need * perCredit)}`
       : t('profile.zeroAthReady'));
     return;
   }
   setText(claimAirdropStatus, perCredit && perCredit > 0n
-    ? `${formatAthProfileAmount(credits * perCredit)} ATH`
+    ? formatAthProfileAmount(credits * perCredit)
     : String(credits));
 }
 
@@ -18063,7 +18074,6 @@ function renderAthProfileStats() {
     vaultProtocolState?.airdrop_total_allocation_ath,
     VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   );
-  renderAthActivityCredits();
   renderAthClaimStatus();
   // [BUILT 2026-08-03] The GLOBAL figure, from AirdropPool. It used to come from the Vault global; clean-17 deleted
   // the Vault and moved the undistributed remainder here, and until the genesis ceremony sealed there was no address
@@ -18073,7 +18083,7 @@ function renderAthProfileStats() {
   const distributed = athPoolState.distributedTotal ?? null;
   if (distributed !== null && poolTotal !== null && poolTotal > 0n) {
     const percent = (distributed * 10_000n) / poolTotal;
-    setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(distributed)} ATH`);
+    setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(distributed)}`);
     return;
   }
   const remainingRaw = vaultProtocolState?.airdrop_remaining_ath;
@@ -18084,7 +18094,7 @@ function renderAthProfileStats() {
   const remaining = nonNegativeBigInt(remainingRaw);
   const issued = remaining >= total ? 0n : total - remaining;
   const percent = (issued * 10_000n) / total;
-  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)} ATH`);
+  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)}`);
 }
 
 function normalizeUsernameInput(input) {

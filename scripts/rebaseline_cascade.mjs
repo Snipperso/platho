@@ -43,11 +43,12 @@ const STEPS = [
   { name: 'экономика UsernameRegistry', cmd: tsNode('scripts/username_registry_storage_economics.ts') },
   { name: 'отчёт цен публикации', cmd: `${npm} run pricing:report` },
   { name: 'проверка генезиса', cmd: `${npm} run mainnet:genesis:verify`, allowFail: true },
-  { name: 'веб-препреп (preview)', cmd: `${npm} run web:deploy:prepare` },
-  // Both of these exit non-zero before genesis and are SUPPOSED to: the production bundle is blocked on
-  // MAINNET_GENESIS_NOT_VERIFIED, which cannot clear until the chain is read after deployment. They still write
-  // their artifacts, which is what the rest of the tree pins, so a non-zero code here is not a cascade failure.
-  { name: 'веб-препреп (production)', cmd: `${npm} run web:deploy:prepare:prod`, allowFail: true },
+  // ONE step now: `--mode both` writes the preview AND production artifact sets, because they are pinned by the same
+  // test and regenerating one without the other leaves the tree red for a reason unrelated to the change. It exits
+  // non-zero before genesis and is SUPPOSED to — the production bundle is blocked on MAINNET_GENESIS_NOT_VERIFIED,
+  // which cannot clear until the chain is read after deployment. Both artifact sets are still written, which is what
+  // the rest of the tree pins, so a non-zero code here is not a cascade failure.
+  { name: 'веб-препреп (preview + production)', cmd: `${npm} run web:deploy:prepare`, allowFail: true },
 ];
 
 function tsNode(script) {
