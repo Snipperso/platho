@@ -32,7 +32,7 @@
 // public bucket space. tests/conv-lane-send.test.ts pins the message against a REAL sealed capsule and a live RecordShard.
 
 import { buildConvPublishBrowser } from './conv-publish-browser.mjs?v=1';
-import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=33';
+import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=34';
 import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=18';
 
 /**

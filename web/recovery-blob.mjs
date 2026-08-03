@@ -18,7 +18,7 @@
 // reader can cross-check. tests/recovery-blob.test.ts pins the seed round-trip, the wrong-seed refusal, the essentials
 // that survive, the non-essentials that default, and the non-zero hashes.
 
-import { tonCell } from './pwa-contract-transactions.mjs?v=33';
+import { tonCell } from './pwa-contract-transactions.mjs?v=34';
 
 const RECOVERY_BLOB_SALT = 'PLATHO.RECOVERY.BLOB.SALT.V1';
 const RECOVERY_BLOB_INFO = 'PLATHO.RECOVERY.BLOB.KEY.V1';

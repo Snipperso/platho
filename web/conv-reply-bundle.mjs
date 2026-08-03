@@ -17,7 +17,7 @@
 // the getter's base64 BoC string or a parsed cell. [clean17-private-lane-plan: Y reply-bundle resolution]
 
 import { publicKeyBundleFromVaultKeyRecord, CRYPTO_SUITES } from './crypto/platho-crypto.mjs?v=13';
-import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=33';
+import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=34';
 
 const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 

@@ -15,7 +15,7 @@
 // tests/public-publish-browser.test.ts pins the message against the @ton/core reference (by representation hash)
 // and against a live PublicShard in a sandbox.
 
-import { beginCell } from './pwa-contract-transactions.mjs?v=33';
+import { beginCell } from './pwa-contract-transactions.mjs?v=34';
 import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=4';
 import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=1';
 

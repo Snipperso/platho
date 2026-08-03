@@ -1501,6 +1501,22 @@ export function createProfileRegistryMessage(type, params = {}, options = {}) {
   };
 }
 
+/**
+ * AirdropTicket.TicketClaim — an EMPTY message, so the body is nothing but its opcode.
+ *
+ * Mirrors `message(0x41544332) TicketClaim {}` in contracts/AirdropTicket.tact. Declared here with the other
+ * contract bodies rather than inline at the call site: a hand-rolled opcode is exactly the kind of literal that
+ * drifts silently, and a wrong one reaches the ticket's catch-all `receive(_: Slice)` — which tolerates unknown
+ * bodies instead of bouncing, so the claim would be swallowed with the wallet reporting success.
+ */
+export const AIRDROP_TICKET_OPS = Object.freeze({
+  TicketClaim: 0x41544332,
+});
+
+export function buildAirdropTicketClaimBody() {
+  return new TinyCellBuilder().uint(AIRDROP_TICKET_OPS.TicketClaim, 32, 'op').toBocBase64();
+}
+
 export function createWalletTransaction(messages, options = {}) {
   const validUntil = options.validUntil
     ?? Math.floor((options.nowMs ?? Date.now()) / 1000) + (options.ttlSeconds ?? 300);

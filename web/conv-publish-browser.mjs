@@ -16,7 +16,7 @@
 //     it receives; a near-miss stores a commitment the reader's delivery check rejects.
 // tests/conv-publish-browser.test.ts pins the message against the @ton/core reference AND against a live RecordShard.
 
-import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
+import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=34';
 import { recordShardAddressBytes, recordShardStateInit, rawAddress } from './shard-address.mjs?v=4';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 

@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v805</span>
+              <span class="app-version-label" id="appVersionLabel">v806</span>
             </div>
           </div>
         </div>
@@ -355,6 +355,10 @@
               <h2>ATH</h2>
               <div class="profile-stat-list">
                 <div class="profile-stat-row">
+                  <span data-i18n="profile.activityCredits">Activity credits</span>
+                  <strong id="athActivityCreditsStatus">-</strong>
+                </div>
+                <div class="profile-stat-row">
                   <span data-i18n="profile.activityDropIssued">Activity drop issued</span>
                   <strong id="athDropIssuedStatus">-</strong>
                 </div>
@@ -364,6 +368,7 @@
                 </div>
               </div>
               <div class="settings-list">
+                <button id="claimAirdropButton" type="button"><span data-i18n="profile.claimAirdrop">Claim ATH</span><strong class="profile-action-status" id="claimAirdropStatus" data-i18n="profile.statusChecking">checking</strong></button>
                 <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
               </div>
             </section>
@@ -709,6 +714,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=805" type="module"></script>
+    <script src="./app.js?v=806" type="module"></script>
   </body>
 </html>

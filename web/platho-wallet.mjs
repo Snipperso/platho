@@ -13,7 +13,7 @@ import {
   createMessagingIdentity,
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=13';
-import { tonCell } from './pwa-contract-transactions.mjs?v=33';
+import { tonCell } from './pwa-contract-transactions.mjs?v=34';
 
 const {
   beginCell,

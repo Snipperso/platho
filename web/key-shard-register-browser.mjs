@@ -18,7 +18,7 @@
 // (22119); registering an auth key you do not control BRICKS the identity permanently (rotation needs a signature under
 // it, KeyShard.tact:26). So this refuses to build without a distinct non-zero auth key rather than send a bricking register.
 
-import { beginCell, snakeCellFromBytes } from './pwa-contract-transactions.mjs?v=33';
+import { beginCell, snakeCellFromBytes } from './pwa-contract-transactions.mjs?v=34';
 import { keyShardAddressBytes, keyShardStateInit, rawAddress } from './shard-address.mjs?v=4';
 
 const KEYSHARD_REGISTER_OPCODE = 0x4B534731n; // "KSG1"
