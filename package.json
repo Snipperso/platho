@@ -33,7 +33,7 @@
     "web:deploy:prepare": "node scripts/prepare_static_web_deploy.mjs --mode preview",
     "web:deploy:prepare:prod": "node scripts/prepare_static_web_deploy.mjs --mode production",
     "audit:archive": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create_larisa_audit_archive.ps1",
-    "evidence:suite": "vitest run --config vitest.all.config.ts --reporter=json --outputFile=artifacts/local/CURRENT_FULL_TEST_RUN.json && node scripts/write_full_test_summary.mjs",
+    "evidence:suite": "node scripts/run_evidence_suite.mjs",
     "pricing:report": "node scripts/publish_reserve_pricing_report.mjs",
     "preprod:check": "node scripts/preprod_guard.mjs",
     "test:debug:files": "bash scripts/debug-test-files.sh"
