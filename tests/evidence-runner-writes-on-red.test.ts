@@ -50,6 +50,21 @@ describe('EVIDENCE-RUNNER — a red suite still records its own verdict', () => 
     expect(existsSync(SUMMARY)).toBe(true);
   });
 
+  it('EVRUN-03: the auto re-run cannot launder a red tree', () => {
+    // The runner re-runs the whole suite once when the ONLY failure is release-truth-single-source, which by
+    // construction reads the artefact written after it finished. That excuse must be narrow: EVRUN-01 above already
+    // drives a red suite whose single failure is an ordinary test, and asserts a non-zero exit — so the gate is
+    // exercised in the negative, not just described. Here the gate itself is pinned.
+    const runner = readFileSync('scripts/run_evidence_suite.mjs', 'utf8');
+    expect(runner).toContain('failures.length === 1 && failures[0].includes(RECHECK)');
+    expect(runner).toContain("const RECHECK = 'release-truth-single-source';");
+    // The re-run is the FULL suite with the same config — not the one guard on its own, which would let the rest of
+    // the tree rot behind a green exit code.
+    expect(runner).toMatch(/VITEST_BIN, 'run', '--config', CONFIG, '--reporter=json', `--outputFile=\$\{RUN_JSON\}`,\s*\], \{ stdio: 'inherit' \}\);/);
+    // And its verdict REPLACES the first one rather than being ignored.
+    expect(runner).toContain('suiteCode = again.status ?? 1;');
+  });
+
   it('EVRUN-02: package.json runs the script, not a shell chain that can skip the generator', () => {
     // `&&` is what caused this; `;` would fix the skip and lose the exit code, and the two behave differently under
     // cmd.exe and sh. Pinned so the chain cannot come back.

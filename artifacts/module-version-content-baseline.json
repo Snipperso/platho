@@ -8,8 +8,8 @@
     "sha256": "704960822641fdb470193dae258a0c5907c280b3cb3eb505b7e67a967aebe242"
   },
   "app.js": {
-    "version": "810",
-    "sha256": "be9d066242a5ff9d0d2e1275a7237b937e2f949332aac505f66831201657ccb1"
+    "version": "811",
+    "sha256": "d7bfea5dd310ecc3eba5b631f73bd39eee0f45fce6bcf1fe2b64231f68957357"
   },
   "ath-ton-rpc-provider.mjs": {
     "version": "42",
@@ -246,6 +246,10 @@
   "shard-rpc.mjs": {
     "version": "2",
     "sha256": "1ec995f4df451c061e505f52dd61781a5b064a35e33bc5a372fb43165a3f2927"
+  },
+  "styles.css": {
+    "version": "277",
+    "sha256": "a58d8910920ceb05cca4b9103f7927021ffe1cde07eceda06b8f462f17835bcb"
   },
   "ton-dns-provider.mjs": {
     "version": "41",

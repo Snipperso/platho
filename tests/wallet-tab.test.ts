@@ -40,7 +40,7 @@ describe('wallet tab + durable comment cache guard', () => {
     const moved = [
       'walletBackupWarning', 'createWalletButton', 'importWalletButton', 'unlockWalletButton',
       'changeWalletPasswordButton', 'receiveWalletTonButton', 'sendWalletTonButton',
-      'exportWalletKeyButton', 'importWalletKeyButton', 'walletDisplayModeSelect', 'exportWalletSeedButton',
+      'exportWalletKeyButton', 'importWalletKeyButton', 'exportWalletSeedButton',
       'registerVaultKeysButton', 'clearLocalDataButton',
       'athDropIssuedStatus', 'athSupplyStatus', 'flushAthButton',
     ];
@@ -54,11 +54,51 @@ describe('wallet tab + durable comment cache guard', () => {
     expect(profilePanel).toContain('id="savePrefsButton"');
     expect(walletPanel).not.toContain('id="savePrefsButton"');
 
+    // [OWNER 2026-08-03] "Display as" went the OTHER way — out of Wallet and into Profile. It picks whether other
+    // people see an address or a .ath name, which is identity, not money; it now sits beside the names it chooses
+    // between, in the Usernames and Avatars section.
+    expect(profilePanel).toContain('id="walletDisplayModeSelect"');
+    expect(walletPanel).not.toContain('id="walletDisplayModeSelect"');
+    const usernames = profilePanel.slice(profilePanel.indexOf('aria-label="Usernames and avatars"'));
+    expect(usernames.indexOf('id="walletDisplayModeSelect"')).toBeGreaterThan(-1);
+    expect(usernames.indexOf('id="walletDisplayModeSelect"')).toBeLessThan(usernames.indexOf('aria-label="RPC access"'));
+
     // Every id must survive the move exactly once — a lost id is a control app.js can no longer find, and a
     // duplicated one makes querySelector pick the wrong node.
-    for (const id of [...moved, 'savePrefsButton']) {
+    for (const id of [...moved, 'savePrefsButton', 'walletDisplayModeSelect']) {
       expect((html.match(new RegExp(`id="${id}"`, 'g')) ?? []).length, `${id} appears exactly once`).toBe(1);
     }
+  });
+
+  it('WALLET-TAB-02B: the GRAM actions lead the section and vanish without a wallet', () => {
+    // [OWNER 2026-08-03] Receive/Send are what the tab is opened for; everything below them is one-time setup. And
+    // with no wallet they are hidden outright rather than greyed: offering "Receive GRAM" with nothing to receive
+    // into is a promise the app cannot keep, and the section leads with "Create wallet" in that state instead.
+    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
+    const group = walletPanel.indexOf('id="walletTonGroup"');
+    expect(group, 'the GRAM row lost its id — app.js can no longer hide it').toBeGreaterThan(-1);
+    for (const later of ['id="createWalletButton"', 'id="importWalletButton"', 'id="unlockWalletButton"',
+      'id="changeWalletPasswordButton"', 'id="exportWalletKeyButton"', 'id="registerVaultKeysButton"']) {
+      expect(group, `${later} must come AFTER the GRAM actions`).toBeLessThan(walletPanel.indexOf(later));
+    }
+    // Ships hidden, so a wallet-less first run never flashes the two actions before the refresh runs.
+    expect(walletPanel).toMatch(/id="walletTonGroup"[^>]*\shidden>/);
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toContain('if (walletTonGroup) walletTonGroup.hidden = !plathoWallet;');
+  });
+
+  it('WALLET-TAB-02C: the GRAM row is a TWO-column grid, matching the two buttons in it', () => {
+    // The balance button used to hold the first slot. Removing it left a three-column grid with two children, so the
+    // actions sat squeezed into the left two-thirds while every row below ran the full width — what the owner saw.
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Comments stripped first: the rule carries a note explaining which column was removed, and a naive scan for the
+    // old value matches that explanation instead of the declaration.
+    const rule = css
+      .slice(css.indexOf('.wallet-ton-group {'), css.indexOf('.wallet-ton-group button'))
+      .replace(/\/\*[\s\S]*?\*\//g, ' ');
+    expect(rule).toContain('grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);');
+    expect(rule, 'a third column with nothing to put in it').not.toMatch(/1\.2fr/);
+    expect((rule.match(/minmax\(/g) ?? []).length, 'exactly two columns declared').toBe(2);
   });
 
   it('WALLET-TAB-03: the headline balances cannot disagree with the rail corner', () => {

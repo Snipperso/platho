@@ -303,7 +303,7 @@ describe('PWA runtime config guard', () => {
     const versionNumber = String(versionLabel).slice(1);
     expect(html).toContain(`<script src="./app.js?v=${versionNumber}" type="module">`);
     expect(readFileSync('web/sw.js', 'utf8')).toContain(`./app.js?v=${versionNumber}`);
-    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=276">/);
+    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=277">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6143,12 +6143,12 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v887/);
+    expect(sw).toMatch(/platho-pwa-prototype-v888/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=276/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=277/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
@@ -6168,7 +6168,8 @@ describe('PWA runtime config guard', () => {
     //
     // Versions are now DERIVED in tests/module-version-agreement.test.ts (sw.js against the real importers, and the
     // importers against each other). What belongs here is the question this test actually asks: WHICH modules ship
-    // offline. Non-module entries below (styles.css, manifest, icons) keep their literals — MODVER does not cover them.
+    // offline. The manifest and icons below keep their literals. styles.css is NO LONGER one of those exceptions:
+    // MODCONTENT covers .css since 2026-08-03, after a changed stylesheet shipped behind a stale ?v=276.
     //
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs/);

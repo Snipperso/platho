@@ -33,7 +33,9 @@ function sourceFiles() {
   return [...new Set(files)].filter((f) => existsSync(f));
 }
 
-const REF = /['"`](\.[^'"`]*?\/?([A-Za-z0-9._-]+\.(?:mjs|js)))\?v=(\d+)['"`]/g;
+// .css is included on purpose: a stylesheet is cached exactly like a module, and styles.css shipped changed with a
+// stale ?v= on 2026-08-03 because both this tool and the MODCONTENT guard only looked at .mjs/.js.
+const REF = /['"`](\.[^'"`]*?\/?([A-Za-z0-9._-]+\.(?:mjs|js|css)))\?v=(\d+)['"`]/g;
 
 /** module file name -> the `?v=` its importers use. */
 function versionedModules() {

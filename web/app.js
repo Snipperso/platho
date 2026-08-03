@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v810';
+const PLATHO_APP_RUNTIME_VERSION = 'v811';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -417,6 +417,7 @@ const unlockWalletButton = document.querySelector('#unlockWalletButton');
 const unlockWalletStatus = document.querySelector('#unlockWalletStatus');
 const changeWalletPasswordButton = document.querySelector('#changeWalletPasswordButton');
 const changeWalletPasswordStatus = document.querySelector('#changeWalletPasswordStatus');
+const walletTonGroup = document.querySelector('#walletTonGroup');
 const receiveWalletTonButton = document.querySelector('#receiveWalletTonButton');
 const receiveWalletTonStatus = document.querySelector('#receiveWalletTonStatus');
 const sendWalletTonButton = document.querySelector('#sendWalletTonButton');
@@ -9213,10 +9214,72 @@ function introFirstMessageBlocks(bytes) {
   }
 }
 
-// onFirstContact: the K_root is already adopted by the handler; here we surface the conversation. A first contact is
-// ANONYMOUS by design — INTRO carries no sender wallet, only the sender keyId + profile — so the thread is keyed on
-// the sender keyId and labelled as such until a later CONV message (which does carry a wallet) can name it.
-function handleIntroFirstContact(opened) {
+// Threads whose peer-wallet verification is in flight, so a re-entrant sync does not start a second chain read for the
+// same dialog (the scan runs on every return-to-visible).
+const inboundPeerIdentityInFlight = new Set();
+
+/**
+ * NAME AN INBOUND DIALOG — from the INTRO publish source, VERIFIED.
+ *
+ * OBSERVED 2026-08-03 on the owner's phone: every message from the desktop arrived under "Anonymous gDSQd5rc" and
+ * stayed there. The receiver was not missing the sender's address — intro-receive-handler stores it as `peerWallet`
+ * (the INTRO publish tx src IS the sender's wallet under direct-pay) and a REPLY already resolves it successfully.
+ * handleIntroFirstContact simply declared one parameter and dropped the capsule that carried it — under a comment
+ * stating the opposite of the truth, which is why nobody looked again.
+ *
+ * The src on its own is a HINT and must not become a label: anyone can re-publish a captured capsule from their own
+ * wallet, which would put THEIR address on someone else's conversation. resolvePeerReplyBundle closes that — it reads
+ * the KeyShard AT that wallet and refuses unless the shard's keyId is this conversation's peerKeyId. That is the same
+ * gate a reply passes before it will encrypt anything, so a dialog that can be replied to is exactly a dialog that can
+ * be named. A failure leaves the dialog anonymous, which is the honest state, not a broken one.
+ */
+async function resolveInboundPeerWalletIdentity(thread) {
+  if (!thread?.convPeerKeyId || !localRecipientKeyPair?.keyId) return false;
+  if (!isAnonymousPeerThread(thread)) return false;              // already named — nothing to resolve
+  if (inboundPeerIdentityInFlight.has(thread.id)) return false;
+  const rec = convKeyStore?.getConversation(localRecipientKeyPair.keyId, thread.convPeerKeyId) ?? null;
+  const peerWallet = rec?.peerWallet ?? null;
+  if (!peerWallet) return false;                                 // a genuinely anonymous sender: nothing to verify
+  const transport = globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return false;
+
+  inboundPeerIdentityInFlight.add(thread.id);
+  try {
+    const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+    const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+    // Throws when the shard at that wallet hashes to a different keyId — a wrong or hostile source.
+    await resolvePeerReplyBundle({
+      provider, peerWallet, peerKeyId: thread.convPeerKeyId, callOptions: criticalChainReadOptions(),
+    });
+    refreshThreadIdentityFromVariants(thread, [peerWallet]);      // clears the pending flags on the way through
+    applyThreadDisplayFields(thread);
+    syncThreadDisplayToContactStore(thread);
+    renderThreads();
+    return true;
+  } catch (error) {
+    // Verification failed or the read did not come back. Stop hiding the dialog: an unnamed message must never be
+    // invisible, and the grace window exists precisely so this falls open.
+    thread.pendingIdentityResolution = false;
+    thread.pendingClaimedSenderResolution = false;
+    thread.pendingIdentityResolutionAt = null;
+    if (!noteTonRpcRateLimit(error)) console.warn('[intro] peer wallet identity unresolved', error);
+    renderThreads();
+    return false;
+  } finally {
+    inboundPeerIdentityInFlight.delete(thread.id);
+  }
+}
+
+/** Idempotent: safe to call on every sync tick for a dialog that is still anonymous. */
+function queueInboundPeerIdentityResolution(thread) {
+  if (!isAnonymousPeerThread(thread) || inboundPeerIdentityInFlight.has(thread?.id)) return;
+  resolveInboundPeerWalletIdentity(thread).catch((error) => console.warn('[intro] identity resolve failed', error));
+}
+
+// onFirstContact: the K_root is already adopted by the handler; here we surface the conversation. The second argument
+// is the fetched INTRO capsule — `capsule.source` is the sender's wallet and `capsule.created_at` is the IntroShard's
+// own stamp. Both used to be dropped on the floor by a one-parameter signature.
+function handleIntroFirstContact(opened, capsule = null) {
   const senderKeyId = introKeyIdString(opened.senderKeyId);
   const created = createInboundPeerThread({ senderKeyId, keyId: senderKeyId, label: null });
   let thread = threads.find((item) => item.id === created.id);
@@ -9226,15 +9289,36 @@ function handleIntroFirstContact(opened) {
   // is a normalised/anonymised peer id (a lossy round-trip), so the raw keyId is kept here explicitly. [CONV-send]
   thread.convPeerKeyId = senderKeyId;
   scheduleRecoveryBackup(conversationId(localRecipientKeyPair.keyId, senderKeyId));   // adopted a new K_root — back its slot up
+  // A wallet to verify means this dialog is ABOUT to have a name: hold it hidden for the grace window so the owner
+  // sees "UQB0ES…" rather than "Anonymous gDSQd5rc" flickering into it. With no wallet on the wire the flags stay
+  // clear and the dialog shows immediately — a genuinely anonymous sender is not pending anything.
+  const peerWallet = convKeyStore?.getConversation(localRecipientKeyPair.keyId, senderKeyId)?.peerWallet ?? null;
+  if (peerWallet && isAnonymousPeerThread(thread)) {
+    thread.pendingIdentityResolution = true;
+    thread.pendingClaimedSenderResolution = true;
+    thread.pendingIdentityResolutionAt = new Date().toISOString();
+  }
   const bytes = opened.firstMessageBytes;
   if (bytes && bytes.length > 0) {
     const blocks = introFirstMessageBlocks(bytes);
-    const message = { type: 'in', text: blocks ? messagePreviewFromBlocks(blocks) : '', meta: 'received', blocks: blocks ?? undefined };
+    // The IntroShard-stamped created_at (seconds) — the same value the adoption ordering uses. Without it this message
+    // reached ensureMessageOrderFields with no time and was stamped Date.now() at persist, i.e. discovery order.
+    const introCreatedAtSec = Number(capsule?.created_at ?? capsule?.createdAt ?? 0) || 0;
+    const message = {
+      type: 'in',
+      text: blocks ? messagePreviewFromBlocks(blocks) : '',
+      meta: 'received',
+      ...(introCreatedAtSec > 0
+        ? { createdAtMs: introCreatedAtSec * 1000, createdAt: new Date(introCreatedAtSec * 1000).toISOString() }
+        : {}),
+      blocks: blocks ?? undefined,
+    };
     insertThreadMessage(thread, message);
     refreshThreadAfterMessageChange(thread);
     markIncomingThreadMessage(thread);
   }
   renderThreads();
+  queueInboundPeerIdentityResolution(thread);
 }
 
 // Build + start the scan (idempotent). Safe to call on unlock and on every return-to-visible.
@@ -10213,6 +10297,15 @@ function privateEntryCreatedAtMs(entry) {
 }
 
 function messageCreatedAtMs(message) {
+  // The SIGNED sender time wins over every local stamp. Two reasons, and the second is why it is FIRST and not a
+  // fallback: (1) it is the same number on both devices, so a dialog reads identically on the phone and the desktop;
+  // (2) devices already carry messages stamped with their DISCOVERY time from before this fix, and the capsule is
+  // persisted into local history (serializeMessageForHistory keeps `capsule`), so preferring it REPAIRS them on the
+  // next load instead of leaving the owner with a permanently scrambled dialog.
+  // An INTRO capsule deliberately carries a canonical header1 with createdAt 0 (it must leak no timing), so the
+  // `> 0` guard inside capsuleSenderCreatedAtMs lets first-contact fall through to the IntroShard stamp below.
+  const signed = capsuleSenderCreatedAtMs(message);
+  if (signed !== null) return signed;
   const local = Number(message?.localCreatedAtMs ?? message?.localHistoryCreatedAt);
   if (Number.isFinite(local) && local > 0) return local;
   const direct = Number(message?.createdAtMs);
@@ -10221,9 +10314,30 @@ function messageCreatedAtMs(message) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function privateChainMessageOrderFields(entry) {
+// The SENDER's own timestamp, from header1 of the capsule. It is inside the AEAD-authenticated header, so it is signed:
+// a relay cannot move a message in the timeline by re-publishing it later.
+//
+// MEASURED 2026-08-03 on the owner's phone. The receiving side rendered [image], Test12, Test9, Test8 — reverse order —
+// while the sending side rendered Test7..Test12, image, and the dialog list said "19:32" for a message sent at 16:59.
+// Nothing sorted wrong. The CONV lane hands the opener an entry built as `{ entry_id: found.seq }` with NO time
+// (conv-lane.mjs never passes createdAtSec to convChainEntryFromParsed), so every received message reached
+// ensureMessageOrderFields with no timestamp and got stamped Date.now() AS IT WAS PERSISTED. toncenter serves
+// /messages with `sort=desc`, so the scan opens the NEWEST capsule first — and the OLDEST message therefore got the
+// LARGEST timestamp. The order on screen was the order of discovery, inverted.
+//
+// The sender's header1 time is the right key regardless: it is what a messenger means by "when was this sent", it is
+// identical on both devices, and it costs no extra read — the capsule is already open in our hands.
+// Takes anything that carries `.capsule` — an opened chain entry OR a thread message (a message keeps its capsule,
+// including across a reload).
+function capsuleSenderCreatedAtMs(carrier) {
+  const ms = Number(carrier?.capsule?.header1?.createdAt);
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+function privateChainMessageOrderFields(entry, opened = null) {
   const chainEntryId = privateEntryIdText(entry);
-  const createdAtMs = privateEntryCreatedAtMs(entry);
+  // Chain time first (the shard's own stamp, when a caller plumbs it), then the signed sender time. Never Date.now().
+  const createdAtMs = privateEntryCreatedAtMs(entry) ?? capsuleSenderCreatedAtMs(opened);
   const fields = {};
   if (chainEntryId !== null) fields.chainEntryId = chainEntryId;
   if (createdAtMs !== null) {
@@ -10323,7 +10437,7 @@ function messageFromOpenedCapsule(opened, meta, entry) {
     type: isOutgoing ? 'out' : 'in',
     text,
     meta,
-    ...privateChainMessageOrderFields(entry),
+    ...privateChainMessageOrderFields(entry, opened),
     blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
     capsule: opened.capsule,
     profileVersion: opened.capsule?.header0?.profileVersion ?? 0,
@@ -10386,7 +10500,9 @@ function messageFromOpenedPrivateParts(parts, meta) {
     type: isOutgoing ? 'out' : 'in',
     text: documentBlocks.length > 0 ? messagePreviewFromBlocks(documentBlocks) : text,
     meta,
-    ...privateChainMessageOrderFields(firstEntry),
+    // `first` is the part with partIndex 0 — every part of one message shares the sender's header1 time, so the
+    // multipart message lands at the same point in the timeline as a single-part one sent at the same moment.
+    ...privateChainMessageOrderFields(firstEntry, first),
     capsule: first?.capsule,
     capsules: ordered.map((part) => part.opened?.capsule).filter(Boolean),
     blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
@@ -10609,6 +10725,9 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
+  // A dialog opened by an INTRO whose verification did not land (cold key cache, a rate-limited read) stays anonymous
+  // forever otherwise: this is the retry, and it returns immediately once the dialog has a name.
+  if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread);
   await persistMessageToEncryptedHistory(targetThread, message);
   // Only an INCOMING message's header carries the counterparty's avatar. An outgoing ('out') message carries the
   // OWN avatar pointer, and the avatar media cache is content-addressed by avatarHash (not wallet), so feeding it
@@ -10631,6 +10750,9 @@ async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
+  // A dialog opened by an INTRO whose verification did not land (cold key cache, a rate-limited read) stays anonymous
+  // forever otherwise: this is the retry, and it returns immediately once the dialog has a name.
+  if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread);
   await persistMessageToEncryptedHistory(targetThread, message);
   const firstOpened = parts[0]?.opened;
   // Incoming only — see appendOpenedCapsuleMessage: an outgoing message's header carries the OWN avatar.
@@ -15200,6 +15322,10 @@ function refreshMessagingControls() {
   setText(unlockWalletStatus, storedWalletLockStatus());
   if (changeWalletPasswordButton) changeWalletPasswordButton.disabled = !hasStoredWallet;
   setText(changeWalletPasswordStatus, hasStoredWallet ? t('wallet.statusChange') : t('wallet.statusNotStored'));
+  // [OWNER 2026-08-03] The GRAM row is HIDDEN, not merely disabled, until a wallet is actually unlocked: with no
+  // wallet there is nothing to receive into and nothing to send from, and the section leads with "Create wallet"
+  // instead. `hidden` (not a class) so it also drops out of the accessibility tree and the grid's row flow.
+  if (walletTonGroup) walletTonGroup.hidden = !plathoWallet;
   if (receiveWalletTonButton) receiveWalletTonButton.disabled = !currentWalletReceiveAddress();
   setText(receiveWalletTonStatus, currentWalletReceiveAddress() ? 'QR' : t('wallet.statusNoWallet'));
   if (sendWalletTonButton) sendWalletTonButton.disabled = !plathoWallet;
