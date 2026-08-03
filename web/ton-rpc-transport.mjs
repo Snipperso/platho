@@ -19,6 +19,12 @@ const TONCENTER_REQUEST_SPACING_MS = 1_500;
 const TONCENTER_RATE_LIMIT_BACKOFF_MS = 60_000;
 const TONCENTER_MAX_RETRY_AFTER_MS = 120_000;
 const TONCENTER_RATE_LIMIT_RETRIES = 0;
+// Backoff STEP for a 5xx retry (multiplied by the attempt: 400 / 800 / 1200 ms). Short on purpose — a broadcast that
+// waits seconds has already lost the race with the user's patience, and the whole point is to beat the app-level
+// retry ladder to the punch.
+const TONCENTER_SERVER_ERROR_BACKOFF_MS = 400;
+// Broadcast only. Reads keep 0: a read is cheap to repeat on the next tick, a lost broadcast costs a message.
+const TONCENTER_SEND_BOC_SERVER_ERROR_RETRIES = 3;
 const TONCENTER_RUN_GET_METHOD_CACHE_TTL_MS = 15_000;
 const TONCENTER_RUN_GET_METHOD_CACHE_MAX_ENTRIES = 512;
 const TONCENTER_MESSAGES_CACHE_TTL_MS = 300_000;
@@ -770,8 +776,13 @@ export async function scheduleToncenterHttpRequest(endpoint, apiKey, request, op
   const requestSpacingMs = finiteNonNegativeMs(options.requestSpacingMs, TONCENTER_REQUEST_SPACING_MS);
   const rateLimitBackoffMs = finiteNonNegativeMs(options.rateLimitBackoffMs, TONCENTER_RATE_LIMIT_BACKOFF_MS);
   const rateLimitRetries = finiteNonNegativeMs(options.rateLimitRetries, TONCENTER_RATE_LIMIT_RETRIES);
+  // Opt-in, and OFF for reads. A failed read is cheap to repeat later; a failed BROADCAST costs the user a message.
+  const serverErrorRetries = finiteNonNegativeMs(options.serverErrorRetries, 0);
+  const serverErrorBackoffMs = finiteNonNegativeMs(options.serverErrorBackoffMs, TONCENTER_SERVER_ERROR_BACKOFF_MS);
   let response = null;
-  for (let attempt = 0; attempt <= rateLimitRetries; attempt += 1) {
+  let rateLimited = 0;
+  let serverErrors = 0;
+  while (true) {
     response = await scheduleToncenterRequest(
       limiterKey,
       request,
@@ -783,9 +794,32 @@ export async function scheduleToncenterHttpRequest(endpoint, apiKey, request, op
         queueTimeoutMs: options.queueTimeoutMs,
       },
     );
-    if (response?.status !== 429) return response;
+    if (response?.status === 429) {
+      if (rateLimited >= rateLimitRetries) return response;
+      rateLimited += 1;
+      continue;
+    }
+    // MEASURED 2026-08-03, from the owner's console: eight `POST /api/v3/message 500 (Internal Server Error)` in a
+    // row while sending a burst. toncenter 5xx-es its own broadcast endpoint, and this loop used to hand a 500
+    // straight back — one POST, no second try. The message then fell into the app-level retry ladder with its
+    // multi-second backoff, which is what a message stuck on "sending" looks like from the outside.
+    //
+    // Re-POSTing is SAFE, and that is the whole reason this is allowed to retry at all: the external is already
+    // signed and bound to one wallet seqno, so the chain runs it AT MOST ONCE however many copies arrive. The same
+    // property the ambiguous-broadcast re-broadcast has relied on all along.
+    //
+    // There is no second provider to fall back to, and that is a TECHNICAL fact rather than a preference: the old
+    // Orbs (ton-access) path was removed because it is stuck on toncenter API v2 and lags the 2026-04 sub-second TON
+    // upgrade, so it cannot confirm a just-sent message and reintroducing it would add real latency, not resilience.
+    // Retrying the one modern provider we have is therefore the whole available answer here. A DIFFERENT, v3-capable
+    // provider would be a legitimate second lane — Orbs specifically is not.
+    if (response && response.status >= 500 && serverErrors < serverErrorRetries) {
+      serverErrors += 1;
+      await delay(serverErrorBackoffMs * serverErrors);   // 400ms, 800ms, 1200ms — bounded, never a hammer
+      continue;
+    }
+    return response;
   }
-  return response;
 }
 
 function writeBit(bytes, bitOffset, bit) {
@@ -1089,6 +1123,11 @@ export function createTonCenterV3Transport(options = {}) {
           requestSpacingMs,
           rateLimitBackoffMs,
           rateLimitRetries: finiteNonNegativeMs(options.sendBocRateLimitRetries, Math.max(rateLimitRetries, 1)),
+          // The ONLY caller that opts into 5xx retries — see the note in scheduleToncenterHttpRequest. Safe because
+          // the external is signed against one seqno, so the chain runs it at most once however many copies arrive.
+          serverErrorRetries: finiteNonNegativeMs(
+            options.sendBocServerErrorRetries, TONCENTER_SEND_BOC_SERVER_ERROR_RETRIES,
+          ),
           skipIfRateLimited: skipIfRateLimited === true,
           priority,
           queueTimeoutMs,

@@ -37,13 +37,13 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=107';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=110';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   TON_RPC_REQUEST_TIMEOUT_MS,
   decodeTonAddressSliceBoc,
-} from './ton-rpc-transport.mjs?v=63';
+} from './ton-rpc-transport.mjs?v=66';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -148,16 +148,16 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=8';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=42';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=45';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=45';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=48';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=4';
+import { createPublicLane } from './public-lane.mjs?v=7';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=4';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=4';
-import { createIntroLane } from './intro-lane.mjs?v=4';
+import { createIntroLane } from './intro-lane.mjs?v=7';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
@@ -167,7 +167,7 @@ import { publishConvLaneParts } from './conv-lane-send.mjs?v=4';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
 import { createConvReadLane } from './conv-lane.mjs?v=4';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=5';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=2';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=5';
 import { readAccountStates } from './shard-reader.mjs?v=4';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
@@ -195,13 +195,13 @@ import {
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
 } from './shard-discovery.mjs?v=6';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=41';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=44';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=47';
+} from './username-ton-rpc-provider.mjs?v=50';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v817';
+const PLATHO_APP_RUNTIME_VERSION = 'v820';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late

@@ -7,13 +7,9 @@
     "version": "4",
     "sha256": "c5693a9d57f9278e580442544a781bbd0b26313f037b907dd49a8bacfda86bce"
   },
-  "app.js": {
-    "version": "817",
-    "sha256": "157dcb9742e6adc184a9943a85484d4f8d99b261728666f356d3bf5829a16ec2"
-  },
   "ath-ton-rpc-provider.mjs": {
-    "version": "42",
-    "sha256": "9ee38b0b46edea96fb2c27e3155dfd8d20c542d6da3aa81115e694486147a29e"
+    "version": "45",
+    "sha256": "c90e4a81c8df2ebe1df770f62c0938cfc3591b93f6d21ec8cc3735279e24c534"
   },
   "boot-guard.js": {
     "version": "6",
@@ -96,8 +92,8 @@
     "sha256": "675e1036dcb1c4b05fa22af79179b8d3a4435116412b90e99ba14c06c6de74c5"
   },
   "intro-lane.mjs": {
-    "version": "4",
-    "sha256": "727e5a1316102ce3a43b30d2fd1d3b648f8fb15af1137f18c631c161055d1e0e"
+    "version": "7",
+    "sha256": "39e014d94795190781e579d4a10c219964a0309a5dba27ff880dc01fd52cf43c"
   },
   "intro-publish-browser.mjs": {
     "version": "4",
@@ -148,8 +144,8 @@
     "sha256": "bc4c9350ee202b79cb41d38484444f50231d3347696c1ef4472522eaab43bfab"
   },
   "platho-config.mjs": {
-    "version": "107",
-    "sha256": "8960a59647481314b318defe82b6beed24087faf2b37093b8c0e046c06e96324"
+    "version": "110",
+    "sha256": "9721fcdd9ee1fef59bd7579dbd15852a9ce38b285abe9dc32128d6935fa39612"
   },
   "platho-crypto.mjs": {
     "version": "13",
@@ -164,8 +160,8 @@
     "sha256": "34f0dff12a64f338b1f3fe6be50effca7a31683763590acf1f0f9b1053a61b6c"
   },
   "profile-registry-ton-rpc-provider.mjs": {
-    "version": "45",
-    "sha256": "4fb9f9eebf438a1a1885f4429c155881db78718b9540d050f2dfdf85f2db1834"
+    "version": "48",
+    "sha256": "2c7f2fc2deec829d92f3369502ac4d857f3ce10edc5c10ee588a601f2fafad0a"
   },
   "public-channel-subscriptions.mjs": {
     "version": "19",
@@ -176,8 +172,8 @@
     "sha256": "3121f3ad4632e7bdbf0d0f708c37757244c31ed336b4b831dc23898973dab5ad"
   },
   "public-lane.mjs": {
-    "version": "4",
-    "sha256": "ac01ff9b6f267d37afb2648bae15937690a72c3e8b5aeaf9f28839d21ba97b71"
+    "version": "7",
+    "sha256": "82f2fad26d8615d66ea24d38d12746ef4ce64d1ac1485971ae2017a93a4c4199"
   },
   "public-publish-browser.mjs": {
     "version": "2",
@@ -244,32 +240,32 @@
     "sha256": "a0cb704c781ac041b50123ff8c1fc17ec91b011ca7d0b5439a74902252c925fe"
   },
   "shard-rpc.mjs": {
-    "version": "2",
-    "sha256": "1ec995f4df451c061e505f52dd61781a5b064a35e33bc5a372fb43165a3f2927"
+    "version": "5",
+    "sha256": "69d0738c2336ecf7039df780cdb12fc81dc401b8cd924c786a12b106031fa665"
   },
   "styles.css": {
     "version": "277",
     "sha256": "a58d8910920ceb05cca4b9103f7927021ffe1cde07eceda06b8f462f17835bcb"
   },
   "ton-dns-provider.mjs": {
-    "version": "41",
-    "sha256": "2673eec8876f6c9c4ee49cfece2ab50e1480979554916fe2342af2191f786510"
+    "version": "44",
+    "sha256": "d3ab798623aff6d6f34dd993b7106a1acbba9060cb8a0fad2c9de9f9933a824c"
   },
   "ton-mnemonic-wordlist.mjs": {
     "version": "1",
     "sha256": "d13dec6a205cd361f9b87b7165095fa811c951cae210732a47032cdd9bd99575"
   },
   "ton-rpc-transport.mjs": {
-    "version": "63",
-    "sha256": "f92cfa85689be4de7a2b22b55add8cff78b6f570cd00adad7a253b3009574205"
+    "version": "66",
+    "sha256": "e2bee63f36086055b904dbfa13def1fdccae5b202f579b7d30e1e15ac1d4cf30"
   },
   "ton-stack-num.mjs": {
     "version": "1",
     "sha256": "7031e619544b06e40dbabee8f7669edec08bbf65256296fb9fc854ef79b26bed"
   },
   "username-ton-rpc-provider.mjs": {
-    "version": "47",
-    "sha256": "c9d28fa2def51a5ff8d199a6f17da6abec04fe13c3e2e783ccfb014947bb5cee"
+    "version": "50",
+    "sha256": "fc3854eeda6cf6c63735c4dcd0688a68b32e4cd6a22c0f967400ce49809ba9c6"
   },
   "webp-encoder.mjs": {
     "version": "1",
