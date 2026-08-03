@@ -293,10 +293,16 @@ describe('PWA runtime config guard', () => {
     expect(versionLabel).toBeTruthy();
     expect(runtimeVersion).toBe(versionLabel);
     expect(Number(String(versionLabel).slice(1))).toBeGreaterThanOrEqual(720);
-    // The app.js cache-bust query MUST track the app version (index.html's script tag here; the sw.js ASSETS
-    // entry is checked in PWA-CONFIG-08), or the console shows a stale ?v= and a cached app.js can be served
-    // under the old URL.
-    expect(html).toMatch(/<script src="\.\/app\.js\?v=801" type="module">/);
+    // The app.js cache-bust query MUST track the app version — and until 2026-08-02 this comment SAID so while the
+    // assertion below pinned an independent literal, so the two could drift and did: a release bumped the ?v= to 801
+    // and left the label at v800. The update-detect compares the LIVE label to the RUNNING const, both read v800, it
+    // concluded "no new version" and never reloaded. Devices sat on the old build through a full cache clear, because
+    // no cache was involved — the server was honestly serving a v800 label.
+    //
+    // Derived from versionLabel now, so all three move together or the release fails here.
+    const versionNumber = String(versionLabel).slice(1);
+    expect(html).toContain(`<script src="./app.js?v=${versionNumber}" type="module">`);
+    expect(readFileSync('web/sw.js', 'utf8')).toContain(`./app.js?v=${versionNumber}`);
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=276">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
@@ -6129,7 +6135,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v878/);
+    expect(sw).toMatch(/platho-pwa-prototype-v879/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6138,7 +6144,12 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    expect(sw).toMatch(/\.\/app\.js\?v=801/);
+    // Derived from index.html's badge, not a literal — this was the FOURTH copy of the app version, and the release
+    // that bumped the other three left this one behind. Every copy that can be derived, is.
+    const swVersionNumber = String(readFileSync('web/index.html', 'utf8')
+      .match(/id="appVersionLabel">v(\d+)<\/span>/)?.[1] ?? '');
+    expect(swVersionNumber).toBeTruthy();
+    expect(sw).toContain(`./app.js?v=${swVersionNumber}`);
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
     expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
     expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);

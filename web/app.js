@@ -223,7 +223,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v800';
+const PLATHO_APP_RUNTIME_VERSION = 'v802';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -20854,7 +20854,14 @@ async function attemptIntroFirstContactDirect(context) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) throw new Error('INTRO direct-pay: RPC transport unavailable');
   if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
-  const readEntry = createEntryReader((call) => transport.runGetMethod(call));
+  // FRESH, never cached. [MEASURED 2026-08-02, owner's first sends on clean-17] This used to pass the call through
+  // untouched, so it inherited runGetMethodCacheTtlMs = 15_000 — and the confirm loop below spans ~14s. Every retry
+  // after the first therefore re-read the FIRST answer out of the client's own cache: one real request, fired in the
+  // instant right after broadcast when the entry cannot possibly be visible yet, then five arguments with itself.
+  // The INTRO was on chain within seconds every time (verified: bucket 0 of epoch 20667 holds all three sends), and
+  // the client reported "on-chain time is not yet visible" regardless of how long anyone waited or how often they
+  // resent. A retry that can be served from the cache of the attempt it is retrying is not a retry.
+  const readEntry = createEntryReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));
 
   // IDEMPOTENT RETRY: a prior attempt already SIGNED (and maybe broadcast) this INTRO. Re-broadcast the SAME external
   // rather than minting a NEW capsule (new K_root/introNonce) + publishing again — a re-mint double-charges and, if the
@@ -20906,9 +20913,16 @@ async function attemptIntroFirstContactDirect(context) {
 
   // Read back the CONTRACT created_at (fork-safety — the recipient stores THIS same value), using the captured stealth
   // fields so a re-broadcast retry confirms identically. Bounded retries cover the indexer lag right after broadcast.
+  //
+  // [WIDENED 2026-08-02] 6 attempts over ~14s was too short even with the caching bug above fixed. What has to happen
+  // first is not one thing but three: the external reaches a validator, the transaction lands in a block, and the
+  // endpoint's get-method view catches up to that block. MEASURED the same day: an entry confirmed present on chain
+  // read back as ABSENT through toncenter and appeared only on a later poll. The old window could expire before the
+  // write it was waiting for was observable through any endpoint, and the user was then told to resend something that
+  // had already succeeded — at a fresh 0.0339 GRAM each time.
   let createdAtSec = null;
-  for (let attempt = 0; attempt < 6 && createdAtSec === null; attempt += 1) {
-    if (attempt > 0) await delay(Math.min(1000 * attempt, 4000));
+  for (let attempt = 0; attempt < 14 && createdAtSec === null; attempt += 1) {
+    if (attempt > 0) await delay(Math.min(2000 * attempt, 8000));
     try {
       const confirmed = await confirmIntroCreatedAt({
         readEntry, epoch: sendState.epoch, bucket: sendState.bucket, fromEntryId: sendState.expectedEntryId, r: sendState.r, viewTag: sendState.viewTag,
@@ -21028,8 +21042,12 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   const ageMs = Date.now() - Number(send.at ?? Date.now());
   const reArm = () => { if (generation === convDeliveryConfirmGeneration && ageMs < CONV_CONFIRM_MAX_AGE_MS) armConvDeliveryConfirm(thread, message, attempt + 1); };
   if (!transport?.runGetMethod) { reArm(); return; }
-  const readView = createRecordShardViewReader((call) => transport.runGetMethod(call));
-  const readRecord = createRecordShardRecordReader((call) => transport.runGetMethod(call));
+  // FRESH, like the INTRO confirm. This lane was SAVED by its schedule rather than by its code: ticks at 12s/20s/30s
+  // are spaced wider than the 15s read cache, so a cached negative expired between them. That is luck holding a
+  // correctness property — a question of the form "has my write landed" must never be answerable from a cache filled
+  // before the write. Tighten the schedule one day and this becomes the INTRO bug.
+  const readView = createRecordShardViewReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));
+  const readRecord = createRecordShardRecordReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));
   const commits = send.commits.map((h) => BigInt('0x' + h));
   // Only the TERMINAL tick needs the authoritative full-shard walk (to prove ABSENCE via complete). Earlier ticks scan
   // just the recent top — a LANDED message is there and short-circuits to verified; a not-found stays inconclusive and
