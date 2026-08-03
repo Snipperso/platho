@@ -1262,8 +1262,11 @@ describe('PWA runtime config guard', () => {
     // The iOS run-loop freeze (v509) recurs whenever 2+ toncenter reads run concurrently. Avatar hydration
     // fanned out many getAvatar reads through loadProfileAvatarImage with DIFFERENT dedup keys, so they were
     // NOT serialized against each other. A single serial lane caps avatar chain reads to one at a time.
-    expect(app).toMatch(/let avatarChainReadLane = Promise\.resolve\(\)/);
-    expect(app).toMatch(/function enqueueAvatarChainRead\(task\) \{/);
+    // [OWNER 2026-08-03] The hand-rolled chain is gone: this lane, the username-hygiene lane and the new
+    // outgoing-publish queue were the same eight lines three times. One primitive now, and the duplicates were
+    // deleted rather than left unused. Behaviour pinned in tests/private-send-serial-lane.test.ts.
+    expect(app).toMatch(/function createSerialLane\(\) \{/);
+    expect(app).toMatch(/const enqueueAvatarChainRead = createSerialLane\(\);/);
     expect(loadAvatarSource).toMatch(/const promise = enqueueAvatarChainRead\(async \(\) => \{/);
 
     // The two public-feed avatar hydrators run sequentially (feed-post authors, then channel authors) instead
@@ -1474,7 +1477,7 @@ describe('PWA runtime config guard', () => {
     const insertIndex = submitSource.indexOf('insertThreadMessage(thread, message)');
     // The preflight moved INTO the publish (attemptConvMessagePublishDirect's assertConnectedAthAtLeast /
     // assertWalletGramAtLeast), so the ordering invariant is now pinned against the send call itself.
-    const preflightIndex = submitSource.indexOf('await attemptPrivateComposerMessagePublish(');
+    const preflightIndex = submitSource.indexOf('await enqueueOutgoingPublish(() => attemptPrivateComposerMessagePublish(');
 
     expect(helperSource).toMatch(/Activate Platho account before sending/);
     expect(helperSource).toMatch(/RPC verification pending/);
@@ -2657,7 +2660,7 @@ describe('PWA runtime config guard', () => {
     // skips both — no added latency); the pause is released in a finally so it can never wedge sync off.
     expect(app).toMatch(/const keylessBudget = usingKeylessTonRpc\(\);\s*\n\s*const endPrivateOutboundWork = keylessBudget \? beginPrivateOutboundWork\(\) : null;/);
     expect(app).toMatch(/if \(keylessBudget && privateChainSyncPromise\) \{[\s\S]*Promise\.race\(\[[\s\S]*PRIVATE_SEND_SYNC_WAIT_CAP_MS/);
-    expect(app).toMatch(/await attemptPrivateComposerMessagePublish\(sendContext\);[\s\S]{0,220}?finally \{\s*\n\s*if \(endPrivateOutboundWork\) endPrivateOutboundWork\(\);/);
+    expect(app).toMatch(/await enqueueOutgoingPublish\(\(\) => attemptPrivateComposerMessagePublish\(sendContext\)\);[\s\S]{0,260}?finally \{\s*\n\s*if \(endPrivateOutboundWork\) endPrivateOutboundWork\(\);/);
     // The direct-pay delivery confirm read (armConvDeliveryConfirm -> runConvDeliveryConfirm) pauses sync for THAT
     // read only (bounded, per spaced tick) on the keyless budget — never the whole 24h re-arm window.
     expect(app).toMatch(/const endConfirmOutboundWork = usingKeylessTonRpc\(\) \? beginPrivateOutboundWork\(\) : null;/);
@@ -4778,8 +4781,10 @@ describe('PWA runtime config guard', () => {
     // capture-at-submit (before the composer clears) is not dropped by an already-cleared global.
     expect(app).toMatch(/function publicDocumentBlocksFromDraft\(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments\)/);
     expect(app).toMatch(/const fileAttachments = normalizePrivateFileAttachments\(publicFileAttachments\);.*captured BEFORE the clear/);
-    expect(app).toMatch(/await submitPublicPostDirect\(\{\s*\n\s*text,\s*\n\s*attachments,\s*\n\s*fileAttachments,/);
-    expect(app).toMatch(/await submitPublicCommentDirect\(draftCommentTarget, text, attachments, fileAttachments\)/);
+    // Both public submits ride the shared outgoing-publish queue (see tests/private-send-serial-lane.test.ts): a
+    // burst of posts overlapped exactly like a burst of messages and buried the RPC pump the same way.
+    expect(app).toMatch(/await enqueueOutgoingPublish\(\(\) => submitPublicPostDirect\(\{\s*\n\s*text,\s*\n\s*attachments,\s*\n\s*fileAttachments,/);
+    expect(app).toMatch(/await enqueueOutgoingPublish\(\(\) => submitPublicCommentDirect\(draftCommentTarget, text, attachments, fileAttachments\)\)/);
     // The toolbar is wired (▼ hide + delegated format buttons + open-on-field-click).
     expect(app).toMatch(/setupComposerToolbar\(publicComposerToolbar, publicMessageInput, publicToolbarHide\)/);
     expect(I18N_STRINGS.en['composer.formatBar']).toBeTruthy();
@@ -5868,7 +5873,9 @@ describe('PWA runtime config guard', () => {
     // for the protocol buyback/burn-due path; there is no longer a user-facing wallet-burn handler to assert.
     expect(app).not.toMatch(/async function submitAthWalletBurn/);
     expect(app).toMatch(/flushAthButton\?\.addEventListener\('click'/);
-    expect(app).toMatch(/const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = \[5_000, 15_000, 45_000, 90_000, 180_000\]/);
+    // [OWNER 2026-08-03] Starts at 2s now: the claimed balance took visibly long to appear, and post-April TON
+    // settles in well under a second, so a 5s first look was pure waiting.
+    expect(app).toMatch(/const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = \[2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000\]/);
     expect(flushSource).toMatch(/function queueAthFlushPostTransactionRefresh\(\)/);
     expect(flushSource).toMatch(/queueAthFlushPostTransactionRefresh\(\)/);
     expect(flushSource).toMatch(/resolveUsernameRegistryProvider\(\)[\s\S]*provider\.getGlobal/);
@@ -6152,7 +6159,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v890/);
+    expect(sw).toMatch(/platho-pwa-prototype-v894/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".

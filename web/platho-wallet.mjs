@@ -549,6 +549,16 @@ export async function getPlathoWalletSeqno(wallet, transport, options = {}) {
       address: wallet.address,
       method: 'seqno',
       stack: [],
+      // NEVER FROM CACHE. A seqno is a SIGNING INPUT: sign two externals against the same value and the wallet
+      // contract accepts exactly one and silently drops the rest.
+      //
+      // MEASURED 2026-08-03 on the owner's phone: a burst of ~8 messages left every one on "sending" and exactly TWO
+      // reached the recipient. This call passed no cacheTtlMs, so it inherited the transport default of 15_000 ms
+      // (platho-config runGetMethodCacheTtlMs; `seqno` has no per-method override) — every message signed inside one
+      // 15-second window got the SAME cached seqno, and the burst happened to straddle one window boundary, which is
+      // why exactly two landed. The same cache also froze waitForWalletSeqnoAtLeast's poll loop, so a multipart send
+      // could spin the full 40 attempts against a value that could not change.
+      cacheTtlMs: 0,
       // A never-deployed wallet aborts this get-method with exit_code -13. Tell
       // the fallback transport that is a definitive answer, so it does not
       // exhaust (and load) the censorship-survival fallback transports just to
@@ -633,6 +643,72 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// MONOTONIC SEQNO FLOOR, per wallet.
+//
+// A FRESH chain read is still not enough for CONCURRENT sends. Post-April TON includes a transaction in well under a
+// second, so a read taken AFTER the previous send returned will normally see the advance — but two sends that overlap
+// (the user taps again before the first call resolves, or a multipart message and a manual send race) still read the
+// same seqno, and the loser is dropped silently.
+//
+// SCOPE, honestly: this does NOT explain the 2026-08-03 burst — see the header of
+// tests/burst-send-seqno-collision.test.ts for the refutation and what the evidence actually points at. It is a real
+// hole in a signing path, closed on its own merits.
+//
+// This is the same shape the Vault lane solved in v417 with a per-owner nonce floor, re-derived for the counter that
+// replaced it. The floor tracks the chain UPWARD (never below a fresh read) and is raised past every seqno we
+// actually broadcast.
+//
+// THE FAILURE MODE OF A NAIVE FLOOR is a permanent wedge: if a broadcast external is lost, the chain never reaches
+// the floor, and every later message signs a seqno the wallet will not accept. So the lead is BOUNDED — once the
+// chain has failed to catch up for longer than the grace, the chain wins and the floor is reset to it.
+const walletSeqnoFloors = new Map();
+const WALLET_SEQNO_FLOOR_GRACE_MS = 90_000;
+
+function walletSeqnoFloorKey(wallet) {
+  return String(wallet?.address ?? '');
+}
+
+/** The seqno to SIGN with: the fresh chain value, or our floor when the chain has not caught up yet. */
+function applyWalletSeqnoFloor(wallet, chainSeqno, now = Date.now()) {
+  const key = walletSeqnoFloorKey(wallet);
+  if (!key) return chainSeqno;
+  // SEQNO 0 IS NOT A LAGGING READ — it is "this wallet has no code yet". The first external must carry the StateInit
+  // (`includeStateInit: seqno === 0`), so letting a floor raise it above zero would sign a transfer that can never
+  // deploy the wallet and the account would stay uninitialized. Caught by PLATHO-WALLET-04E/04G, which this fix broke
+  // before it shipped: the floor returned 44 where the chain said 0.
+  if (chainSeqno === 0) {
+    walletSeqnoFloors.set(key, { seqno: 0, at: now });
+    return 0;
+  }
+  const entry = walletSeqnoFloors.get(key);
+  if (!entry || chainSeqno >= entry.seqno) {
+    // The chain caught up (or ran ahead — another device sent from the same wallet). The chain is the authority.
+    walletSeqnoFloors.set(key, { seqno: chainSeqno, at: now });
+    return chainSeqno;
+  }
+  if ((now - entry.at) > WALLET_SEQNO_FLOOR_GRACE_MS) {
+    // Our floor has been ahead for too long: an external we broadcast never landed. Believe the chain rather than
+    // signing forever against a seqno it will never reach.
+    walletSeqnoFloors.set(key, { seqno: chainSeqno, at: now });
+    return chainSeqno;
+  }
+  return entry.seqno;
+}
+
+/** Called after a successful broadcast: the next external must not reuse this seqno. */
+function noteWalletSeqnoBroadcast(wallet, seqno, now = Date.now()) {
+  const key = walletSeqnoFloorKey(wallet);
+  if (!key) return;
+  const next = Number(seqno) + 1;
+  const entry = walletSeqnoFloors.get(key);
+  if (!entry || next > entry.seqno) walletSeqnoFloors.set(key, { seqno: next, at: now });
+}
+
+/** Test seam only — the floor is module state, and a test that cannot clear it cannot prove the grace. */
+export function __resetWalletSeqnoFloorsForTests() {
+  walletSeqnoFloors.clear();
+}
+
 async function waitForWalletSeqnoAtLeast(wallet, transport, targetSeqno, options = {}) {
   const attempts = Number(options.seqnoPollAttempts ?? 40);
   const delayMs = Number(options.seqnoPollMs ?? 1500);
@@ -651,7 +727,10 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
   if (!transport?.sendBoc) throw new Error('TON RPC sendBoc transport is not configured');
   const messages = Array.isArray(transaction?.messages) ? transaction.messages : [transaction];
   const chunks = chunkWalletMessages(messages, options.maxMessagesPerTransfer ?? PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER);
-  let seqno = options.seqno ?? await getPlathoWalletSeqno(wallet, transport, options);
+  // An explicit options.seqno is a deliberate caller choice (an idempotent re-broadcast of an already-signed
+  // external) and must pass through untouched — re-signing it under a NEW seqno would double-execute if the first
+  // copy had in fact landed.
+  let seqno = options.seqno ?? applyWalletSeqnoFloor(wallet, await getPlathoWalletSeqno(wallet, transport, options));
   if (chunks.length > 1 && !transport.runGetMethod && options.seqno === undefined) {
     throw new Error('TON RPC runGetMethod transport is required for multi-transfer wallet publish');
   }
@@ -686,6 +765,7 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
       }
       throw error;
     }
+    noteWalletSeqnoBroadcast(wallet, seqno);
     batches.push({ ...built, result, messageCount: chunk.length });
     if (index < chunks.length - 1) {
       seqno = await waitForWalletSeqnoAtLeast(wallet, transport, seqno + 1, options);
