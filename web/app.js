@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v811';
+const PLATHO_APP_RUNTIME_VERSION = 'v812';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -9233,25 +9233,49 @@ const inboundPeerIdentityInFlight = new Set();
  * gate a reply passes before it will encrypt anything, so a dialog that can be replied to is exactly a dialog that can
  * be named. A failure leaves the dialog anonymous, which is the honest state, not a broken one.
  */
-async function resolveInboundPeerWalletIdentity(thread) {
+async function resolveInboundPeerWalletIdentity(thread, claimedUsername = null) {
   if (!thread?.convPeerKeyId || !localRecipientKeyPair?.keyId) return false;
-  if (!isAnonymousPeerThread(thread)) return false;              // already named — nothing to resolve
   if (inboundPeerIdentityInFlight.has(thread.id)) return false;
+  const anonymous = isAnonymousPeerThread(thread);
+  const nameWanted = Boolean(claimedUsername) && !threadWearsUsername(thread, claimedUsername);
+  if (!anonymous && !nameWanted) return false;                   // already named, and no new claim to check
   const rec = convKeyStore?.getConversation(localRecipientKeyPair.keyId, thread.convPeerKeyId) ?? null;
-  const peerWallet = rec?.peerWallet ?? null;
+  const peerWallet = rec?.peerWallet ?? ownerWalletFromThread(thread) ?? null;
   if (!peerWallet) return false;                                 // a genuinely anonymous sender: nothing to verify
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return false;
 
   inboundPeerIdentityInFlight.add(thread.id);
   try {
-    const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
-    const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
-    // Throws when the shard at that wallet hashes to a different keyId — a wrong or hostile source.
-    await resolvePeerReplyBundle({
-      provider, peerWallet, peerKeyId: thread.convPeerKeyId, callOptions: criticalChainReadOptions(),
-    });
-    refreshThreadIdentityFromVariants(thread, [peerWallet]);      // clears the pending flags on the way through
+    if (anonymous) {
+      const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
+      const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
+      // Throws when the shard at that wallet hashes to a different keyId — a wrong or hostile source.
+      await resolvePeerReplyBundle({
+        provider, peerWallet, peerKeyId: thread.convPeerKeyId, callOptions: criticalChainReadOptions(),
+      });
+    }
+
+    // The peer's .ath, if they linked one. It rides in the capsule metadata as senderUsername — but it is TYPED BY
+    // THE SENDER, so it proves nothing on its own; verifiedPlathoUsernameIdentityForWallet resolves the name's owner
+    // on chain and returns null unless it is THIS wallet. Same pipeline the public channel claims go through.
+    let usernameIdentity = null;
+    if (claimedUsername) {
+      try { usernameIdentity = await verifiedPlathoUsernameIdentityForWallet(claimedUsername, peerWallet); }
+      catch { usernameIdentity = null; }                         // transient read: keep the address, retry next message
+    }
+
+    // ONE call with BOTH: preferredInboundIdentity ranks PLATHO_NFT above WALLET_ADDRESS, and
+    // refreshThreadIdentityFromVariants never REPLACES an identity once set — so handing them over separately would
+    // freeze the dialog on whichever landed first (the address, since the KeyShard read comes back sooner).
+    const variants = [...(usernameIdentity ? [usernameIdentity] : []), ...privateWalletIdentityVariants(peerWallet)];
+    if (usernameIdentity && !anonymous) {
+      // The address already won. Upgrading it to the wallet's OWN verified name is not a change of counterparty, so
+      // this narrow overwrite is safe — and it is the only way a dialog named before the name arrived ever gets it.
+      // A display name the user picked themselves (localLabel / displayIdentity) is left alone.
+      thread.identity = usernameIdentity;
+    }
+    refreshThreadIdentityFromVariants(thread, variants);          // clears the pending flags on the way through
     applyThreadDisplayFields(thread);
     syncThreadDisplayToContactStore(thread);
     renderThreads();
@@ -9270,10 +9294,27 @@ async function resolveInboundPeerWalletIdentity(thread) {
   }
 }
 
-/** Idempotent: safe to call on every sync tick for a dialog that is still anonymous. */
-function queueInboundPeerIdentityResolution(thread) {
-  if (!isAnonymousPeerThread(thread) || inboundPeerIdentityInFlight.has(thread?.id)) return;
-  resolveInboundPeerWalletIdentity(thread).catch((error) => console.warn('[intro] identity resolve failed', error));
+/** Does this dialog already wear the claimed .ath? Compared canonically — "name", "name.ath" and "NAME" are one. */
+function threadWearsUsername(thread, claimedUsername) {
+  let claimed = null;
+  try { claimed = plathoUsernameIdentity(claimedUsername); } catch { claimed = null; }
+  if (!claimed) return true;   // unparseable claim: nothing to add, so treat it as already handled
+  return threadIdentityVariants(thread).some(
+    (variant) => variant.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT && variant.value === claimed.value,
+  );
+}
+
+/** The peer's SELF-DECLARED .ath from an opened capsule. A claim, never a proof — see the verify above. */
+function claimedPeerUsernameFromOpened(opened) {
+  const claim = opened?.payload?.senderUsername ?? opened?.payload?.sender_username ?? null;
+  return typeof claim === 'string' && claim.trim().length > 0 ? claim : null;
+}
+
+/** Idempotent: safe to call on every incoming message. Returns immediately once the dialog is named and wears it. */
+function queueInboundPeerIdentityResolution(thread, claimedUsername = null) {
+  if (!thread || inboundPeerIdentityInFlight.has(thread.id)) return;
+  if (!isAnonymousPeerThread(thread) && (!claimedUsername || threadWearsUsername(thread, claimedUsername))) return;
+  resolveInboundPeerWalletIdentity(thread, claimedUsername).catch((error) => console.warn('[intro] identity resolve failed', error));
 }
 
 // onFirstContact: the K_root is already adopted by the handler; here we surface the conversation. The second argument
@@ -10726,8 +10767,9 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
   // A dialog opened by an INTRO whose verification did not land (cold key cache, a rate-limited read) stays anonymous
-  // forever otherwise: this is the retry, and it returns immediately once the dialog has a name.
-  if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread);
+  // forever otherwise: this is the retry. It also carries the peer's .ath claim, which ONLY a message can carry — the
+  // INTRO has no room for it — so this is where a named dialog gets its name.
+  if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread, claimedPeerUsernameFromOpened(opened));
   await persistMessageToEncryptedHistory(targetThread, message);
   // Only an INCOMING message's header carries the counterparty's avatar. An outgoing ('out') message carries the
   // OWN avatar pointer, and the avatar media cache is content-addressed by avatarHash (not wallet), so feeding it
@@ -10750,9 +10792,9 @@ async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
-  // A dialog opened by an INTRO whose verification did not land (cold key cache, a rate-limited read) stays anonymous
-  // forever otherwise: this is the retry, and it returns immediately once the dialog has a name.
-  if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread);
+  // Same as the single-part path. The claim rides on part 0's metadata, so read it from there rather than from the
+  // assembled message, which keeps no metadata of its own.
+  if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread, claimedPeerUsernameFromOpened(parts[0]?.opened));
   await persistMessageToEncryptedHistory(targetThread, message);
   const firstOpened = parts[0]?.opened;
   // Incoming only — see appendOpenedCapsuleMessage: an outgoing message's header carries the OWN avatar.
