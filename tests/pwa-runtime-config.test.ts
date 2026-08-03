@@ -383,7 +383,10 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['chat.setLocalName']).toBe('Set local name');
     expect(app).toMatch(/identity-variant-action/);
     expect(app).toMatch(/promptThreadLocalLabel\(thread\)\.catch/);
-    expect(app).toMatch(/identityMenuButton\.hidden = identityDisplayOptions\(thread\)\.length < 1/);
+    // [OWNER 2026-08-03] The chevron no longer counts identities at all. It used to be hidden below a threshold, which
+    // silently hid "Set local name" — the popover's own first item, and the only way to rename a dialog. See
+    // PEERNAME-07 in tests/peer-username-from-wire.test.ts for the full rule and its counter-case.
+    expect(app).toMatch(/identityMenuButton\.hidden = identityMenuHidden\(thread\);/);
   });
 
   it('PWA-CONFIG-01H: Public wallet channels share the Private "Display as" name + avatar per counterparty', () => {
@@ -2780,8 +2783,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function updatePrivateSenderModeUi\(sendBlockReason = privateSendBlockReason\(\)\)/);
     expect(app).toMatch(/privateSenderModeToggleBlockReason\(sendBlockReason\)/);
     // clean-17: the anonymous flag (currentPrivateSenderOptions().includeSenderWalletMetadata) is asserted above; the
-    // former createPrivateComposerCapsules internals (the senderMetadata ternary, senderUsername) were removed with the
-    // Vault composer path.
+    // former createPrivateComposerCapsules internals (the senderMetadata ternary) went with the Vault composer path.
+    // senderUsername went with them and should NOT have: the recipient has no other source for the peer's .ath (there
+    // is no reverse wallet -> name index on chain), so dialogs showed a raw address forever. Restored 2026-08-03 at
+    // the direct-pay encode site; the sender WALLET stays out, which is the invariant below.
     expect(app).toMatch(/privateComposerSendPlan\(text, attachments, senderOptions\)/);
     // clean-17 honest payload invariant: the live direct-pay CONV send (attemptConvMessagePublishDirect) seals to the
     // peer's KeyShard bundle and NEVER embeds the sender wallet in the capsule payload — the identity is messaging-keys
@@ -2805,10 +2810,14 @@ describe('PWA runtime config guard', () => {
     // record, written when the INTRO was adopted and re-verified against the peer's KeyShard on every reply.)
     // v725 hid an unidentified inbound dialog during a grace window when its sender was CLAIMED but not yet verified,
     // so a real dialog only appeared once resolved (no "Anonymous …" flicker); a GENUINELY anonymous sender was shown
-    // straight away. Direct pay only ever produces the second case: a first contact arrives as an INTRO, which by
-    // design carries no sender wallet at all, so there is nothing claimed to wait on and the thread is shown at once —
-    // it gets a name when a later CONV message brings the wallet. The predicates survive (a restored thread can still
-    // carry the flag); nothing sets them any more, which is the correct behaviour, not a lost one.
+    // straight away.
+    //
+    // The paragraph that used to stand here claimed direct pay only ever produces the second case, "because an INTRO
+    // by design carries no sender wallet", and concluded that nothing setting the flags was correct. Both halves were
+    // false and cost the owner a week of dialogs named "Anonymous …": the INTRO publish tx SRC *is* the sender's
+    // wallet under direct pay, intro-receive-handler has always stored it as peerWallet, and a CONV message brings no
+    // wallet at all. The flags now have a writer again (handleIntroFirstContact arms them while the KeyShard
+    // verification is in flight), which is what the grace was built for.
     expect(app).toMatch(/function isPendingIdentityResolutionThread\(thread\)/);
     expect(app).toMatch(/function isTransientPendingResolutionThread\(thread\)/);
     expect(app).toMatch(/if \(isTransientPendingResolutionThread\(thread\)\) return false;/);
@@ -6143,7 +6152,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v889/);
+    expect(sw).toMatch(/platho-pwa-prototype-v890/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".

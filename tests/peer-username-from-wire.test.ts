@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { encodeCompactPayload, decodeCompactPayload } from '../web/crypto/platho-crypto.mjs';
+import {
+  encodeCompactPayload,
+  decodeCompactPayload,
+  compactPayloadReservedTailBytes,
+  createEncryptedConvCapsule,
+  openEncryptedPrivateCapsule,
+  createMessagingIdentity,
+  exportPublicKeyBundle,
+  randomBytes,
+  PLATHO_COMPACT_IDENTITY_BYTES,
+  PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+  PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
+  PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
+  PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES,
+} from '../web/crypto/platho-crypto.mjs';
+import { splitBytesToCapsuleParts, MAX_CAPSULE_USEFUL_BYTES } from '../web/capsule-part-policy.mjs';
 
 // A dialog must show the peer's .ath, not their raw address — when the peer has one and it is REALLY theirs.
 //
@@ -16,6 +31,103 @@ import { encodeCompactPayload, decodeCompactPayload } from '../web/crypto/platho
 //   2. the claim is VERIFIED against the dialog's wallet before it becomes a label — the sender types this string, so
 //      an unverified claim would let anyone wear anyone's name.
 const APP = readFileSync('web/app.js', 'utf8');
+
+/** The payload the live CONV send builds, byte for byte: same encoder, same options, same reserved tail. */
+function convPayloadBytes(senderUsername?: string) {
+  return encodeCompactPayload({
+    type: 'document',
+    bytes: new TextEncoder().encode('hello'),
+    streamId: randomBytes(16),
+    partIndex: 0,
+    partCount: 1,
+    senderUsername,
+    reservedTailBytes: compactPayloadReservedTailBytes({ senderRecovery: true }),
+  }, {});
+}
+
+describe('PEERNAME-WIRE — the name must survive the SEAL, not just the codec', () => {
+  // THE MISTAKE THIS EXISTS TO PREVENT, made 2026-08-03 and caught by the owner within the hour.
+  //
+  // The first version of this fix shipped with a test that proved encodeCompactPayload -> decodeCompactPayload
+  // round-trips `senderUsername`, and concluded the name was "on the wire". It was not. attemptConvMessagePublishDirect
+  // computed `senderOptions` and used it ONLY for the size budget — it never handed it to the encoder, so the field the
+  // receive path read was never written by the send path. The codec test passed the whole time.
+  //
+  // A round trip through a codec proves a codec. These go through createEncryptedConvCapsule and out the other side
+  // via openEncryptedPrivateCapsule, so what is asserted is what a recipient can actually read.
+  it('PEERNAME-WIRE-01: a sealed CONV capsule opens with the sender .ath the send path put in', async () => {
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const bundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
+    const built = await createEncryptedConvCapsule('', bundle, sender, randomBytes(32), {
+      payloadBytes: convPayloadBytes('platho'), senderRecovery: true,
+    });
+    const opened: any = await openEncryptedPrivateCapsule(built, recipient.encryptionKeyPair, { enforceExpiry: false });
+    expect(opened.payload.senderUsername).toBe('platho.ath');
+  });
+
+  it('PEERNAME-WIRE-02: anonymous mode seals NO name — the toggle survives the seal too', async () => {
+    // Counter-case. currentPrivateSenderOptions leaves senderUsername undefined when the eye is on, and this proves
+    // the omission reaches the recipient rather than being a UI-only promise.
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const bundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
+    const built = await createEncryptedConvCapsule('', bundle, sender, randomBytes(32), {
+      payloadBytes: convPayloadBytes(undefined), senderRecovery: true,
+    });
+    const opened: any = await openEncryptedPrivateCapsule(built, recipient.encryptionKeyPair, { enforceExpiry: false });
+    expect(opened.payload.senderUsername).toBeUndefined();
+  });
+
+  it('PEERNAME-WIRE-04: a MULTIPART message with a name still lands on a valid size class', async () => {
+    // The known landmine. Adding metadata grows the encoded payload, and a part sized without room for it throws
+    // "Compact payload must use a supported useful slot size" — which is exactly how the 68-byte identity section
+    // broke every message after first contact. The split reserves privateCompactPayloadOverhead, which has ALWAYS
+    // included the username bytes (that over-reservation is the evidence the omission was an oversight), so this
+    // asserts the reservation is real rather than assuming it.
+    const overhead = PLATHO_COMPACT_IDENTITY_BYTES
+      + PLATHO_COMPACT_SENDER_RECOVERY_BYTES
+      + PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES
+      + PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES
+      + PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES + 'platho.ath'.length;
+    const document = randomBytes(MAX_CAPSULE_USEFUL_BYTES * 2);
+    const parts = splitBytesToCapsuleParts(document, MAX_CAPSULE_USEFUL_BYTES, { perPartOverheadBytes: overhead });
+    expect(parts.length, 'the fixture must actually be multipart').toBeGreaterThan(1);
+
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const bundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
+    const streamId = randomBytes(16);
+    for (const [index, part] of parts.entries()) {
+      const payloadBytes = encodeCompactPayload({
+        type: 'document', bytes: part.bytes, sizeClass: part.sizeClass,
+        streamId, partIndex: index, partCount: parts.length,
+        senderUsername: 'platho',
+        reservedTailBytes: compactPayloadReservedTailBytes({ senderRecovery: true }),
+      }, {});
+      // createEncryptedConvCapsule throws "CONV capsule payload size class mismatch" if the encoded payload landed
+      // on a different class than the split assigned — the seal is the assertion.
+      const built = await createEncryptedConvCapsule('', bundle, sender, randomBytes(32), {
+        payloadBytes, sizeClass: part.sizeClass, senderRecovery: true,
+      });
+      const opened: any = await openEncryptedPrivateCapsule(built, recipient.encryptionKeyPair, { enforceExpiry: false });
+      expect(opened.payload.senderUsername).toBe('platho.ath');
+      expect(opened.payload.partCount).toBe(parts.length);
+    }
+  });
+
+  it('PEERNAME-WIRE-03: the send path actually passes the name to the encoder', () => {
+    // The line whose absence caused all of the above. Pinned at the call site, not at the helper.
+    const app = readFileSync('web/app.js', 'utf8');
+    const send = app.slice(
+      app.indexOf('async function attemptConvMessagePublishDirect'),
+      app.indexOf('async function attemptPrivateComposerMessagePublish'),
+    );
+    expect(send).toContain('senderUsername: privateSenderUsernameMetadataLabel(senderOptions) ?? undefined,');
+    // The sender WALLET stays out — that omission IS deliberate and must not be undone by this change.
+    expect(send, 'the sender wallet must never enter a CONV payload').not.toMatch(/senderWallet/);
+  });
+});
 
 describe('PEERNAME — the peer .ath travels on the wire and is verified before display', () => {
   it('PEERNAME-01: senderUsername survives encode -> decode as payload.senderUsername', () => {
@@ -84,5 +196,24 @@ describe('PEERNAME — the peer .ath travels on the wire and is verified before 
   it('PEERNAME-06: both the single-part and multipart receive paths pass the claim along', () => {
     expect(APP).toContain("queueInboundPeerIdentityResolution(targetThread, claimedPeerUsernameFromOpened(opened));");
     expect(APP).toContain("queueInboundPeerIdentityResolution(targetThread, claimedPeerUsernameFromOpened(parts[0]?.opened));");
+  });
+
+  it('PEERNAME-07: the display-as chevron is not gated on having TWO identities to choose between', () => {
+    // OBSERVED 2026-08-03: a dialog named by its wallet address had no chevron at all, so there was no way to rename
+    // it. The gate was `identityDisplayOptions(thread).length <= 1` — "hide unless there are at least two identities"
+    // — which is true of every inbound dialog, since it has exactly one: the peer's address. But the popover's FIRST
+    // item is "Set local name", an action that never depends on how many identities exist, so the button was hiding
+    // the only way to reach it.
+    expect(APP, 'the two-identity gate is back').not.toContain('identityDisplayOptions(thread).length <= 1');
+    expect(APP).toContain('function identityMenuHidden(thread) {');
+    // Both header branches (identity resolved and not) must use the same rule — they disagreed before, which is how
+    // the stricter one went unnoticed.
+    expect((APP.match(/identityMenuButton\.hidden = identityMenuHidden\(thread\);/g) ?? []).length).toBe(2);
+    // Saved messages keeps no chevron: re-labelling your own notes as your own address is not a choice.
+    const fn = APP.slice(APP.indexOf('function identityMenuHidden(thread) {'));
+    expect(fn.slice(0, 200)).toContain('isSavedMessagesThread(thread)');
+    // …and the popover really does always offer the action the button now exposes.
+    const popover = APP.slice(APP.indexOf('function showIdentityPopover(thread, anchor) {'));
+    expect(popover.slice(0, 900)).toContain('onSetLocalName:');
   });
 });
