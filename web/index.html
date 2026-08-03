@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v806</span>
+              <span class="app-version-label" id="appVersionLabel">v809</span>
             </div>
           </div>
         </div>
@@ -353,11 +353,13 @@
 
             <section class="profile-section" aria-label="ATH">
               <h2>ATH</h2>
+              <!-- [OWNER 2026-08-03] The claim leads the section, and the separate "activity credits" row is gone:
+                   it said the same thing as the button's own status, and two controls for one number is one too many.
+                   The button carries the progress ("0 ATH / 100 ATH") and stays disabled until the threshold. -->
+              <div class="settings-list">
+                <button id="claimAirdropButton" type="button"><span data-i18n="profile.claimAirdrop">Claim ATH</span><strong class="profile-action-status" id="claimAirdropStatus" data-i18n="profile.statusChecking">checking</strong></button>
+              </div>
               <div class="profile-stat-list">
-                <div class="profile-stat-row">
-                  <span data-i18n="profile.activityCredits">Activity credits</span>
-                  <strong id="athActivityCreditsStatus">-</strong>
-                </div>
                 <div class="profile-stat-row">
                   <span data-i18n="profile.activityDropIssued">Activity drop issued</span>
                   <strong id="athDropIssuedStatus">-</strong>
@@ -368,7 +370,6 @@
                 </div>
               </div>
               <div class="settings-list">
-                <button id="claimAirdropButton" type="button"><span data-i18n="profile.claimAirdrop">Claim ATH</span><strong class="profile-action-status" id="claimAirdropStatus" data-i18n="profile.statusChecking">checking</strong></button>
                 <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
               </div>
             </section>
@@ -714,6 +715,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=806" type="module"></script>
+    <script src="./app.js?v=809" type="module"></script>
   </body>
 </html>

@@ -175,8 +175,11 @@ function parseArgs(argv) {
     }
   }
 
-  if (!['preview', 'production'].includes(args.mode)) {
-    throw new Error('--mode must be preview or production');
+  // `both` exists because the two artifact sets are pinned by the SAME test (WEB-DEPLOY-05), so regenerating one and
+  // forgetting the other leaves the tree red for a reason that has nothing to do with the change being made. That
+  // cost two full suite runs on 2026-08-03 alone. One command, no half to forget.
+  if (!['preview', 'production', 'both'].includes(args.mode)) {
+    throw new Error('--mode must be preview, production or both');
   }
   if (!args.domain) throw new Error('--domain is required');
   if (!args.outputDir) {
@@ -554,10 +557,8 @@ function prepareStaticWebDeploy(options) {
   return report;
 }
 
-function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const report = prepareStaticWebDeploy(options);
-  console.log(JSON.stringify({
+function summarize(report) {
+  return {
     ok: report.blockers.length === 0,
     status: report.status,
     mode: report.mode,
@@ -567,8 +568,25 @@ function main() {
     blockers: report.blockers,
     warnings: report.warnings,
     productionReady: report.productionReady,
-  }, null, 2));
-  if (report.blockers.length > 0) process.exit(1);
+  };
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  // `both` runs preview FIRST so a production blocker cannot stop the preview artifacts from being written — the rest
+  // of the tree pins those, and a blocked production bundle before genesis is an expected state, not a failure of the
+  // preparation itself. The exit code still reflects either set having blockers; callers that tolerate that (the
+  // rebaseline cascade) mark the step allowFail.
+  const modes = options.mode === 'both' ? ['preview', 'production'] : [options.mode];
+  const reports = [];
+  for (const mode of modes) {
+    const outputDir = options.mode === 'both'
+      ? join(ARTIFACTS_DIR, `platho-web-static-${mode}`)
+      : options.outputDir;
+    reports.push(prepareStaticWebDeploy({ ...options, mode, outputDir }));
+  }
+  console.log(JSON.stringify(reports.length === 1 ? summarize(reports[0]) : reports.map(summarize), null, 2));
+  if (reports.some((report) => report.blockers.length > 0)) process.exit(1);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
