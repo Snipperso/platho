@@ -1,4 +1,4 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=33';
 import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=63';
 

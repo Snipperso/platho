@@ -13,7 +13,7 @@
 // It is a thin, injectable seam so it can be tested without a browser or a chain: tests/intro-receive-handler.test.ts
 // drives a REAL INTRO capsule through it and checks the stored K_root equals the sender's.
 
-import { openIntroCapsuleFromChainCells } from './crypto/platho-crypto.mjs?v=12';
+import { openIntroCapsuleFromChainCells } from './crypto/platho-crypto.mjs?v=13';
 import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=33';
 
 const asBytes = (value, name) => (value instanceof Uint8Array ? value : readSnakeCellBytes(value, { name }));

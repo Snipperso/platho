@@ -20,7 +20,7 @@
 // the /messages reader) rather than inventing a path — one queue per client key is what the rate model rests on.
 
 import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo } from './pwa-contract-transactions.mjs?v=33';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 
 export class PublicShardTonRpcProviderError extends Error {
   constructor(message) {

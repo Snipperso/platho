@@ -60,6 +60,21 @@ export const PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES = 5;
 export const PLATHO_COMPACT_SENDER_USERNAME_METADATA_MAX_BYTES = 25;
 export const PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES = 37;
 export const PLATHO_COMPACT_SENDER_RECOVERY_BYTES = 64;
+
+/**
+ * How many bytes a sealer carves out of the useful area before the payload content starts. Every capsule builder here
+ * computes it, and a CALLER that pre-encodes its payload (the CONV multi-part send does, to split a document across
+ * parts) has to compute the SAME number or the encoded payload will not land on a size class.
+ *
+ * [ADDED 2026-08-02] It was four copies of the expression and one place that got it wrong: app.js reserved only the
+ * sender-recovery section, while the sealer reserves the identity section too. clean-16 added that 68-byte identity
+ * section and updated the sealers, not the call site. The useful size came out 68 bytes off every size class, and every
+ * message AFTER the first contact died on "Compact payload must use a supported useful slot size" — the conversation
+ * established, then could not be used.
+ */
+export function compactPayloadReservedTailBytes({ senderRecovery = true } = {}) {
+  return PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+}
 export const PLATHO_COMPACT_CONTENT_TYPES = Object.freeze({
   TEXT: 1,
   IMAGE: 2,
@@ -2705,7 +2720,7 @@ async function createEncryptedPrivateCapsuleForVerifiedRecipient(plaintext, reci
   const senderRecovery = options.senderRecovery !== false;
   // clean-16: the sender identity section (68 bytes) rides inside the encrypted body and is carved out of the useful
   // area exactly like the sender-recovery section, so the on-chain body size stays EXACTLY privateBodyBytes(sizeClass).
-  const payloadReservedBytes = PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+  const payloadReservedBytes = compactPayloadReservedTailBytes({ senderRecovery });
   const payloadBytes = options.payloadBytes
     ? assertCompactPayloadBytes(options.payloadBytes, { ...options, reservedTailBytes: payloadReservedBytes })
     : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext }, {
@@ -2825,7 +2840,7 @@ export async function createEncryptedConvCapsule(plaintext, recipientPublicBundl
   const suite = assertSupportedPrivateSuite(normalizedRecipient.suite);
   const cryptoSuite = normalizedRecipient.contractSuite;
   const senderRecovery = options.senderRecovery !== false;
-  const payloadReservedBytes = PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+  const payloadReservedBytes = compactPayloadReservedTailBytes({ senderRecovery });
   const payloadBytes = options.payloadBytes
     ? assertCompactPayloadBytes(options.payloadBytes, { ...options, reservedTailBytes: payloadReservedBytes })
     : encodeCompactPayload(options.payload ?? { type: 'text', text: plaintext ?? '' }, { ...options, reservedTailBytes: payloadReservedBytes });
@@ -2930,7 +2945,7 @@ export async function createEncryptedIntroCapsule(recipientPublicBundle, senderI
   });
 
   const senderRecovery = options.senderRecovery !== false;
-  const payloadReservedBytes = PLATHO_COMPACT_IDENTITY_BYTES + (senderRecovery ? PLATHO_COMPACT_SENDER_RECOVERY_BYTES : 0);
+  const payloadReservedBytes = compactPayloadReservedTailBytes({ senderRecovery });
   const payloadBytes = encodeCompactPayload(
     { type: 'document', bytes: handshake.introPayloadBytes },
     { ...options, reservedTailBytes: payloadReservedBytes },
