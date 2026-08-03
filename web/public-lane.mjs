@@ -23,11 +23,11 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole lane
 // runs against a stub transport and a fixed clock, the way the intro lane does.
 
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=1';
-import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=1';
-import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
-import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=1';
-import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=4';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=2';
+import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=2';
+import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=2';
+import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=2';
+import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=5';
 import {
   publicBeaconScanAddresses,
   publicAvatarScanAddresses,
@@ -39,7 +39,7 @@ import {
   publicEpochTag,
   publicEraOf,
   addrKey,
-} from './shard-discovery.mjs?v=3';
+} from './shard-discovery.mjs?v=4';
 
 const PS_KIND_CHANNEL = 0;
 const PS_KIND_THREAD = 1;

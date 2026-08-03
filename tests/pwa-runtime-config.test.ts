@@ -214,7 +214,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=40/);
+    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=41/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -746,8 +746,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/indexedDB\.databases\(\)/);
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
-    expect(html).toMatch(/<h2 data-i18n="common\.wallet">Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="walletTonBalanceButton"[\s\S]*id="registerVaultKeysButton"/);
-    expect(html).toMatch(/Wallet GRAM[\s\S]*id="walletTonBalanceStatus"/);
+    expect(html).toMatch(/<h2 data-i18n="common\.wallet">Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="registerVaultKeysButton"/);
+    // [OWNER 2026-08-03] The balance BUTTON is gone: the headline card at the top of the section already shows the
+    // same number, and a second copy of it right below read as a different figure. The GRAM row is now just the two
+    // money actions, and the headline card is the single place the balance is rendered.
+    expect(html).toMatch(/Wallet GRAM[\s\S]*id="receiveWalletTonButton"[\s\S]*id="sendWalletTonButton"/);
+    expect(html).not.toContain('walletTonBalanceButton');
+    expect(html).not.toContain('walletTonBalanceStatus');
     expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
     expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).toMatch(/Sync messages[\s\S]*tap to sync/);
@@ -756,7 +761,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/hasActiveVaultMessagingKeys/);
     expect(app).toMatch(/hasActivePlathoAccount/);
     expect(app).toMatch(/plathoAccountActivationFeeLabel/);
-    expect(app).toMatch(/walletTonBalanceButton\?\.addEventListener\('click'/);
+    // The button is gone, and so is every reference to it: a querySelector that can never match plus a handler that
+    // can never fire is the shape that made me chase a live control through dead code.
+    expect(app).not.toContain('walletTonBalanceButton');
+    expect(app).not.toContain('walletTonBalanceStatus');
     expect(app).toMatch(/Activate Platho account before sending/);
     expect(app).toMatch(/item\.disabled = false/);
     expect(app).not.toMatch(/item\.dataset\.tab !== 'profile'/);
@@ -6135,7 +6143,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v886/);
+    expect(sw).toMatch(/platho-pwa-prototype-v887/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".

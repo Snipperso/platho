@@ -33,7 +33,7 @@
 // the stealth view_tag. intro-scan-policy.mjs has recommended this in prose since it was written; this is the
 // code that finally does it.
 
-import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=3';
+import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=4';
 import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=1';
 
 /**

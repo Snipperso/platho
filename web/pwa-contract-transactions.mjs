@@ -194,6 +194,22 @@ function bytesToHex(bytes) {
   return [...toUint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * A 256-bit hash (or any byte string) as a BigInt, WITHOUT Buffer.
+ *
+ * MEASURED 2026-08-03, from the owner's phone: the intro scan reported `Buffer is not defined` on every pass. Two
+ * shipped browser modules built this value as `BigInt('0x' + Buffer.from(h).toString('hex'))` — and `Buffer` is a
+ * Node global that browsers do not have. One of them is literally named `introBodyCommitBrowser`.
+ *
+ * The consequence was total and silent: the scan FOUND the intro, fetched the capsule, and then died verifying the
+ * body commitment. First contact could never complete in a browser, while the sender saw every message publish. The
+ * error went to console.warn — unreachable on a phone, which is the device it happened on.
+ */
+export function bytesToBigUint(bytes) {
+  const hex = bytesToHex(bytes);
+  return hex.length === 0 ? 0n : BigInt(`0x${hex}`);
+}
+
 function hexToBytes(value, length = null, name = 'hex bytes') {
   const text = String(value ?? '').trim();
   if (!/^[0-9a-fA-F]*$/.test(text) || text.length % 2 !== 0) {

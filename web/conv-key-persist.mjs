@@ -8,7 +8,7 @@
 // is ciphertext). createIndexedDbConvKeyStore is the thin production glue that supplies a real IndexedDB backend.
 
 import { createConvKeyStore } from './conv-key-store.mjs?v=2';
-import { tonCell } from './pwa-contract-transactions.mjs?v=34';
+import { tonCell } from './pwa-contract-transactions.mjs?v=35';
 
 const KEY_STORE_NAME = 'convKeys';
 const BLOB_STORE_NAME = 'convKeyBlob';

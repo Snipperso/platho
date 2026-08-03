@@ -9,9 +9,9 @@
 // consumed), exactly as the CONV/INTRO sends. A rebuild would be safe here too (re-registering the same bundle is a
 // self-replace no-op that only bumps key_generation), but re-broadcast avoids even that.
 
-import { buildKeyShardRegisterBrowser } from './key-shard-register-browser.mjs?v=1';
-import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=34';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=18';
+import { buildKeyShardRegisterBrowser } from './key-shard-register-browser.mjs?v=2';
+import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=35';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=19';
 
 /**
  * Register (or replace) the user's messaging keys on their KeyShard. `wallet` is the app's WalletContractV5R1 handle;

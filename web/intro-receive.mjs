@@ -21,9 +21,9 @@
 //   - The scan window must cover the full retention period, not just today. An intro published just before
 //     midnight lives in yesterday's shard, and entries stay live for a week from the moment they were written.
 
-import { INTRO_READ_SPACE, introShardAddress, addrKey } from './shard-discovery.mjs?v=3';
+import { INTRO_READ_SPACE, introShardAddress, addrKey } from './shard-discovery.mjs?v=4';
 import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=1';
-import { readAccountStates, changedSince, changeMarkerOf } from './shard-reader.mjs?v=1';
+import { readAccountStates, changedSince, changeMarkerOf } from './shard-reader.mjs?v=2';
 import { scanIntros } from './intro-scan.mjs';
 
 // THE WINDOW REACHES FORWARD AS WELL AS BACK, and the forward edge is not decoration.
