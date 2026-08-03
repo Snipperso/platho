@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v880';
+const CACHE_NAME = 'platho-pwa-prototype-v881';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=276',
-  './app.js?v=803',
+  './app.js?v=804',
   './i18n.mjs?v=33',
   './i18n-strings.mjs?v=33',
   './boot-signal-field.mjs?v=1',
@@ -24,9 +24,9 @@ const ASSETS = [
   './ton-rpc-transport.mjs?v=63',
   './ton-dns-provider.mjs?v=40',
   './ath-ton-rpc-provider.mjs?v=42',
-  './profile-registry-ton-rpc-provider.mjs?v=44',
+  './profile-registry-ton-rpc-provider.mjs?v=45',
   './username-ton-rpc-provider.mjs?v=47',
-  './crypto/platho-crypto.mjs?v=12',
+  './crypto/platho-crypto.mjs?v=13',
   './replay-store.mjs?v=1',
   './profile-avatar-media-store.mjs?v=1',
   './webp-encoder.mjs?v=1',

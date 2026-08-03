@@ -6135,7 +6135,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v880/);
+    expect(sw).toMatch(/platho-pwa-prototype-v881/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6150,37 +6150,49 @@ describe('PWA runtime config guard', () => {
       .match(/id="appVersionLabel">v(\d+)<\/span>/)?.[1] ?? '');
     expect(swVersionNumber).toBeTruthy();
     expect(sw).toContain(`./app.js?v=${swVersionNumber}`);
+    // [SPLIT 2026-08-02] MEMBERSHIP ONLY below — the `?v=` literals are gone from these assertions.
+    //
+    // Pinning the version here made this file a THIRD copy of every module version, and on 2026-08-02 that copy
+    // CERTIFIED a real defect: it asserted sw.js precached profile-registry-ton-rpc-provider at ?v=44, which was
+    // perfectly true, while app.js imported ?v=45. The service worker was warming a URL nothing requests — cold
+    // starts fetched the module over the network and an offline start had no copy at all. A guard that compares a
+    // file with a number cannot see a disagreement between two files.
+    //
+    // Versions are now DERIVED in tests/module-version-agreement.test.ts (sw.js against the real importers, and the
+    // importers against each other). What belongs here is the question this test actually asks: WHICH modules ship
+    // offline. Non-module entries below (styles.css, manifest, icons) keep their literals — MODVER does not cover them.
+    //
     // i18n engine + dictionaries + boot-screen worker/engine are precached (offline).
-    expect(sw).toMatch(/\.\/i18n\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/i18n-strings\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/boot-signal-field\.mjs\?v=1/);
-    expect(sw).toMatch(/\.\/boot-signal-worker\.js\?v=1/);
+    expect(sw).toMatch(/\.\/i18n\.mjs/);
+    expect(sw).toMatch(/\.\/i18n-strings\.mjs/);
+    expect(sw).toMatch(/\.\/boot-signal-field\.mjs/);
+    expect(sw).toMatch(/\.\/boot-signal-worker\.js/);
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
-    expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js\?v=1/);
-    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs\?v=7/);
-    expect(sw).toMatch(/\.\/platho-config\.mjs\?v=105/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
-    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs\?v=14/);
-    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs\?v=19/);
-    expect(sw).toMatch(/\.\/encrypted-message-store\.mjs\?v=5/);
-    expect(sw).toMatch(/\.\/platho-wallet\.mjs\?v=18/);
-    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs\?v=33/);
-    expect(sw).toMatch(/\.\/ton-rpc-transport\.mjs\?v=63/);
-    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs\?v=44/);
-    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs\?v=42/);
-    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs\?v=40/);
-    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs\?v=47/);
-    expect(sw).toMatch(/\.\/recipient-identities\.mjs\?v=6/);
-    expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs\?v=12/);
+    expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js/);
+    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs/);
+    expect(sw).toMatch(/\.\/platho-config\.mjs/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs/);
+    expect(sw).toMatch(/\.\/message-pricing-policy\.mjs/);
+    expect(sw).toMatch(/\.\/public-channel-subscriptions\.mjs/);
+    expect(sw).toMatch(/\.\/encrypted-message-store\.mjs/);
+    expect(sw).toMatch(/\.\/platho-wallet\.mjs/);
+    expect(sw).toMatch(/\.\/pwa-contract-transactions\.mjs/);
+    expect(sw).toMatch(/\.\/ton-rpc-transport\.mjs/);
+    expect(sw).toMatch(/\.\/profile-registry-ton-rpc-provider\.mjs/);
+    expect(sw).toMatch(/\.\/ath-ton-rpc-provider\.mjs/);
+    expect(sw).toMatch(/\.\/ton-dns-provider\.mjs/);
+    expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs/);
+    expect(sw).toMatch(/\.\/recipient-identities\.mjs/);
+    expect(sw).toMatch(/\.\/crypto\/platho-crypto\.mjs/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/ed25519\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/curves\/abstract\/edwards\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/hashes\/sha2\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/hashes\/_md\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/post-quantum\/ml-kem\.js/);
     expect(sw).toMatch(/\.\/vendor\/@noble\/post-quantum\/_crystals\.js/);
-    expect(sw).toMatch(/\.\/webp-encoder\.mjs\?v=1/);
-    expect(sw).toMatch(/\.\/qr-code\.mjs\?v=1/);
+    expect(sw).toMatch(/\.\/webp-encoder\.mjs/);
+    expect(sw).toMatch(/\.\/qr-code\.mjs/);
     expect(sw).toMatch(/\.\/vendor\/@jsquash\/webp\/codec\/enc\/webp_enc\.js/);
     expect(sw).toMatch(/\.\/vendor\/@jsquash\/webp\/codec\/enc\/webp_enc\.wasm/);
     expect(sw).toMatch(/\.\/manifest\.webmanifest\?v=3/);

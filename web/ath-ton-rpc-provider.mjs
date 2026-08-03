@@ -1,4 +1,4 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=63';
 
 export class AthTonRpcProviderError extends Error {

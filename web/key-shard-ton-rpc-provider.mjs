@@ -12,7 +12,7 @@
 // you get a well-formed address that simply holds nothing: reads return "no such user" and nothing errors. That is
 // why web/shard-address.mjs pins this derivation against @ton/core rather than trusting it.
 
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=3';
 
 export class KeyShardTonRpcProviderError extends Error {

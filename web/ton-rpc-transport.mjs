@@ -1,4 +1,4 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=12';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 
 
 export class TonRpcTransportError extends Error {

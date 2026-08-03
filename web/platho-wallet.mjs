@@ -12,7 +12,7 @@ import {
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-} from './crypto/platho-crypto.mjs?v=12';
+} from './crypto/platho-crypto.mjs?v=13';
 import { tonCell } from './pwa-contract-transactions.mjs?v=33';
 
 const {

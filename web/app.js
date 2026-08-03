@@ -10,6 +10,7 @@ import {
   PLATHO_COMPACT_IDENTITY_BYTES,
   PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
   PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+  compactPayloadReservedTailBytes,
   PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
   PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES,
   PLATHO_COMPACT_IMAGE_FORMATS,
@@ -19,7 +20,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=12';
+} from './crypto/platho-crypto.mjs?v=13';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -223,7 +224,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v803';
+const PLATHO_APP_RUNTIME_VERSION = 'v804';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -21196,7 +21197,11 @@ async function attemptConvMessagePublishDirect(context) {
     const payloadBytes = encodeCompactPayload({
       type: 'document', bytes: part.bytes, sizeClass: part.sizeClass,
       streamId, partIndex: index, partCount: documentParts.length,
-      reservedTailBytes: PLATHO_COMPACT_SENDER_RECOVERY_BYTES,
+      // MUST equal what createEncryptedConvCapsule will reserve, or the pre-encoded payload lands off every size class.
+      // This used to name only the sender-recovery section and miss the 68-byte identity one, so every message after
+      // the first contact threw "Compact payload must use a supported useful slot size". Shared helper now — the
+      // formula lived in four places and the fifth copy is what broke.
+      reservedTailBytes: compactPayloadReservedTailBytes({ senderRecovery: true }),
     });
     const capsule = await createEncryptedConvCapsule('', bundle, localIdentity, route.bucketKey, {
       payloadBytes, sizeClass: part.sizeClass, senderRecovery: true, now: createdAtSec * 1000,
