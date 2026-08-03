@@ -10,8 +10,8 @@
 // in so this stays testable against a stub transport. tests/intro-send-coords.test.ts pins the fill read, the pick, and
 // the created_at match (including the race where another sender's publish bumped the entryId).
 
-import { chooseIntroBucket } from './intro-bucket.mjs?v=1';
-import { introShardAddress } from './shard-discovery.mjs?v=3';
+import { chooseIntroBucket } from './intro-bucket.mjs?v=2';
+import { introShardAddress } from './shard-discovery.mjs?v=4';
 
 /** next_id (fill) of an (epoch, bucket) shard — how many intros it already holds — and 0 for a shard that does not
  *  exist yet (readScanPage returns null for a structurally-absent account). */

@@ -19,7 +19,7 @@
 // It reuses the shared transport (runGetMethod through the app's pump, readAccountStates for the batched sweep,
 // the /messages reader) rather than inventing a path — one queue per client key is what the rate model rests on.
 
-import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo } from './pwa-contract-transactions.mjs?v=34';
+import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=35';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 
 export class PublicShardTonRpcProviderError extends Error {
@@ -187,10 +187,10 @@ export function decodePublicPage(result) {
 /** The 256-bit hash of a cell from either world: @ton/core Cell.hash() (a Buffer) or the browser hasher. */
 async function cellHashBig(cell) {
   if (cell && typeof cell.hash === 'function') {
-    return BigInt('0x' + Buffer.from(cell.hash()).toString('hex'));
+    return bytesToBigUint(cell.hash());
   }
   const { hash } = await computeCellHashAndDepth(cell);
-  return BigInt('0x' + Buffer.from(hash).toString('hex'));
+  return bytesToBigUint(hash);
 }
 
 /** Recompute the commitment the CONTRACT stores: H(PS_BODY_DOMAIN ‖ header.hash ‖ body.hash). Mirrors
@@ -204,7 +204,7 @@ export async function publicBodyCommit(headerCell, bodyCell) {
     .uint(b, 256, 'body hash')
     .endCell();
   const { hash } = await computeCellHashAndDepth(preimage);
-  return BigInt('0x' + Buffer.from(hash).toString('hex'));
+  return bytesToBigUint(hash);
 }
 
 function resolveTransport(options) {

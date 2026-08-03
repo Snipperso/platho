@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v809</span>
+              <span class="app-version-label" id="appVersionLabel">v810</span>
             </div>
           </div>
         </div>
@@ -342,7 +342,10 @@
                  disagree with the number in the rail. -->
             <div class="wallet-headline is-pending" data-nav-vault-balance aria-hidden="true">
               <article class="wallet-headline-card">
-                <span data-i18n="wallet.walletGram">Wallet GRAM</span>
+                <!-- [OWNER 2026-08-03] Just the ticker, like the ATH card beside it. A ticker is not translated, so
+                     the pair reads GRAM / ATH in every locale — the label used to be a translated "wallet GRAM"
+                     phrase next to a bare "ATH", which read as two different kinds of thing. -->
+                <span>GRAM</span>
                 <strong data-nav-vault-ton>0 GRAM</strong>
               </article>
               <article class="wallet-headline-card">
@@ -350,6 +353,38 @@
                 <strong data-nav-vault-ath>0 ATH</strong>
               </article>
             </div>
+
+            <section class="profile-section" aria-label="Wallet" data-i18n-aria-label="common.wallet">
+              <h2 data-i18n="common.wallet">Wallet</h2>
+              <div class="settings-list">
+                <button id="walletBackupWarning" class="wallet-backup-warning" type="button" hidden><span data-i18n="wallet.keyNotBackedUp">Wallet key not backed up</span><strong data-i18n="wallet.saveNow">Save now</strong></button>
+                <button id="createWalletButton" type="button"><span data-i18n="wallet.create">Create wallet</span><strong id="createWalletStatus" data-i18n="wallet.statusRecommended">recommended</strong></button>
+                <button id="importWalletButton" type="button"><span data-i18n="wallet.import">Import wallet</span><strong id="importWalletStatus" data-i18n="wallet.status24Words">24 words</strong></button>
+                <button id="unlockWalletButton" type="button"><span data-i18n="wallet.unlock">Unlock wallet</span><strong id="unlockWalletStatus" data-i18n="wallet.statusNotStored">not stored</strong></button>
+                <button id="changeWalletPasswordButton" type="button"><span data-i18n="wallet.changePassword">Change password</span><strong id="changeWalletPasswordStatus" data-i18n="wallet.statusEncrypted">encrypted</strong></button>
+                <!-- [OWNER 2026-08-03] The balance button is gone: the headline card above shows the same number from
+                     the same [data-nav-vault-balance] source, so this row was a second copy of it sitting next to the
+                     two actions. Actions only now. -->
+                <div class="wallet-ton-group" aria-label="Wallet GRAM" data-i18n-aria-label="wallet.walletGram">
+                  <button id="receiveWalletTonButton" type="button"><span data-i18n="wallet.receiveGram">Receive GRAM</span><strong id="receiveWalletTonStatus" data-i18n="wallet.statusQr">QR</strong></button>
+                  <button id="sendWalletTonButton" type="button"><span data-i18n="wallet.sendGram">Send GRAM</span><strong id="sendWalletTonStatus" data-i18n="wallet.statusWallet">wallet</strong></button>
+                </div>
+                <button id="exportWalletKeyButton" type="button"><span data-i18n="wallet.exportKey">Export wallet key</span><strong id="exportWalletKeyStatus" data-i18n="wallet.statusEncryptedFile">encrypted file</strong></button>
+                <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
+                <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
+                <label class="settings-select-row" for="walletDisplayModeSelect">
+                  <span data-i18n="wallet.displayAs">Display as</span>
+                  <select id="walletDisplayModeSelect" aria-label="Wallet display mode" data-i18n-aria-label="wallet.displayMode">
+                    <option value="address" data-i18n="wallet.optionAddress">Address</option>
+                    <option value="platho_nft" data-i18n="wallet.optionPlathoName">Platho name</option>
+                  </select>
+                  <strong id="walletDisplayModeStatus" data-i18n="wallet.statusAddress">address</strong>
+                </label>
+                <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
+                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
+                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
+              </div>
+            </section>
 
             <section class="profile-section" aria-label="ATH">
               <h2>ATH</h2>
@@ -373,36 +408,6 @@
                 <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
               </div>
             </section>
-
-            <section class="profile-section" aria-label="Wallet" data-i18n-aria-label="common.wallet">
-              <h2 data-i18n="common.wallet">Wallet</h2>
-              <div class="settings-list">
-                <button id="walletBackupWarning" class="wallet-backup-warning" type="button" hidden><span data-i18n="wallet.keyNotBackedUp">Wallet key not backed up</span><strong data-i18n="wallet.saveNow">Save now</strong></button>
-                <button id="createWalletButton" type="button"><span data-i18n="wallet.create">Create wallet</span><strong id="createWalletStatus" data-i18n="wallet.statusRecommended">recommended</strong></button>
-                <button id="importWalletButton" type="button"><span data-i18n="wallet.import">Import wallet</span><strong id="importWalletStatus" data-i18n="wallet.status24Words">24 words</strong></button>
-                <button id="unlockWalletButton" type="button"><span data-i18n="wallet.unlock">Unlock wallet</span><strong id="unlockWalletStatus" data-i18n="wallet.statusNotStored">not stored</strong></button>
-                <button id="changeWalletPasswordButton" type="button"><span data-i18n="wallet.changePassword">Change password</span><strong id="changeWalletPasswordStatus" data-i18n="wallet.statusEncrypted">encrypted</strong></button>
-                <div class="wallet-ton-group" aria-label="Wallet GRAM" data-i18n-aria-label="wallet.walletGram">
-                  <button id="walletTonBalanceButton" type="button"><span data-i18n="wallet.walletGram">Wallet GRAM</span><strong id="walletTonBalanceStatus">-</strong></button>
-                  <button id="receiveWalletTonButton" type="button"><span data-i18n="wallet.receiveGram">Receive GRAM</span><strong id="receiveWalletTonStatus" data-i18n="wallet.statusQr">QR</strong></button>
-                  <button id="sendWalletTonButton" type="button"><span data-i18n="wallet.sendGram">Send GRAM</span><strong id="sendWalletTonStatus" data-i18n="wallet.statusWallet">wallet</strong></button>
-                </div>
-                <button id="exportWalletKeyButton" type="button"><span data-i18n="wallet.exportKey">Export wallet key</span><strong id="exportWalletKeyStatus" data-i18n="wallet.statusEncryptedFile">encrypted file</strong></button>
-                <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
-                <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
-                <label class="settings-select-row" for="walletDisplayModeSelect">
-                  <span data-i18n="wallet.displayAs">Display as</span>
-                  <select id="walletDisplayModeSelect" aria-label="Wallet display mode" data-i18n-aria-label="wallet.displayMode">
-                    <option value="address" data-i18n="wallet.optionAddress">Address</option>
-                    <option value="platho_nft" data-i18n="wallet.optionPlathoName">Platho name</option>
-                  </select>
-                  <strong id="walletDisplayModeStatus" data-i18n="wallet.statusAddress">address</strong>
-                </label>
-                <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
-                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
-                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
-              </div>
-            </section>
           </div>
         </section>
 
@@ -413,7 +418,7 @@
               <p id="profileHandle" data-i18n="nav.profile">Profile</p>
               <!-- Build version, duplicated from the rail badge: the rail is hidden on the narrow (mobile / TG
                    Mini App) layout, and TMA webviews cache hard — this is the on-device way to verify the build. -->
-              <span class="app-version-label" id="profileVersionLabel">v800</span>
+              <span class="app-version-label" id="profileVersionLabel">v810</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -715,6 +720,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=809" type="module"></script>
+    <script src="./app.js?v=810" type="module"></script>
   </body>
 </html>

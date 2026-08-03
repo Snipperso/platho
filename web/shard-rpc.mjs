@@ -18,7 +18,7 @@
 // client) depends on there being exactly one queue.
 
 import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint } from './ton-rpc-transport.mjs?v=63';
-import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=34';
+import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=35';
 
 /** A scan is background work: it must yield to anything the user is waiting on. */
 const SCAN_REQUEST_OPTIONS = Object.freeze({

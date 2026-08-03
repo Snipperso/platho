@@ -39,7 +39,7 @@ describe('wallet tab + durable comment cache guard', () => {
     const profilePanel = html.slice(html.indexOf('data-panel="profile"'));
     const moved = [
       'walletBackupWarning', 'createWalletButton', 'importWalletButton', 'unlockWalletButton',
-      'changeWalletPasswordButton', 'walletTonBalanceButton', 'receiveWalletTonButton', 'sendWalletTonButton',
+      'changeWalletPasswordButton', 'receiveWalletTonButton', 'sendWalletTonButton',
       'exportWalletKeyButton', 'importWalletKeyButton', 'walletDisplayModeSelect', 'exportWalletSeedButton',
       'registerVaultKeysButton', 'clearLocalDataButton',
       'athDropIssuedStatus', 'athSupplyStatus', 'flushAthButton',

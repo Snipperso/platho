@@ -13,10 +13,10 @@
 // No @ton/core and no build/*.ts here on purpose: this module runs in the browser, where neither loads. Cells are
 // the client's own records, parsed by its own reader — see web/intro-codec.mjs and web/shard-address.mjs, each
 // pinned against the reference implementation because a divergence here fails silently.
-import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=1';
+import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=2';
 import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=2';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
-import { parseBocBase64, computeCellHashAndDepth, beginCell } from './pwa-contract-transactions.mjs?v=34';
+import { parseBocBase64, computeCellHashAndDepth, beginCell, bytesToBigUint } from './pwa-contract-transactions.mjs?v=35';
 
 /**
  * Bind the batched state read to a request function.
@@ -111,10 +111,10 @@ export async function introBodyCommitBrowser(header0, body) {
   const bodyHash = (await computeCellHashAndDepth(body)).hash;
   const preimage = beginCell();
   preimage.uint(IS_BODY_DOMAIN, 32, 'IS_BODY_DOMAIN');
-  preimage.uint(BigInt('0x' + Buffer.from(h0).toString('hex')), 256, 'header_0 hash');
-  preimage.uint(BigInt('0x' + Buffer.from(bodyHash).toString('hex')), 256, 'body hash');
+  preimage.uint(bytesToBigUint(h0), 256, 'header_0 hash');
+  preimage.uint(bytesToBigUint(bodyHash), 256, 'body hash');
   const { hash } = await computeCellHashAndDepth(preimage.endCell());
-  return BigInt('0x' + Buffer.from(hash).toString('hex'));
+  return bytesToBigUint(hash);
 }
 
 /**

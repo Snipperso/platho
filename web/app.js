@@ -30,14 +30,14 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=18';
+} from './platho-wallet.mjs?v=19';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=106';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=107';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -144,45 +144,45 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
-} from './pwa-contract-transactions.mjs?v=34';
+} from './pwa-contract-transactions.mjs?v=35';
 import {
   MAX_BATCH_PARTS,
-} from './publish-batch-orchestration.mjs?v=7';
+} from './publish-batch-orchestration.mjs?v=8';
 import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=42';
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=45';
-import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=1';
+import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=1';
-import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=1';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=1';
+import { createPublicLane } from './public-lane.mjs?v=2';
+import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=2';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=1';
-import { createIntroLane } from './intro-lane.mjs?v=1';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=1';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=2';
+import { createIntroLane } from './intro-lane.mjs?v=2';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=1';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard } from './conv-discovery.mjs?v=1';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=1';
-import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=1';
-import { createConvReadLane } from './conv-lane.mjs?v=1';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=2';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=1';
-import { readAccountStates } from './shard-reader.mjs?v=1';
+import { outgoingRecordShard } from './conv-discovery.mjs?v=2';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=2';
+import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
+import { createConvReadLane } from './conv-lane.mjs?v=2';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=3';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=2';
+import { readAccountStates } from './shard-reader.mjs?v=2';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=1';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=2';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=2';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=1';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=2';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=3';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=2';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=1';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=2';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=2';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=2';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=3';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -194,8 +194,8 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=3';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=40';
+} from './shard-discovery.mjs?v=4';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=41';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v809';
+const PLATHO_APP_RUNTIME_VERSION = 'v810';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -421,8 +421,6 @@ const receiveWalletTonButton = document.querySelector('#receiveWalletTonButton')
 const receiveWalletTonStatus = document.querySelector('#receiveWalletTonStatus');
 const sendWalletTonButton = document.querySelector('#sendWalletTonButton');
 const sendWalletTonStatus = document.querySelector('#sendWalletTonStatus');
-const walletTonBalanceButton = document.querySelector('#walletTonBalanceButton');
-const walletTonBalanceStatus = document.querySelector('#walletTonBalanceStatus');
 const exportWalletKeyButton = document.querySelector('#exportWalletKeyButton');
 const walletBackupWarning = document.querySelector('#walletBackupWarning');
 const exportWalletKeyStatus = document.querySelector('#exportWalletKeyStatus');
@@ -12318,15 +12316,6 @@ function markNavVaultBalanceRetryNeeded(reason = 'retrying') {
   markNavVaultBalancePending(reason, { retry: true });
 }
 
-function walletTonBalanceLabel() {
-  const balance = vaultPocketState.wallet?.ton_balance;
-  return balance === null || balance === undefined ? '-' : t('common.gramAmount', { amount: formatTonNanotons(balance) });
-}
-
-function refreshWalletTonProfileStatus() {
-  setText(walletTonBalanceStatus, walletTonBalanceLabel());
-}
-
 function refreshMessageActionStatuses(options = {}) {
   if (!plathoWallet) {
     if (!options.keepSyncStatus) setMessageSyncStatus(t('common.walletRequiredStatus'), 'wallet-required');
@@ -15215,8 +15204,6 @@ function refreshMessagingControls() {
   setText(receiveWalletTonStatus, currentWalletReceiveAddress() ? 'QR' : t('wallet.statusNoWallet'));
   if (sendWalletTonButton) sendWalletTonButton.disabled = !plathoWallet;
   setText(sendWalletTonStatus, plathoWallet ? t('wallet.statusWallet') : t('wallet.statusUnlock'));
-  if (walletTonBalanceButton) walletTonBalanceButton.disabled = !plathoWallet;
-  refreshWalletTonProfileStatus();
   if (exportWalletKeyButton) exportWalletKeyButton.disabled = !readEncryptedPlathoWalletRecord();
   setText(exportWalletKeyStatus, readEncryptedPlathoWalletRecord() ? t('wallet.statusEncryptedFile') : t('wallet.statusNotStored'));
   if (importWalletKeyButton) importWalletKeyButton.disabled = false;
@@ -17688,18 +17675,6 @@ sendWalletTonButton?.addEventListener('click', async () => {
   }
 });
 
-walletTonBalanceButton?.addEventListener('click', async () => {
-  try {
-    walletTonBalanceButton.disabled = true;
-    await refreshWalletTonBalanceForProfile();
-  } catch (error) {
-    setText(walletTonBalanceStatus, t('common.blocked'));
-    console.error(error);
-  } finally {
-    refreshMessagingControls();
-  }
-});
-
 exportWalletKeyButton?.addEventListener('click', async () => {
   try {
     exportWalletKeyButton.disabled = true;
@@ -19252,17 +19227,16 @@ async function refreshWalletTonBalanceForProfile() {
     vaultPocketState = {
       wallet: { ton_balance: null, ath_balance: vaultPocketState.wallet?.ath_balance ?? null },
     };
-    refreshWalletTonProfileStatus();
+    refreshVaultMoveWidget();
     return null;
   }
-  setText(walletTonBalanceStatus, t('wallet.checking'));
   const balance = await loadConnectedTonWalletBalance();
   if (balance === null) {
     // Transient failed read (loadConnectedTonWalletBalance returns null on total failure, it does not throw): do NOT
     // wipe a known balance to "-" and do NOT give up — keep last-known and re-read on a short backoff so the profile
     // eventually shows the balance instead of stranding on a dash until the user leaves and returns.
     scheduleWalletTonProfileBalanceRetry();
-    refreshWalletTonProfileStatus();
+    refreshVaultMoveWidget();
     return vaultPocketState.wallet?.ton_balance ?? null;
   }
   clearWalletTonProfileBalanceRetry();
@@ -19272,7 +19246,9 @@ async function refreshWalletTonBalanceForProfile() {
       ath_balance: vaultPocketState.wallet?.ath_balance ?? null,
     },
   };
-  refreshWalletTonProfileStatus();
+  // The headline card is now the ONLY place this number is rendered, and it is fed by refreshNavVaultBalance. Leaving
+  // the old profile-status call here would have updated vaultPocketState and shown nothing.
+  refreshVaultMoveWidget();
   return balance;
 }
 
@@ -19313,7 +19289,6 @@ function resetVaultPocketState() {
     wallet: { ton_balance: null, ath_balance: null },
   };
   markNavVaultBalanceIdle();
-  refreshWalletTonProfileStatus();
   refreshVaultMoveWidget();
 }
 
@@ -19355,7 +19330,6 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
         ath_balance: ath ?? vaultPocketState.wallet?.ath_balance ?? null,
       },
     };
-    refreshWalletTonProfileStatus();
     refreshVaultMoveWidget();
     markNavVaultBalanceReady();
     refreshComposerCostStatus();

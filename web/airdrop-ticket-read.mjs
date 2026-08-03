@@ -8,8 +8,8 @@
 //
 // The address is DERIVED, not asked for: FeeAccumulator computes it internally and the sealed contract exposes no
 // getter. Absence of the account is a normal state, not an error — it means the user has not published yet.
-import { airdropTicketAddressBytes, rawAddress } from './shard-address.mjs?v=4';
-import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=18';
+import { airdropTicketAddressBytes, rawAddress } from './shard-address.mjs?v=5';
+import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=19';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 
 /** Friendly, bounceable address of `ownerWallet`'s ticket. `ownerWallet` is a raw `workchain:hex` address. */
