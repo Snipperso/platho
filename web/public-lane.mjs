@@ -27,7 +27,7 @@ import { createShardStatesRequest, createShardMessagesWithSourceReader } from '.
 import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=1';
 import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=1';
 import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=1';
-import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=3';
+import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=4';
 import {
   publicBeaconScanAddresses,
   publicAvatarScanAddresses,

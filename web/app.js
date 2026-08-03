@@ -176,6 +176,7 @@ import {
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=2';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
 import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
 import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=1';
@@ -224,7 +225,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v804';
+const PLATHO_APP_RUNTIME_VERSION = 'v805';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1268,6 +1269,11 @@ let athFlushState = {
   busy: false,
   error: null,
 };
+
+// This wallet's activity-credit ticket. `credits === null` means NOT READ YET — distinct from a read that found no
+// account, which is `credits = 0n` and the ordinary state of a wallet that has not published. Conflating the two
+// would put a confident zero where the truth is "unknown".
+let athTicketState = { credits: null, minClaimCredits: null, address: null };
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
@@ -10689,6 +10695,26 @@ function privateSyncStatusText(result) {
 // The thread a decrypted CONV message belongs to, keyed on the peer's messaging keyId (the same convPeerKeyId
 // handleIntroFirstContact stamped on the INTRO-receive thread). Created if a message somehow arrives before the INTRO
 // thread does (defensive — the K_root is adopted from that INTRO, so normally the thread already exists).
+/**
+ * One-time heal for devices that already grew the duplicate. While `convPeerKeyId` was memory-only, a reload made the
+ * CONV scan miss the real dialog and mint an "Anonymous <keyId>" thread beside it; that empty twin then persisted into
+ * local history and came back on every start. Persisting the field stops NEW ones — this clears the one already there.
+ *
+ * Deliberately narrow: only a thread that is the anonymous twin BY ID, carries no messages, and is not the dialog we
+ * are keeping. An anonymous thread with content is a real conversation whose peer never revealed a wallet, and
+ * deleting that would lose messages.
+ */
+function dropEmptyAnonymousTwin(keepThread, peerKeyIdB64) {
+  if (!keepThread || !peerKeyIdB64) return;
+  const twinId = createInboundPeerThread({ senderKeyId: peerKeyIdB64, keyId: peerKeyIdB64, label: null })?.id;
+  if (!twinId || twinId === keepThread.id) return;
+  const index = threads.findIndex((item) => item.id === twinId && item !== keepThread);
+  if (index < 0) return;
+  if ((threads[index].messages?.length ?? 0) > 0) return;
+  threads.splice(index, 1);
+  renderThreads();
+}
+
 function resolveConvReceiveThread(peerKeyIdB64) {
   let thread = threads.find((item) => item.convPeerKeyId === peerKeyIdB64);
   if (thread) {
@@ -11139,6 +11165,11 @@ function serializeThreadForHistory(thread) {
     identityVariants: threadIdentityVariants(thread),
     localLabel: thread.localLabel ?? null,
     avatarImageUrl: thread.avatarImageUrl ?? null,
+    // [ADDED 2026-08-03] The bridge from INTRO adoption to CONV routing, and it used to live ONLY in memory. Every
+    // reload dropped it, so the CONV receive scan — which finds a dialog by `convPeerKeyId` — could not match the
+    // real thread and created an "Anonymous <keyId>" one beside it. The user saw an empty duplicate appear after
+    // sending, and the conversation they had just established looked like two.
+    convPeerKeyId: thread.convPeerKeyId ?? null,
   });
 }
 
@@ -11171,6 +11202,9 @@ function applyHistoryThreadSnapshot(thread, snapshot) {
     ]);
     thread.identity = thread.identity ?? preferredInboundIdentity(thread.identityVariants);
   }
+  // Restore the CONV bridge before anything else can route around its absence. Never OVERWRITE a live value: the
+  // in-memory one was stamped by a send or an adoption this session and is authoritative over a persisted copy.
+  if (!thread.convPeerKeyId && snapshot.convPeerKeyId) thread.convPeerKeyId = snapshot.convPeerKeyId;
   if (!thread.localLabel && snapshot.name && snapshot.name !== 'Imported') thread.name = snapshot.name;
   if (snapshot.subtitle && snapshot.subtitle !== 'local encrypted history') thread.subtitle = snapshot.subtitle;
   if (snapshot.avatar) thread.avatar = snapshot.avatar;
@@ -12875,8 +12909,27 @@ function composerEstimatedMaxChargeNanotons(profile, parts = 1) {
 // The OBSERVED SETTLED net price of one capsule (real user debit after the over-hold is refunded on ACK),
 // from the sandbox-measured net-price tables, plus the retained network-fee surcharge (not refunded).
 function composerProfileNetPriceNanotons(profile) {
+  const isPublic = composerProfileKindLabel(profile) === 'public';
+  // [CORRECTED 2026-08-03] Direct-pay quotes the figure the send ACTUALLY attaches.
+  //
+  // This used to read PRIVATE/PUBLIC_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS — a table of "observed settled charge"
+  // measured against Vault, a contract clean-17 deleted. MEASURED on chain 2026-08-03, owner's wallet: a CONV send
+  // settled at 18,865,000 while the composer promised 33,900,000. The table was not merely stale, it described a
+  // different architecture: under Vault the user paid a batch-amortised price, under direct-pay they attach a flat
+  // per-publish figure straight to the shard.
+  //
+  // publish-price.mjs is the honest source — pinned by tests/publish-price.test.ts against the .tact gates AND the
+  // live getters, so it cannot drift the way the measured table did. Size class no longer changes the price at all:
+  // a shard's gate is `value >= deploy_min_value` whatever the capsule holds, so a bigger message costs more only by
+  // needing more PARTS. The surplus comes back by mode-128, which is why the attached figure slightly OVERSTATES the
+  // settled one (19.1M quoted vs 18.87M settled) — erring high is honest, erring low would promise a send the wallet
+  // cannot fund.
+  if (privateLaneDirectPayEnabled()) {
+    const attached = isPublic ? publicPublishValueForKind(0) : CONV_PUBLISH_VALUE;
+    return nonNegativeBigInt(attached) + currentNetworkFeeSurchargeNanotons();
+  }
   const sizeClass = Number(profile?.sizeClass ?? 1);
-  const settled = composerProfileKindLabel(profile) === 'public'
+  const settled = isPublic
     ? publicCapsuleBaseNetPriceNanotons(sizeClass)
     : privateCapsuleBaseNetPriceNanotons(sizeClass);
   return nonNegativeBigInt(settled) + currentNetworkFeeSurchargeNanotons();
@@ -13078,7 +13131,13 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
     };
   }
   return {
-    text: t('composer.costHoldStatus', { cost: formatTonNanotons(price), hold: formatTonNanotons(hold), surcharge: surchargeText, discount: formatAthDiscountLabel() }),
+    // [CORRECTED 2026-08-03] No hold under direct-pay, so do not name one. The code three lines above already knew
+    // this — "No Vault hold under direct-pay (see composerKnownVaultTonShortfall)" — and the label went on showing
+    // 0.1626 GRAM reserved anyway, computed by the batch-hold model of a contract clean-17 deleted. A number the
+    // surrounding code documents as non-existent is worse than no number.
+    text: privateLaneDirectPayEnabled()
+      ? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText, discount: formatAthDiscountLabel() })
+      : t('composer.costHoldStatus', { cost: formatTonNanotons(price), hold: formatTonNanotons(hold), surcharge: surchargeText, discount: formatAthDiscountLabel() }),
     state: 'ready',
     parts,
   };
@@ -17876,11 +17935,22 @@ function renderAthProfileStats() {
     vaultProtocolState?.airdrop_total_allocation_ath,
     VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   );
-  // clean-17: the "issued" figure has NO client source yet. It used to come from the Vault global, and the Vault is
-  // gone; under clean-17 the undistributed remainder lives in AirdropPool, for which the client has neither a reader
-  // nor a configured address (the address only exists after the genesis ceremony). Until that reader is built this
-  // renders "-" — a dash is honest, a number read off the superseded clean-15 Vault would not be.
-  // [roadmap: AirdropPool client reader]
+  // [BUILT 2026-08-03] THIS WALLET'S OWN ACCRUAL, which is what the row is actually asked to answer.
+  //
+  // The dash used to be honest and is not any more. Publishing accrues credits on a per-owner AirdropTicket, and that
+  // has worked since genesis — MEASURED the same day, the owner's ticket already held 8 — but the client could not
+  // name the ticket's address, so it showed nothing while the user reasonably concluded the airdrop was dead.
+  //
+  // Rendered as bare numbers (`8 / 10`) on purpose: the label beside it already says what they count, so no locale
+  // needs a new sentence, and a number cannot be mistranslated.
+  //
+  // The GLOBAL "issued out of 15M" figure below is a different question, still unanswerable — it lives in AirdropPool
+  // and the client has neither its address in config nor a reader. That dash stays a dash. [roadmap: AirdropPool reader]
+  if (athTicketState.credits !== null) {
+    const need = athTicketState.minClaimCredits ?? 0n;
+    setText(athDropIssuedStatus, need > 0n ? `${athTicketState.credits} / ${need}` : String(athTicketState.credits));
+    return;
+  }
   const remainingRaw = vaultProtocolState?.airdrop_remaining_ath;
   if (remainingRaw === null || remainingRaw === undefined || total <= 0n) {
     setText(athDropIssuedStatus, '-');
@@ -19282,6 +19352,27 @@ async function refreshAthFlushState() {
 async function refreshAthProtocolStats() {
   return await refreshAthProtocolStatsRun();
 }
+/**
+ * Read this wallet's airdrop ticket. A missing account is the NORMAL state before the first publish, so it resolves
+ * to zero credits rather than an error; only a transport failure leaves the previous value in place, because a
+ * transient RPC blip must not blank a figure the user was just looking at.
+ */
+async function refreshAthTicketState() {
+  const wallet = plathoWallet?.address ? parseTonAddress(plathoWallet.address).raw : null;
+  if (!wallet) { athTicketState = { credits: null, minClaimCredits: null, address: null }; return; }
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!transport?.runGetMethod) return;
+  try {
+    const read = createAirdropTicketReader((call) => transport.runGetMethod(call));
+    const ticket = await read(wallet);
+    athTicketState = ticket.exists
+      ? { credits: ticket.credits, minClaimCredits: ticket.minClaimCredits, address: ticket.address }
+      : { credits: 0n, minClaimCredits: null, address: ticket.address };
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] ticket read failed', error);
+  }
+}
+
 async function refreshAthProtocolStatsRun() {
   renderAthProfileStats();
   // Serialize the ATH-stats reads (jetton -> flush), one at a time. Reads that overlap are the iOS
@@ -19299,6 +19390,7 @@ async function refreshAthProtocolStatsRun() {
         : nonNegativeBigInt(data.total_supply),
     };
     await refreshAthFlushState();
+    await refreshAthTicketState();
     renderAthProfileStats();
     return athProtocolState;
   } catch (error) {
@@ -20946,6 +21038,7 @@ async function attemptIntroFirstContactDirect(context) {
     kRoot: sendState.kRoot, createdAt: createdAtSec, introNonce: sendState.introNonce, peerKeyId: sendState.peerKeyId, peerEncPublicKey: null, peerWallet: sendState.peerWallet,
   });
   thread.convPeerKeyId = sendState.peerKeyId;
+  dropEmptyAnonymousTwin(thread, sendState.peerKeyId);
   scheduleRecoveryBackup(conversationId(selfKeyId, sendState.peerKeyId));   // a new K_root — back its slot up (debounced)
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };

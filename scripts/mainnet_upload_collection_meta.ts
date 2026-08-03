@@ -213,7 +213,13 @@ async function main() {
     return;
   }
 
-  for (let i = 0; i < externals.length; i++) {
+  // [ADDED 2026-08-03] Skip the upload when the registry already holds all three parts, the way the ART uploader
+  // does. Without it a re-run to SEAL re-sent every part: harmless (same keys, same content, meta_count unchanged)
+  // but it spends gas and, more to the point, makes the operator watch three sends they did not ask for and cannot
+  // tell apart from a first upload.
+  const alreadyUploaded = startCount === bodies.length;
+  if (alreadyUploaded) console.log(`  registry meta_count already == ${bodies.length} — skipping upload, sealing only.`);
+  for (let i = 0; !alreadyUploaded && i < externals.length; i++) {
     const e = externals[i];
     console.log(`  [${i + 1}/${externals.length}] ${e.label} (${e.bytes}B, seqno ${seqno}) ...`);
     let advanced = false;
@@ -225,9 +231,12 @@ async function main() {
     }
     if (!advanced) die(`${e.label} did not land after 3 attempts (~6min) — stopping; re-run (idempotent) to resume`);
   }
-  let count = 0;
-  for (let t = 0; t < 6; t++) { count = Number(BigInt(await gwRunGet(registry.toString(), 'get_meta_count'))); if (count === 3) break; await sleep(4000); }
-  console.log('  uploaded. registry meta_count =', count, '/ 3');
+  let count = startCount;
+  if (!alreadyUploaded) {
+    count = 0;
+    for (let t = 0; t < 6; t++) { count = Number(BigInt(await gwRunGet(registry.toString(), 'get_meta_count'))); if (count === 3) break; await sleep(4000); }
+    console.log('  uploaded. registry meta_count =', count, '/ 3');
+  }
   if (count !== 3) die(`meta_count is ${count}, expected 3 — some uploads did not land; re-run (idempotent) before sealing.`);
 
   if (doSeal) {

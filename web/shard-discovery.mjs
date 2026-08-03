@@ -39,7 +39,7 @@ import {
   recoveryShardAddressBytes,
   publicShardAddressBytes,
   rawAddress,
-} from './shard-address.mjs?v=3';
+} from './shard-address.mjs?v=4';
 
 export const EPOCH_SECONDS = 86400;
 

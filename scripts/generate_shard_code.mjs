@@ -11,7 +11,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 // hash(code, data) over a code cell the browser cannot import, and both the identity read and the avatar read
 // now resolve through it. PublicShard (added 2026-07-21) is the public/avatar lane; the client derives channel,
 // thread, beacon and avatar shard addresses from its code hash to sweep the directory and render the feed.
-const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard', 'PublicShard'];
+// AirdropTicket (added 2026-08-03) is not a shard, but it reaches the browser for exactly the same reason: its
+// address is hash(code, data) over the owner wallet, FeeAccumulator derives it that way internally, and the sealed
+// contract exposes no getter that would hand it out. Without the code cell the client cannot find a user's own
+// airdrop credits — which is why the wallet screen showed a dash while the ticket on chain held 8 of them.
+const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard', 'PublicShard', 'AirdropTicket'];
 
 export function renderShardCodeModule() {
   const lines = [
