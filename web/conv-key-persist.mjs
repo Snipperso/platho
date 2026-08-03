@@ -7,7 +7,7 @@
 // pure and driven over an injectable blob backend (tests/conv-key-persist.test.ts pins the round-trip + that the blob
 // is ciphertext). createIndexedDbConvKeyStore is the thin production glue that supplies a real IndexedDB backend.
 
-import { createConvKeyStore } from './conv-key-store.mjs?v=1';
+import { createConvKeyStore } from './conv-key-store.mjs?v=2';
 import { tonCell } from './pwa-contract-transactions.mjs?v=33';
 
 const KEY_STORE_NAME = 'convKeys';

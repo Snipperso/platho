@@ -21,18 +21,32 @@
 // encrypted-message-store; the memory store does not persist). The ADOPTION and SEQ logic is pure and testable
 // independent of storage — tests/conv-key-store.test.ts pins both, including the mutation that removes the compare.
 
-import { conversationOrder } from './crypto/conv-routing.mjs?v=1';
+import { conversationOrder, base64urlDecode } from './crypto/conv-routing.mjs?v=2';
 
+// [CORRECTED 2026-08-02] Strings arrive in TWO forms and this accepted only one.
+//
+// A keyId's canonical string form is BASE64URL — computeHybridKeyId emits it, introKeyIdString renders it, the intro
+// capsule header carries it (platho-crypto base64urlEncode), and conv-routing's normalizeKeyId decodes it. This
+// function hex-decoded instead, so BOTH live paths — the sender's adoption after a confirmed INTRO and the recipient's
+// adoption of an incoming one — threw `peerKeyId must be 32-byte hex` on a value that was perfectly well-formed.
+// Nothing caught it because the tests hand this store raw Uint8Arrays, which take the branch above.
+//
+// The two encodings cannot be confused: 32 bytes is 64 hex characters or 43 base64url ones, so length decides. Hex
+// stays supported for persisted records written before this.
 function toBytes(value, length, name) {
   let bytes;
   if (value instanceof Uint8Array) bytes = value;
   else if (Array.isArray(value)) bytes = Uint8Array.from(value);
   else if (typeof value === 'string') {
     const hex = value.startsWith('0x') ? value.slice(2) : value;
-    if (hex.length !== length * 2 || /[^0-9a-fA-F]/.test(hex)) throw new TypeError(`${name} must be ${length}-byte hex`);
-    bytes = new Uint8Array(length);
-    for (let i = 0; i < length; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  } else throw new TypeError(`${name} must be bytes or hex`);
+    if (hex.length === length * 2 && !/[^0-9a-fA-F]/.test(hex)) {
+      bytes = new Uint8Array(length);
+      for (let i = 0; i < length; i += 1) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    } else {
+      try { bytes = base64urlDecode(value); } catch { throw new TypeError(`${name} must be ${length}-byte hex or base64url`); }
+      if (bytes.length !== length) throw new TypeError(`${name} must be ${length}-byte hex or base64url`);
+    }
+  } else throw new TypeError(`${name} must be bytes, hex or base64url`);
   if (bytes.length !== length) throw new RangeError(`${name} must be ${length} bytes, got ${bytes.length}`);
   return bytes;
 }
