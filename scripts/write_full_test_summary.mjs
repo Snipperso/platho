@@ -17,7 +17,9 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-const RUN = 'artifacts/local/CURRENT_FULL_TEST_RUN.json';
+// The run report to read. Overridable so run_evidence_suite.mjs can point BOTH halves at the same file — it used to
+// take a --out and this took none, so a redirected run silently summarised the previous canonical report instead.
+const RUN = process.argv[2] || 'artifacts/local/CURRENT_FULL_TEST_RUN.json';
 const SUMMARY = 'artifacts/CURRENT_FULL_TEST_SUMMARY.json';
 
 if (!existsSync(RUN)) {
