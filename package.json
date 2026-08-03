@@ -36,7 +36,9 @@
     "evidence:suite": "node scripts/run_evidence_suite.mjs",
     "pricing:report": "node scripts/publish_reserve_pricing_report.mjs",
     "preprod:check": "node scripts/preprod_guard.mjs",
-    "test:debug:files": "bash scripts/debug-test-files.sh"
+    "test:debug:files": "bash scripts/debug-test-files.sh",
+    "web:deploy": "node scripts/deploy_static_web.mjs",
+    "web:deploy:preview": "node scripts/deploy_static_web.mjs --mode preview"
   },
   "keywords": [],
   "author": "",

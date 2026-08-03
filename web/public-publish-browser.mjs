@@ -16,7 +16,7 @@
 // and against a live PublicShard in a sandbox.
 
 import { beginCell } from './pwa-contract-transactions.mjs?v=33';
-import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=3';
+import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=4';
 import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=1';
 
 // "PSP1" — message(0x50535031) PublicPublish. MUST equal the opcode PublicShard.tact declares; mirrored here (not

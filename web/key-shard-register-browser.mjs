@@ -19,7 +19,7 @@
 // it, KeyShard.tact:26). So this refuses to build without a distinct non-zero auth key rather than send a bricking register.
 
 import { beginCell, snakeCellFromBytes } from './pwa-contract-transactions.mjs?v=33';
-import { keyShardAddressBytes, keyShardStateInit, rawAddress } from './shard-address.mjs?v=3';
+import { keyShardAddressBytes, keyShardStateInit, rawAddress } from './shard-address.mjs?v=4';
 
 const KEYSHARD_REGISTER_OPCODE = 0x4B534731n; // "KSG1"
 

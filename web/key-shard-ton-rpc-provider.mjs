@@ -13,7 +13,7 @@
 // why web/shard-address.mjs pins this derivation against @ton/core rather than trusting it.
 
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
-import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=3';
+import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=4';
 
 export class KeyShardTonRpcProviderError extends Error {
   constructor(message) {

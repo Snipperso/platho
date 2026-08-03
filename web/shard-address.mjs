@@ -21,7 +21,10 @@
 // evidence worth having, given the failure mode above.
 
 import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
-import { RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC, PUBLICSHARD_CODE_BOC } from './shard-code.mjs?v=3';
+import {
+  RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC, PUBLICSHARD_CODE_BOC,
+  AIRDROPTICKET_CODE_BOC,
+} from './shard-code.mjs?v=4';
 
 const CODE_CACHE = new Map();
 
@@ -133,6 +136,21 @@ export const keyShardAddressBytes = (ownerWallet, profileRegistry) =>
 
 export const keyShardStateInit = (ownerWallet, profileRegistry) =>
   shardStateInitCell(KEYSHARD_CODE_BOC, [['owner_wallet', ownerWallet, 'address'], ['profile_registry', profileRegistry, 'address']]);
+
+/**
+ * AIRDROP TICKET: a wallet's per-owner activity-credit account. init(owner: Address), deployed lazily by the FIRST
+ * TicketCredit the FeeAccumulator forwards out of a capsule fee — so the account exists only once the user has
+ * published something, and its absence means "no credits yet", not "broken".
+ *
+ * Derived here rather than asked for: FeeAccumulator computes this address internally (its `ticketAddress`) and the
+ * SEALED contract exposes no getter that hands it out. Until 2026-08-03 the client could not name the address at all,
+ * so the wallet screen rendered a dash while the owner's ticket on chain already held 8 credits.
+ *
+ * The layout must match FeeAccumulator.ticketAddress exactly — `storeUint(0, 1)` then the owner address — which is
+ * what initDataCell already emits for a single address argument.
+ */
+export const airdropTicketAddressBytes = (ownerWallet) =>
+  addressFor(AIRDROPTICKET_CODE_BOC, [['owner', ownerWallet, 'address']]);
 
 /**
  * PUBLIC: one partition of the public/avatar lane. init(partition_key: Int, epoch_tag: Int) — two int257, the
