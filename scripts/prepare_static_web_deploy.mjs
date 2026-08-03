@@ -48,6 +48,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'key-shard-ton-rpc-provider.mjs',
   'shard-address.mjs',
   'airdrop-ticket-read.mjs',
+  'airdrop-pool-read.mjs',
   'shard-code.mjs',
   'username-ton-rpc-provider.mjs',
   'sw.js',

@@ -20,7 +20,7 @@
 // FUNDING: always INTRO_PUBLISH_VALUE (the deploy figure). The shard keeps only what it needs and returns the surplus.
 
 import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=1';
-import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=33';
+import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=34';
 import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=18';
 
 /** base64url → bytes (the capsule advertises ephemeralR / view material as base64url, not standard base64). */

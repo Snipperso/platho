@@ -37,7 +37,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=105';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=106';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -120,6 +120,7 @@ import {
   createPublicPostPayloadV2,
   createUsernameRegistryMessage,
   createWalletTransaction,
+  buildAirdropTicketClaimBody,
   buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
@@ -143,7 +144,7 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
-} from './pwa-contract-transactions.mjs?v=33';
+} from './pwa-contract-transactions.mjs?v=34';
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=7';
@@ -177,6 +178,7 @@ import {
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=1';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=2';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=1';
+import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
 import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=1';
 import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=1';
@@ -225,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v805';
+const PLATHO_APP_RUNTIME_VERSION = 'v806';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -655,6 +657,9 @@ const flushAthButton = document.querySelector('#flushAthButton');
 const flushAthStatus = document.querySelector('#flushAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
+const athActivityCreditsStatus = document.querySelector('#athActivityCreditsStatus');
+const claimAirdropButton = document.querySelector('#claimAirdropButton');
+const claimAirdropStatus = document.querySelector('#claimAirdropStatus');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
 const brandNetworkLabel = document.querySelector('#brandNetworkLabel');
 const chatCountLabel = document.querySelector('#chatCountLabel');
@@ -1273,7 +1278,13 @@ let athFlushState = {
 // This wallet's activity-credit ticket. `credits === null` means NOT READ YET — distinct from a read that found no
 // account, which is `credits = 0n` and the ordinary state of a wallet that has not published. Conflating the two
 // would put a confident zero where the truth is "unknown".
-let athTicketState = { credits: null, minClaimCredits: null, address: null };
+let athTicketState = { credits: null, minClaimCredits: null, inFlight: 0n, claimMinValue: null, address: null };
+
+// The pool's own numbers: how much of the activity airdrop has gone out, and how much ATH one credit is worth.
+// `athPerCredit` is what turns an internal credit count into the figure a user can act on — 10 credits is not
+// "10 of something", it is 100 ATH.
+let athPoolState = { distributedTotal: null, totalPool: null, athPerCredit: null };
+let athClaimState = { busy: false, error: null, errorCode: null };
 
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
@@ -16445,6 +16456,67 @@ linkUsernameButton?.addEventListener('click', async () => {
   }
 });
 
+/**
+ * Claim the accrued airdrop: send TicketClaim (opcode 0x41544332, empty body) from the OWNER wallet to its own
+ * AirdropTicket, carrying at least the ticket's own claim_min_value.
+ *
+ * The contract gates are sender==owner (27010), nothing already in flight (27011), credits >= the minimum (27012)
+ * and enough value to fund the delivery (27013) — that last one is checked in COMPUTE deliberately, so a claim that
+ * cannot pay its own way bounces instead of moving credits into flight and failing invisibly in ACTION. The wallet
+ * balance is checked HERE for the same reason the flush does it: a zero-GRAM broadcast never lands, and the user
+ * would be left staring at a pending state with nothing to act on.
+ */
+async function submitAirdropClaim() {
+  requireNoPendingServiceWorkerAppShellReload();
+  requirePlathoWallet();
+  if (!athTicketState.address) throw new Error('Airdrop ticket address is not known yet');
+  if (!athClaimReady()) throw new Error('No airdrop is ready to claim');
+  const value = nonNegativeBigInt(athTicketState.claimMinValue ?? 0n);
+  if (value <= 0n) throw new Error('Airdrop ticket did not report its claim value');
+
+  const required = value + WALLET_FEE_HEADROOM_NANOTONS;
+  const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
+  if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < required) {
+    const error = new Error(`Wallet needs ~${formatTonNanotons(required)} GRAM to claim`);
+    error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
+    throw error;
+  }
+
+  athClaimState = { busy: true, error: null, errorCode: null };
+  renderAthClaimStatus();
+  const transaction = createWalletTransaction([{
+    address: athTicketState.address,
+    amount: value.toString(),
+    payload: buildAirdropTicketClaimBody(),
+  }]);
+  await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
+  // Reflect the in-flight state immediately: the ticket moves the credits the moment it executes, and a user who
+  // sees the old number would reasonably press again into gate 27011.
+  athTicketState = { ...athTicketState, inFlight: athTicketState.credits ?? 0n, credits: 0n };
+  athClaimState = { busy: false, error: null, errorCode: null };
+  renderAthProfileStats();
+  queueAthFlushPostTransactionRefresh();
+}
+
+claimAirdropButton?.addEventListener('click', async () => {
+  try {
+    claimAirdropButton.disabled = true;
+    await submitAirdropClaim();
+  } catch (error) {
+    athClaimState = {
+      busy: false,
+      error: String(error?.message ?? error ?? 'Airdrop claim blocked'),
+      errorCode: error?.code ?? null,
+    };
+    flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+      ? t('profile.flushNeedsWalletGram')
+      : t('common.syncDelayed'));
+    console.error(error);
+  } finally {
+    renderAthClaimStatus();
+  }
+});
+
 flushAthButton?.addEventListener('click', async () => {
   try {
     flushAthButton.disabled = true;
@@ -17928,6 +18000,62 @@ function athSupplyDisplayValue() {
   return adjusted < 0n ? 0n : adjusted;
 }
 
+/**
+ * This wallet's accrual, IN ATH — not in credits.
+ *
+ * A credit is an internal unit: the pool pays `ath_per_credit` for each, currently 10 ATH. Showing "10 / 10" told the
+ * owner nothing he could act on, which is fair — it names a quantity of something unnamed. The same state reads
+ * "100 / 100 ATH", and the unit is spelled out in the value rather than left to the section heading.
+ *
+ * Falls back to the raw credit count only if the pool multiplier could not be read, because a wrong ATH figure would
+ * be worse than an honest internal one.
+ */
+function renderAthActivityCredits() {
+  const credits = athTicketState.credits;
+  if (credits === null) { setText(athActivityCreditsStatus, t('profile.statusChecking')); return; }
+  const perCredit = athPoolState.athPerCredit ?? null;
+  const need = athTicketState.minClaimCredits ?? 0n;
+  if (perCredit === null || perCredit <= 0n) {
+    setText(athActivityCreditsStatus, need > 0n ? `${credits} / ${need}` : String(credits));
+    return;
+  }
+  const have = formatAthProfileAmount(credits * perCredit);
+  if (need <= 0n) { setText(athActivityCreditsStatus, `${have} ATH`); return; }
+  setText(athActivityCreditsStatus, `${have} / ${formatAthProfileAmount(need * perCredit)} ATH`);
+}
+
+/** Whether a claim can be signed right now, and why not when it cannot. */
+function athClaimReady() {
+  const credits = athTicketState.credits;
+  const need = athTicketState.minClaimCredits;
+  if (credits === null || need === null) return false;
+  return nonNegativeBigInt(athTicketState.inFlight) === 0n && credits >= need;
+}
+
+function renderAthClaimStatus() {
+  if (claimAirdropButton) claimAirdropButton.disabled = athClaimState.busy || !athClaimReady();
+  if (!claimAirdropStatus) return;
+  if (athClaimState.busy) { setText(claimAirdropStatus, t('profile.claiming')); return; }
+  if (athClaimState.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') { setText(claimAirdropStatus, t('profile.flushNeedsWalletGram')); return; }
+  if (athClaimState.error) { setText(claimAirdropStatus, t('common.syncDelayed')); return; }
+  if (athTicketState.credits === null) { setText(claimAirdropStatus, t('profile.statusChecking')); return; }
+  // A claim already on its way: the ticket moved the credits into flight and is waiting on the redeem leg. Showing
+  // the pending state is what stops a user from signing a second one that gate 27011 would refuse anyway.
+  if (nonNegativeBigInt(athTicketState.inFlight) > 0n) { setText(claimAirdropStatus, t('profile.claimPending')); return; }
+  const perCredit = athPoolState.athPerCredit ?? null;
+  const credits = athTicketState.credits;
+  if (!athClaimReady()) {
+    const need = athTicketState.minClaimCredits ?? 0n;
+    setText(claimAirdropStatus, perCredit && perCredit > 0n && need > 0n
+      ? `${formatAthProfileAmount(credits * perCredit)} / ${formatAthProfileAmount(need * perCredit)} ATH`
+      : t('profile.zeroAthReady'));
+    return;
+  }
+  setText(claimAirdropStatus, perCredit && perCredit > 0n
+    ? `${formatAthProfileAmount(credits * perCredit)} ATH`
+    : String(credits));
+}
+
 function renderAthProfileStats() {
   setText(athSupplyStatus, formatAthProfileAmount(athSupplyDisplayValue()));
   renderAthFlushStatus();
@@ -17935,20 +18063,17 @@ function renderAthProfileStats() {
     vaultProtocolState?.airdrop_total_allocation_ath,
     VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
   );
-  // [BUILT 2026-08-03] THIS WALLET'S OWN ACCRUAL, which is what the row is actually asked to answer.
-  //
-  // The dash used to be honest and is not any more. Publishing accrues credits on a per-owner AirdropTicket, and that
-  // has worked since genesis — MEASURED the same day, the owner's ticket already held 8 — but the client could not
-  // name the ticket's address, so it showed nothing while the user reasonably concluded the airdrop was dead.
-  //
-  // Rendered as bare numbers (`8 / 10`) on purpose: the label beside it already says what they count, so no locale
-  // needs a new sentence, and a number cannot be mistranslated.
-  //
-  // The GLOBAL "issued out of 15M" figure below is a different question, still unanswerable — it lives in AirdropPool
-  // and the client has neither its address in config nor a reader. That dash stays a dash. [roadmap: AirdropPool reader]
-  if (athTicketState.credits !== null) {
-    const need = athTicketState.minClaimCredits ?? 0n;
-    setText(athDropIssuedStatus, need > 0n ? `${athTicketState.credits} / ${need}` : String(athTicketState.credits));
+  renderAthActivityCredits();
+  renderAthClaimStatus();
+  // [BUILT 2026-08-03] The GLOBAL figure, from AirdropPool. It used to come from the Vault global; clean-17 deleted
+  // the Vault and moved the undistributed remainder here, and until the genesis ceremony sealed there was no address
+  // to configure — so this rendered a dash and said so. `distributed_total` is read directly rather than derived as
+  // total-minus-remaining: the pool CAPS remaining_budget at seal, so the subtraction has an edge the field does not.
+  const poolTotal = athPoolState.totalPool ?? null;
+  const distributed = athPoolState.distributedTotal ?? null;
+  if (distributed !== null && poolTotal !== null && poolTotal > 0n) {
+    const percent = (distributed * 10_000n) / poolTotal;
+    setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(distributed)} ATH`);
     return;
   }
   const remainingRaw = vaultProtocolState?.airdrop_remaining_ath;
@@ -17959,7 +18084,7 @@ function renderAthProfileStats() {
   const remaining = nonNegativeBigInt(remainingRaw);
   const issued = remaining >= total ? 0n : total - remaining;
   const percent = (issued * 10_000n) / total;
-  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)}`);
+  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)} ATH`);
 }
 
 function normalizeUsernameInput(input) {
@@ -19366,10 +19491,35 @@ async function refreshAthTicketState() {
     const read = createAirdropTicketReader((call) => transport.runGetMethod(call));
     const ticket = await read(wallet);
     athTicketState = ticket.exists
-      ? { credits: ticket.credits, minClaimCredits: ticket.minClaimCredits, address: ticket.address }
-      : { credits: 0n, minClaimCredits: null, address: ticket.address };
+      ? {
+        credits: ticket.credits,
+        minClaimCredits: ticket.minClaimCredits,
+        inFlight: ticket.inFlight,
+        claimMinValue: ticket.claimMinValue,
+        address: ticket.address,
+      }
+      : { credits: 0n, minClaimCredits: null, inFlight: 0n, claimMinValue: null, address: ticket.address };
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] ticket read failed', error);
+  }
+}
+
+/** The pool's distributed total and ath-per-credit. A failed read leaves the previous values rather than blanking. */
+async function refreshAthPoolState() {
+  const address = PLATHO_APP_CONFIG.airdropPool?.address ?? null;
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!address || !transport?.runGetMethod) return;
+  try {
+    const pool = await createAirdropPoolReader((call) => transport.runGetMethod(call))(address);
+    if (pool.exists) {
+      athPoolState = {
+        distributedTotal: pool.distributedTotal,
+        totalPool: pool.totalPool,
+        athPerCredit: pool.athPerCredit,
+      };
+    }
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] pool read failed', error);
   }
 }
 
@@ -19391,6 +19541,7 @@ async function refreshAthProtocolStatsRun() {
     };
     await refreshAthFlushState();
     await refreshAthTicketState();
+    await refreshAthPoolState();
     renderAthProfileStats();
     return athProtocolState;
   } catch (error) {

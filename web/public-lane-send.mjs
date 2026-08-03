@@ -15,7 +15,7 @@
 // needs and returns the surplus via mode-128, so overpaying an existing shard costs nothing.
 
 import { buildPublicPublishBrowser } from './public-publish-browser.mjs?v=1';
-import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=33';
+import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=34';
 import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=18';
 
 /**

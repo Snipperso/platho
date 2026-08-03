@@ -16,7 +16,7 @@
 import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=1';
 import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=2';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
-import { parseBocBase64, computeCellHashAndDepth, beginCell } from './pwa-contract-transactions.mjs?v=33';
+import { parseBocBase64, computeCellHashAndDepth, beginCell } from './pwa-contract-transactions.mjs?v=34';
 
 /**
  * Bind the batched state read to a request function.

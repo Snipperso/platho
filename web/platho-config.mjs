@@ -149,6 +149,12 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   ath: {
     masterAddress: 'UQCThzitzPXm2dH9psaVkZlkAcHqzCJjcBpD29b5closNbd7',
   },
+  // [ADDED 2026-08-03] The airdrop pool, so the client can finally answer "how much of the activity airdrop has been
+  // distributed". That figure used to come from the Vault global; under clean-17 it lives here, and until the genesis
+  // ceremony sealed there was no address to configure — which is why the profile row rendered a dash and said so.
+  airdropPool: {
+    address: 'UQBa1zD7DySeGO4crmeB7ZAuDu1xDRE6DIOsYfFFYke4Y-xL',
+  },
   usernameRegistry: {
     address: 'UQBR-Ujp5676B3xTiqQ77R2OIjZYBn1GxUvI8V3bmHVV0F_W',
   },

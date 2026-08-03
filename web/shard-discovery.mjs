@@ -27,7 +27,7 @@
 // Addresses are returned as url-safe friendly STRINGS, which is the wire form toncenter packs 35% tighter than
 // raw hex (measured 2026-07-18) and what every consumer here ultimately needs.
 
-import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=33';
+import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=34';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
 import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=18';
 import {

@@ -9,7 +9,7 @@
 
 import { toWireAddress } from './shard-reader.mjs?v=1';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
-import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=33';
+import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=34';
 
 /**
  * Decode a RecoveryShardView getter stack (12 items, in declaration order). An arity check guards the same silent
