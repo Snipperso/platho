@@ -73,6 +73,27 @@ describe('MODCONTENT — a module version must move when the module does', () =>
     expect(stale, `a changed module kept its version, so cached clients will not see it:\n${stale.join('\n')}`).toEqual([]);
   });
 
+  it('MODCONTENT-03: the FOUR release anchors agree, and the bump tool never touches app.js', () => {
+    // app.js?v= IS the release version. PLATHO_APP_RUNTIME_VERSION, #appVersionLabel and #profileVersionLabel all
+    // live INSIDE app.js, so a tool that auto-bumps app.js on a content change desynchronises the label — and fixing
+    // the label changes the content, which bumps it again. That circle burned a release cycle on 2026-08-04.
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const sw = readFileSync('web/sw.js', 'utf8');
+    const runtime = app.match(/const PLATHO_APP_RUNTIME_VERSION = 'v(\d+)';/)?.[1];
+    expect(runtime, 'PLATHO_APP_RUNTIME_VERSION is unreadable').toBeTruthy();
+    expect(html, 'index.html loads a different app.js than the runtime version claims')
+      .toContain(`./app.js?v=${runtime}"`);
+    expect(sw, 'the service worker precaches a different app.js than the runtime version claims')
+      .toContain(`'./app.js?v=${runtime}'`);
+    expect(html).toContain(`id="appVersionLabel">v${runtime}<`);
+    expect(html).toContain(`id="profileVersionLabel">v${runtime}<`);
+    // And the tool that cascades every OTHER module is told to keep its hands off this one.
+    const tool = readFileSync('scripts/bump_module_versions.mjs', 'utf8');
+    expect(tool).toContain("const RELEASE_VERSIONED = new Set(['app.js']);");
+    expect(tool).toContain('if (RELEASE_VERSIONED.has(name)) return null;');
+  });
+
   it('MODCONTENT-02: the baseline covers the modules that matter — an empty scan must not pass', () => {
     // Counter-case. The assertion above is "no stale entries found", which an empty scan also satisfies.
     const modules = versionedModules();

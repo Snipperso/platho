@@ -46,7 +46,14 @@ function versionedModules() {
   return out;
 }
 
+// app.js is NOT a module this tool may bump. Its `?v=` IS the release version and must equal
+// PLATHO_APP_RUNTIME_VERSION and the #appVersionLabel — all three of which live INSIDE app.js, so auto-bumping it on
+// a content change desynchronises the label, and editing the label changes the content, which bumps it again. That
+// circle cost a release cycle on 2026-08-04. The release step cascades all four by hand, together.
+const RELEASE_VERSIONED = new Set(['app.js']);
+
 function resolveModulePath(name) {
+  if (RELEASE_VERSIONED.has(name)) return null;
   for (const candidate of [`web/${name}`, `web/crypto/${name}`]) {
     if (existsSync(candidate)) return candidate;
   }
