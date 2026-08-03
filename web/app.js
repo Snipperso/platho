@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v812';
+const PLATHO_APP_RUNTIME_VERSION = 'v813';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4857,7 +4857,7 @@ function renderConversationIdentity(thread) {
   if (!identity) {
     activeTitle.textContent = labelText;
     if (identityMenuButton) {
-      identityMenuButton.hidden = identityDisplayOptions(thread).length < 1;
+      identityMenuButton.hidden = identityMenuHidden(thread);
       identityMenuButton.setAttribute('aria-label', t('chat.chooseDisplayNameFor', { name: labelText }));
       identityMenuButton.setAttribute('title', t('chat.chooseDisplayName'));
     }
@@ -4868,10 +4868,27 @@ function renderConversationIdentity(thread) {
   label.textContent = labelText;
   activeTitle.replaceChildren(label);
   if (identityMenuButton) {
-    identityMenuButton.hidden = identityDisplayOptions(thread).length <= 1;
+    identityMenuButton.hidden = identityMenuHidden(thread);
     identityMenuButton.setAttribute('aria-label', t('chat.chooseDisplayNameFor', { name: labelText }));
     identityMenuButton.setAttribute('title', t('chat.chooseDisplayName'));
   }
+}
+
+/**
+ * The chevron is not only a CHOOSER — the popover it opens always offers "Set local name" (showIdentityPopover passes
+ * onSetLocalName unconditionally).
+ *
+ * OBSERVED 2026-08-03 on the owner's phone: a dialog named by its wallet address had no chevron at all, so there was
+ * no way to rename it. The gate was `options.length <= 1`, i.e. "hide unless there are at least TWO identities to pick
+ * between" — true for every inbound dialog, which has exactly one (the peer's address). Correct for a chooser, wrong
+ * for a menu whose first item is an action that never depends on how many identities exist.
+ *
+ * Saved messages stays without one: "My notes" is the user's own dialog, and offering to re-label it as their own
+ * wallet address is not a choice anyone wants.
+ */
+function identityMenuHidden(thread) {
+  if (!thread || isSavedMessagesThread(thread)) return true;
+  return false;
 }
 
 const MESSAGE_SYNC_LOADING_FRAMES = Object.freeze(['Syncing', 'Syncing.', 'Syncing..', 'Syncing...']);
@@ -21593,6 +21610,19 @@ async function attemptConvMessagePublishDirect(context) {
     const payloadBytes = encodeCompactPayload({
       type: 'document', bytes: part.bytes, sizeClass: part.sizeClass,
       streamId, partIndex: index, partCount: documentParts.length,
+      // The sender's own .ath, so the recipient can show a name instead of an address.
+      //
+      // The sender WALLET stays out, deliberately and permanently: a CONV body seals to the peer's KeyShard bundle
+      // and the identity on the wire is messaging-keys only. The USERNAME is a different thing — it was dropped as
+      // collateral when the Vault composer path was deleted, not by any decision about it, and the proof is right
+      // here: privateCompactPayloadOverhead has been reserving room for it in every split ever since, so each part
+      // was already sized for bytes that never shipped.
+      //
+      // MEASURED 2026-08-03: without this the recipient had no source for the name at all. There is no reverse
+      // wallet -> .ath index on chain (UsernameRegistry resolves name -> owner only), so the wire is the ONLY path.
+      // Honours the anonymous toggle: includeSenderWalletMetadata === false leaves senderUsername undefined and
+      // nothing is written.
+      senderUsername: privateSenderUsernameMetadataLabel(senderOptions) ?? undefined,
       // MUST equal what createEncryptedConvCapsule will reserve, or the pre-encoded payload lands off every size class.
       // This used to name only the sender-recovery section and miss the 68-byte identity one, so every message after
       // the first contact threw "Compact payload must use a supported useful slot size". Shared helper now — the
