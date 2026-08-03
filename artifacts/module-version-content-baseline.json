@@ -8,8 +8,8 @@
     "sha256": "704960822641fdb470193dae258a0c5907c280b3cb3eb505b7e67a967aebe242"
   },
   "app.js": {
-    "version": "811",
-    "sha256": "d7bfea5dd310ecc3eba5b631f73bd39eee0f45fce6bcf1fe2b64231f68957357"
+    "version": "812",
+    "sha256": "9e1f84bb159b26ac32347ee514363a5d14025f244de3362d9705399804733ad4"
   },
   "ath-ton-rpc-provider.mjs": {
     "version": "42",

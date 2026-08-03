@@ -76,8 +76,8 @@ describe('RECVIDENT — an inbound dialog is named from the INTRO source, but on
     // The src of an INTRO publish is a HINT: anyone can re-publish a captured capsule from their own wallet. Naming
     // the dialog from an unverified src would let a relayer put THEIR address on someone else's conversation.
     const fn = APP.slice(
-      APP.indexOf('async function resolveInboundPeerWalletIdentity(thread) {'),
-      APP.indexOf('function queueInboundPeerIdentityResolution(thread) {'),
+      APP.indexOf('async function resolveInboundPeerWalletIdentity(thread, claimedUsername = null) {'),
+      APP.indexOf('function threadWearsUsername(thread, claimedUsername) {'),
     );
     expect(fn.length).toBeGreaterThan(200);
     const verifyAt = fn.indexOf('resolvePeerReplyBundle(');
@@ -92,8 +92,8 @@ describe('RECVIDENT — an inbound dialog is named from the INTRO source, but on
     // The grace window hides a dialog that is about to be named. If the read never lands, a real received message
     // must not stay invisible — the catch clears the flags.
     const fn = APP.slice(
-      APP.indexOf('async function resolveInboundPeerWalletIdentity(thread) {'),
-      APP.indexOf('function queueInboundPeerIdentityResolution(thread) {'),
+      APP.indexOf('async function resolveInboundPeerWalletIdentity(thread, claimedUsername = null) {'),
+      APP.indexOf('function threadWearsUsername(thread, claimedUsername) {'),
     );
     const catchBlock = fn.slice(fn.indexOf('} catch (error) {'));
     expect(catchBlock).toContain('thread.pendingIdentityResolution = false;');
@@ -110,7 +110,7 @@ describe('RECVIDENT — an inbound dialog is named from the INTRO source, but on
   });
 
   it('RECVIDENT-04: resolution is retried on later incoming messages, and never runs twice at once', () => {
-    expect(APP).toContain("if (message.type !== 'out') queueInboundPeerIdentityResolution(targetThread);");
+    expect(APP).toContain("queueInboundPeerIdentityResolution(targetThread, claimedPeerUsernameFromOpened(opened));");
     expect(APP).toContain('const inboundPeerIdentityInFlight = new Set();');
     expect(APP).toContain('inboundPeerIdentityInFlight.add(thread.id);');
     expect(APP).toContain('inboundPeerIdentityInFlight.delete(thread.id);');
