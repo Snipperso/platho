@@ -6642,6 +6642,25 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain("t('vault.activateAccount')");
   });
 
+  it('PWA-SPINNER-01: the sync indicator reports WORK, not "has not succeeded yet"', () => {
+    // MEASURED on the owner's dump: spinner maxMs 71215, heldBy 'public' — while the public phase of the sync tick
+    // itself cost 1974ms and the whole page had spent 16 requests since load. publicSyncPhase was BORN 'syncing'
+    // and nothing anywhere set it back to 'syncing': the only transitions in the file were to 'synced'/'delayed'.
+    // So the span it drove was "page load -> first successful public sync", regardless of whether anything was
+    // running. The private lane never had this because it begins its phase explicitly (beginMessageSyncUi).
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app, 'idle until work starts').toMatch(/let publicSyncPhase = 'idle';/);
+    const run = app.slice(app.indexOf('async function syncPublicChannelsRun() {'), app.indexOf('async function syncPublicChannelsRun() {') + 400);
+    expect(run, 'and the ENTRY is marked, not only the exits').toContain("setPublicSyncPhase('syncing');");
+    // Both exits stay — a spinner that starts must always stop, on success and on failure alike.
+    expect(app).toContain("setPublicSyncPhase('synced');");
+    expect(app).toContain("setPublicSyncPhase('delayed');");
+    // The instrument that found it: the spinner's own span, and WHICH flag held it. An OR over three flags hides
+    // the culprit completely, which is why measuring the sync tick answered the wrong question.
+    expect(app).toContain('globalThis.plathoLastSpinnerSpan = {');
+    expect(app).toMatch(/maxHeldBy: spanMs >= Number\(previous\?\.maxMs \?\? 0\) \? heldBy : /);
+  });
+
   it('PWA-PUBCONFIRM-01: a published post stops waiting for the 30s feed timer, and both ladders match the MEASURED index lag', () => {
     // The owner, 2026-08-04: "the private message went in a second, the public post took a while." Both lanes
     // broadcast one wallet transfer and both drop an optimistic record immediately — the difference was what
