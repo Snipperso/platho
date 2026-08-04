@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v834';
+const PLATHO_APP_RUNTIME_VERSION = 'v835';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3530,6 +3530,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   convReadLaneInstance = null;
   convBucketSeqMarks.clear();
   cancelAllConvDeliveryConfirms();   // drop pending delivery-confirm timers so none fires against a torn-down transport
+  cancelPublicPublishVisibilityChecks();   // same rule for the public side: no tick may fire against a swapped wallet
   convKeyStore = null;
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
@@ -4006,6 +4007,7 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   localProfileAvatarPointer = null;
   stopIntroReceiveLane();
   cancelAllConvDeliveryConfirms();   // drop pending delivery-confirm timers so none fires against a torn-down transport
+  cancelPublicPublishVisibilityChecks();   // same rule for the public side: no tick may fire against a swapped wallet
   convKeyStore = null;
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
@@ -21941,7 +21943,20 @@ function markDirectSendPublished(thread, message) {
 //      CONV_CONFIRM_MAX_AGE_MS — well beyond both the ~300s external validity and any realistic indexer lag — so by
 //      then a landed record WOULD be visible, and a subsequent resend safely REBUILDS (the external is provably dead).
 //   3. CANCELLABLE + RE-ARMABLE. Every armed timer is tracked so teardown cancels it; unresolved sends re-arm on reload.
-const CONV_CONFIRM_SCHEDULE_MS = [12_000, 20_000, 30_000, 45_000, 60_000, 90_000, 120_000];
+// MEASURED 2026-08-04 against live toncenter, five probes of the newest indexed transaction: the index runs
+// 1-5 seconds behind the wall clock, median ~3s, and the masterchain head is 1s behind. The old first tick of 12s
+// was calibrated when a send went through the Vault and the answer could not exist sooner; under direct pay the
+// publish is one wallet transfer and TON has been sub-second since the April upgrade. Twelve seconds was not a
+// safety margin any more, it was a stale number nobody re-measured.
+//
+// TIGHTENING IS SAFE BECAUSE THE READS ARE FRESH. The note in runConvDeliveryConfirm warns that ticks are "spaced
+// wider than the 15s read cache" and that tightening the schedule would resurrect the INTRO bug — but the very next
+// lines pass cacheTtlMs: 0 on both readers. The hazard was closed in code and the warning outlived it; a cached
+// negative can no longer be served to a "has my write landed" question at any spacing.
+//
+// First tick at 4s clears the measured median with margin; the tail stays wide, because a message that has not
+// landed in half a minute is not waiting on the indexer.
+const CONV_CONFIRM_SCHEDULE_MS = [4_000, 9_000, 18_000, 30_000, 45_000, 60_000, 90_000, 120_000];
 const CONV_CONFIRM_MAX_AGE_MS = 8 * 60 * 1000;   // TERMINAL: past ~8 min the external is long dead (>330s) and a landed record is indexed — decide now
 const CONV_CONFIRM_BOUNDED_SCAN = 256;           // non-terminal ticks scan only the recent top (a landed message is there); the FULL record_count walk that proves ABSENCE runs once, at the terminal tick
 const CONV_CONFIRM_REARM_MAX_AGE_MS = 24 * 60 * 60 * 1000;   // re-arm unresolved sends up to 24h after reload: well under RS_RETENTION (1y), so an absent shard is still "never deployed" (red correct), not "retired"
@@ -21997,9 +22012,10 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   const reArm = () => { if (generation === convDeliveryConfirmGeneration && ageMs < CONV_CONFIRM_MAX_AGE_MS) armConvDeliveryConfirm(thread, message, attempt + 1); };
   if (!transport?.runGetMethod) { reArm(); return; }
   // FRESH, like the INTRO confirm. This lane was SAVED by its schedule rather than by its code: ticks at 12s/20s/30s
-  // are spaced wider than the 15s read cache, so a cached negative expired between them. That is luck holding a
+  // are spaced wider than the 15s read cache, so a cached negative expired between them. That was luck holding a
   // correctness property — a question of the form "has my write landed" must never be answerable from a cache filled
-  // before the write. Tighten the schedule one day and this becomes the INTRO bug.
+  // before the write. The cacheTtlMs: 0 below is what actually closes it, and it is why CONV_CONFIRM_SCHEDULE_MS
+  // could be tightened to the measured index lag: the property now lives in the reads, not in the spacing.
   const readView = createRecordShardViewReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));
   const readRecord = createRecordShardRecordReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));
   const commits = send.commits.map((h) => BigInt('0x' + h));
@@ -22506,6 +22522,57 @@ async function rebroadcastPublicPublish(job, retained) {
   }
 }
 
+/**
+ * MAKE A JUST-PUBLISHED POST GO GREEN ON THE INDEXER'S CLOCK, NOT ON THE FEED TIMER.
+ *
+ * The owner, 2026-08-04: "the private message went in a second, the public post took a while." Both lanes broadcast
+ * the same way — one wallet transfer — and both drop an optimistic record on screen immediately. The difference was
+ * entirely in what RETIRES the pending badge:
+ *
+ *   private — its own confirm ladder, armed the moment the send returns;
+ *   public  — nothing. The record carried "public published, confirming" until the background feed sync happened to
+ *             merge its on-chain twin, and that sync runs at most once every PUBLIC_BACKGROUND_SYNC_MS (30s), yields
+ *             to any in-flight send, and is never triggered by the publish itself.
+ *
+ * So a post that was on chain in a second could sit visibly "confirming" for half a minute or more. Same work on the
+ * wire, completely different clocks on screen.
+ *
+ * This closes it with the machinery that already exists rather than a second confirm driver: the feed merge already
+ * retires a pending record when the chain twin with the same bodyHash appears (mergeLocalPendingPublicFeed), so the
+ * only thing missing was asking sooner. Ticks follow the same measured index lag the CONV ladder now uses, and stop
+ * as soon as nothing is pending — a landed post costs one extra sync, not a standing timer.
+ */
+const publicVisibilityTimers = new Set();
+const PUBLIC_VISIBILITY_SCHEDULE_MS = [4_000, 9_000, 18_000];
+
+function cancelPublicPublishVisibilityChecks() {
+  for (const timer of publicVisibilityTimers) window.clearTimeout(timer);
+  publicVisibilityTimers.clear();
+}
+
+function anyPendingPublicFeedItem() {
+  for (const entry of Object.values(publicChannelFeedCache ?? {})) {
+    for (const post of entry?.feed?.posts ?? entry?.posts ?? []) {
+      if (isPendingPublicFeedItem(post)) return true;
+      for (const comment of post?.comments ?? []) if (isPendingPublicFeedItem(comment)) return true;
+    }
+  }
+  return false;
+}
+
+function schedulePublicPublishVisibilityChecks(attempt = 0) {
+  if (attempt >= PUBLIC_VISIBILITY_SCHEDULE_MS.length) return;
+  const timer = window.setTimeout(async () => {
+    publicVisibilityTimers.delete(timer);
+    // Nothing pending any more (a background sync got there first, or the user cleared it) — stop, do not spend
+    // reads proving something already proven.
+    if (!anyPendingPublicFeedItem()) return;
+    try { await syncPublicChannels(); } catch (error) { noteTonRpcRateLimit(error); }
+    if (anyPendingPublicFeedItem()) schedulePublicPublishVisibilityChecks(attempt + 1);
+  }, PUBLIC_VISIBILITY_SCHEDULE_MS[attempt]);
+  publicVisibilityTimers.add(timer);
+}
+
 function resumePendingPublicPublishConfirmations() {
   const channels = publicChannelFeedCache ?? {};
   for (const [channelId, entry] of Object.entries(channels)) {
@@ -22842,6 +22909,9 @@ async function submitPublicPostDirect(draft = null) {
   // the just-published post from the feed. The pending copy retires by itself: the merge drops it once the
   // chain twin with the same bodyHash appears.
   if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'public published, confirming' });
+  // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
+  // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
+  schedulePublicPublishVisibilityChecks();
   setPublicStatus('public published');
   globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result, direct: true };
   return result;
@@ -22939,6 +23009,7 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
     throw error;
   }
   if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment published, confirming' });
+  schedulePublicPublishVisibilityChecks();   // same clock as a post — a comment is the twin that gets forgotten
   setPublicStatus('comment published');
   return result;
 }
