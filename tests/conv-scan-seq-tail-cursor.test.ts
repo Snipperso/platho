@@ -69,6 +69,33 @@ describe('SEQTAIL — the CONV scan skips already-decrypted entries before decry
     expect(APP).toContain('if (seq <= convBucketSeqHighWater(bucketAddress)) return;');
   });
 
+  it('SEQTAIL-07: the mark SURVIVES a reload, and it is DERIVED from the stored messages', () => {
+    // MEASURED on the owner's dump: the first pass after every reload read `collected: 51, appended: 0` — the whole
+    // window decrypted to conclude nothing was new, because the mark lived only in the tab's memory. The cost scaled
+    // with how much the conversation had carried lately, not with how much of it was new.
+    //
+    // The mark is a fact ABOUT the messages ("everything up to seq N in this shard is already in my history"), so it
+    // is rebuilt FROM them rather than persisted beside them. A second stored copy of a derived value is the thing
+    // that breaks somewhere other than where it lives — and here the specific break would be a mark that outlives
+    // the messages it speaks for, which is a silent skip: exactly the failure this lane must never have.
+    expect(APP).toContain('function seedConvSeqMarksFromHistory(messages) {');
+    expect(APP, 'the shard address rides with the entry, so a stored message remembers where it came from')
+      .toContain('collected.push({ opened, entry: { entry_id: found.seq, address: bucket || undefined } });');
+    expect(APP, 'and lands on the message as a first-class field')
+      .toContain('if (shardAddress !== null) fields.convShardAddress = shardAddress;');
+
+    // Rebuilt from the RESTORED messages — no separate store to fall out of sync with, and nothing to migrate.
+    expect(APP).toContain('const seededSeqMarks = seedConvSeqMarksFromHistory(restored.map((item) => item.message));');
+    expect(APP, 'and the count is visible, so a device that seeded nothing is diagnosable').toContain('seededSeqMarks,');
+
+    // A multipart message spans several entries in one shard; the mark must clear its HIGHEST, or the tail of it
+    // gets re-opened on every pass forever.
+    const seed = APP.slice(APP.indexOf('function seedConvSeqMarksFromHistory(messages) {'), APP.indexOf('function advanceConvBucketSeqHighWater('));
+    expect(seed).toContain('Number(message.chainLastEntryId ?? message.chainEntryId)');
+    // Absence of the field is the SAFE direction: no address, no mark, one honest re-read.
+    expect(seed).toContain("if (typeof address !== 'string' || !address) continue;");
+  });
+
   it('SEQTAIL-06: the skip count is reported, so the win is visible on a real device', () => {
     // A pass that skips EVERYTHING is the healthy steady state; a diagnostic that only records passes which did work
     // cannot show that the work stopped.

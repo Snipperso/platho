@@ -1752,7 +1752,9 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function syncConvCapsulesFromShards'),
       app.indexOf('async function syncPrivateCapsulesFromChain'),
     );
-    expect(convSyncSource).toMatch(/collected\.push\(\{ opened, entry: \{ entry_id: found\.seq \} \}\);[\s\S]*await cooperativeYield\(\);/);
+    // The subject here is the YIELD after every open, not the entry's shape — the entry also carries the shard
+    // address now (SEQTAIL-07 owns that), so match the push loosely and keep the ordering assertion sharp.
+    expect(convSyncSource).toMatch(/collected\.push\(\{ opened, entry: \{ entry_id: found\.seq,[^}]*\} \}\);[\s\S]*await cooperativeYield\(\);/);
     // C: the crypto self-test (diagnostic-only) runs DEFERRED off the unlock critical path, not awaited inline.
     expect(app).toMatch(/setTimeout\(resolve, 0\)\)\s*\.then\(\(\) => runPlathoCryptoSelfTest\(\)\)/);
     expect(app).not.toMatch(/const result = await runPlathoCryptoSelfTest\(\)/);
