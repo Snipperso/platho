@@ -382,7 +382,10 @@ export function decodeProfileBlockContent(content) {
 //   [version u8=1][flags u8: bit0 hasImage, bit1 textTruncated]
 //   [entryId u64 BE][bodyHash 32 bytes]
 //   [walletLen u8][wallet utf8 raw form][authorLen u8][author utf8][titleLen u8][title utf8][snippet utf8 ...]
-export const SHARE_BLOCK_CONTENT_VERSION = 1;
+// v1 packed the entry id as a uint64. clean-17's public feed id is `epochTag.shardSeq.entryId` — a string — so v2
+// carries it length-prefixed as text. The decoder reads BOTH: v1 shares already on chain keep rendering.
+export const SHARE_BLOCK_CONTENT_VERSION = 2;
+export const SHARE_ENTRY_ID_MAX_BYTES = 64;
 export const SHARE_AUTHOR_MAX_BYTES = 64;
 export const SHARE_TITLE_MAX_BYTES = 96;
 export const SHARE_WALLET_MAX_BYTES = 80;
@@ -393,8 +396,23 @@ export const SHARE_FLAG_HAS_IMAGE = 0x01;
 export const SHARE_FLAG_TEXT_TRUNCATED = 0x02;
 
 export function encodeShareBlockContent(share) {
-  const entryId = BigInt(share?.entryId ?? -1n);
-  if (entryId < 0n || entryId > 0xffffffffffffffffn) throw new Error('share entryId must fit uint64');
+  // THE ENTRY ID IS A STRING, and packing it as a uint64 is what made forwarding a public post impossible.
+  //
+  // OBSERVED 2026-08-04 (owner): attach a post to a message and the send does nothing at all until the forward is
+  // cancelled. `BigInt('688.0.1')` throws a SyntaxError, the submit handler died on it, and an async handler that
+  // throws looks exactly like a button that does nothing.
+  //
+  // The id stopped being a number when the public feed made it globally unique: entry_id is 0-based PER SHARD, so
+  // a channel's posts across its era/overflow shards collide on it, and the feed identity became
+  // `epochTag.shardSeq.entryId`. This encoder kept the CapsuleHub-era assumption that an entry id is an integer —
+  // the same "stale after the redeploy" class as the Vault wording, except this one was load-bearing.
+  //
+  // v2 carries it length-prefixed as text. decodeShareBlockContent still reads v1 (the uint64 form), so shares
+  // already on chain keep rendering; only newly written ones use v2.
+  const entryIdText = String(share?.entryId ?? '').trim();
+  if (!entryIdText) throw new Error('share block needs the entry id');
+  const entryId = textEncoder.encode(truncateUtf8ToBytes(entryIdText, SHARE_ENTRY_ID_MAX_BYTES));
+  if (entryId.length !== textEncoder.encode(entryIdText).length) throw new Error('share entryId is too long');
   const bodyHashHex = String(share?.bodyHash ?? '').replace(/^0x/i, '').toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(bodyHashHex)) throw new Error('share bodyHash must be 32 hex bytes');
   const wallet = textEncoder.encode(truncateUtf8ToBytes(String(share?.authorWallet ?? '').trim(), SHARE_WALLET_MAX_BYTES));
@@ -408,13 +426,14 @@ export function encodeShareBlockContent(share) {
   // encoder's own re-cut is then a no-op that must not drop the flag.
   const flags = (share?.hasImage ? SHARE_FLAG_HAS_IMAGE : 0)
     | (share?.textTruncated || snippetText.length < fullSnippet.length ? SHARE_FLAG_TEXT_TRUNCATED : 0);
-  const out = new Uint8Array(2 + 8 + 32 + 1 + wallet.length + 1 + author.length + 1 + title.length + snippet.length);
+  const out = new Uint8Array(2 + 1 + entryId.length + 32 + 1 + wallet.length + 1 + author.length + 1 + title.length + snippet.length);
   out[0] = SHARE_BLOCK_CONTENT_VERSION;
   out[1] = flags;
-  let id = entryId;
-  for (let i = 9; i >= 2; i -= 1) { out[i] = Number(id & 0xffn); id >>= 8n; }
-  for (let i = 0; i < 32; i += 1) out[10 + i] = parseInt(bodyHashHex.slice(i * 2, i * 2 + 2), 16);
-  let offset = 42;
+  out[2] = entryId.length;
+  out.set(entryId, 3);
+  let offset = 3 + entryId.length;
+  for (let i = 0; i < 32; i += 1) out[offset + i] = parseInt(bodyHashHex.slice(i * 2, i * 2 + 2), 16);
+  offset += 32;
   out[offset] = wallet.length;
   out.set(wallet, offset + 1);
   offset += 1 + wallet.length;
@@ -432,16 +451,22 @@ export function decodeShareBlockContent(content) {
   const bytes = content instanceof Uint8Array ? content : new Uint8Array(content ?? []);
   // Unknown future versions / truncated frames return null — a bad share block must never make the carrying
   // message undecodable (the REPLY/FILE/PROFILE rule).
+  // NO v1 COMPATIBILITY PATH, and that is not an oversight. v1 packed the entry id as a uint64, which means it
+  // could never encode a public post at all — clean-17's feed id is `epochTag.shardSeq.entryId`, BigInt() threw on
+  // it, and the send died there. So no v1 share was ever written to the wire: carrying a reader for it would be
+  // dead weight pretending to be caution. [OWNER 2026-08-04: "there are no sent ones".]
   if (bytes.length < 45 || bytes[0] !== SHARE_BLOCK_CONTENT_VERSION) return null;
   const flags = bytes[1];
-  let entryId = 0n;
-  for (let i = 2; i <= 9; i += 1) entryId = (entryId << 8n) | BigInt(bytes[i]);
+  const decoder = new TextDecoder();
+  const entryIdLength = bytes[2];
+  if (entryIdLength === 0 || 3 + entryIdLength + 32 + 1 > bytes.length) return null;
+  const entryId = decoder.decode(bytes.subarray(3, 3 + entryIdLength));
   let bodyHash = '0x';
-  for (let i = 10; i < 42; i += 1) bodyHash += bytes[i].toString(16).padStart(2, '0');
-  let offset = 42;
+  let offset = 3 + entryIdLength;
+  for (let i = offset; i < offset + 32; i += 1) bodyHash += bytes[i].toString(16).padStart(2, '0');
+  offset += 32;
   const walletLength = bytes[offset];
   if (walletLength === 0 || offset + 1 + walletLength + 1 > bytes.length) return null;
-  const decoder = new TextDecoder();
   const authorWallet = decoder.decode(bytes.subarray(offset + 1, offset + 1 + walletLength));
   offset += 1 + walletLength;
   const authorLength = bytes[offset];
@@ -453,7 +478,7 @@ export function decodeShareBlockContent(content) {
   const title = decoder.decode(bytes.subarray(offset + 1, offset + 1 + titleLength));
   offset += 1 + titleLength;
   return {
-    entryId: entryId.toString(),
+    entryId,
     bodyHash,
     authorWallet,
     author,

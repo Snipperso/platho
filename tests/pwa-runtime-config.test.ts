@@ -3321,7 +3321,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/content = encodeProfileBlockContent\(block\);/);
     expect(app).toMatch(/const profile = decodeProfileBlockContent\(content\);\s*if \(profile\) blocks\.push\(\{ type: 'profile', \.\.\.profile \}\);/);
     // Imported from the policy module (bumped ?v in lockstep with the codec change).
-    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,\s*\} from '\.\/capsule-part-policy\.mjs\?v=9';/);
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,\s*\} from '\.\/capsule-part-policy\.mjs\?v=\d+';/);
   });
 
   it('PWA-PROFILE-USERNAME-01: channel .ath username is claimed in the profile, verified on-chain, and only the verified name is shown', () => {
@@ -5365,8 +5365,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain('img.src = url;');
     const embed = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildSharedPostEmbed(') + 2600);
     expect(embed).not.toMatch(/innerHTML/);
-    // NO wire change: the SHARE block codec stays at version 1 (the reference — entryId + bodyHash — already rides it).
-    expect(policy).toContain('export const SHARE_BLOCK_CONTENT_VERSION = 1;');
+    // The reference the image lookup needs — entryId + bodyHash — rides the SHARE block. It went to version 2 on
+    // 2026-08-04 because v1 packed the entry id as a uint64 and clean-17's public feed id is `epochTag.shardSeq.
+    // entryId`: BigInt threw on it, so a forward of a real post could never be encoded (nor even rendered — the
+    // throw came out of renderConversation). Nothing had ever been written in v1, so there is no v1 reader.
+    expect(policy).toContain('export const SHARE_BLOCK_CONTENT_VERSION = 2;');
+    expect(policy, 'the id is carried as text, length-prefixed').toContain('out[2] = entryId.length;');
+    expect(policy, 'and nothing tries to make a number of it').not.toContain('BigInt(share?.entryId');
     // The resolved image has a feed-style image rule.
     expect(css).toMatch(/\.shared-post-embed-image \{[\s\S]*?max-width: 100%;[\s\S]*?max-height: 260px;/);
   });
