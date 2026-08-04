@@ -6557,6 +6557,31 @@ describe('PWA runtime config guard', () => {
     }
   });
 
+  it('PWA-VAULTWORDS-01: no user-visible string names the deleted Vault, and a label says what its value IS', () => {
+    // THIRD TIME TODAY the retired Vault turned up in the interface: "up to X GRAM from Vault" in the channel
+    // dialog, "Route: Vault" in the mint dialog, and — spotted by the owner on the unlock modal — "Хранилище:
+    // AES-GCM-256 + PBKDF2-SHA256". The last one is the subtle case and worth naming precisely, because it was not
+    // a leftover reference at all: `wallet.storageLabel` described the LOCAL encrypted wallet record, which has
+    // nothing to do with the Vault contract. It read as a leftover because "Хранилище" is exactly the word the
+    // Russian UI used for the Vault, and the label was also simply wrong — its value is a cipher and a KDF, not a
+    // place. Renaming it to Encryption fixes the collision and the mislabel in one move.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toContain("{ label: t('wallet.encryptionLabel'), value:");
+    expect(app, 'the old key is gone from the code').not.toContain('wallet.storageLabel');
+    expect(EN_STRINGS['wallet.encryptionLabel']).toBe('Encryption');
+
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
+      expect(dict['wallet.storageLabel'], `${locale}: retired key`).toBeUndefined();
+      expect(dict['wallet.encryptionLabel'], `${locale}: replacement`).toBeTruthy();
+      // vault.name existed only to print "Vault" as a route; the route line went with the Vault itself.
+      expect(dict['vault.name'], `${locale}: the Vault's own name is dead copy`).toBeUndefined();
+    }
+    // The vault.* NAMESPACE stays — it carries the account-activation UI, which is a live feature that merely kept
+    // the old prefix. This guard is about STRINGS THE USER READS, not about identifiers.
+    expect(app).toContain("t('vault.activateAccount')");
+  });
+
   it('PWA-PUBCONFIRM-01: a published post stops waiting for the 30s feed timer, and both ladders match the MEASURED index lag', () => {
     // The owner, 2026-08-04: "the private message went in a second, the public post took a while." Both lanes
     // broadcast one wallet transfer and both drop an optimistic record immediately — the difference was what
