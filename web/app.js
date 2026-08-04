@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v840';
+const PLATHO_APP_RUNTIME_VERSION = 'v841';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16547,7 +16547,10 @@ function renderConversation() {
     } else {
       row.append(bubble);
     }
-    if (manualActions) row.append(manualActions);
+    // The notes DELETE is a hover action and belongs in the cluster with Copy; retry/cancel stay a labelled block
+    // under the bubble, where a failed send needs to be read rather than discovered by hovering.
+    if (manualActions?.classList?.contains('row-note-delete-button')) rowActionsCluster(row).append(manualActions);
+    else if (manualActions) row.append(manualActions);
     appendRowReplyButton(row, beginPrivateReplyForRow);
     appendRowCopyButton(row, copyTextFromContent(message));
     messageStrip.append(row);
@@ -16871,11 +16874,29 @@ function appendRowReplyButton(row, onReply) {
     event.stopPropagation();
     onReply(row);
   });
-  row.append(button);
+  rowActionsCluster(row).append(button);
 }
 
 // Desktop-visible copy affordance (v651, mobile = long-press): rendered only when the row has copyable TEXT
 // (captured at render time — no re-resolution on click). Same hover-only CSS family as the Reply button.
+/**
+ * The row's hover-action cluster, created on first use.
+ *
+ * Every action used to position itself absolutely by its ORDINAL (reply at -26px, copy at -52px), which assumed
+ * every earlier button exists. "My notes" has no Reply — you do not reply to yourself — so Copy sat one slot out
+ * with a dead 26px gap in front of it: the pointer left the row on the way there, :hover ended, and the button
+ * disappeared before it could be clicked. One flex cluster has no ordinals to get wrong.
+ */
+function rowActionsCluster(row) {
+  let cluster = row.querySelector(':scope > .row-actions');
+  if (!cluster) {
+    cluster = document.createElement('div');
+    cluster.className = 'row-actions';
+    row.append(cluster);
+  }
+  return cluster;
+}
+
 function appendRowCopyButton(row, copyText) {
   const value = String(copyText ?? '').trim();
   if (!value) return;
@@ -16889,7 +16910,7 @@ function appendRowCopyButton(row, copyText) {
     event.stopPropagation();
     copyRowText(row, value);
   });
-  row.append(button);
+  rowActionsCluster(row).append(button);
 }
 
 function beginPrivateReplyForRow(row) {
@@ -21726,15 +21747,25 @@ function privateMessageShouldShowManualActions(message) {
 function privateMessageManualActionsElement(thread, message) {
   // "My notes" is a notepad, not a conversation: deleting is a primary action there, and it is the ONLY way out of a
   // full notepad (the lane refuses to save rather than dropping the oldest note). Offered on every note.
+  //
+  // AN ICON IN THE HOVER CLUSTER, not a standing labelled button [owner 2026-08-04]. It joins Copy in the same
+  // cluster, so the two are contiguous and the cluster's own rules place them — no per-button geometry to get wrong.
+  // The label survives as the title/aria-label, which is what a screen reader and a tooltip read.
   if (isRealSavedThread(thread)) {
-    const noteActions = document.createElement('div');
-    noteActions.className = 'message-actions';
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.textContent = t('notes.delete');
-    remove.addEventListener('click', () => { void deleteSelfNoteFromUi(thread, message, remove); });
-    noteActions.append(remove);
-    return noteActions;
+    remove.className = 'row-reply-button row-note-delete-button';
+    remove.title = t('notes.delete');
+    remove.setAttribute('aria-label', t('notes.delete'));
+    const icon = document.createElement('span');
+    icon.className = 'icon icon-trash';
+    icon.setAttribute('aria-hidden', 'true');
+    remove.append(icon);
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      void deleteSelfNoteFromUi(thread, message, remove);
+    });
+    return remove;
   }
   if (!privateMessageShouldShowManualActions(message)) return null;
   const actions = document.createElement('div');

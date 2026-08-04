@@ -3609,7 +3609,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function appendRowCopyButton\(row, copyText\)/);
     expect(app).toMatch(/appendRowCopyButton\(row, copyTextFromContent\(message\)\);/);
     expect(app).toMatch(/appendRowCopyButton\(row, copyTextFromContent\(comment\)\);/);
-    expect(css).toMatch(/\.row-copy-button \{\s*right: 32px;/);
+    // No per-button offset to pin any more: one flex cluster places whatever actions a row has. The old ordinal
+    // geometry (reply -26px, copy -52px) assumed every earlier button exists, and in "My notes" — which has no
+    // Reply — it left Copy a dead 26px from the bubble, unreachable because the pointer lost :hover on the way.
+    expect(css).toMatch(/\.row-actions \{[\s\S]*?position: absolute;/);
+    expect(css).toMatch(/\.message\.out \.row-actions \{[\s\S]*?flex-direction: row-reverse;/);
     // Touch devices: native selection callout suppressed on rows (long-press is the copy action there).
     expect(css).toMatch(/@media \(hover: none\) \{[\s\S]*?-webkit-touch-callout: none;/);
     // Armed swipe ring stays visible on OUTGOING bubbles (their border-color override loses to this rule).
@@ -3760,7 +3764,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function appendRowReplyButton\(row, onReply\)/);
     expect(app).toMatch(/appendRowReplyButton\(row, beginPrivateReplyForRow\);/);
     expect(app).toMatch(/appendRowReplyButton\(row, beginPublicCommentReplyForRow\);/);
-    expect(css).toMatch(/@media \(hover: hover\) \{[\s\S]*?\.message:hover > \.row-reply-button/);
+    expect(css).toMatch(/@media \(hover: hover\) \{[\s\S]*?\.message:hover > \.row-actions/);
     // Fullscreen lightbox (v647): the dialog fills the viewport — zooming needs the room, not a content card. v742
     // bounds the height to --app-viewport-height on EVERY platform (bare height:100% didn't resolve on desktop -> a
     // tall image overflowed the window).

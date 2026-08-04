@@ -2,8 +2,8 @@ const CACHE_NAME = 'platho-pwa-prototype-v904';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=279',
-  './app.js?v=840',
+  './styles.css?v=280',
+  './app.js?v=841',
   './i18n.mjs?v=38',
   './i18n-strings.mjs?v=40',
   './boot-signal-field.mjs?v=1',
@@ -97,6 +97,7 @@ const ASSETS = [
   './assets/icons/open-app.svg',
   './assets/icons/info.svg',
   './assets/icons/copy.svg',
+  './assets/icons/trash.svg',
   './assets/icons/download.svg',
   './assets/icons/compass.svg',
   './assets/icons/about.svg',

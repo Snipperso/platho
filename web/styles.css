@@ -955,11 +955,49 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 /* Desktop reply affordance (v647): visible ONLY on hover-capable devices — touch keeps the clean swipe UX. */
-.row-reply-button {
+/* ONE CLUSTER, NOT PER-BUTTON OFFSETS.
+   Each row action used to place itself absolutely by its ORDINAL — reply at -26px, copy at -52px — which silently
+   assumed every earlier button exists. In "My notes" there is no Reply (you do not reply to yourself), so Copy sat
+   at -52px with a 26px DEAD GAP between it and the bubble: the pointer left the row on its way there, :hover ended,
+   and the button vanished before it could be clicked. [OWNER 2026-08-04: "the copy button is away from the window,
+   so it cannot be pressed"]
+   A flex cluster has no ordinals to get wrong: whatever buttons a row has are contiguous and flush against the
+   bubble, and adding or removing one cannot open a gap. */
+.row-actions {
   display: none;
   position: absolute;
+  top: 0;
+  right: -26px;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+/* Incoming bubbles get the cluster to the RIGHT of the bubble; outgoing (right-edge-hugging) to the LEFT, where it
+   grows leftwards so the FIRST button always stays flush. */
+.message.out .row-actions {
+  right: auto;
+  left: -26px;
+  flex-direction: row-reverse;
+}
+
+/* Comment cards are wide and their top-right corner is free, so the cluster sits INSIDE them (v651). */
+.comment-item .row-actions {
   top: 2px;
   right: 2px;
+  flex-direction: row-reverse;
+}
+
+@media (hover: hover) {
+  .message:hover > .row-actions,
+  .comment-item:hover > .row-actions,
+  .row-actions:focus-within {
+    display: inline-flex;
+  }
+}
+
+.row-reply-button {
+  display: inline-flex;
+  position: static;
   align-items: center;
   justify-content: center;
   width: 26px;
@@ -975,28 +1013,9 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 /* v653 (owner: buttons overlapped the message text): on PRIVATE rows the hover actions sit OUTSIDE the bubble,
-   flush against its edge — never over the content. Hover survives because the buttons are DOM children of the
-   row (CSS :hover follows the tree, not the box) and flush placement leaves no dead gap; these buttons render
-   on hover-capable (desktop) viewports only, where the strip has ample side space (bubbles cap at 82%).
-   Incoming bubbles get them to the RIGHT of the bubble; outgoing (right-edge-hugging) to the LEFT. */
-.message .row-reply-button {
-  top: 0;
-  right: -26px;
-}
-
-.message.out .row-reply-button {
-  right: auto;
-  left: -26px;
-}
-
-@media (hover: hover) {
-  .message:hover > .row-reply-button,
-  .comment-item:hover > .row-reply-button,
-  .row-reply-button:focus-visible {
-    display: inline-flex;
-  }
-}
-
+   flush against its edge — never over the content. Hover survives because the cluster is a DOM child of the row
+   (CSS :hover follows the tree, not the box) and flush placement leaves no dead gap; it renders on hover-capable
+   (desktop) viewports only, where the strip has ample side space (bubbles cap at 82%). */
 .row-reply-button:hover {
   border-color: var(--accent);
 }
@@ -1008,28 +1027,15 @@ html[data-platho-telegram="true"] .install-header-button {
   text-underline-offset: 2px;
 }
 
-/* Desktop Copy button (v651): sits next to the Reply button. On comment cards both stay in the top-right corner
-   (wide cards, the meta row leaves it free); on PRIVATE rows both live outside the bubble (v653, see above). */
-.row-copy-button {
-  right: 32px;
+/* Copy (v651) and, in "My notes", Delete — they carry no geometry of their own any more: the cluster places them. */
+.row-note-delete-button .icon {
+  width: 15px;
+  height: 15px;
 }
 
-.message .row-copy-button {
-  top: 0;
-  right: -52px;
-}
-
-.message.out .row-copy-button {
-  right: auto;
-  left: -52px;
-}
-
-@media (hover: hover) {
-  .message:hover > .row-copy-button,
-  .comment-item:hover > .row-copy-button,
-  .row-copy-button:focus-visible {
-    display: inline-flex;
-  }
+.row-note-delete-button:hover {
+  border-color: var(--danger, #ff6b6b);
+  color: var(--danger, #ff6b6b);
 }
 
 /* Long-press copy confirmation (v651): a quick green "camera flash" over the bubble/row. */
@@ -4548,6 +4554,7 @@ button.feed-item:hover {
 .icon-open-app { --mask: url("./assets/icons/open-app.svg"); }
 .icon-info { --mask: url("./assets/icons/info.svg"); }
 .icon-copy { --mask: url("./assets/icons/copy.svg"); }
+.icon-trash { --mask: url("./assets/icons/trash.svg"); }
 .icon-download { --mask: url("./assets/icons/download.svg"); }
 .icon-compass { --mask: url("./assets/icons/compass.svg"); }
 .icon-about { --mask: url("./assets/icons/about.svg"); }
