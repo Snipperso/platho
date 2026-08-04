@@ -37,13 +37,14 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=111';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=112';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   TON_RPC_REQUEST_TIMEOUT_MS,
   decodeTonAddressSliceBoc,
-} from './ton-rpc-transport.mjs?v=67';
+  tonRpcRequestCounters,
+} from './ton-rpc-transport.mjs?v=68';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -153,16 +154,16 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=8';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=46';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=49';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=47';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=50';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=10';
+import { createPublicLane } from './public-lane.mjs?v=11';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=4';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=4';
-import { createIntroLane } from './intro-lane.mjs?v=9';
+import { createIntroLane } from './intro-lane.mjs?v=10';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
@@ -172,7 +173,7 @@ import { publishConvLaneParts } from './conv-lane-send.mjs?v=4';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
 import { createConvReadLane } from './conv-lane.mjs?v=6';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=5';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=7';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=8';
 import { readAccountStates } from './shard-reader.mjs?v=4';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
@@ -200,13 +201,13 @@ import {
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
 } from './shard-discovery.mjs?v=6';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=45';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=46';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=51';
+} from './username-ton-rpc-provider.mjs?v=52';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -232,7 +233,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v848';
+const PLATHO_APP_RUNTIME_VERSION = 'v849';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -854,6 +855,7 @@ function copyPrivateThreadDiagnostic() {
       // steady state; `read` climbing every pass means the gate is not holding; `probe: false` means the batched
       // accountStates could not run and every shard is being read the old way.
       convSync: globalThis.plathoLastConvSync ?? null,
+      syncProfile: globalThis.plathoLastSyncProfile ?? null,
       // The restore's own numbers. I told the owner twice today to look at a counter that the dump did not carry —
       // first the shard stats, now seededSeqMarks. A diagnostic that exists only in a global nobody prints is not
       // a diagnostic; it is a note to myself. `seeded: 0` with a non-empty history is the exact signature of the
@@ -11624,6 +11626,37 @@ function usingKeylessTonRpc() {
 
 // The public feed shares the unified background sync loop but at a gentler cadence than the private fast-idle
 // tier (it is less time-sensitive, and keyless reads share one toncenter budget).
+/**
+ * A per-phase stopwatch for one sync tick: wall time AND toncenter requests spent, by phase.
+ *
+ * The request count is the half that matters. Wall time alone cannot separate "this phase is doing a lot of work"
+ * from "this phase is waiting behind someone else's work in the shared pump" — and with one serial queue for the
+ * whole client, that difference is the entire diagnosis. tonRpcRequestCounters is cumulative, so a phase is the
+ * delta across it.
+ */
+function beginSyncPhaseProfile() {
+  const startedAt = Date.now();
+  const before = { at: startedAt, n: tonRpcRequestCounters.total, ms: tonRpcRequestCounters.ms };
+  const phases = {};
+  let cursor = before;
+  return {
+    mark(name) {
+      const now = { at: Date.now(), n: tonRpcRequestCounters.total, ms: tonRpcRequestCounters.ms };
+      phases[name] = { ms: now.at - cursor.at, req: now.n - cursor.n, netMs: now.ms - cursor.ms };
+      cursor = now;
+    },
+    commit() {
+      globalThis.plathoLastSyncProfile = {
+        at: new Date().toISOString(),
+        totalMs: Date.now() - startedAt,
+        phases,
+        // Since page load: a boot that is slow ONCE looks completely different from one that is slow every tick.
+        sinceLoad: { req: tonRpcRequestCounters.total, netMs: tonRpcRequestCounters.ms, byLeaf: { ...tonRpcRequestCounters.byLeaf } },
+      };
+    },
+  };
+}
+
 const PUBLIC_BACKGROUND_SYNC_MS = 30_000;
 let lastPublicBackgroundSyncAt = 0;
 // Unified background sync loop. Runs on EVERY in-app tab — only document.hidden (the whole app backgrounded)
@@ -11662,9 +11695,15 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
     }
     // PUBLIC feed — synced in the background (every ~30s) regardless of the active tab AND regardless of
     // wallet, so switching to Public is instant. Cheap cursor read; best effort.
+    // WHERE THE TIME GOES, measured per phase. The owner's boot still felt slow after the private decryption was
+    // down to zero (his dump: collected 0, seqSkipped 58), and two rounds of reasoning about it produced two wrong
+    // answers. Counting is cheaper than arguing: each phase records its wall time and how many toncenter requests
+    // it spent, so the next dump names the expensive one instead of inviting a third guess.
+    const phase = beginSyncPhaseProfile();
     if (Date.now() - lastPublicBackgroundSyncAt >= PUBLIC_BACKGROUND_SYNC_MS) {
       lastPublicBackgroundSyncAt = Date.now();
       try { await syncPublicChannels(); } catch (error) { noteTonRpcRateLimit(error); }
+      phase.mark('public');
     }
     // PRIVATE — only with a wallet + messaging keys; otherwise keep the loop alive for the public sync above.
     if (!plathoWallet || !localRecipientKeyPair) {
@@ -11674,6 +11713,8 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
     beginMessageSyncUi();
     try {
       const result = await syncPrivateCapsulesFromChainOnce({ mode: 'auto' });
+      phase.mark('private');
+      phase.commit();
       completeMessageSyncUi(result);
       if ((result?.scanComplete === false && result?.reason !== 'index_limit_without_cursor') || result?.reason === 'catch_up_pending') {
         // Fast follow-up only while the catch-up actually makes progress;
