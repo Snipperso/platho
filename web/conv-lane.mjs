@@ -16,6 +16,8 @@
 
 import { incomingRecordShards } from './conv-discovery.mjs?v=4';
 import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=5';
+import { changeMarkerOf } from './shard-reader.mjs?v=4';
+import { addrKey } from './shard-discovery.mjs?v=6';
 
 // Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,
 // it MAY hold older ones the newest-page read did not return. The reader now pages, but only to get PAST junk when an
@@ -35,18 +37,101 @@ const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
  */
 export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = true } = {}) {
   if (typeof readMessagesWithSource !== 'function') throw new Error('createConvReadLane requires readMessagesWithSource');
+
+  // ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  // THE CHANGE-MARKER GATE — a shard nobody wrote to must not cost a history read.
+  //
+  // MEASURED 2026-08-04: one conversation, no new messages, and the pass still fetched the /messages window of
+  // all three window epochs, every 12 seconds, forever. Three requests to learn nothing — and at N conversations
+  // it is 3N, sequential, so the "syncing" spinner grows linearly with how many people you talk to. That is a
+  // product ceiling, not an inefficiency: at 20 dialogs the pass no longer finishes between ticks.
+  //
+  // `last_transaction_lt` settles it STRICTLY EARLIER and for free: it arrives in the batched accountStates read,
+  // it is monotonic per account, and it moves on ANY inbound transaction. So it can be wrong only in the harmless
+  // direction — a fee top-up re-reads a shard for nothing; it can never report "unchanged" for a shard that
+  // accepted a capsule. The PUBLIC lane already caches its comment threads on exactly this marker; this is the
+  // same instrument on the private side.
+  //
+  // ABSENCE IS ALSO AN ANSWER, and the cheapest one: toncenter omits an address it has never seen, so a bucket
+  // with no row has no history to read. (A touched-but-empty address does come back, as an uninit row — so this
+  // is "never written to", not "currently empty".)
+  //
+  // THE MARK MOVES ONLY AFTER A SUCCESSFUL READ. A bucket whose /messages call failed keeps its OLD mark, so the
+  // next pass reads it again. Recording the new marker there would skip the shard forever — a silent, permanent
+  // loss of every capsule in it, which is the one failure this lane exists to prevent.
+  const shardMarks = new Map();            // addrKey -> change marker last read successfully
+  const SHARD_MARK_LIMIT = 512;            // bounded: epochs advance and old buckets leave the window for good
+  // Cumulative since this lane was built (i.e. since unlock). Reported in the on-device diagnostic dump, because
+  // "the gate is skipping" and "the gate is skipping EVERYTHING" look identical from the outside — a silent lane
+  // is the healthy state here AND the shape of a receive failure, so the counters have to separate them.
+  const laneStats = { read: 0, skipped: 0, absent: 0 };
+
+  function markShard(key, marker) {
+    if (!key || marker === null || marker === undefined) return;
+    shardMarks.delete(key);                // re-insert: Map insertion order doubles as the LRU list
+    shardMarks.set(key, marker);
+    while (shardMarks.size > SHARD_MARK_LIMIT) {
+      const oldest = shardMarks.keys().next();
+      if (oldest.done) break;
+      shardMarks.delete(oldest.value);
+    }
+  }
+
   return {
+    /**
+     * Drop a shard's change mark so the next pass reads its whole window again, whatever the marker says.
+     *
+     * THE GATE ABOVE ONLY KNOWS WHETHER THE BYTES ARRIVED. The caller decrypts them, and a capsule that failed to
+     * open for a TRANSIENT reason must be read again — but by then the shard's marker has not moved, so the gate
+     * would skip it forever. The caller already tracks exactly this (its per-bucket `blocked` set, which also bars
+     * its own seq high-water from advancing); this is how it tells the read side the same thing. The two marks are
+     * one decision and they must be dropped together.
+     */
+    forgetShard(address) {
+      if (!address) return;
+      try { shardMarks.delete(addrKey(address)); } catch { /* not an address we ever marked */ }
+    },
+
+    /** History reads made, gate skips, and never-written shards — cumulative since this lane was built. */
+    shardReadStats() {
+      return { ...laneStats, marks: shardMarks.size };
+    },
+
     /**
      * Every incoming CONV capsule chain-entry for one conversation across the acceptance window [epochNow-windowW ..
      * epochNow]. Each entry is ready for openPrivateCapsuleChainEntry. Foreign/malformed/wrong-signature bodies are
      * dropped. A shard whose read throws is skipped (its conversation window is best-effort, never fatal to the rest).
      */
-    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) {
-      const buckets = await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
+    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null }) {
+      // `shards` lets a caller that already derived these buckets hand them over rather than pay the HKDF twice;
+      // `states` lets a caller that batched the accountStates read for MANY conversations at once share the answer
+      // (1024 addresses fit one request, so every conversation's window costs one request between them all).
+      // Omit both and this behaves exactly as it always did: derive, then read every bucket.
+      const buckets = shards ?? await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
       const out = [];
       for (const bucket of buckets) {
+        const key = addrKey(bucket.address);
+        // The marker this read will be worth, or null when the caller gave us no states to judge by (then the
+        // bucket is read unconditionally, as it always was). A LOCAL, never written back onto `bucket` — the
+        // caller may hold that array across passes, and a marker surviving into a pass that has no states would
+        // silence a shard on the strength of a measurement nobody made this time round.
+        let marker = null;
+        if (states) {
+          const state = states.get(key);
+          // No row: never written to, nothing to read.
+          if (!state) { markShard(key, 'absent'); laneStats.absent += 1; continue; }
+          // A row with neither an lt nor a data hash carries no evidence either way. changeMarkerOf would still
+          // hand back a string ("null"), and a CONSTANT marker is the worst possible one — it matches itself on
+          // every later pass and silences the shard for good. Unknown means read it and remember nothing.
+          if ((state.lastLt ?? state.dataHash ?? null) !== null) {
+            marker = changeMarkerOf(state);
+            if (shardMarks.get(key) === marker) { laneStats.skipped += 1; continue; }
+          }
+        }
         let messages;
         try { messages = await readMessagesWithSource(bucket.address); } catch { continue; }
+        laneStats.read += 1;
+        if (marker !== null) markShard(key, marker);
         if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT) {
           // Not silent: a shard at the page cap may hide older bodies (no pagination yet). Ordinary text stays well
           // under this; a burst / large multipart in one direction-epoch can hit it. Pagination is the fix.

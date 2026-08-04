@@ -73,7 +73,12 @@ describe('MODCONTENT — a module version must move when the module does', () =>
     expect(stale, `a changed module kept its version, so cached clients will not see it:\n${stale.join('\n')}`).toEqual([]);
   });
 
-  it('MODCONTENT-03: the FOUR release anchors agree, and the bump tool never touches app.js', () => {
+  it('MODCONTENT-03: the FIVE release anchors agree, and the bump tool never touches app.js', () => {
+    // FIVE, and the fifth is the one that gets missed: PLATHO_APP_RUNTIME_VERSION, ./app.js?v= in index.html,
+    // #appVersionLabel, #profileVersionLabel, and './app.js?v=' in sw.js. The bump tool rewrites every OTHER
+    // ?v= in sw.js but not this one, precisely because app.js is excluded from it — so sw.js keeps the previous
+    // release's app.js in its precache list and this guard is the only thing that says so. (Caught red on
+    // 2026-08-04 with the other four already bumped.)
     // app.js?v= IS the release version. PLATHO_APP_RUNTIME_VERSION, #appVersionLabel and #profileVersionLabel all
     // live INSIDE app.js, so a tool that auto-bumps app.js on a content change desynchronises the label — and fixing
     // the label changes the content, which bumps it again. That circle burned a release cycle on 2026-08-04.

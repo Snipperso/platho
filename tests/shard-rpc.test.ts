@@ -2,6 +2,8 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { beginCell } from '@ton/core';
 import { createShardStatesRequest, createShardMessagesReader, createShardMessagesWithSourceReader } from '../web/shard-rpc.mjs';
 import { readAccountStates } from '../web/shard-reader.mjs';
+import { toncenterScanLaneOptions } from '../web/ton-rpc-transport.mjs';
+import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // SHARD-RPC — the two reads the shard lane needs and the app's transport did not expose.
@@ -27,6 +29,7 @@ beforeEach(() => { seen = []; });
 afterEach(() => {
   delete (globalThis as any).plathoTonRpcEndpoint;
   delete (globalThis as any).plathoToncenterApiKey;
+  delete (globalThis as any).plathoTonRpcConfig;
 });
 
 describe('SHARD-RPC — batched state reads and history reads, on the shared pump', () => {
@@ -289,5 +292,84 @@ describe('SHARD-RPC — the opcode-filtered history window', () => {
     const out = await read('0:' + '66'.repeat(32));
     expect(out.length).toBe(0);
     expect(seen.length, 'stopped at the cap instead of chasing the flood').toBe(3);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// THE PUMP THIS LANE RIDES — one queue, at the configured cadence.
+//
+// MEASURED 2026-08-04 against live toncenter: six consecutive shard reads landed 1775 / 1605 / 1619 / 1588 /
+// 1602 ms apart — 8.3 seconds for six requests, on a key whose configured spacing is 125 ms. The lane passed no
+// spacing at all, so every request inherited ton-rpc-transport's 1500 ms module default, and it did so on its own
+// 'shard-scan' limiter key: a SECOND single-worker queue beside the shared one. Twelve times too slow on the
+// entire receive path — a quiet conversation's "syncing" spinner stood for ~20 seconds doing nothing but waiting
+// its turn — and two parallel connections to one host, which platho-config calls out as the iPhone-freeze shape.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+describe('SHARD-RPC — the scan lane rides the app pump at the app cadence', () => {
+  it('RPC-PACE-01: the configured spacing REACHES the wire (it used to stop at the module default)', async () => {
+    // Timed on purpose: the spacing is only observable as delay, so asserting on an options object would pass
+    // just as happily if the value were dropped one call later. Its own limiter key keeps the shared queue's
+    // state out of this measurement.
+    (globalThis as any).plathoToncenterApiKey = 'a-key';
+    (globalThis as any).plathoTonRpcConfig = {
+      primaryProviderId: 'p',
+      providers: [{ id: 'p', useUserApiKey: true, requestSpacingMs: 20, rateLimitKey: 'test-scan-pacing' }],
+    };
+    const read = createShardMessagesWithSourceReader({
+      endpoint: MESSAGES, opcode: PSP1, fetch: fakeFetch({ messages: [] }),
+    });
+
+    const startedAt = Date.now();
+    for (const index of [0, 1, 2, 3]) await read(`0:${String(index).repeat(64)}`);
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(seen.length, 'four reads, four requests').toBe(4);
+    // Four requests at the 1500 ms default cost >= 4500 ms; at the configured 20 ms they cost ~60 ms. Anything
+    // under this threshold can only be the configured value — the gap between the two is two orders of magnitude.
+    expect(elapsedMs, `four paced reads took ${elapsedMs} ms — the module default would cost 4500`).toBeLessThan(700);
+  });
+
+  it('RPC-PACE-02: the cadence and the queue come from the REAL config, keyed and keyless', () => {
+    // The values themselves, against what the app actually ships — a fast lane pointed at the wrong queue would
+    // put two lanes x 8 rps against a 10 rps key cap, so the pair has to be read together.
+    (globalThis as any).plathoToncenterApiKey = 'a-key';
+    expect(toncenterScanLaneOptions(PLATHO_APP_CONFIG.network.tonRpc)).toEqual({
+      rateLimitKey: 'toncenter-shared',
+      requestSpacingMs: 125,
+    });
+
+    // No key: anonymous toncenter is ~1 rps and the lane must slow down with everything else, not race ahead.
+    delete (globalThis as any).plathoToncenterApiKey;
+    expect(toncenterScanLaneOptions(PLATHO_APP_CONFIG.network.tonRpc).requestSpacingMs).toBe(1100);
+  });
+
+  it('RPC-PACE-04: a DECLINED request is not an empty shard — strict callers get a throw', async () => {
+    // scheduleToncenterHttpRequest resolves to undefined when the pump refuses a request outright (a 429 backoff,
+    // with skipIfRateLimited set). For a lane that re-reads its whole window every pass, calling that "no messages"
+    // is harmless. For conv-lane, which REMEMBERS what it read, it is a silent loss: the shard gets recorded as
+    // read at its current change marker and is skipped until somebody writes to it again — a capsule sitting in it
+    // is never delivered, and every counter reports a clean pass.
+    (globalThis as any).plathoToncenterApiKey = 'a-key';
+    (globalThis as any).plathoTonRpcConfig = {
+      primaryProviderId: 'p',
+      providers: [{ id: 'p', useUserApiKey: true, requestSpacingMs: 5, rateLimitKey: 'test-declined-lane' }],
+    };
+    // A fetch that never runs, because the pump declines first: emulate the decline by making the scheduled request
+    // resolve to nothing, which is exactly the shape scheduleToncenterRequest returns on a skip.
+    const declining = async () => undefined as any;
+
+    const lenient = createShardMessagesWithSourceReader({ endpoint: MESSAGES, opcode: PSP1, fetch: declining });
+    await expect(lenient('0:' + '77'.repeat(32)), 'the default stays lenient — the other lanes rely on it').resolves.toEqual([]);
+
+    const strict = createShardMessagesWithSourceReader({ endpoint: MESSAGES, opcode: PSP1, fetch: declining, strict: true });
+    await expect(strict('0:' + '77'.repeat(32)), 'strict refuses to manufacture an empty window').rejects.toThrow(/did not run/);
+  });
+
+  it('RPC-PACE-03: no config yet — the lane still runs, at the safe default', () => {
+    // Boot order is not something this module gets to assume. Before installConfiguredTonRuntime has published a
+    // config, an empty answer leaves scheduleToncenterHttpRequest on its own conservative default rather than
+    // inventing a fast one.
+    delete (globalThis as any).plathoTonRpcConfig;
+    expect(toncenterScanLaneOptions()).toEqual({});
   });
 });

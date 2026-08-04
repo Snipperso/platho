@@ -1393,6 +1393,55 @@ function configuredProviderList(config = {}) {
   return ordered;
 }
 
+/**
+ * The request spacing one provider must actually run at.
+ *
+ * A no-key user-toncenter MUST use the keyless ~1 rps spacing, NOT the keyed 125ms (8 rps): anonymous
+ * toncenter.com rate-limits at ~1 rps, so 125ms would 429-storm it into a perpetual "RPC busy" /
+ * private_index_read_failed. It STILL stays a non-emergency primary (no demotion — see createTonRpcTransportFromConfig);
+ * when a key is later added, applyToncenterApiKey rebuilds the transport with the full keyed spacing.
+ *
+ * ONE implementation, two callers: the transport factory below and the SHARD SCAN LANE (web/shard-rpc.mjs), which
+ * issues its own /accountStates and /messages requests outside any transport object. A second copy of this rule is
+ * the shape of defect that hid for a whole release — see toncenterScanLaneOptions.
+ */
+export function effectiveToncenterRequestSpacingMs(provider = {}, defaults = {}) {
+  const userKeyMissing = (provider?.useUserApiKey ?? defaults.useUserApiKey) === true
+    && !(provider?.apiKey ?? defaults.apiKey)
+    && !globalThis.plathoToncenterApiKey;
+  const configuredSpacingMs = provider?.requestSpacingMs ?? defaults.requestSpacingMs;
+  return userKeyMissing
+    ? Math.max(Number(configuredSpacingMs ?? 0) || 0, TONCENTER_KEYLESS_REQUEST_SPACING_MS)
+    : configuredSpacingMs;
+}
+
+/**
+ * The limiter key and spacing the SHARD SCAN LANE must use, taken from the PRIMARY provider — i.e. the same pump,
+ * at the same cadence, as every other read this client makes.
+ *
+ * MEASURED 2026-08-04 against live toncenter, six consecutive shard reads: 1775 / 1605 / 1619 / 1588 / 1602 ms
+ * apart, 8.3s for six requests. The lane passed no spacing at all, so it inherited this module's 1500ms module
+ * default while the configured keyed spacing was 125ms — a 12x pacing penalty on the ENTIRE receive path (every
+ * CONV history read, every INTRO scan, every PUBLIC channel read, every avatar part). That is what a 20-second
+ * "syncing" spinner over one quiet conversation was made of: about a dozen requests, each waiting 1.6s for its turn.
+ *
+ * The limiter key matters just as much. The lane used its own 'shard-scan' key, i.e. a SECOND single-worker queue
+ * running in parallel with 'toncenter-shared' — and platho-config calls that shared key load-bearing precisely
+ * because iOS WebKit stalls its run loop on parallel connections to one host (the iPhone freeze). Dropping the
+ * spacing without merging the queues would also have put two lanes x 8 rps against a 10 rps key cap.
+ */
+export function toncenterScanLaneOptions(config = null) {
+  const resolved = config ?? globalThis.plathoTonRpcConfig ?? null;
+  if (!resolved) return {};
+  const provider = configuredProviderList(resolved)[0] ?? {};
+  const rateLimitKey = provider.rateLimitKey ?? resolved.rateLimitKey ?? null;
+  const requestSpacingMs = effectiveToncenterRequestSpacingMs(provider, resolved);
+  return {
+    ...(rateLimitKey ? { rateLimitKey } : {}),
+    ...(Number.isFinite(Number(requestSpacingMs)) ? { requestSpacingMs: Number(requestSpacingMs) } : {}),
+  };
+}
+
 function stringSet(value) {
   if (!Array.isArray(value)) return null;
   const out = new Set(value.map((item) => String(item)).filter(Boolean));
@@ -1451,17 +1500,7 @@ export function createTonRpcTransportFromConfig(provider = {}, defaults = {}) {
   if (!['toncenter-v3', 'toncenter', 'platho-rpc', 'json-rpc-compatible'].includes(kind)) {
     throw new TonRpcTransportError(`Unsupported TON RPC provider kind: ${kind}`);
   }
-  // A no-key user-toncenter MUST use the keyless ~1 rps spacing, NOT the keyed 100ms (10 rps): anonymous
-  // toncenter.com rate-limits at ~1 rps, so 100ms would 429-storm it into a perpetual "RPC busy" /
-  // private_index_read_failed. It STILL stays a non-emergency primary (no demotion — see below); when a key
-  // is later added, applyToncenterApiKey rebuilds the transport with the full keyed spacing.
-  const userKeyMissing = (provider?.useUserApiKey ?? defaults.useUserApiKey) === true
-    && !(provider?.apiKey ?? defaults.apiKey)
-    && !globalThis.plathoToncenterApiKey;
-  const configuredSpacingMs = provider?.requestSpacingMs ?? defaults.requestSpacingMs;
-  const effectiveRequestSpacingMs = userKeyMissing
-    ? Math.max(Number(configuredSpacingMs ?? 0) || 0, TONCENTER_KEYLESS_REQUEST_SPACING_MS)
-    : configuredSpacingMs;
+  const effectiveRequestSpacingMs = effectiveToncenterRequestSpacingMs(provider, defaults);
   const transport = createTonCenterV3Transport({
     endpoint,
     messagesEndpoint: provider?.messagesEndpoint ?? defaults.messagesEndpoint,

@@ -214,7 +214,10 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-01B: configured TON DNS provider module exports the requested runtime provider', async () => {
     const providerConfig = PLATHO_APP_CONFIG.tonDns.provider;
     const moduleUrl = providerConfig.moduleUrl;
-    expect(moduleUrl).toMatch(/\.\/ton-dns-provider\.mjs\?v=44/);
+    // The version is deliberately NOT pinned to a literal here: this test is about the URL naming a module that
+    // really exports the requested provider, and MODCONTENT-01 already owns "the version tracks the content".
+    // Pinning the number made every unrelated cascade fail here, which teaches people to edit tests to go green.
+    expect(moduleUrl).toMatch(/^\.\/ton-dns-provider\.mjs\?v=\d+$/);
     const modulePath = moduleUrl.replace(/^\.\//, '../web/').replace(/\?.*$/, '');
     const module = await import(modulePath);
     const exportName = providerConfig.exportName ?? 'default';
@@ -1344,8 +1347,11 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function syncPrivateCapsulesFromChain'),
     );
     expect(syncSource).not.toMatch(/Promise\.all\(/);
-    expect(syncSource).toMatch(/entries = await lane\.readIncoming\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\)/);
+    expect(syncSource).toMatch(/entries = await lane\.readIncoming\(\{\s*\n\s*kRoot, selfKeyId, peerKeyId, epochNow, windowW: plan\.windowW, shards, states: shardStates,/);
     expect(syncSource).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, localRecipientKeyPair/);
+    // The shard-state probe that decides WHICH histories to read is one awaited batch before the loop, not a read
+    // per conversation racing the others — same serial rule, applied to the pass that was added to make it cheap.
+    expect(syncSource).toMatch(/const shardStates = await readConvShardStates\(plans\);/);
 
     // Spot-check the UsernameRegistry route verifier reads its two checks sequentially. (Its ProfileRegistry twin
     // went with the Vault avatar path — direct pay does no route read at all.)
