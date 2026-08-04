@@ -6555,6 +6555,35 @@ describe('PWA runtime config guard', () => {
     }
   });
 
+  it('PWA-PUBCONFIRM-01: a published post stops waiting for the 30s feed timer, and both ladders match the MEASURED index lag', () => {
+    // The owner, 2026-08-04: "the private message went in a second, the public post took a while." Both lanes
+    // broadcast one wallet transfer and both drop an optimistic record immediately — the difference was what
+    // RETIRES the pending badge. Private had its own confirm ladder; public had nothing, so the badge waited for
+    // the background feed sync (PUBLIC_BACKGROUND_SYNC_MS = 30s, and it yields to any in-flight send).
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // MEASURED against live toncenter: the newest indexed transaction runs 1-5s behind the wall clock (median ~3s)
+    // and the masterchain head 1s. The old 12s first tick was calibrated in the Vault era and never re-measured.
+    expect(app).toMatch(/const CONV_CONFIRM_SCHEDULE_MS = \[4_000, 9_000, 18_000, 30_000, 45_000, 60_000, 90_000, 120_000\];/);
+    expect(app).toMatch(/const PUBLIC_VISIBILITY_SCHEDULE_MS = \[4_000, 9_000, 18_000\];/);
+
+    // Tightening is only safe because the confirm reads bypass the cache — a "has my write landed" question must
+    // never be answerable from a cache filled before the write. The spacing is no longer what protects it.
+    const confirm = app.slice(app.indexOf('async function runConvDeliveryConfirm('), app.indexOf('async function runConvDeliveryConfirm(') + 2200);
+    expect(confirm.match(/cacheTtlMs: 0, priority: 'critical'/g)?.length, 'both readers read fresh').toBe(2);
+
+    // Both publish paths arm the check; a comment is the twin that gets forgotten.
+    expect(app.match(/schedulePublicPublishVisibilityChecks\(\);/g)?.length, 'post AND comment').toBe(2);
+    // It reuses the existing merge (which already retires a pending record when the chain twin appears) rather
+    // than growing a second confirm driver.
+    const sched = app.slice(app.indexOf('function schedulePublicPublishVisibilityChecks('), app.indexOf('function schedulePublicPublishVisibilityChecks(') + 900);
+    expect(sched).toMatch(/if \(!anyPendingPublicFeedItem\(\)\) return;/);
+    expect(sched).toMatch(/await syncPublicChannels\(\);/);
+    expect(sched, 'it stops once nothing is pending — no standing timer').toMatch(/if \(anyPendingPublicFeedItem\(\)\) schedulePublicPublishVisibilityChecks\(attempt \+ 1\);/);
+    // And it dies with the wallet, like every other timer that holds a transport.
+    expect(app.match(/cancelPublicPublishVisibilityChecks\(\);/g)?.length, 'both teardown sites').toBeGreaterThanOrEqual(2);
+  });
+
   it('PWA-HEADING-01: the Heading button reaches the wire as the renderer\'s own markdown', () => {
     // A heading is the one LINE-level format in the composer, so it is the one that cannot be expressed as a pair
     // of delimiters. The chain it has to survive: toolbar -> .fmt-heading span -> serializer -> `# ` on the wire ->
