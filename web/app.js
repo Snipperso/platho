@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v846';
+const PLATHO_APP_RUNTIME_VERSION = 'v847';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -810,6 +810,12 @@ function copyPrivateThreadDiagnostic() {
           d: message?.type ?? null,
           m: message?.meta ?? null,
           ce: message?.chainEntryId !== undefined && message?.chainEntryId !== null ? 'y' : 'n',
+          // The ACTUAL entry id, and the reply block's reference. Added 2026-08-04 after a reply quote scrolled to
+          // the wrong message and two rounds of reasoning could not settle WHY: the id is a per-shard seq that
+          // restarts every epoch AND runs independently per direction, so the same number names several rows. With
+          // `id` and `ref` side by side, one dump says whether the reference even has a match, and how many.
+          id: message?.chainEntryId ?? null,
+          ref: (Array.isArray(message?.blocks) ? message.blocks : []).find((b) => b?.type === 'reply')?.refEntryId ?? null,
           t: String(message?.text ?? '').slice(0, 20),
         })),
         // AVATAR, added 2026-08-04 after "the avatar never reached the recipient" could not be diagnosed from this
@@ -7462,7 +7468,7 @@ function buildReplyQuoteNode(reply, scroller) {
     quote.dataset.refEntryId = refEntryId;
     quote.addEventListener('click', (event) => {
       event.stopPropagation();
-      const target = replyQuoteTargetRow(scroller, quote, refEntryId);
+      const target = replyQuoteTargetRow(scroller, quote, refEntryId, reply.snippet);
       if (!target) return;
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.remove('reply-target-flash');
@@ -7491,18 +7497,40 @@ function buildReplyQuoteNode(reply, scroller) {
  * the duplicates are a day or more apart, and the one being answered is the recent one. If nothing precedes the
  * quote (a restored history whose target is not loaded), fall back to the first match rather than doing nothing.
  */
-function replyQuoteTargetRow(scroller, quote, refEntryId) {
+function replyQuoteTargetRow(scroller, quote, refEntryId, snippet) {
   const matches = [...scroller.querySelectorAll(`[data-entry-id="${refEntryId}"]`)];
   if (matches.length <= 1) return matches[0] ?? null;
-  const ownRow = quote.closest('[data-entry-id]');
-  if (!ownRow) return matches[0];
-  let best = null;
+  // The reply's own row. `closest('[data-entry-id]')` alone is not enough: an optimistic reply has no entry id
+  // yet, and without a position to compare against every candidate looked equally good.
+  const ownRow = quote.closest('[data-entry-id]') ?? quote.closest('.message, .comment-item');
+  const precedes = (row) => Boolean(ownRow && (ownRow.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING));
+
+  // THE SNIPPET IS THE REAL DISAMBIGUATOR, and position alone was not enough — that is what the first attempt got
+  // wrong. Each DIRECTION of a conversation has its own shard and its own seq counter, so within one epoch the
+  // user's own message #3 and the peer's message #3 both exist. "Nearest above" then lands on whichever came last,
+  // which is a coin flip. The quote carries the target's text, denormalized, precisely so the reference survives
+  // without a lookup — so use it: the row whose message text matches the quoted snippet IS the target.
+  const wanted = String(snippet ?? '').trim();
+  const matchesSnippet = (row) => {
+    if (!wanted) return false;
+    const text = String(messageForRow(row)?.text ?? '').trim();
+    if (!text) return false;
+    return text === wanted || text.startsWith(wanted) || wanted.startsWith(text);
+  };
+
+  let snippetAbove = null;
+  let snippetAny = null;
+  let above = null;
   for (const candidate of matches) {
     if (candidate === ownRow) continue;
-    // DOCUMENT_POSITION_PRECEDING: the candidate comes before the replying row.
-    if (ownRow.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_PRECEDING) best = candidate;
+    const hit = matchesSnippet(candidate);
+    if (hit && precedes(candidate)) snippetAbove = candidate;
+    if (hit && !snippetAny) snippetAny = candidate;
+    if (precedes(candidate)) above = candidate;
   }
-  return best ?? matches[0];
+  // Best evidence first: the right text above the reply, then the right text anywhere, then merely the nearest
+  // above, and finally the first match — a tap must always land somewhere rather than doing nothing.
+  return snippetAbove ?? snippetAny ?? above ?? matches[0];
 }
 
 // Snippet for a quote strip + the wire block: first text, else a media word (denormalized, like Telegram).
