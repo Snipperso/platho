@@ -42,8 +42,13 @@ describe('AVPTR — the avatar pointer survives a CONV seal, and is read where i
     // have been fine and this whole fix would be noise.
     const sender: any = await createMessagingIdentity();
     const recipient: any = await createMessagingIdentity();
+    // A FIXED bucketKey, not a random one. The wire assertion below scans the 40 bytes for the pointer's marker
+    // byte, and 32 random bytes contain any given value about 12% of the time — a test that fails one run in eight
+    // for a reason unrelated to what it is checking teaches people to re-run until green. (Caught 2026-08-04, in a
+    // test written the same day: the scan is the right check, the random fixture was not.)
+    const bucketKey = new Uint8Array(32).fill(0x11);
     const bundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
-    const built: any = await createEncryptedConvCapsule('hi', bundle, sender, randomBytes(32), {
+    const built: any = await createEncryptedConvCapsule('hi', bundle, sender, bucketKey, {
       profileVersion: 7, avatarHash: `0x${'ab'.repeat(32)}`,
     });
 

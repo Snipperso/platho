@@ -225,7 +225,10 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
     const del = app.slice(app.indexOf('async function deleteSelfNoteFromUi'), app.indexOf('async function retryPrivateMessageFromUi'));
 
     // Delete is offered on EVERY note (a notepad's primary action), and it is the only way out of a full notepad.
-    expect(app).toMatch(/if \(isRealSavedThread\(thread\)\) \{[\s\S]{0,400}?remove\.textContent = t\('notes\.delete'\)/);
+    // An ICON in the row's hover cluster since 2026-08-04 (owner ask). The label lives on as title/aria-label,
+    // which is what a tooltip and a screen reader read — the affordance moved, the naming did not disappear.
+    expect(app).toMatch(/if \(isRealSavedThread\(thread\)\) \{[\s\S]{0,600}?remove\.className = 'row-reply-button row-note-delete-button'/);
+    expect(app).toMatch(/remove\.setAttribute\('aria-label', t\('notes\.delete'\)\)/);
 
     // Held by the SAME guard as a save: deleting rewrites the snapshot, so it carries the identical hazard of
     // overwriting chunks an incomplete restore could not see.
