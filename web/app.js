@@ -220,7 +220,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=37';
+} from './i18n.mjs?v=38';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v837';
+const PLATHO_APP_RUNTIME_VERSION = 'v838';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -12626,7 +12626,7 @@ async function requestAndDecryptEncryptedWallet(record, {
       passwordManagerNetworkGlobalId: record?.networkGlobalId,
       summary: [
         { label: t('wallet.storedWalletLabel'), value: record?.address ? shortAddress(record.address) : t('wallet.encrypted') },
-        { label: t('wallet.storageLabel'), value: `${record?.cipher ?? PLATHO_WALLET_CIPHER_NAME} + ${record?.kdf ?? PLATHO_WALLET_KDF_NAME}` },
+        { label: t('wallet.encryptionLabel'), value: `${record?.cipher ?? PLATHO_WALLET_CIPHER_NAME} + ${record?.kdf ?? PLATHO_WALLET_KDF_NAME}` },
       ],
     });
     if (!result) return null;
