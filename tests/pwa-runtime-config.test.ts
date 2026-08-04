@@ -306,7 +306,9 @@ describe('PWA runtime config guard', () => {
     const versionNumber = String(versionLabel).slice(1);
     expect(html).toContain(`<script src="./app.js?v=${versionNumber}" type="module">`);
     expect(readFileSync('web/sw.js', 'utf8')).toContain(`./app.js?v=${versionNumber}`);
-    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=277">/);
+    // Version-agnostic on purpose: MODCONTENT-01 owns "the ?v= tracks the content". A literal number here reddened
+    // on every unrelated stylesheet change, which teaches people to edit tests until they go green.
+    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=\d+">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -4830,11 +4832,14 @@ describe('PWA runtime config guard', () => {
     // trimmed heading/quote/center/justify (didn't fit one row) — those must NOT be present as buttons.
     for (const bar of ['privateComposerToolbar', 'publicComposerToolbar']) {
       const slice = html.slice(html.indexOf(`id="${bar}"`), html.indexOf(`id="${bar}"`) + 4200);
-      for (const fmt of ['bold', 'italic', 'select']) { // v774: a Select-word button (right after emoji)
+      // v774: a Select-word button (right after emoji). v830: Heading is BACK, by owner request — v770 had trimmed
+      // it for ROW WIDTH ("didn't fit one row"), which was a layout call and not a correctness one, and the row is
+      // a horizontal scroller anyway. It is the only block-level format the composer offers.
+      for (const fmt of ['bold', 'italic', 'select', 'heading']) {
         expect(slice, `${bar}:${fmt}`).toMatch(new RegExp(`data-format="${fmt}"`));
       }
-      // v773 removed preview; v775 removed the list button (just prefixed "- ", easier by hand); heading/quote/etc stay gone.
-      for (const gone of ['list', 'preview', 'heading', 'quote', 'center', 'justify']) {
+      // v773 removed preview; v775 removed the list button (just prefixed "- ", easier by hand); quote/align stay gone.
+      for (const gone of ['list', 'preview', 'quote', 'center', 'justify']) {
         expect(slice, `${bar}:${gone}-removed`).not.toMatch(new RegExp(`data-format="${gone}"`));
       }
       // Emoji is the first toolbar button, immediately followed by the Select-word button (owner: 'сразу после смайлов').
@@ -4871,11 +4876,13 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toMatch(/id="composerPreviewDialog"/);
     expect(app).not.toMatch(/function openComposerPreview\(|function renderComposerPreviewBlocks\(/);
 
-    // Every locale ships the ACTIVE toolbar strings (OPSEC key parity). The heading/quote/align/preview keys
-    // stay in the dictionaries as reserved (their buttons were trimmed/removed) — parity is unaffected.
+    // Every locale ships the ACTIVE toolbar strings (OPSEC key parity). The quote/align/preview keys stay in the
+    // dictionaries as reserved (their buttons were trimmed/removed) — parity is unaffected. formatHeading was one
+    // of those reserved keys and is now ACTIVE again, so it moves into this list: the strings shipped in all ten
+    // locales since v769, which is why re-adding the button needed no translation work.
     for (const locale of Object.keys(I18N_STRINGS)) {
       const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
-      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.hideFormatBar']) {
+      for (const key of ['composer.formatBold', 'composer.formatItalic', 'composer.formatHeading', 'composer.hideFormatBar']) {
         expect(dict[key], `${locale}:${key}`).toBeTruthy();
       }
     }
@@ -6172,7 +6179,7 @@ describe('PWA runtime config guard', () => {
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
     expect(sw).toMatch(/new Request\(event\.request\.url, \{ cache: 'no-cache', credentials: 'same-origin' \}\)/);
-    expect(sw).toMatch(/\.\/styles\.css\?v=277/);
+    expect(sw).toMatch(/\.\/styles\.css\?v=\d+/);   // membership, not version — see PWA-CONFIG-01B
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
@@ -6494,5 +6501,54 @@ describe('PWA runtime config guard', () => {
       .toMatch(/publicLaneReaderInstance = null;\s*\n\s*publicLaneReaderTransport = null;/);
     expect(app.match(/createPublicLane\(/g)?.length, 'exactly one construction site')
       .toBe(1);
+  });
+
+  it('PWA-ROWREF-01: a rendered row knows its OWN message — never re-derived from a colliding entry id', () => {
+    // MEASURED 2026-08-04: long-press-copy a text message on the phone, paste, and the word "Image" came out.
+    // A private message's chainEntryId is the RecordShard publish `seq`, numbered PER SHARD and restarted every
+    // epoch, so two messages in one conversation share the id and `find` returns the older one — an image-only
+    // message whose copy text falls back to the "Image" preview literal. The desktop copy button was right all
+    // along because it captures its text at render time; only the path that re-resolved was wrong.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app, 'rows are bound to their message at render time').toMatch(/const messageRowRefs = new WeakMap\(\);/);
+    expect(app.match(/(?<!function )rememberMessageForRow\(row, (?:message|comment)\)/g)?.length, 'both row builders bind: private messages AND public comments')
+      .toBe(2);
+    // Every consumer must ASK THE ROW first. The id lookup stays only as the fallback for a row rendered before
+    // this binding existed — it must never be the first answer.
+    for (const fn of ['function privateRowCopyText(row) {', 'function publicCommentRowCopyText(row) {', 'function beginPrivateReplyForRow(row) {']) {
+      const body = app.slice(app.indexOf(fn), app.indexOf(fn) + 700);
+      const boundAt = body.indexOf('messageForRow(row)');
+      // The ID lookup specifically — `.find((candidate) => String(candidate.<id>...`. NOT the plain `threads.find`
+      // that picks the active thread, which legitimately runs first and matched a looser pattern.
+      const lookupAt = body.indexOf('.find((candidate) => String(candidate.');
+      expect(boundAt, `${fn} consults the row's own message`).toBeGreaterThan(0);
+      expect(boundAt, `${fn} consults it BEFORE the entry-id lookup`).toBeLessThan(lookupAt);
+    }
+  });
+
+  it('PWA-HEADING-01: the Heading button reaches the wire as the renderer\'s own markdown', () => {
+    // A heading is the one LINE-level format in the composer, so it is the one that cannot be expressed as a pair
+    // of delimiters. The chain it has to survive: toolbar -> .fmt-heading span -> serializer -> `# ` on the wire ->
+    // MSG_HEADING_RE on the recipient's side -> .msg-heading. A break anywhere in it shows the reader a literal
+    // hash, and the writer never sees it.
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+
+    expect(html.match(/data-format="heading"/g)?.length, 'BOTH composers get the button, private and public').toBe(2);
+    expect(app, 'and the dispatcher knows it').toMatch(/case 'heading': composerEditorToggleHeading\(editor\); break;/);
+
+    // The serializer emits a PREFIX, not a wrapping delimiter, and starts a line for it — `# ` means nothing
+    // mid-line, so a heading that ever ends up after other content must not put a bare hash in the text.
+    const ser = app.slice(app.indexOf('function serializeComposerEditor('), app.indexOf('function serializeComposerEditor(') + 5200);
+    expect(ser).toMatch(/cls\.contains\('fmt-heading'\)/);
+    expect(ser).toMatch(/if \(out && !out\.endsWith\('\\n'\)\) out \+= '\\n';\s*\n\s*const level/);
+    expect(ser).toMatch(/out \+= `\$\{'#'\.repeat\(level\)\} \$\{serChildren\(child, ''\)\}`;/);
+
+    // ONE regex for "what is a heading", the receive renderer's own. A second copy in the composer would be free
+    // to drift, and the drift is invisible to whoever writes the message.
+    const build = app.slice(app.indexOf('function buildComposerEditorDom('), app.indexOf('function buildComposerEditorDom(') + 1400);
+    expect(build, 'the rebuild reuses MSG_HEADING_RE').toMatch(/const heading = MSG_HEADING_RE\.exec\(line\);/);
+    expect(app.match(/const MSG_HEADING_RE = /g)?.length, 'declared exactly once').toBe(1);
+    expect(app, 'no second heading regex anywhere').not.toMatch(/COMPOSER_HEADING_LINE_RE/);
   });
 });
