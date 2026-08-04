@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v830';
+const PLATHO_APP_RUNTIME_VERSION = 'v831';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6394,6 +6394,7 @@ function appendPublicItemComments(article, item) {
     // Chain anchor (parity with private .message rows): the swipe-to-reply gesture reads it as the reply ref and
     // reply quotes scroll to it. A local-pending comment has none — replying to it waits for the entry id.
     if (comment.entryId !== undefined && comment.entryId !== null && comment.entryId !== '') row.dataset.entryId = String(comment.entryId);
+    rememberMessageForRow(row, comment);   // same binding as private rows — long-press copy must not re-derive it
     const commentAuthorRow = document.createElement('div');
     commentAuthorRow.className = 'feed-author-row';
     const commentAvatar = document.createElement('div');
@@ -13868,6 +13869,20 @@ function serializeComposerEditor(el, keepTrailingBr = false) {
           seg += serChildren(child, '**');
         } else if (cls.contains('fmt-italic')) {
           seg += serChildren(child, '*');
+        } else if (cls.contains('fmt-heading')) {
+          // A HEADING IS A LINE PREFIX, not a pair of delimiters — the only format here that is not symmetric, which
+          // is why it gets its own branch instead of a `delim`. It emits the markdown the RECEIVE renderer already
+          // understands (`# ` .. `### `, appendFormattedMessage's MSG_HEADING_RE), so nothing downstream changes:
+          // the wire form is the same text a user could have typed by hand.
+          //
+          // The newline guard is what keeps that true. `# ` only means "heading" at the START of a line; if anything
+          // ever precedes the span on its line (a paste, a native edit that merged two lines), emitting the hash
+          // inline would put a literal `#` in the middle of the recipient's text. Starting a line for it costs
+          // nothing and cannot misrender.
+          flush();
+          if (out && !out.endsWith('\n')) out += '\n';
+          const level = Math.min(Math.max(Number(child.dataset?.level) || 1, 1), 3);
+          out += `${'#'.repeat(level)} ${serChildren(child, '')}`;
         } else if (cls.contains('fmt-code')) {
           seg += serChildren(child, '`');
         } else if (tag === 'DIV' || tag === 'P') {
@@ -14045,6 +14060,22 @@ function buildComposerEditorDom(el, text) {
   const lines = String(text ?? '').split('\n');
   lines.forEach((line, index) => {
     if (index > 0) el.append(document.createElement('br'));
+    // A restored draft (or a pasted post) must come back looking the way it was written: a heading line rebuilds
+    // as the same span the toolbar makes, not as a literal `# ` the user then has to delete by hand. Round-trip
+    // closed — serialize(build(x)) === x for every heading line.
+    //
+    // MSG_HEADING_RE IS THE RECEIVE RENDERER'S OWN REGEX, reused rather than restated. A second copy here would be
+    // free to drift, and drift means the composer showing a heading the recipient reads as a literal hash — the
+    // failure would be invisible to whoever writes it.
+    const heading = MSG_HEADING_RE.exec(line);
+    if (heading) {
+      const span = document.createElement('span');
+      span.className = 'fmt-heading';
+      span.dataset.level = String(heading[1].length);
+      appendEditorInline(span, heading[2], el);   // context stays the EDITOR so markers resolve to its attachments
+      el.append(span);
+      return;
+    }
     appendEditorInline(el, line);
   });
 }
@@ -14611,6 +14642,83 @@ function composerEditorUnformatRange(range, className, el) {
     sel.removeAllRanges();
     sel.addRange(r);
   }
+}
+
+// The TOP-LEVEL run of nodes making up the caret's line: everything between the surrounding <br>s. Lines in this
+// editor are not elements — Enter inserts a <br> and the content stays flat — so "the line" has to be computed,
+// and it has to be computed at the TOP level: the hash of a heading only means anything at the very start of the
+// line, so a span reaching inside a .fmt-bold would emit `**# text**`, which the receive renderer shows verbatim.
+function composerEditorLineNodes(el, range) {
+  let node = range.startContainer;
+  if (node === el) node = el.childNodes[Math.min(range.startOffset, Math.max(0, el.childNodes.length - 1))] ?? null;
+  else { while (node && node.parentNode !== el) node = node.parentNode; }
+  if (!node) return null;
+  if (node.tagName === 'BR') node = node.previousSibling;   // caret parked on the break itself: take the line above
+  if (!node) return null;
+  let first = node;
+  while (first.previousSibling && first.previousSibling.tagName !== 'BR') first = first.previousSibling;
+  let last = node;
+  while (last.nextSibling && last.nextSibling.tagName !== 'BR') last = last.nextSibling;
+  const nodes = [];
+  for (let n = first; n; n = n.nextSibling) { nodes.push(n); if (n === last) break; }
+  return nodes.length ? nodes : null;
+}
+
+/**
+ * Toggle the caret's LINE between plain text and a heading.
+ *
+ * ON AN EMPTY LINE THIS IS A NO-OP, deliberately and by precedent: Bold on an empty line does nothing either
+ * (composerEditorToggleFormat expands a collapsed caret to the word under it and gives up when there is none), so
+ * the interaction is the same one the user already knows — write the line, then press the button. The alternative,
+ * leaving an empty `.fmt-heading` span waiting to catch the next keystroke, is the exact state that
+ * composerEditorNormalizeEmptyFmt exists to clean up after; it is not worth re-creating on purpose.
+ *
+ * A line holding an attachment atom is refused for the same reason toggleFormat refuses one: the marker would end
+ * up inside the heading's text and the block splitter downstream would have to reason about a `# ` prefix on a
+ * line that is really an image.
+ */
+function composerEditorToggleHeading(el) {
+  if (!el || el.disabled) return;
+  el.focus();
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.commonAncestorContainer)) return;
+  const nodes = composerEditorLineNodes(el, range);
+  if (!nodes) return;
+
+  // Remember WHERE the caret was. Wrapping and unwrapping MOVE the very same nodes rather than cloning them, so
+  // the container stays valid across the operation and the caret can go back exactly where the user left it.
+  const caretNode = range.startContainer;
+  const caretOffset = range.startOffset;
+  const restoreCaret = () => {
+    if (!caretNode?.isConnected) return;
+    const r = document.createRange();
+    try { r.setStart(caretNode, Math.min(caretOffset, caretNode.nodeType === 3 ? caretNode.nodeValue.length : caretNode.childNodes.length)); }
+    catch { return; }
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  };
+
+  const existing = nodes.length === 1 && nodes[0].nodeType === 1 && nodes[0].classList?.contains('fmt-heading') ? nodes[0] : null;
+  if (existing) {
+    const parent = existing.parentNode;
+    while (existing.firstChild) parent.insertBefore(existing.firstChild, existing);
+    existing.remove();
+  } else {
+    if (nodes.some((n) => n.nodeType === 1 && (n.dataset?.marker || n.querySelector?.('[data-marker]')))) return;
+    if (nodes.every((n) => (n.textContent ?? '') === '')) return;   // empty line — see the note above
+    const span = document.createElement('span');
+    span.className = 'fmt-heading';
+    span.dataset.level = '1';
+    nodes[0].parentNode.insertBefore(span, nodes[0]);
+    for (const n of nodes) span.append(n);
+    // A heading already inside the line would nest and serialize two hashes; flatten it the way toggleFormat does.
+    span.querySelectorAll('.fmt-heading').forEach((n) => { while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n); n.remove(); });
+  }
+  restoreCaret();
+  composerEditorAfterEdit(el);
 }
 
 function composerEditorToggleFormat(el, className) {
@@ -15322,6 +15430,7 @@ function applyComposerFormat(editor, format) {
   switch (format) {
     case 'bold': composerEditorToggleFormat(editor, 'fmt-bold'); break;
     case 'italic': composerEditorToggleFormat(editor, 'fmt-italic'); break;
+    case 'heading': composerEditorToggleHeading(editor); break;
     case 'select': composerEditorSelectWordAtCaret(editor); break;
     default: break;
   }
@@ -16283,6 +16392,7 @@ function renderConversation() {
     // Chain anchor: the swipe-to-reply gesture reads it as the reply ref, and reply quotes scroll to it. A
     // not-yet-confirmed optimistic message has none — replying to it is gated until the entry id lands.
     if (message.chainEntryId !== undefined && message.chainEntryId !== null) row.dataset.entryId = String(message.chainEntryId);
+    rememberMessageForRow(row, message);   // WHICH message this row is — never re-derived from the entry id (see below)
     if (message === conversationOpenFirstUnreadRef) row.dataset.firstUnread = 'true';
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
@@ -16710,7 +16820,10 @@ function beginPrivateReplyForRow(row) {
   const entryId = row?.dataset?.entryId;
   const thread = threads.find((candidate) => candidate.id === activeThreadId);
   if (!entryId || !thread) return;
-  const message = thread.messages.find((candidate) => String(candidate.chainEntryId ?? '') === entryId);
+  // The ROW's own message first — chainEntryId collides across epoch shards (see messageRowRefs), and a reply that
+  // quotes a different message than the one the finger landed on is the same defect wearing different clothes.
+  const message = messageForRow(row)
+    ?? thread.messages.find((candidate) => String(candidate.chainEntryId ?? '') === entryId);
   if (!message) return;
   setPrivateReplyDraft({
     refEntryId: entryId,
@@ -16741,6 +16854,35 @@ attachSwipeToReply(publicPane, '.comment-item', beginPublicCommentReplyForRow);
 // (not the reply-snippet cap) — text blocks joined, quote/image blocks excluded.
 const LONG_PRESS_COPY_MS = 500;
 
+/**
+ * WHICH message a rendered row is showing — bound at render time, never re-derived.
+ *
+ * MEASURED 2026-08-04, the owner's report: long-press-copy a text message on the phone, paste, and the word
+ * "Image" comes out. The clipboard was fine and so was the copy code; the LOOKUP was wrong. Long-press resolves the
+ * row back to a message by `dataset.entryId`, and under clean-17 a private message's chainEntryId is the RecordShard
+ * publish `seq` — which is numbered PER SHARD and restarts every epoch (RecordShard gate 13653 only requires
+ * seq > last_seq within one shard). The owner's conversation spans epochs 20668 and 20669, so two different
+ * messages carry chainEntryId "3". `find` returns the FIRST, an older image-only message, whose copy text falls
+ * back to messagePreviewFromBlocks -> the literal "Image".
+ *
+ * The desktop copy BUTTON never had this: it captures its text at render time from the message in hand. So the two
+ * copy paths disagreed on the same row — and only the one nobody can inspect on a phone was wrong.
+ *
+ * This closes the class rather than the symptom: REPLY re-resolves by the same colliding id, so the same collision
+ * would quote the wrong message. Rows are rebuilt on every render, so a WeakMap needs no invalidation.
+ * (The public lane already learned this: it makes its feed entryId globally unique with the shard's coordinates —
+ * "entry_id is 0-based PER shard account, so a channel's posts across its era/overflow shards COLLIDE on it".)
+ */
+const messageRowRefs = new WeakMap();
+
+function rememberMessageForRow(row, message) {
+  if (row && message) messageRowRefs.set(row, message);
+}
+
+function messageForRow(row) {
+  return row ? messageRowRefs.get(row) ?? null : null;
+}
+
 function copyTextFromContent(item) {
   const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
   const fromBlocks = blocks
@@ -16770,6 +16912,8 @@ async function copyRowText(row, text) {
 }
 
 function privateRowCopyText(row) {
+  const bound = messageForRow(row);
+  if (bound) return copyTextFromContent(bound);
   const entryId = row?.dataset?.entryId;
   const thread = threads.find((candidate) => candidate.id === activeThreadId);
   if (!entryId || !thread) return '';
@@ -16778,6 +16922,8 @@ function privateRowCopyText(row) {
 }
 
 function publicCommentRowCopyText(row) {
+  const bound = messageForRow(row);
+  if (bound) return copyTextFromContent(bound);
   const entryId = row?.dataset?.entryId;
   if (!entryId || !publicPostDetailOpen) return '';
   const comment = publicPostDetailMergedComments().find((candidate) => String(candidate.entryId ?? '') === entryId);
