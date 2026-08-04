@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v847';
+const PLATHO_APP_RUNTIME_VERSION = 'v848';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -854,6 +854,17 @@ function copyPrivateThreadDiagnostic() {
       // steady state; `read` climbing every pass means the gate is not holding; `probe: false` means the batched
       // accountStates could not run and every shard is being read the old way.
       convSync: globalThis.plathoLastConvSync ?? null,
+      // The restore's own numbers. I told the owner twice today to look at a counter that the dump did not carry —
+      // first the shard stats, now seededSeqMarks. A diagnostic that exists only in a global nobody prints is not
+      // a diagnostic; it is a note to myself. `seeded: 0` with a non-empty history is the exact signature of the
+      // marks failing to rebuild.
+      historyRestore: globalThis.plathoLastEncryptedHistoryRestore
+        ? {
+          restored: globalThis.plathoLastEncryptedHistoryRestore.restored ?? null,
+          failed: globalThis.plathoLastEncryptedHistoryRestore.failedRecords ?? null,
+          seeded: globalThis.plathoLastEncryptedHistoryRestore.seededSeqMarks ?? null,
+        }
+        : null,
       // RECEIVE SIDE. The intro scan is a background loop whose errors go to console.warn — invisible on a phone.
       // These four fields are what turns "I see no messages" into a diagnosis.
       introLane: {
@@ -10125,6 +10136,10 @@ function mergeOpenedPrivateMessage(existingMessage, incomingMessage) {
     'capsules',
     'chainEntryId',
     'chainLastEntryId',
+    // BACKFILL. A message already in history from before this field existed gets its shard address here, on the
+    // pass that re-reads it — so ONE full pass makes the whole window seedable instead of waiting for new traffic
+    // to arrive shard by shard. The value is derived from the capsule just read, not invented.
+    'convShardAddress',
     'createdAt',
     'createdAtMs',
     'meta',
@@ -11757,6 +11772,11 @@ function serializeMessageForHistory(message) {
     createdAtMs: messageCreatedAtMs(message),
     chainEntryId: message.chainEntryId ?? null,
     chainLastEntryId: message.chainLastEntryId ?? null,
+    // WHICH SHARD it came from. THIS LIST IS A WHITELIST, and leaving the field out of it is what made the whole
+    // seq-mark persistence a no-op: the field was set on the in-memory message, never written, and so there was
+    // nothing to rebuild the marks from on the next boot. MEASURED on the owner's dump — the first pass after a
+    // reload still read `collected: 58, seqSkipped: 0`, fifty-eight decryptions to learn nothing.
+    convShardAddress: message.convShardAddress ?? null,
     localCreatedAtMs: message.localCreatedAtMs ?? null,
     localHistoryCreatedAt: message.localHistoryCreatedAt ?? null,
     blocks: messageBlocksForHistory(message),

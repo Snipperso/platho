@@ -94,6 +94,23 @@ describe('SEQTAIL — the CONV scan skips already-decrypted entries before decry
     expect(seed).toContain('Number(message.chainLastEntryId ?? message.chainEntryId)');
     // Absence of the field is the SAFE direction: no address, no mark, one honest re-read.
     expect(seed).toContain("if (typeof address !== 'string' || !address) continue;");
+
+    // AND THE FIELD MUST ACTUALLY REACH THE STORE. serializeMessageForHistory is a WHITELIST; leaving the field out
+    // of it made this entire mechanism a no-op — set in memory, never written, nothing to rebuild from on the next
+    // boot. MEASURED on the owner's dump: the first pass after a reload still read `collected: 58, seqSkipped: 0`.
+    const serializerAt = APP.indexOf('function serializeMessageForHistory(message) {');
+    const serializer = APP.slice(serializerAt, serializerAt + 3000);
+    expect(serializer.length).toBeGreaterThan(200);
+    expect(serializer, 'persisted, or the seeding above has nothing to read').toContain('convShardAddress: message.convShardAddress ?? null,');
+
+    // A message stored before the field existed gets it BACKFILLED on the pass that re-reads its capsule, so one
+    // full pass makes the whole window seedable instead of waiting for new traffic shard by shard.
+    const merge = APP.slice(APP.indexOf('function mergeOpenedPrivateMessage('), APP.indexOf('function upsertOpenedPrivateMessage('));
+    expect(merge, 'backfilled onto an already-known message').toContain("'convShardAddress',");
+
+    // And the counter is IN THE DUMP, not only in a global. Twice today I pointed at a number the dump did not
+    // carry; a diagnostic nobody can print is a note to self, not a diagnostic.
+    expect(APP).toContain('seeded: globalThis.plathoLastEncryptedHistoryRestore.seededSeqMarks ?? null,');
   });
 
   it('SEQTAIL-06: the skip count is reported, so the win is visible on a real device', () => {
