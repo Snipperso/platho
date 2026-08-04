@@ -40,6 +40,11 @@ if (readers.length === 0) {
   process.exit(1);
 }
 
+// A missing import resolves to nothing at runtime and dies inside whatever `catch` surrounds it — no test that reads
+// app.js as TEXT can see that. This ran first because it is instant and its failure invalidates everything after it.
+const imports = spawnSync(process.execPath, ['scripts/check_app_imports.mjs'], { stdio: 'inherit' });
+if (imports.status !== 0) process.exit(imports.status ?? 1);
+
 // The artefacts FIRST: static-web-deploy-prep pins them, so running it against a stale bundle fails for a reason
 // that has nothing to do with the change being made.
 const prep = spawnSync(process.execPath, ['scripts/prepare_static_web_deploy.mjs', '--mode', 'both'], { stdio: 'inherit' });
