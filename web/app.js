@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v841';
+const PLATHO_APP_RUNTIME_VERSION = 'v844';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -16888,11 +16888,15 @@ function appendRowReplyButton(row, onReply) {
  * disappeared before it could be clicked. One flex cluster has no ordinals to get wrong.
  */
 function rowActionsCluster(row) {
-  let cluster = row.querySelector(':scope > .row-actions');
+  // Hung off the BUBBLE when there is one. An incoming .message row is a grid stretched to its max width whatever
+  // the bubble holds, so anchoring to the row put the actions up to 240px from a short message; the bubble is the
+  // edge the reader actually sees. Comment cards have no bubble and keep their in-card corner.
+  const anchor = row.querySelector(':scope > .bubble') ?? row;
+  let cluster = anchor.querySelector(':scope > .row-actions');
   if (!cluster) {
     cluster = document.createElement('div');
     cluster.className = 'row-actions';
-    row.append(cluster);
+    anchor.append(cluster);
   }
   return cluster;
 }

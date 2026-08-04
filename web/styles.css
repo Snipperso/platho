@@ -963,33 +963,44 @@ html[data-platho-telegram="true"] .install-header-button {
    so it cannot be pressed"]
    A flex cluster has no ordinals to get wrong: whatever buttons a row has are contiguous and flush against the
    bubble, and adding or removing one cannot open a gap. */
+/* ANCHORED BY THE EDGE THAT FACES THE BUBBLE, never by a fixed pixel offset. A single 26px button could be placed
+   at left:-26px and land flush; a CLUSTER placed that way grows RIGHTWARD and climbs onto the message (owner saw
+   the delete icon sitting on the post). Pinning the facing edge to the row's edge — right:100% on the left side,
+   left:100% on the right — makes the cluster grow AWAY from the bubble whatever it contains. */
 .row-actions {
   display: none;
   position: absolute;
   top: 0;
-  right: -26px;
+  left: 100%;
+  right: auto;
+  margin-left: 4px;
   gap: 2px;
   align-items: flex-start;
 }
 
-/* Incoming bubbles get the cluster to the RIGHT of the bubble; outgoing (right-edge-hugging) to the LEFT, where it
-   grows leftwards so the FIRST button always stays flush. */
+/* Incoming bubbles get the cluster to the RIGHT of the bubble; outgoing (right-edge-hugging) to the LEFT, where
+   row-reverse keeps the FIRST button nearest the bubble. */
 .message.out .row-actions {
-  right: auto;
-  left: -26px;
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 4px;
   flex-direction: row-reverse;
 }
 
-/* Comment cards are wide and their top-right corner is free, so the cluster sits INSIDE them (v651). */
+/* Comment cards are wide and their top-right corner is free, so the cluster sits INSIDE them (v651) — the one
+   place it is deliberately over the card rather than beside it. */
 .comment-item .row-actions {
   top: 2px;
   right: 2px;
+  left: auto;
+  margin-left: 0;
   flex-direction: row-reverse;
 }
 
 @media (hover: hover) {
-  .message:hover > .row-actions,
-  .comment-item:hover > .row-actions,
+  .message:hover .row-actions,
+  .comment-item:hover .row-actions,
   .row-actions:focus-within {
     display: inline-flex;
   }
@@ -1182,6 +1193,12 @@ a .avatar.has-image,
 }
 
 .bubble {
+  /* The anchor for the row's hover actions. MEASURED 2026-08-04: an INCOMING .message is a grid that stretches to
+     max-width min(348px, 82%) whatever the bubble holds, so a short reply left its row box 240px wider than the
+     bubble — actions anchored to the ROW hung that far out in space. Outgoing rows happen to shrink to their
+     bubble, which is why only one side ever looked right. The bubble is the only edge that is always the edge the
+     user sees, so it is the one the cluster hangs off. */
+  position: relative;
   width: fit-content;
   min-width: 0;
   max-width: 100%;
