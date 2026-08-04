@@ -215,7 +215,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=33';
+} from './i18n.mjs?v=34';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v825';
+const PLATHO_APP_RUNTIME_VERSION = 'v826';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -829,6 +829,9 @@ function copyPrivateThreadDiagnostic() {
       // builds its optimistic record by hand and never puts profileVersion/avatarHash on it, so a per-message field
       // would have read zero here no matter what actually went on the wire — a diagnostic that lies confidently.
       // Only capsules RESTORED from chain carry those fields, which is why the incoming half above works.
+      // Why the LAST avatar media load gave up, and how far into the shard read it got.
+      avatarLoad: globalThis.plathoLastAvatarLoad ?? null,
+      avatarShard: globalThis.plathoLastAvatarShard ?? null,
       ownAvatar: (() => {
         const fields = currentProfilePointerFields();
         return { pv: Number(fields.profileVersion ?? 0) || 0, ah: shortAvatarHashForDiagnostic(fields.avatarHash) };
@@ -8482,6 +8485,11 @@ function profileAvatarPointerFromRecord(record) {
 function publicAvatarPartMatchesShard(payload, ownerWallet, pointer) {
   if (payload?.type !== 'avatar') return false;
   const pointerStreamId = pointer.avatarStreamId ?? pointer.avatar_stream_id ?? null;
+  // `stream_id` is the HEX STRING form and `streamId` is the raw 16 BYTES — readPublicPostPayloadV2 emits both, and
+  // only the string one can be compared against the pointer. I briefly "fixed" this to prefer `streamId` on the
+  // strength of reading the inner header parser (which really does emit camelCase only) instead of the outer payload
+  // reader; String(Uint8Array) is "172,12,187,…", so that would have broken a comparison that worked. Measured before
+  // shipping. Do not "modernise" this key.
   if (pointerStreamId && String(payload.stream_id ?? '').toLowerCase() !== String(pointerStreamId).toLowerCase()) return false;
   if (pointer.avatarPartCount && Number(payload.partCount ?? payload.part_count ?? 0) !== Number(pointer.avatarPartCount)) return false;
   if (ownerWallet && payload.authorWallet && !sameWalletAddress(payload.authorWallet, ownerWallet)) return false;
@@ -8494,11 +8502,12 @@ async function readAvatarPartsFromShard(ownerWallet, pointer) {
   const cached = await readProfileAvatarMediaCache(pointer?.avatarHash);
   if (cached) return cached;
   if (!pointer) return null;
+  const noteShard = (step, extra = {}) => { globalThis.plathoLastAvatarShard = { at: new Date().toISOString(), step, ...extra }; };
   const lane = directPublicLaneReader();
-  if (!lane) return null;
+  if (!lane) { noteShard('no-lane'); return null; }
   let messages;
   try { ({ messages } = await lane.readAvatarParts(ownerWallet)); }
-  catch (error) { console.warn('[public] avatar shard read failed', error); return null; }
+  catch (error) { noteShard('read-failed', { error: String(error?.message ?? error).slice(0, 120) }); console.warn('[public] avatar shard read failed', error); return null; }
   const parts = [];
   for (const message of messages ?? []) {
     const parsed = parsePublicPublish(message.bodyCell);
@@ -8510,6 +8519,14 @@ async function readAvatarPartsFromShard(ownerWallet, pointer) {
     parts.push({ ...payload, imageBytes: payload.imageBytes ?? payload.image_bytes });
   }
   const assembled = await assembledAvatarPartGroup(parts, pointer);
+  // `messages` is what the shard held, `parts` is what survived publicAvatarPartMatchesShard, and `assembled` is what
+  // passed the sha256 == pointer.avatarHash check. Which of the three numbers collapses says which gate rejected it.
+  noteShard(assembled?.imageUrl ? 'ok' : 'not-assembled', {
+    messages: messages?.length ?? 0,
+    matched: parts.length,
+    want: Number(pointer.avatarPartCount ?? 0),
+    stream: String(pointer.avatarStreamId ?? '').slice(0, 12),
+  });
   return assembled?.imageUrl ?? null;
 }
 
@@ -8580,18 +8597,30 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
   if (cached) return cached;
   const key = `${ownerWallet}:${requestedPointer?.profileVersion ?? 'current'}:${requestedPointer?.avatarHash ?? 'current'}`;
   if (profileAvatarLoadPromises.has(key)) return profileAvatarLoadPromises.get(key);
+  // WHY IT RETURNED NULL. Six separate returns hand back the same `null`, and from the outside they are one symptom:
+  // the dialog keeps the letter tile. Three rounds of chasing the owner's missing avatar were spent proving the chain
+  // healthy link by link because nothing said WHICH step gave up. The dump carries the last outcome from here on.
+  const note = (step, extra = {}) => { globalThis.plathoLastAvatarLoad = { at: new Date().toISOString(), wallet: String(ownerWallet).slice(0, 12), step, ...extra }; };
   const promise = enqueueAvatarChainRead(async () => {
     const resolved = await resolveProfileAvatarProvider();
-    if (!resolved) return null;
+    if (!resolved) { note('no-provider'); return null; }
     const readOptions = { profileRegistryAddress: resolved.address, ...criticalChainReadOptions() };
     const record = requestedPointer
       ? await resolved.provider.getAvatarVersion(ownerWallet, requestedPointer.profileVersion, readOptions)
       : await resolved.provider.getAvatar(ownerWallet, readOptions);
     const recordPointer = profileAvatarPointerFromRecord(record);
-    if (!recordPointer) return null;
-    if (requestedPointer && recordPointer.avatarHash.toLowerCase() !== requestedPointer.avatarHash.toLowerCase()) return null;
-    return readAvatarPartsFromShard(ownerWallet, recordPointer);
+    // A version mismatch lands here too: getAvatarVersion returns exists:false when the shard holds a different
+    // version than the message asked for, which is indistinguishable from "no avatar" without this label.
+    if (!recordPointer) { note('no-record', { wantVersion: requestedPointer?.profileVersion ?? null }); return null; }
+    if (requestedPointer && recordPointer.avatarHash.toLowerCase() !== requestedPointer.avatarHash.toLowerCase()) {
+      note('hash-mismatch', { want: requestedPointer.avatarHash.slice(2, 14), got: recordPointer.avatarHash.slice(2, 14) });
+      return null;
+    }
+    const url = await readAvatarPartsFromShard(ownerWallet, recordPointer);
+    if (url) note('ok');
+    return url;
   }).catch((error) => {
+    note('threw', { error: String(error?.message ?? error).slice(0, 120) });
     if (!noteTonRpcRateLimit(error)) console.error(error);
     return null;
   }).finally(() => {
