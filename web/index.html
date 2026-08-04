@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v825</span>
+              <span class="app-version-label" id="appVersionLabel">v826</span>
             </div>
           </div>
         </div>
@@ -376,7 +376,6 @@
                 <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
                 <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
                 <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
-                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
               </div>
             </section>
 
@@ -412,7 +411,7 @@
               <p id="profileHandle" data-i18n="nav.profile">Profile</p>
               <!-- Build version, duplicated from the rail badge: the rail is hidden on the narrow (mobile / TG
                    Mini App) layout, and TMA webviews cache hard — this is the on-device way to verify the build. -->
-              <span class="app-version-label" id="profileVersionLabel">v825</span>
+              <span class="app-version-label" id="profileVersionLabel">v826</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -518,6 +517,17 @@
                   <strong id="toncenterKeyStatus" class="rpc-key-status"></strong>
                   <button id="getToncenterKeyButton" type="button" class="rpc-key-get" data-i18n="profile.rpcKeyGet">Get</button>
                 </div>
+              </div>
+            </section>
+
+            <!-- [OWNER 2026-08-04] Moved out of the Wallet tab. Wiping this device's local data is not a wallet
+                 operation — it touches no keys and no money — and the wallet tab should hold what the wallet is for.
+                 Last section on the profile: a destructive one-way action does not belong above the things people
+                 use every day. -->
+            <section class="profile-section" aria-label="Device" data-i18n-aria-label="profile.device">
+              <h2 data-i18n="profile.device">Device</h2>
+              <div class="settings-list">
+                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
               </div>
             </section>
 
@@ -724,6 +734,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=825" type="module"></script>
+    <script src="./app.js?v=826" type="module"></script>
   </body>
 </html>

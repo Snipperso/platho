@@ -84,4 +84,32 @@ describe('AVPTR — the avatar pointer survives a CONV seal, and is read where i
     expect(APP).toContain('avatarPointerFromOpenedCapsule(firstOpened),');
     expect((APP.match(/avatarPointerFromOpenedCapsule\(/g) ?? []).length, 'a hydration site was missed').toBe(3);
   });
+
+  it('AVPTR-05: every way the media load can give up is LABELLED', () => {
+    // Six returns hand back the same null, and from outside they are one symptom: the letter tile stays. Three
+    // rounds were spent proving the chain healthy link by link because nothing said WHICH step gave up. Each exit
+    // now names itself, and the shard read reports the three counts that separate its own gates.
+    for (const step of ["note('no-provider')", "note('no-record'", "note('hash-mismatch'", "note('threw'", "note('ok')"]) {
+      expect(APP, `an unlabelled avatar-load exit: ${step}`).toContain(step);
+    }
+    for (const step of ["noteShard('no-lane')", "noteShard('read-failed'", "noteShard(assembled?.imageUrl ? 'ok' : 'not-assembled'"]) {
+      expect(APP, `an unlabelled avatar-shard exit: ${step}`).toContain(step);
+    }
+    // messages -> matched -> assembled: which number collapses says which gate rejected the parts.
+    expect(APP).toContain('messages: messages?.length ?? 0,');
+    expect(APP).toContain('matched: parts.length,');
+    expect(APP).toContain('want: Number(pointer.avatarPartCount ?? 0),');
+    // …and both records reach the dump, or labelling them changes nothing.
+    expect(APP).toContain('avatarLoad: globalThis.plathoLastAvatarLoad ?? null,');
+    expect(APP).toContain('avatarShard: globalThis.plathoLastAvatarShard ?? null,');
+  });
+
+  it('AVPTR-06: the public payload stream id is read as the STRING key, not the byte array', () => {
+    // readPublicPostPayloadV2 emits BOTH `stream_id` (hex string) and `streamId` (raw 16 bytes). Only the string can
+    // be compared against the pointer. I briefly "fixed" this to prefer camelCase on the strength of reading the
+    // INNER header parser instead of the outer payload reader — String(Uint8Array) is "172,12,187,…", which would
+    // have broken a comparison that worked. Measured before shipping; pinned so it cannot be modernised back.
+    expect(APP).toContain("String(payload.stream_id ?? '').toLowerCase()");
+    expect(APP, 'the byte-array key is being compared as a string').not.toContain('String(payload.streamId ??');
+  });
 });

@@ -41,7 +41,7 @@ describe('wallet tab + durable comment cache guard', () => {
       'walletBackupWarning', 'createWalletButton', 'importWalletButton', 'unlockWalletButton',
       'changeWalletPasswordButton', 'receiveWalletTonButton', 'sendWalletTonButton',
       'exportWalletKeyButton', 'importWalletKeyButton', 'exportWalletSeedButton',
-      'registerVaultKeysButton', 'clearLocalDataButton',
+      'registerVaultKeysButton',
       'athDropIssuedStatus', 'athSupplyStatus', 'flushAthButton',
     ];
     for (const id of moved) {
@@ -59,13 +59,21 @@ describe('wallet tab + durable comment cache guard', () => {
     // between, in the Usernames and Avatars section.
     expect(profilePanel).toContain('id="walletDisplayModeSelect"');
     expect(walletPanel).not.toContain('id="walletDisplayModeSelect"');
+
+    // [OWNER 2026-08-04] "Clear local data" went the same way. Wiping this device touches no keys and no money, so
+    // it is not a wallet operation; it sits LAST on the profile because a destructive one-way action does not belong
+    // above the things people use every day.
+    expect(profilePanel).toContain('id="clearLocalDataButton"');
+    expect(walletPanel).not.toContain('id="clearLocalDataButton"');
+    expect(profilePanel.indexOf('aria-label="Device"'))
+      .toBeGreaterThan(profilePanel.indexOf('aria-label="RPC access"'));
     const usernames = profilePanel.slice(profilePanel.indexOf('aria-label="Usernames and avatars"'));
     expect(usernames.indexOf('id="walletDisplayModeSelect"')).toBeGreaterThan(-1);
     expect(usernames.indexOf('id="walletDisplayModeSelect"')).toBeLessThan(usernames.indexOf('aria-label="RPC access"'));
 
     // Every id must survive the move exactly once — a lost id is a control app.js can no longer find, and a
     // duplicated one makes querySelector pick the wrong node.
-    for (const id of [...moved, 'savePrefsButton', 'walletDisplayModeSelect']) {
+    for (const id of [...moved, 'savePrefsButton', 'walletDisplayModeSelect', 'clearLocalDataButton']) {
       expect((html.match(new RegExp(`id="${id}"`, 'g')) ?? []).length, `${id} appears exactly once`).toBe(1);
     }
   });
