@@ -127,6 +127,30 @@ describe('BURSTSEQ — consecutive sends must not collide on one wallet seqno', 
     expect(res.seqno).toBe(399);
   });
 
+  it('BURSTSEQ-07: the send diagnostic reads a field that actually EXISTS on the returned object', async () => {
+    // MEASURED 2026-08-04, from the owner's first filled-in dump: `"send": { "ok": true, ..., "seqno": null }`.
+    // The diagnostic read `result.seqno`, but publishConvLaneParts returns `{ parts, result }` and the seqno lives on
+    // the INNER object (sendPlathoWalletTransaction spreads the first built external, `{ boc, seqno, wallet }`). So
+    // it reported null on every send forever — a diagnostic that always answers "nothing" is worse than none,
+    // because it looks like a finding. This pins the READ PATH against the REAL shape rather than against my memory
+    // of it: drive the wallet, then assert app.js reads exactly where the value turned out to be.
+    __resetWalletSeqnoFloorsForTests();
+    const wallet = await createPlathoWallet({ mnemonic: MNEMONIC });
+    const chain = frozenChainTransport(77);
+    const res: any = await sendPlathoWalletTransaction(
+      wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, { transport: chain.transport },
+    );
+    expect(res.seqno, 'sendPlathoWalletTransaction stopped exposing seqno at the top level').toBe(77);
+    expect(res.batchCount, 'sendPlathoWalletTransaction stopped exposing batchCount').toBe(1);
+
+    // publishConvLaneParts wraps THAT object one level down, and the dump must follow it down.
+    const lane = readFileSync('web/conv-lane-send.mjs', 'utf8');
+    expect(lane).toContain('return { parts: prepared, result };');
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toContain('seqno: result?.result?.seqno ?? null,');
+    expect(app).toContain('externals: result?.result?.batchCount ?? 1,');
+  });
+
   it('BURSTSEQ-06: a lost external does NOT wedge the wallet forever — the floor lead is bounded', async () => {
     // COUNTER-CASE, and the reason a naive floor is worse than none. If a broadcast external is lost, the chain never
     // reaches the floor. Without a bound every later message would sign a seqno the wallet will not accept and the
