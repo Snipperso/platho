@@ -340,6 +340,96 @@ describe('embedded Platho wallet', () => {
     expect(sentBoc).not.toBeNull();
   });
 
+  // A 200 from toncenter /message means "queued", NOT "executed". The seqno floor is raised on that 200, so it can
+  // legitimately run ahead of the chain — and an external signed for a seqno the chain has not reached is DROPPED by
+  // the validator (exit code 133), not held back for its turn. These three cases pin the client's side of that.
+  //
+  // MEASURED 2026-08-04 on the owner's mainnet wallet: chain at 149, client signing 150, twelve rejected broadcasts,
+  // an image stuck on "sending" for 6.5 minutes until the 90s floor grace expired. The image before it had reported
+  // "the shard did not store it" — the dropped predecessor, seen from the other end.
+  it('PLATHO-WALLET-04J: never broadcasts a seqno the chain has not reached', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    let chainSeqno = 42;
+    let reads = 0;
+    const broadcasts: { signed: number; chainAtBroadcast: number }[] = [];
+    const transport = {
+      async runGetMethod() {
+        reads += 1;
+        // The predecessor lands on the third read — the index lag a real send sees.
+        if (reads === 3) chainSeqno = 43;
+        return { stack: [{ type: 'num', value: `0x${chainSeqno.toString(16)}` }] };
+      },
+      async sendBoc() { return { ok: true }; },
+    };
+    const message = { address: `0:${'11'.repeat(32)}`, amount: '1000000', payload: null };
+    const send = async () => {
+      const result: any = await sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, {
+        transport, seqnoCatchupAttempts: 6, seqnoCatchupMs: 0,
+      });
+      broadcasts.push({ signed: result.seqno, chainAtBroadcast: chainSeqno });
+    };
+
+    await send();            // signs 42, raises the floor to 43 while the chain is still 42
+    await send();            // the floor is AHEAD — must WAIT, not sign 43 into a chain that is still at 42
+
+    expect(broadcasts.map((b) => b.signed)).toEqual([42, 43]);
+    // THE INVARIANT: at the moment each external went out, the chain was ready to accept exactly that seqno.
+    for (const broadcast of broadcasts) expect(broadcast.chainAtBroadcast).toBe(broadcast.signed);
+  });
+
+  it('PLATHO-WALLET-04K: a LOST external does not wedge the wallet — the chain wins over our floor', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const chainSeqno = 42;   // the first broadcast is accepted by the RPC and then dropped by the network: never moves
+    const signed: number[] = [];
+    const transport = {
+      async runGetMethod() { return { stack: [{ type: 'num', value: `0x${chainSeqno.toString(16)}` }] }; },
+      async sendBoc() { return { ok: true }; },
+    };
+    const message = { address: `0:${'22'.repeat(32)}`, amount: '1000000', payload: null };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result: any = await sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, {
+        transport, seqnoCatchupAttempts: 3, seqnoCatchupMs: 0,
+      });
+      signed.push(result.seqno);
+    }
+
+    // Before this fix the second send signed 43 for the whole 90s grace and every copy was rejected with 133.
+    expect(signed).toEqual([42, 42]);
+  });
+
+  it('PLATHO-WALLET-04L: exit code 133 drops the floor and never offers the dead bytes for re-broadcast', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const chainSeqno = 77;
+    let failNext = true;
+    const signed: number[] = [];
+    const transport = {
+      async runGetMethod() { return { stack: [{ type: 'num', value: `0x${chainSeqno.toString(16)}` }] }; },
+      async sendBoc() {
+        if (!failNext) return { ok: true };
+        failNext = false;
+        const error: any = new Error('TON RPC sendBoc failed with HTTP 500');
+        error.status = 500;
+        error.chainExitCode = 133;
+        error.responseBody = 'LITE_SERVER_UNKNOWN: cannot apply external message to current state : '
+          + 'External message was not accepted, terminating vm with exit code 133';
+        throw error;
+      },
+    };
+    const message = { address: `0:${'33'.repeat(32)}`, amount: '1000000', payload: null };
+    const send = () => sendPlathoWalletTransaction(wallet, { messages: [message], validUntil: 1_700_000_300 }, { transport });
+
+    let rejected: any = null;
+    await send().catch((error) => { rejected = error; });
+    expect(rejected).not.toBeNull();
+    // Proven-dead bytes must not enter the idempotent re-broadcast path — that path is for AMBIGUOUS failures.
+    expect(rejected.builtBoc).toBeUndefined();
+
+    const result: any = await send();
+    signed.push(result.seqno);
+    // The floor was dropped by its own disproof, so the very next attempt signs what the chain actually wants.
+    expect(signed).toEqual([chainSeqno]);
+  });
+
   it('PLATHO-WALLET-05: encrypts to a recipient Vault key record derived from their wallet recovery phrase', async () => {
     const alice = await createPlathoWallet({ mnemonic });
     const bob = await createPlathoWallet({ mnemonic: bobMnemonic });

@@ -14,6 +14,7 @@ import {
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=13';
 import { tonCell } from './pwa-contract-transactions.mjs?v=35';
+import { toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=69';
 
 const {
   beginCell,
@@ -709,6 +710,62 @@ export function __resetWalletSeqnoFloorsForTests() {
   walletSeqnoFloors.clear();
 }
 
+/** Drop our lead for this wallet: used when the chain has PROVEN the floor wrong, so it must not outlive its disproof. */
+function resetWalletSeqnoFloor(wallet) {
+  const key = walletSeqnoFloorKey(wallet);
+  if (key) walletSeqnoFloors.delete(key);
+}
+
+// v5r1 throws this from recv_external when the signed seqno is not EXACTLY the stored one. MEASURED in the sandbox
+// against our own PLATHO_WALLET_V5R1_CODE_BOC: ahead by one -> 133, behind -> 133, expired valid_until -> 136,
+// correct -> 0. The VM log shows it literally: `EQUAL` then `THROWIFNOT 133`.
+export const PLATHO_WALLET_SEQNO_MISMATCH_EXIT_CODE = 133;
+
+/** True when the chain rejected the external for a seqno it does not accept — proof our seqno was wrong. */
+function walletErrorIsSeqnoMismatch(error) {
+  const direct = Number(error?.chainExitCode);
+  if (Number.isFinite(direct)) return direct === PLATHO_WALLET_SEQNO_MISMATCH_EXIT_CODE;
+  const text = String(error?.responseBody ?? error?.message ?? '');
+  return toncenterBroadcastExitCode(text) === PLATHO_WALLET_SEQNO_MISMATCH_EXIT_CODE;
+}
+
+// How long to wait for the chain to CONSUME an external we already broadcast before concluding it was lost. TON is
+// sub-second since the 2026-04 upgrade and the toncenter index lag MEASURED 2026-08-04 is 1-5s, so ~15s is many
+// times the honest worst case — long enough that a healthy predecessor always lands, short enough that a lost one
+// does not wedge the user.
+const WALLET_SEQNO_CATCHUP_ATTEMPTS = 20;
+const WALLET_SEQNO_CATCHUP_MS = 700;
+
+/**
+ * The seqno to SIGN with. Never returns a value the chain has not reached.
+ *
+ * A 200 from toncenter /message means "queued for broadcast", NOT "the chain executed it" — so the floor, which is
+ * raised on that 200, can legitimately run ahead of the chain. Signing the floor anyway is not optimism, it is a
+ * coin flip: a validator that sees seqno N+1 before N has executed throws exit code 133 and DROPS the external.
+ * TON does not hold it back until its turn.
+ *
+ * MEASURED 2026-08-04 on the owner's mainnet wallet: chain at 149, client signing 150, twelve rejected broadcasts,
+ * one image stuck on "sending" for 6.5 minutes until the 90s floor grace expired and let it sign 149. The image
+ * BEFORE it had reported "the shard did not store it" — that was the dropped predecessor, the same failure seen
+ * from the other end.
+ */
+async function resolveWalletSendSeqno(wallet, transport, options) {
+  const chainSeqno = await getPlathoWalletSeqno(wallet, transport, options);
+  const floored = applyWalletSeqnoFloor(wallet, chainSeqno);
+  if (floored <= chainSeqno) return floored;
+  try {
+    return await waitForWalletSeqnoAtLeast(wallet, transport, floored, {
+      seqnoPollAttempts: options?.seqnoCatchupAttempts ?? WALLET_SEQNO_CATCHUP_ATTEMPTS,
+      seqnoPollMs: options?.seqnoCatchupMs ?? WALLET_SEQNO_CATCHUP_MS,
+    });
+  } catch {
+    // The predecessor never landed: toncenter answered 200 for an external the network then dropped. Believe the
+    // chain rather than signing a seqno it will never reach.
+    resetWalletSeqnoFloor(wallet);
+    return getPlathoWalletSeqno(wallet, transport, options);
+  }
+}
+
 async function waitForWalletSeqnoAtLeast(wallet, transport, targetSeqno, options = {}) {
   const attempts = Number(options.seqnoPollAttempts ?? 40);
   const delayMs = Number(options.seqnoPollMs ?? 1500);
@@ -730,7 +787,7 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
   // An explicit options.seqno is a deliberate caller choice (an idempotent re-broadcast of an already-signed
   // external) and must pass through untouched — re-signing it under a NEW seqno would double-execute if the first
   // copy had in fact landed.
-  let seqno = options.seqno ?? applyWalletSeqnoFloor(wallet, await getPlathoWalletSeqno(wallet, transport, options));
+  let seqno = options.seqno ?? await resolveWalletSendSeqno(wallet, transport, options);
   if (chunks.length > 1 && !transport.runGetMethod && options.seqno === undefined) {
     throw new Error('TON RPC runGetMethod transport is required for multi-transfer wallet publish');
   }
@@ -757,10 +814,18 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
         detail: error?.responseBody ?? String(error?.message ?? error),
         seqno,
       });
+      // A seqno mismatch is the chain PROVING our floor wrong. Two consequences, and getting either one wrong is
+      // what turned a lost external into a 6.5-minute wedge:
+      //   1. The floor must not outlive its own disproof — drop it now instead of waiting out the 90s grace, so the
+      //      caller's next attempt reads the chain and signs a seqno that can actually be accepted.
+      //   2. These bytes are a corpse. Re-broadcasting them is guaranteed to fail, so they must NOT be offered for
+      //      the idempotent re-broadcast path below, which exists for AMBIGUOUS failures only.
+      const definitivelyRejected = walletErrorIsSeqnoMismatch(error);
+      if (definitivelyRejected) resetWalletSeqnoFloor(wallet);
       // Attach the SIGNED external so an AMBIGUOUS broadcast (the send may or may not have landed) can be re-broadcast
       // idempotently on retry instead of re-signing a fresh seqno — a fresh sign would double-execute if the first
       // copy actually landed. The external is bound to `seqno`, so the chain runs it at most once. [direct-pay send hardening]
-      if (error && typeof error === 'object' && built?.boc && error.builtBoc === undefined) {
+      if (!definitivelyRejected && error && typeof error === 'object' && built?.boc && error.builtBoc === undefined) {
         try { error.builtBoc = built.boc; error.builtSeqno = seqno; } catch { /* frozen error — best effort */ }
       }
       throw error;
