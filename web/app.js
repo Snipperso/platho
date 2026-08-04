@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v836';
+const PLATHO_APP_RUNTIME_VERSION = 'v837';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -9499,6 +9499,42 @@ function convBucketSeqHighWater(bucketAddress) {
   return convBucketSeqMarks.get(bucketAddress) ?? -1;
 }
 
+/**
+ * Rebuild the per-shard seq high-water from STORED MESSAGES, at boot.
+ *
+ * MEASURED on the owner's dump: the first pass after every reload read `collected: 51, appended: 0` — fifty-one
+ * capsules decrypted to conclude that nothing was new. The mark that prevents exactly this lived only in the tab's
+ * memory, so a reload threw it away, and ML-KEM decapsulation is ~4.7ms per capsule on a desktop and 3-5x that on
+ * a phone. The cost scaled with how much the conversation had carried lately, not with how much was new — so the
+ * busier the dialog, the slower every start.
+ *
+ * DERIVED, NOT STORED ALONGSIDE. The mark is a fact ABOUT the messages ("everything up to seq N in this shard is
+ * already in my history"), so keeping a second persisted copy of it is a copy of a derived value — the thing that
+ * breaks somewhere other than where it lives. If the history is wiped, cleared or unreadable, the marks are simply
+ * not there to rebuild, and the scan does the full honest pass. A mark can never outlive the messages it speaks for.
+ *
+ * A message stored before this shipped has no `convShardAddress`, contributes nothing, and its shard is re-read
+ * once — the safe direction, which is the only direction this may ever fail in.
+ *
+ * KNOWN AND UNCHANGED: the mark is the MAX of what we hold, so an append that failed mid-pass while a later one
+ * succeeded leaves a gap the mark sits above. That is exactly today's in-session behaviour (bucketMaxSeq advances
+ * per pass, not per successful append); persisting makes it durable rather than healed by the next reload. It is
+ * not made worse here, and closing it belongs with the append path that can actually observe the failure.
+ */
+function seedConvSeqMarksFromHistory(messages) {
+  let seeded = 0;
+  for (const message of messages ?? []) {
+    const address = message?.convShardAddress;
+    if (typeof address !== 'string' || !address) continue;
+    // A multipart message spans several entries in one shard; chainLastEntryId is its highest.
+    const seq = Number(message.chainLastEntryId ?? message.chainEntryId);
+    if (!Number.isFinite(seq)) continue;
+    advanceConvBucketSeqHighWater(address, seq);
+    seeded += 1;
+  }
+  return seeded;
+}
+
 function advanceConvBucketSeqHighWater(bucketAddress, seq) {
   if (!bucketAddress || !Number.isFinite(seq)) return;
   if (seq <= convBucketSeqHighWater(bucketAddress)) return;
@@ -10597,10 +10633,14 @@ function capsuleSenderCreatedAtMs(carrier) {
 
 function privateChainMessageOrderFields(entry, opened = null) {
   const chainEntryId = privateEntryIdText(entry);
+  // WHICH SHARD this came out of. Carried so the seq high-water can be DERIVED from stored history on the next
+  // boot instead of being rebuilt by decrypting the whole window again — see seedConvSeqMarksFromHistory.
+  const shardAddress = typeof entry?.address === 'string' && entry.address ? entry.address : null;
   // Chain time first (the shard's own stamp, when a caller plumbs it), then the signed sender time. Never Date.now().
   const createdAtMs = privateEntryCreatedAtMs(entry) ?? capsuleSenderCreatedAtMs(opened);
   const fields = {};
   if (chainEntryId !== null) fields.chainEntryId = chainEntryId;
+  if (shardAddress !== null) fields.convShardAddress = shardAddress;
   if (createdAtMs !== null) {
     fields.createdAtMs = createdAtMs;
     fields.createdAt = new Date(createdAtMs).toISOString();
@@ -11371,7 +11411,9 @@ async function syncConvCapsulesFromShards() {
           continue;
         }
         if (seqUsable) bucketMaxSeq.set(bucket, Math.max(bucketMaxSeq.get(bucket) ?? 0, foundSeq));
-        collected.push({ opened, entry: { entry_id: found.seq } });
+        // The shard ADDRESS rides with the entry so the stored message remembers where it came from — that is what
+        // lets the next boot rebuild the seq high-water without decrypting anything (seedConvSeqMarksFromHistory).
+        collected.push({ opened, entry: { entry_id: found.seq, address: bucket || undefined } });
         // Cooperative yield after EVERY opened capsule: ML-KEM-768 decapsulation is SYNCHRONOUS CPU, and a burst
         // of them in a tight loop starves the main thread on a slow single-thread device (the measured iPhone SE2
         // freeze). An `await` on an already-resolved promise only drains microtasks — the browser cannot paint
@@ -11946,8 +11988,15 @@ async function restoreEncryptedMessageHistory() {
     // Heal AFTER the snapshots have been applied (they are what re-adds the poisoned variants). Boot run: also
     // re-queue anonymous/pending-stuck peer messages and do the one-off own-contact-display cleanup.
     if (healCrossWalletIdentityBleed({ requeueAnonymous: true, clearOwnContactDisplay: true })) changed = true;
+    // Rebuild the receive scan's seq high-water from what we just restored, BEFORE the first sync pass runs — that
+    // is the whole point: the pass then skips every capsule already in history instead of decrypting the window
+    // again. Derived from the messages themselves, so it cannot outlive them.
+    const seededSeqMarks = seedConvSeqMarksFromHistory(restored.map((item) => item.message));
     globalThis.plathoLastEncryptedHistoryRestore = {
       restored: restored.length,
+      // How many restored messages carried a shard address and fed the seq high-water. Zero on a device whose
+      // history predates this field — expect one full re-open pass then, and none after the next message lands.
+      seededSeqMarks,
       failed: failed.length,
       failedRecords: failed,
       dbName: currentMessageHistoryDbName(),
