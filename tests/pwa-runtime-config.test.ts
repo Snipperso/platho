@@ -6561,6 +6561,31 @@ describe('PWA runtime config guard', () => {
       .toBe(1);
   });
 
+  it('PWA-ROWREF-02: a reply quote scrolls to the nearest match ABOVE it, not the first in the document', () => {
+    // [OWNER 2026-08-04] Tapping a reply quote scrolled the conversation somewhere else entirely. The THIRD
+    // appearance of one collision: data-entry-id is the RecordShard publish seq, numbered per shard and restarted
+    // every epoch, so a conversation spanning two days holds several rows with the same id. querySelector returns
+    // the FIRST in document order — the OLDEST — which is why the jump landed far above the target.
+    //
+    // Copy and reply-targeting were fixed by binding each row to its message object at render time. This one
+    // cannot be: the reference arrives ON THE WIRE as a bare id and has to be resolved against the DOM. A reply
+    // always refers to something sent before it, so the reply's own position is what disambiguates.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toContain('function replyQuoteTargetRow(scroller, quote, refEntryId) {');
+    expect(app, 'the quote resolves through the helper, never by a bare first-match query')
+      .toContain('const target = replyQuoteTargetRow(scroller, quote, refEntryId);');
+    expect(app, 'no first-match lookup by entry id survives anywhere')
+      .not.toMatch(/querySelector\(`\[data-entry-id=/);
+
+    const fn = app.slice(app.indexOf('function replyQuoteTargetRow('), app.indexOf('// Snippet for a quote strip'));
+    expect(fn, 'it considers ALL matches').toMatch(/querySelectorAll\(`\[data-entry-id=/);
+    expect(fn, 'and picks by position relative to the replying row')
+      .toContain('ownRow.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_PRECEDING');
+    expect(fn, 'never targeting the reply itself').toContain('if (candidate === ownRow) continue;');
+    // Fail SOFT: a target that is not loaded must still scroll somewhere rather than making the tap do nothing.
+    expect(fn).toContain('return best ?? matches[0];');
+  });
+
   it('PWA-ROWREF-01: a rendered row knows its OWN message — never re-derived from a colliding entry id', () => {
     // MEASURED 2026-08-04: long-press-copy a text message on the phone, paste, and the word "Image" came out.
     // A private message's chainEntryId is the RecordShard publish `seq`, numbered PER SHARD and restarted every
