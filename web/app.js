@@ -118,6 +118,11 @@ import {
   createAthWalletMessage,
   createPublicPostPayload,
   createPublicPostPayloadV2,
+  // MISSING SINCE IT WAS FIRST USED. Five call sites read it and not one import declared it, so every call threw a
+  // ReferenceError — swallowed whole by the bare `catch { continue; }` each of them sits in. The avatar could never
+  // assemble (the owner chased that for a day) and the public feed's V2 payload reads were dead the same way, in
+  // silence. Found 2026-08-04 only because the drop counters started naming the reason instead of counting it.
+  readPublicPostPayloadV2,
   createUsernameRegistryMessage,
   createWalletTransaction,
   buildAirdropTicketClaimBody,
@@ -227,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v827';
+const PLATHO_APP_RUNTIME_VERSION = 'v828';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
