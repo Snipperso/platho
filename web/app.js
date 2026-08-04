@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v829';
+const PLATHO_APP_RUNTIME_VERSION = 'v830';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -842,6 +842,12 @@ function copyPrivateThreadDiagnostic() {
         return { pv: Number(fields.profileVersion ?? 0) || 0, ah: shortAvatarHashForDiagnostic(fields.avatarHash) };
       })(),
       senderResolve: plathoSenderResolveDebug,
+      // THE SCAN ITSELF, and it belongs here because the healthy state and a dead lane look IDENTICAL above:
+      // senderResolve only records a pass that opened something or skipped by seq, so once the change-marker gate
+      // is doing its job there are no new rows at all. `shards.skipped` climbing while `read` stays flat is the
+      // steady state; `read` climbing every pass means the gate is not holding; `probe: false` means the batched
+      // accountStates could not run and every shard is being read the old way.
+      convSync: globalThis.plathoLastConvSync ?? null,
       // RECEIVE SIDE. The intro scan is a background loop whose errors go to console.warn — invisible on a phone.
       // These four fields are what turns "I see no messages" into a diagnosis.
       introLane: {
