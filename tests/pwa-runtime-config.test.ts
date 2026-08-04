@@ -6571,19 +6571,27 @@ describe('PWA runtime config guard', () => {
     // cannot be: the reference arrives ON THE WIRE as a bare id and has to be resolved against the DOM. A reply
     // always refers to something sent before it, so the reply's own position is what disambiguates.
     const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toContain('function replyQuoteTargetRow(scroller, quote, refEntryId) {');
+    expect(app).toContain('function replyQuoteTargetRow(scroller, quote, refEntryId, snippet) {');
     expect(app, 'the quote resolves through the helper, never by a bare first-match query')
-      .toContain('const target = replyQuoteTargetRow(scroller, quote, refEntryId);');
+      .toContain('const target = replyQuoteTargetRow(scroller, quote, refEntryId, reply.snippet);');
     expect(app, 'no first-match lookup by entry id survives anywhere')
       .not.toMatch(/querySelector\(`\[data-entry-id=/);
 
     const fn = app.slice(app.indexOf('function replyQuoteTargetRow('), app.indexOf('// Snippet for a quote strip'));
     expect(fn, 'it considers ALL matches').toMatch(/querySelectorAll\(`\[data-entry-id=/);
     expect(fn, 'and picks by position relative to the replying row')
-      .toContain('ownRow.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_PRECEDING');
+      .toContain('ownRow.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_PRECEDING');
+    // An optimistic reply has no entry id of its own, so the position anchor must fall back to the ROW element —
+    // without it every candidate looked equally good and the pick collapsed to "the first one".
+    expect(fn).toContain("quote.closest('[data-entry-id]') ?? quote.closest('.message, .comment-item')");
     expect(fn, 'never targeting the reply itself').toContain('if (candidate === ownRow) continue;');
+    // Position alone is a COIN FLIP: each direction of a conversation has its own shard and its own seq counter,
+    // so within one epoch the user's own message #3 and the peer's #3 both exist. The quoted text is what tells
+    // them apart, and it already rides the wire.
+    expect(fn, 'the snippet decides').toContain('const matchesSnippet = (row) => {');
+    expect(fn).toContain('return snippetAbove ?? snippetAny ?? above ?? matches[0];');
     // Fail SOFT: a target that is not loaded must still scroll somewhere rather than making the tap do nothing.
-    expect(fn).toContain('return best ?? matches[0];');
+
   });
 
   it('PWA-ROWREF-01: a rendered row knows its OWN message — never re-derived from a colliding entry id', () => {
