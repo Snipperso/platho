@@ -263,13 +263,20 @@ describe('profile block content codec', () => {
     };
     const decoded = m.decodeShareBlockContent(m.encodeShareBlockContent(share));
     expect(decoded).toEqual(share);
-    // uint64 bounds — 0 and max round-trip, negatives/overflow throw (the REPLY-CODEC-02 contract).
+
+    // THE ENTRY ID IS A STRING, and this is the case that mattered. [OWNER 2026-08-04] Attaching a public post to
+    // a message made the send do nothing at all until the forward was cancelled: v1 packed the id as a uint64, and
+    // clean-17's public feed id is `epochTag.shardSeq.entryId` — `BigInt('688.0.1')` throws, the async submit
+    // handler died on it, and a handler that throws looks exactly like a button that does nothing. The id stopped
+    // being a number when the feed made it globally unique (entry_id is 0-based PER SHARD and collides across a
+    // channel's era/overflow shards); the codec kept the CapsuleHub-era assumption.
     const base = { ...share, author: '', title: '', snippet: '' };
-    expect(m.decodeShareBlockContent(m.encodeShareBlockContent({ ...base, entryId: '0' }))?.entryId).toBe('0');
-    expect(m.decodeShareBlockContent(m.encodeShareBlockContent({ ...base, entryId: '18446744073709551615' }))?.entryId)
-      .toBe('18446744073709551615');
-    expect(() => m.encodeShareBlockContent({ ...base, entryId: '-1' })).toThrow();
-    expect(() => m.encodeShareBlockContent({ ...base, entryId: '18446744073709551616' })).toThrow();
+    for (const id of ['688.0.1', '0', '18446744073709551615', '4294967296.3.127']) {
+      expect(m.decodeShareBlockContent(m.encodeShareBlockContent({ ...base, entryId: id }))?.entryId, id).toBe(id);
+    }
+    // An id must exist, and must fit its length prefix.
+    expect(() => m.encodeShareBlockContent({ ...base, entryId: '' })).toThrow();
+    expect(() => m.encodeShareBlockContent({ ...base, entryId: 'x'.repeat(m.SHARE_ENTRY_ID_MAX_BYTES + 1) })).toThrow();
     // bodyHash + authorWallet are REQUIRED (the share gate mirrors the comment gate).
     expect(() => m.encodeShareBlockContent({ ...base, bodyHash: '0x1234' })).toThrow();
     expect(() => m.encodeShareBlockContent({ ...base, authorWallet: '' })).toThrow();
@@ -302,9 +309,16 @@ describe('profile block content codec', () => {
     expect(m.decodeShareBlockContent(new Uint8Array())).toBe(null);
     expect(m.decodeShareBlockContent(new Uint8Array(64).fill(9))).toBe(null); // future version byte
     const good = m.encodeShareBlockContent({ ...base, author: 'ab', title: 'cd', snippet: 'ef' });
-    expect(m.decodeShareBlockContent(good.slice(0, 44))).toBe(null); // chopped inside the wallet field
+    // Offsets are DERIVED from the frame, not hardcoded: v2 puts the entry id first as [len][utf8], so the wallet
+    // field starts after it plus the 32-byte body hash. A test that pins byte 42 silently stops testing the thing
+    // it names the moment the layout moves — which is exactly what happened to the layout it was written against.
+    const walletLenAt = 3 + good[2] + 32;
+    expect(m.decodeShareBlockContent(good.slice(0, walletLenAt + 2))).toBe(null); // chopped inside the wallet field
     const badWalletLen = good.slice();
-    badWalletLen[42] = 0xff; // wallet length points past the buffer
+    badWalletLen[walletLenAt] = 0xff; // wallet length points past the buffer
     expect(m.decodeShareBlockContent(badWalletLen)).toBe(null);
+    const badEntryIdLen = good.slice();
+    badEntryIdLen[2] = 0xff; // the entry id length points past the buffer
+    expect(m.decodeShareBlockContent(badEntryIdLen)).toBe(null);
   });
 });

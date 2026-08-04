@@ -101,7 +101,7 @@ import {
   encodeShareBlockContent,
   decodeShareBlockContent,
   SHARE_SNIPPET_MAX_BYTES,
-} from './capsule-part-policy.mjs?v=9';
+} from './capsule-part-policy.mjs?v=10';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v839';
+const PLATHO_APP_RUNTIME_VERSION = 'v840';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late

@@ -24,8 +24,8 @@
     "sha256": "2a2b6f383f0b0e50f594254c4bae6a111144584cb06ccb9730f9c5ec1a7daeb6"
   },
   "capsule-part-policy.mjs": {
-    "version": "9",
-    "sha256": "ba675a8b10e9f0894fdd6c4be3647233a9b51df850000097b9a982b7ae8489bf"
+    "version": "10",
+    "sha256": "f934f175c7986eb4dacb59c72174ae8c77edfe80b8d9fb9123d078cf8ff6540f"
   },
   "conv-discovery.mjs": {
     "version": "4",
