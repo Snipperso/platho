@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v820';
+const PLATHO_APP_RUNTIME_VERSION = 'v822';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -747,7 +747,7 @@ let plathoSenderResolveDebug = [];
 // vs cryptographic sender, own-guard nulls) because the Hub gave only a publisher address. A shard capsule arrives
 // already bound to a conversation — its bucketKey is derived from the (selfKeyId, peerKeyId) K_root — so what is
 // worth recording is that binding and the thread it selected.
-function recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected, appended }) {
+function recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected, appended, seqSkipped = 0 }) {
   try {
     plathoSenderResolveDebug.push({
       at: new Date().toISOString(),
@@ -757,6 +757,10 @@ function recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected, a
       saved: isSavedMessagesThread(targetThread),
       collected,
       appended,
+      // How many entries the per-shard seq mark skipped BEFORE decryption. This is the number that proves the tail
+      // cursor works on a real device: a steady-state pass should read `skipped` high and `collected` at zero,
+      // where it used to open the whole window every time.
+      seqSkipped,
     });
     if (plathoSenderResolveDebug.length > SENDER_RESOLVE_DEBUG_RING) plathoSenderResolveDebug.shift();
   } catch { /* a diagnostic must never break a receive pass */ }
@@ -796,6 +800,21 @@ function copyPrivateThreadDiagnostic() {
           ce: message?.chainEntryId !== undefined && message?.chainEntryId !== null ? 'y' : 'n',
           t: String(message?.text ?? '').slice(0, 20),
         })),
+        // AVATAR, added 2026-08-04 after "the avatar never reached the recipient" could not be diagnosed from this
+        // dump at all. The sender's side was provably healthy on chain (KeyShard pointer, stream id and both media
+        // parts all matched), so the question is entirely on the receiving device — and it splits in two, which these
+        // fields separate. `pv`/`ah` are the profile pointer the PEER stamped into the last incoming message's
+        // header: zeros mean the sender never put it on the wire. `img` is whether this device managed to turn that
+        // pointer into an image: a real `ah` with img:'n' means the media fetch failed, not the stamp.
+        av: (() => {
+          const incoming = [...(thread.messages ?? [])].reverse().find((message) => message?.type === 'in');
+          const hash = String(incoming?.avatarHash ?? '');
+          return {
+            pv: Number(incoming?.profileVersion ?? 0) || 0,
+            ah: /^0*$/.test(hash) ? 'zero' : hash.slice(0, 12),
+            img: thread.avatarImageUrl ? 'y' : 'n',
+          };
+        })(),
       })),
       senderResolve: plathoSenderResolveDebug,
       // RECEIVE SIDE. The intro scan is a background loop whose errors go to console.warn — invisible on a phone.
@@ -9376,6 +9395,35 @@ function claimedPeerUsernameFromOpened(opened) {
   return typeof claim === 'string' && claim.trim().length > 0 ? claim : null;
 }
 
+// PER-SHARD SEQ HIGH-WATER MARK for the CONV receive scan — the "read only the tail" cursor.
+//
+// Keyed by the shard ADDRESS, which already encodes (kRoot, keyId pair, epoch, direction), so one map covers every
+// conversation and every retired root without a composite key. In memory only, exactly like the epoch cursor beside
+// it: a reload costs ONE full re-open pass, and a lost mark can only ever cause a re-read, never a miss.
+//
+// Bounded so a long-lived session cannot grow it without limit — epochs advance, and old buckets fall out of the
+// read window but would otherwise keep their entry forever. Eviction is safe by construction: the worst case is
+// re-reading a bucket once.
+const convBucketSeqMarks = new Map();
+const CONV_BUCKET_SEQ_MARK_LIMIT = 512;
+
+function convBucketSeqHighWater(bucketAddress) {
+  return convBucketSeqMarks.get(bucketAddress) ?? -1;
+}
+
+function advanceConvBucketSeqHighWater(bucketAddress, seq) {
+  if (!bucketAddress || !Number.isFinite(seq)) return;
+  if (seq <= convBucketSeqHighWater(bucketAddress)) return;
+  // Re-insert so the Map's insertion order doubles as a recency list for the eviction below.
+  convBucketSeqMarks.delete(bucketAddress);
+  convBucketSeqMarks.set(bucketAddress, seq);
+  while (convBucketSeqMarks.size > CONV_BUCKET_SEQ_MARK_LIMIT) {
+    const oldest = convBucketSeqMarks.keys().next();
+    if (oldest.done) break;
+    convBucketSeqMarks.delete(oldest.value);
+  }
+}
+
 /** Idempotent: safe to call on every incoming message. Returns immediately once the dialog is named and wears it. */
 function queueInboundPeerIdentityResolution(thread, claimedUsername = null) {
   if (!thread || inboundPeerIdentityInFlight.has(thread.id)) return;
@@ -11082,6 +11130,9 @@ async function syncConvCapsulesFromShards() {
     // decrypt under the retired one). kRootsForRead holds { kRoot, adoptedAt }.
     const roots = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry.kRoot)];
     const collected = [];
+    const bucketMaxSeq = new Map();   // shard address -> highest seq handled THIS pass
+    const bucketBlocked = new Set();  // shard address -> a transient failure: do not advance its mark at all
+    let seqSkipped = 0;
     let convClean = true; // every shard read for this conversation succeeded — only then may the cursor advance
     for (const kRoot of roots) {
       let entries;
@@ -11094,16 +11145,41 @@ async function syncConvCapsulesFromShards() {
         continue;
       }
       for (const found of entries) {
+        const bucket = String(found.address ?? '');
+        const foundSeq = Number(found.seq);
+        const seqUsable = bucket !== '' && Number.isFinite(foundSeq);
+        // ALREADY DECRYPTED — skip BEFORE the expensive part.
+        //
+        // MEASURED 2026-08-04 on the owner's dump: 24 consecutive passes, each `collected: 32, appended: 0`. Every
+        // ~37s the scan re-opened 32 capsules to discover nothing new, because dedup happened AFTER decryption
+        // (findMessageByCapsuleId needs the opened capsule). One open costs 4.7ms on this desktop and a phone is
+        // 3-5x slower, plus a real macrotask yield after each — roughly half a second of main thread, per pass, for
+        // nothing.
+        //
+        // `seq` is PLAINTEXT in the publish body (parseCapsulePublishBody reads it before any crypto) and strictly
+        // increases per shard — RecordShard gate 13653 refuses a publish whose seq does not exceed last_seq. So this
+        // is an exact high-water mark, not a heuristic: nothing at or below it can be new.
+        if (seqUsable && foundSeq <= convBucketSeqHighWater(bucket)) { seqSkipped += 1; continue; }
         let opened;
         try {
           opened = await openPrivateCapsuleChainEntry(found.entry, localRecipientKeyPair, { enforceExpiry: false });
         } catch (error) {
-          if (isPrivateUnreadableCapsuleError(error)) { skipped += 1; continue; }
+          if (isPrivateUnreadableCapsuleError(error)) {
+            // PERMANENTLY unreadable (someone else's capsule in a shared bucket). Counts as handled: re-trying it
+            // every pass forever is exactly the waste this mark exists to remove.
+            skipped += 1;
+            if (seqUsable) bucketMaxSeq.set(bucket, Math.max(bucketMaxSeq.get(bucket) ?? 0, foundSeq));
+            continue;
+          }
           convClean = false; allClean = false;
+          // TRANSIENT. The mark must NOT move past a message we failed to read, or it is lost for good — so this
+          // bucket is barred from advancing at all this pass and the whole range is re-read next time.
+          if (bucket) bucketBlocked.add(bucket);
           if (noteTonRpcRateLimit(error)) rateLimited = true;
           else console.warn('[conv] capsule open failed', error);
           continue;
         }
+        if (seqUsable) bucketMaxSeq.set(bucket, Math.max(bucketMaxSeq.get(bucket) ?? 0, foundSeq));
         collected.push({ opened, entry: { entry_id: found.seq } });
         // Cooperative yield after EVERY opened capsule: ML-KEM-768 decapsulation is SYNCHRONOUS CPU, and a burst
         // of them in a tight loop starves the main thread on a slow single-thread device (the measured iPhone SE2
@@ -11114,11 +11190,20 @@ async function syncConvCapsulesFromShards() {
       }
     }
     const appendedNow = await appendConvOpenedCapsules(collected, targetThread);
+    // Advance the per-shard marks ONLY here — after the append actually stored them. Moving the mark before this
+    // line would lose every collected message if the append threw.
+    for (const [bucket, seq] of bucketMaxSeq) {
+      if (!bucketBlocked.has(bucket)) advanceConvBucketSeqHighWater(bucket, seq);
+    }
     imported += appendedNow;
     // Feed the on-device routing diagnostic (copyPrivateThreadDiagnostic). Under direct pay routing is no longer a
     // guess: the conversation record's keyId PAIR selects the thread, so the useful record is which pair mapped to
     // which thread and how much it carried. Same instrument, the fact it captures just got simpler.
-    if (collected.length > 0) recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected: collected.length, appended: appendedNow });
+    // Record a pass that skipped everything too — "opened nothing because nothing was new" is exactly the healthy
+    // state, and a diagnostic that only fires when work happened cannot show that it stopped happening.
+    if (collected.length > 0 || seqSkipped > 0) {
+      recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected: collected.length, appended: appendedNow, seqSkipped });
+    }
     // Advance the cursor ONLY on a fully clean scan — a failed read must leave the cursor so those epochs are retried,
     // never silently skipped past.
     if (convClean) await convKeyStore.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
@@ -21737,8 +21822,16 @@ async function attemptConvMessagePublishDirect(context) {
   const sendStartedAt = Date.now();
   try {
     result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
+    // seqno lives at result.result.seqno: publishConvLaneParts returns { parts, result } and `result` is what
+    // sendPlathoWalletTransaction returned, which spreads the FIRST built external ({ boc, seqno, wallet }).
+    // Reading result.seqno one level up silently produced null on every send — a diagnostic that reports nothing is
+    // worse than none, because it looks like an answer. Caught 2026-08-04 by the owner's very first filled-in dump.
     globalThis.plathoLastConvSend = {
-      ok: true, parts: parts.length, seqno: result?.seqno ?? null, ms: Date.now() - sendStartedAt,
+      ok: true,
+      parts: parts.length,
+      seqno: result?.result?.seqno ?? null,
+      externals: result?.result?.batchCount ?? 1,
+      ms: Date.now() - sendStartedAt,
     };
     message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now() };
     // Record the parts' frame_commits + shard address + my highest seq for the delivery confirm (below). commits come
