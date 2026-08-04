@@ -268,10 +268,33 @@ function resolveTonRpcRequestTimeoutMs(requestOptions, transportOptions) {
   );
 }
 
+/**
+ * EVERY toncenter request this client makes passes through fetchWithTonRpcTimeout, which is what makes it the one
+ * place worth counting. The counters are cumulative and free (two increments); a caller snapshots them around a
+ * phase and reports the delta, so "where did the minute go" is answered by subtraction instead of by argument.
+ *
+ * Added 2026-08-04, after a boot that still felt slow with the decryption already down to zero and two rounds of
+ * reasoning failing to say why. The endpoint LEAF is the useful grain — /messages is history, /runGetMethod is a
+ * getter, /accountStates is a batched probe — and it costs nothing to keep.
+ */
+export const tonRpcRequestCounters = { total: 0, ms: 0, byLeaf: Object.create(null) };
+
+function noteTonRpcRequest(url, startedAt) {
+  const ms = Date.now() - startedAt;
+  tonRpcRequestCounters.total += 1;
+  tonRpcRequestCounters.ms += ms;
+  let leaf = 'other';
+  try { leaf = new URL(String(url)).pathname.split('/').pop() || 'other'; } catch { /* keep 'other' */ }
+  const bucket = tonRpcRequestCounters.byLeaf[leaf] ?? (tonRpcRequestCounters.byLeaf[leaf] = { n: 0, ms: 0 });
+  bucket.n += 1;
+  bucket.ms += ms;
+}
+
 async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
+  const startedAt = Date.now();
   const resolvedTimeoutMs = finiteNonNegativeMs(timeoutMs, TON_RPC_REQUEST_TIMEOUT_MS);
   if (resolvedTimeoutMs <= 0) {
-    return await fetchImpl(url, init);
+    try { return await fetchImpl(url, init); } finally { noteTonRpcRequest(url, startedAt); }
   }
 
   let timeoutId = null;
@@ -304,6 +327,7 @@ async function fetchWithTonRpcTimeout(fetchImpl, url, init, timeoutMs) {
   try {
     return await Promise.race([request, timeout]);
   } finally {
+    noteTonRpcRequest(url, startedAt);
     if (timeoutId !== null) clearTimeout(timeoutId);
   }
 }
