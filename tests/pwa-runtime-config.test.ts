@@ -841,8 +841,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function setUsernameMintStatus/);
     expect(app).toMatch(/setUsernameMintStatus\(rateLimited \? TON_RPC_CONNECTING_STATUS : usernameMintStatusText\(error\), rateLimited \? 'busy' : 'error'\)/);
     expect(app).toMatch(/estimatedUsernameMintTonFeeNanotons/);
-    expect(app).toMatch(/t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\) \}\)/);
-    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');   // copy string, retired with the Vault lane's UI
+    expect(app).toMatch(/t\('common\.gramCostValue', \{ amount: formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\) \}\)/);
+    expect(EN_STRINGS['common.gramCostValue']).toBe('up to {amount} GRAM from your wallet');
+    // The mint dialog's "Route: Vault" line went with the Vault: under direct pay the request goes from the wallet
+    // straight to UsernameRegistry, so the line named a hop that no longer exists.
+    expect(app, 'no Vault route line survives').not.toMatch(/t\('username\.route'\)/);
     // (The "official ATH wallet is not the derived registry wallet" refusal belonged to the Vault route check —
     // direct pay sends the ATH transfer to the registry address from the config+manifest pin, with no declared
     // route to disagree with.)
@@ -3378,19 +3381,37 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/editButton\.className = 'discovery-cta-action channel-about-edit'/);
     expect(css).toMatch(/\.channel-about-edit \{[^}]*margin-top: 8px;[^}]*\}/);
     expect(css).not.toMatch(/\.channel-about-edit \{[^}]*background: transparent/);
-    // Estimator mirrors estimatedProfileAvatarTonFeeNanotons but for the PROFILE document (no extra Vault charge — a
-    // channel profile is a plain public post): encode the SAME bytes publishChannelProfile does → split → price batch.
-    const est = app.slice(app.indexOf('function estimatedChannelProfileHoldNanotons('), app.indexOf('function estimatedChannelProfileHoldNanotons(') + 800);
+    // Estimator mirrors estimatedProfileAvatarTonFeeNanotons but for the PROFILE document (a channel profile is a
+    // plain public post): encode the SAME bytes publishChannelProfile does → split → price it.
+    const est = app.slice(app.indexOf('function estimatedChannelProfileChargeNanotons('), app.indexOf('function estimatedChannelProfileChargeNanotons(') + 800);
     expect(est).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername \}\]\)/);
     expect(est).toMatch(/splitBytesToCapsuleParts\(documentBytes, MAX_CAPSULE_USEFUL_BYTES\)/);
     expect(est).toMatch(/composerEstimatedMaxChargeNanotons\(publicComposerPublishProfilesForPlan\(parts\), 1\)/);
-    // The edit dialog surfaces it as a live summary line reusing the mint modal's GRAM-hold wording (parity, no new i18n).
-    const dlg = app.slice(app.indexOf('async function openEditChannelProfileDialog('), app.indexOf('async function openEditChannelProfileDialog(') + 1400);
+
+    // AND THAT ESTIMATOR MUST QUOTE THE DIRECT-PAY FIGURE. Reported by the owner 2026-08-04: this dialog said
+    // "up to 0.1698 GRAM from Vault". Both halves were wrong. The Vault is deleted, and 0.1698 is what the Vault's
+    // batch-hold model computes (127.8M shared base + per-part) — the publish actually attaches 20.3M + surcharge.
+    // Eight times the truth, on a money figure, in the dialog whose whole job is to say what saving will cost.
+    const maxCharge = app.slice(app.indexOf('function composerEstimatedMaxChargeNanotons('), app.indexOf('function composerEstimatedMaxChargeNanotons(') + 1400);
+    expect(maxCharge, 'under direct pay the max charge IS the attached value — there is no hold to reserve')
+      .toMatch(/if \(privateLaneDirectPayEnabled\(\)\) return composerEstimatedNetCostNanotons\(profile, parts\);/);
+
+    // The edit dialog surfaces it as a live summary line, sharing the mint modal's GRAM-cost wording.
+    const dlg = app.slice(app.indexOf('async function openEditChannelProfileDialog('), app.indexOf('async function openEditChannelProfileDialog(') + 1600);
     expect(dlg).toMatch(/summary: \(values\) =>/);
-    expect(dlg).toMatch(/estimatedChannelProfileHoldNanotons\(values\.description, values\.tags\)/);
-    expect(dlg).toMatch(/label: t\('username\.gramHold'\), value: t\('username\.gramHoldValue', \{ amount: formatTonNanotons\(hold\) \}\)/);
-    expect(EN_STRINGS['username.gramHold']).toBe('GRAM hold');
-    expect(EN_STRINGS['username.gramHoldValue']).toBe('up to {amount} GRAM from Vault');   // copy string, retired with the Vault lane's UI
+    expect(dlg).toMatch(/estimatedChannelProfileChargeNanotons\(values\.description, values\.tags\)/);
+    expect(dlg).toMatch(/label: t\('common\.gramCost'\), value: t\('common\.gramCostValue', \{ amount: formatTonNanotons\(charge\) \}\)/);
+    expect(EN_STRINGS['common.gramCost']).toBe('GRAM cost');
+    expect(EN_STRINGS['common.gramCostValue']).toBe('up to {amount} GRAM from your wallet');
+    // The Vault vocabulary is GONE from this pair, key and value, in every locale — a key called `gramHold` is how
+    // the wrong number kept its cover for a release.
+    expect(app, 'no caller left on the retired key').not.toMatch(/username\.gramHold/);
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      const dict = (I18N_STRINGS as Record<string, Record<string, string>>)[locale];
+      expect(dict['username.gramHold'], `${locale}: retired key must be gone`).toBeUndefined();
+      expect(dict['common.gramCostValue'], `${locale}: replacement must exist`).toBeTruthy();
+      expect(dict['common.gramCostValue']).not.toMatch(/Vault|Coffre|Хранилищ/i);
+    }
     // v792 (owner): the on-chain profile byte caps were raised (16 cyrillic chars/tag was too tight — long russian tags
     // cut mid-word; 256-char descriptions too short), and the edit dialog shows a LIVE utf-8 byte budget so nothing
     // truncates silently on save. Decode is unchanged (length fields carry any size) — backward-compatible.
