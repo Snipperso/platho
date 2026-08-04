@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v822';
+const PLATHO_APP_RUNTIME_VERSION = 'v823';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -765,6 +765,13 @@ function recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected, a
     if (plathoSenderResolveDebug.length > SENDER_RESOLVE_DEBUG_RING) plathoSenderResolveDebug.shift();
   } catch { /* a diagnostic must never break a receive pass */ }
 }
+/** A 32-byte avatar hash for the dump: "zero" when unset, else the first 12 hex chars. Tolerates a 0x prefix — the
+ *  first version did not, and printed "0x0000000000" where it meant "zero". */
+function shortAvatarHashForDiagnostic(value) {
+  const hash = String(value ?? '').replace(/^0x/i, '');
+  return /^0*$/.test(hash) ? 'zero' : hash.slice(0, 12);
+}
+
 function copyPrivateThreadDiagnostic() {
   try {
     const own = ownRuntimeWalletRaw();
@@ -808,14 +815,24 @@ function copyPrivateThreadDiagnostic() {
         // pointer into an image: a real `ah` with img:'n' means the media fetch failed, not the stamp.
         av: (() => {
           const incoming = [...(thread.messages ?? [])].reverse().find((message) => message?.type === 'in');
-          const hash = String(incoming?.avatarHash ?? '');
           return {
             pv: Number(incoming?.profileVersion ?? 0) || 0,
-            ah: /^0*$/.test(hash) ? 'zero' : hash.slice(0, 12),
+            ah: shortAvatarHashForDiagnostic(incoming?.avatarHash),
             img: thread.avatarImageUrl ? 'y' : 'n',
           };
         })(),
       })),
+      // WHAT THIS DEVICE STAMPS onto every outgoing capsule — the OTHER half of the avatar question, and the half
+      // the first version of `av` could not answer.
+      //
+      // It is read from the pointer source (currentProfilePointerFields), NOT from an outgoing message: the composer
+      // builds its optimistic record by hand and never puts profileVersion/avatarHash on it, so a per-message field
+      // would have read zero here no matter what actually went on the wire — a diagnostic that lies confidently.
+      // Only capsules RESTORED from chain carry those fields, which is why the incoming half above works.
+      ownAvatar: (() => {
+        const fields = currentProfilePointerFields();
+        return { pv: Number(fields.profileVersion ?? 0) || 0, ah: shortAvatarHashForDiagnostic(fields.avatarHash) };
+      })(),
       senderResolve: plathoSenderResolveDebug,
       // RECEIVE SIDE. The intro scan is a background loop whose errors go to console.warn — invisible on a phone.
       // These four fields are what turns "I see no messages" into a diagnosis.
