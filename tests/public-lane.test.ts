@@ -30,12 +30,15 @@ const publicPublishBody = (kind: number, keyArg: bigint, header: any, body: any)
     .storeRef(header).storeRef(body).endCell();
 
 /** Deploy a PublicShard, publish `n` entries as `sender`, and remember the built (header, body) cells. */
-async function seedShard(bc: Blockchain, sender: any, kind: number, era: number, pk: bigint, keyArg: bigint, n: number, seed: number) {
+//  seeds a shard in ITS OWN era: the publish gate only accepts a shard whose epoch_tag is within one era
+// of the chain clock, so a past-era fixture has to be written while the clock is there. Defaults to the shared CLOCK.
+async function seedShard(bc: Blockchain, sender: any, kind: number, era: number, pk: bigint, keyArg: bigint, n: number, seed: number, baseNow: number = CLOCK) {
   const shard = bc.openContract(await PublicShard.fromInit(pk, publicEpochTag(kind, era)));
+  bc.now = baseNow;
   await shard.send(sender.getSender(), { value: toNano('0.03') }, null);
   const built: Array<{ header: any; body: any }> = [];
   for (let i = 0; i < n; i++) {
-    bc.now = CLOCK + seed * 1000 + i * 97;
+    bc.now = baseNow + seed * 1000 + i * 97;
     const header = cell(seed * 10 + i);
     const body = cell(seed * 10 + 100 + i);
     built.push({ header, body });
@@ -72,6 +75,59 @@ describe('PUBLIC-LANE — the read assembly', () => {
     expect(posts.length, 'all three posts, authenticated').toBe(3);
     expect(posts[0].created_at > posts[2].created_at, 'newest first').toBe(true);
     for (const p of posts) expect(addrKey(p.publisher), 'attributed to the channel wallet').toBe(addrKey(owner.address.toString()));
+  }, 300_000);
+
+  it('PL-YEAR-01: a channel is read over the RETENTION year, and an unchanged shard is never re-read', async () => {
+    // [OWNER 2026-08-04] "in the channel itself posts should honestly hang for a year". PublicShard keeps a CHANNEL
+    // post for 1 year (PS_RETENTION_POST) while the reader stopped at 3 eras = 90 days, so a channel's own posts
+    // vanished from it while still on chain and still paid for. Harmless for a news feed; wrong for a book
+    // published a chapter at a time, which is exactly what this lane is about to carry.
+    //
+    // Widening only works BECAUSE of the marker gate: without it, every live shard of every past era would have its
+    // history re-read on every feed sync. This proves both halves — the window, and that the second read is free.
+    // The whole fixture is built TEN ERAS AGO and the clock is moved forward afterwards: the sandbox refuses to run
+    // a transaction at a timestamp earlier than one an account has already seen, and the publish gate only accepts a
+    // shard whose epoch_tag is within one era of the chain clock. So the past is written first, then we travel to now.
+    const ERA_SECONDS = 2_592_000;   // PS_ERA_SHORT: CHANNEL/THREAD
+    const era = publicEraOf(KIND.CHANNEL, CLOCK);
+    const oldEra = era - 10;         // past the old 90-day window, inside the retention year
+    const oldEraStart = oldEra * ERA_SECONDS + 1000;
+
+    const bc = await Blockchain.create();
+    bc.now = oldEraStart;
+    await deployFeeSink(bc, { funderSeed: 'pl-year-sink' });
+    const owner = await bc.treasury('pl-year-owner');
+    const pk = await publicChannelPartitionKey(publicWalletHash(owner.address), 0);
+    const { shard, built } = await seedShard(bc, owner, KIND.CHANNEL, oldEra, pk, 0n, 2, 7, oldEraStart);
+    bc.now = CLOCK;   // ten eras later — the shard must still be inside the read window
+
+    const shardKey = addrKey(shard.address.toString());
+    const rows = built.slice().reverse().map(({ header, body }) => ({
+      bodyCell: publicPublishBody(KIND.CHANNEL, 0n, header, body), source: owner.address.toString(),
+    }));
+    let messageReads = 0;
+    let markerLt = '1';
+    const lane = makeLane(bc, {
+      pages: new Map([[shardKey, shard]]),
+      messages: new Map([[shardKey, rows]]),
+      liveShards: [shard.address.toString()],
+      onMessages: () => { messageReads += 1; },
+      lt: () => markerLt,
+    });
+
+    const first = await lane.readChannelPosts(owner.address.toString());
+    expect(first.length, 'a shard ten eras old is still inside the window').toBe(2);
+    expect(messageReads, 'first read fetches the history').toBe(1);
+
+    const second = await lane.readChannelPosts(owner.address.toString());
+    expect(second.length, 'served from the snapshot, identical').toBe(2);
+    expect(messageReads, 'the marker did not move, so nothing was re-fetched').toBe(1);
+
+    // A shard that DID accept a write must come back. The marker is what says so.
+    markerLt = '2';
+    const third = await lane.readChannelPosts(owner.address.toString());
+    expect(third.length).toBe(2);
+    expect(messageReads, 'a moved marker re-reads exactly once').toBe(2);
   }, 300_000);
 
   it('PL-02: sweepChannelCatalog ranks by entry_count and dedups a channel to its newest announcement', async () => {
@@ -185,7 +241,7 @@ describe('PUBLIC-LANE — the read assembly', () => {
  * A lane whose transport serves get_page/get_view from the given live contracts and whose beacon sweep and
  * /messages are the given fixtures. This is how the assembly is tested without a real endpoint.
  */
-function makeLane(bc: Blockchain, fixture: { pages: Map<string, any>; messages: Map<string, any[]>; liveShards: string[] }) {
+function makeLane(bc: Blockchain, fixture: { pages: Map<string, any>; messages: Map<string, any[]>; liveShards: string[]; onMessages?: () => void; lt?: () => string }) {
   const shardByKey = fixture.pages;
   const runGetMethod = async (call: any) => {
     const shard = shardByKey.get(addrKey(call.address));
@@ -210,7 +266,7 @@ function makeLane(bc: Blockchain, fixture: { pages: Map<string, any>; messages: 
 }
 
 /** A fetch that answers /accountStates with the live shards present, and /messages with the fixture bodies. */
-function makeFakeFetch(bc: Blockchain, fixture: { messages: Map<string, any[]>; liveShards: string[] }) {
+function makeFakeFetch(bc: Blockchain, fixture: { messages: Map<string, any[]>; liveShards: string[]; onMessages?: () => void; lt?: () => string }) {
   const liveKeys = new Set(fixture.liveShards.map(addrKey));
   return async (urlStr: string) => {
     const url = new URL(urlStr);
@@ -218,10 +274,11 @@ function makeFakeFetch(bc: Blockchain, fixture: { messages: Map<string, any[]>; 
       const requested = url.searchParams.getAll('address');
       const accounts = requested
         .filter((a) => liveKeys.has(addrKey(a)))
-        .map((a) => ({ address: addrKey(a), status: 'active', balance: '1000000', data_hash: 'h', last_transaction_lt: '1' }));
+        .map((a) => ({ address: addrKey(a), status: 'active', balance: '1000000', data_hash: 'h', last_transaction_lt: fixture.lt ? fixture.lt() : '1' }));
       return { ok: true, status: 200, json: async () => ({ accounts }) };
     }
     if (url.pathname.endsWith('/messages')) {
+      fixture.onMessages?.();
       const dest = addrKey(url.searchParams.get('destination') ?? '');
       const rows = fixture.messages.get(dest) ?? [];
       const messages = rows.map((r: any) => ({

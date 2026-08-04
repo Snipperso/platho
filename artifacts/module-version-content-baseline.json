@@ -172,8 +172,8 @@
     "sha256": "3121f3ad4632e7bdbf0d0f708c37757244c31ed336b4b831dc23898973dab5ad"
   },
   "public-lane.mjs": {
-    "version": "9",
-    "sha256": "c17f08127c8ca41502121f829944d8b702920e541ee8549ec07249819be92019"
+    "version": "10",
+    "sha256": "112ef4c64d179e32a206de6d9bc50aff7f586c3fa64a8628b42b44caa5a2bdc6"
   },
   "public-publish-browser.mjs": {
     "version": "2",

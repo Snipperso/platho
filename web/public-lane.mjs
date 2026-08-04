@@ -45,6 +45,26 @@ const PS_KIND_CHANNEL = 0;
 const PS_KIND_THREAD = 1;
 
 /**
+ * How far back a CHANNEL is read — the CONTRACT'S retention, not a guess.
+ *
+ * PublicShard keeps a CHANNEL post for PS_RETENTION_POST = 1 year, and a CHANNEL era is 30 days, so a year is
+ * 12.17 eras: 13 full ones plus the current partial. The reader used to stop at 3 — ninety days — which meant a
+ * channel's own posts vanished from it while they were still on chain, still paid for, and still readable by
+ * anything that asked for the right era. Fine for a news feed, wrong for anything serialized: publish a book a
+ * chapter at a time and the opening chapters disappear from the channel three months in.
+ *
+ * [OWNER 2026-08-04: "in the channel itself posts should honestly hang for a year".] Freshness in channel
+ * DISCOVERY is a separate question and stays narrow — sweepChannelCatalog keeps its own window. Note that BEACON
+ * and AVATAR use the 1-year era, so an eraWindow of 3 there already means three years; only CHANNEL/THREAD count
+ * in 30-day steps.
+ *
+ * Widening is cheap by construction: the era addresses all ride ONE batched accountStates call (14 eras x 4
+ * overflow shards = 56 addresses, against a measured 1024-address ceiling), and the marker gate in readChannelPosts
+ * means a closed era is read once and never again.
+ */
+const PUBLIC_CHANNEL_ERA_WINDOW = 14;
+
+/**
  * Build the PUBLIC read lane.
  *
  * `runGetMethod` is the app's existing transport method, passed in (not imported) so this stays testable.
@@ -72,7 +92,12 @@ export function createPublicLane({
   const readStates = (addresses) => readAccountStates(addresses, { request: statesRequest });
 
   // ─────────────────────────────────────────────────────────────────────────────────────────────────────
-  // THREAD SNAPSHOT CACHE — reopening a post must not re-read comments that cannot have changed.
+  // SHARD SNAPSHOT CACHE — re-reading a shard that cannot have changed must cost nothing.
+  //
+  // It was written for comment threads and named after them, but its key is a SHARD ADDRESS and its value is that
+  // shard's posts — which is exactly what a channel read needs too. Channels went without it and paid for a full
+  // history read of every live shard on every sync; giving them the same cache is a rename, not a second copy.
+  // [2026-08-04, when the channel read window was widened to the retention year]
   //
   // The CapsuleHub path had incremental reads: a snapshot boundary let an unchanged thread come back with ZERO
   // body reads. The shard loader lost that and re-read the whole thread on every open — cheaper than the Hub
@@ -88,24 +113,24 @@ export function createPublicLane({
   //
   // PER SHARD, not per thread: a post's comments accumulate across era shards, so a year-old thread with one new
   // comment re-reads one shard and serves the rest from the snapshot.
-  const THREAD_SNAPSHOT_MAX = 256;                 // ~256 era-shards of comments; bounded so a long session cannot grow it
-  const threadSnapshots = new Map();               // addrKey -> { marker, posts }
+  const SHARD_SNAPSHOT_MAX = 256;                 // ~256 era-shards of comments; bounded so a long session cannot grow it
+  const shardSnapshots = new Map();               // addrKey -> { marker, posts }
 
-  function readThreadSnapshot(key, marker) {
-    const hit = threadSnapshots.get(key);
+  function readShardSnapshot(key, marker) {
+    const hit = shardSnapshots.get(key);
     if (!hit || hit.marker !== marker) return null;
-    threadSnapshots.delete(key);                   // reinsert: Map keeps insertion order, so this is the LRU bump
-    threadSnapshots.set(key, hit);
+    shardSnapshots.delete(key);                   // reinsert: Map keeps insertion order, so this is the LRU bump
+    shardSnapshots.set(key, hit);
     return hit.posts;
   }
 
-  function writeThreadSnapshot(key, marker, posts) {
-    threadSnapshots.delete(key);
-    threadSnapshots.set(key, { marker, posts });
-    while (threadSnapshots.size > THREAD_SNAPSHOT_MAX) {
-      const oldest = threadSnapshots.keys().next();
+  function writeShardSnapshot(key, marker, posts) {
+    shardSnapshots.delete(key);
+    shardSnapshots.set(key, { marker, posts });
+    while (shardSnapshots.size > SHARD_SNAPSHOT_MAX) {
+      const oldest = shardSnapshots.keys().next();
       if (oldest.done) break;
-      threadSnapshots.delete(oldest.value);
+      shardSnapshots.delete(oldest.value);
     }
   }
   /** posts of one shard, authenticated: get_page + /messages(+source) matched by commit. */
@@ -160,7 +185,7 @@ export function createPublicLane({
      * A channel's posts over the era window, authenticated and newest-first. `channelWallet` is the channel's
      * identity — a channel IS a wallet in clean-17. Returns { entry counts unused here } a flat post list.
      */
-    async readChannelPosts(channelWallet, { eraWindow = 3, seqProbe = PUBLIC_SEQ_PROBE } = {}) {
+    async readChannelPosts(channelWallet, { eraWindow = PUBLIC_CHANNEL_ERA_WINDOW, seqProbe = PUBLIC_SEQ_PROBE } = {}) {
       const nowUnix = now();
       const hash = publicWalletHash(channelWallet);
       const era = publicEraOf(PS_KIND_CHANNEL, nowUnix);
@@ -180,7 +205,15 @@ export function createPublicLane({
       for (const coord of coords) {
         const state = live.get(addrKey(coord.address));
         if (!state) continue;
-        const { posts: shardPosts } = await readShardPosts(state.address);
+        // THE SAME MARKER GATE THE THREAD READ HAS USED ALL ALONG, and the reason the window above can span a year
+        // at all: without it, every live shard of every past era would have its history re-read on every feed sync.
+        // A CLOSED era cannot change — its shards are past the publish gate's +/-1 slack — so after one read they
+        // cost exactly their row in the batched accountStates call above, forever.
+        const key = addrKey(coord.address);
+        const marker = changeMarkerOf(state);
+        const snapshot = readShardSnapshot(key, marker);
+        const shardPosts = snapshot ?? (await readShardPosts(state.address)).posts;
+        if (!snapshot) writeShardSnapshot(key, marker, shardPosts);
         for (const p of shardPosts) posts.push({ ...p, channelWallet, channelEpochTag: coord.epochTag, channelShardSeq: coord.seq });
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
@@ -225,10 +258,10 @@ export function createPublicLane({
         const key = addrKey(address);
         const marker = changeMarkerOf(state);
         // Nothing has been written to this shard since we last read it, so its comments are exactly what we hold.
-        const snapshot = readThreadSnapshot(key, marker);
+        const snapshot = readShardSnapshot(key, marker);
         if (snapshot) { posts.push(...snapshot); continue; }
         const { posts: shardPosts } = await readShardPosts(address);
-        writeThreadSnapshot(key, marker, shardPosts);
+        writeShardSnapshot(key, marker, shardPosts);
         posts.push(...shardPosts);
       }
       return posts;
