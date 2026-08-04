@@ -7,6 +7,7 @@
     "build": "node scripts/tact_build.js --config tact.config.json",
     "vectors": "ts-node scripts/generate_ath_wallet_vectors.ts",
     "test": "vitest run --config vitest.all.config.ts",
+    "test:web": "node scripts/run_targeted_web_suite.mjs",
     "test:regression:file": "vitest run --testTimeout=30000",
     "test:all": "vitest run --config vitest.all.config.ts --reporter=verbose",
     "test:debug": "PLATHO_VITEST_DEBUG_LOG=vitest-full-debug.log vitest run --config vitest.debug.config.ts --reporter=verbose",

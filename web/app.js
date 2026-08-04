@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v823';
+const PLATHO_APP_RUNTIME_VERSION = 'v824';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10613,8 +10613,17 @@ function messageFromOpenedCapsule(opened, meta, entry) {
     ...privateChainMessageOrderFields(entry, opened),
     blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
     capsule: opened.capsule,
-    profileVersion: opened.capsule?.header0?.profileVersion ?? 0,
-    avatarHash: opened.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
+    // FROM THE DECRYPTED IDENTITY, not from header0.
+    //
+    // MEASURED 2026-08-04: every received message carried profileVersion 0 and a zero avatar hash, so a private
+    // dialog could never show the peer's avatar — while both wallets had one registered on chain. The reason is
+    // structural: convCapsuleHeader0Bytes serialises exactly 40 bytes (magic, version, publishKind, sizeClass,
+    // cryptoSuite, bucketKey) and CANNOT carry a profile pointer. The in-memory header0 object has the fields, the
+    // WIRE does not, and a chain-sourced capsule rebuilds header0 from those 40 bytes. The pointer travels in the
+    // AEAD-protected IDENTITY section instead, which openPrivateCapsuleChainEntry surfaces at the TOP level.
+    // header0 stays as the fallback for the in-memory path (the sender's own outbox copy still has it there).
+    profileVersion: opened.profileVersion ?? opened.capsule?.header0?.profileVersion ?? 0,
+    avatarHash: opened.avatarHash ?? opened.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
   };
   if (isImage) {
     message.attachment = {
@@ -10679,8 +10688,9 @@ function messageFromOpenedPrivateParts(parts, meta) {
     capsule: first?.capsule,
     capsules: ordered.map((part) => part.opened?.capsule).filter(Boolean),
     blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
-    profileVersion: first?.capsule?.header0?.profileVersion ?? 0,
-    avatarHash: first?.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
+    // Same as the single-part path above: the pointer rides the decrypted identity, not the 40-byte header0.
+    profileVersion: first?.profileVersion ?? first?.capsule?.header0?.profileVersion ?? 0,
+    avatarHash: first?.avatarHash ?? first?.capsule?.header0?.avatarHash ?? zeroAvatarHashHex(),
   };
   if (chainLastEntryId && chainLastEntryId !== message.chainEntryId) {
     message.chainLastEntryId = chainLastEntryId;
