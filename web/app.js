@@ -233,7 +233,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v850';
+const PLATHO_APP_RUNTIME_VERSION = 'v851';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1145,7 +1145,13 @@ let messageAutoSyncCountdownTimer = null;
 let messageAutoSyncPhase = 'idle';
 // Public-feed sync phase (mirrors messageAutoSyncPhase) — drives the channel-detail header subtitle so it reads
 // the same "Syncing…/✓ Synced/Sync delayed" status as a Private conversation. Starts 'syncing' (initial load).
-let publicSyncPhase = 'syncing';
+// 'idle' until a public sync actually STARTS. It used to be born 'syncing', and nothing anywhere ever set it back
+// to 'syncing' — the only transitions in the file are to 'synced' and 'delayed'. So the header spinner span was
+// "page load -> first successful public sync", however long that took and whether or not any work was happening.
+// MEASURED on the owner's dump: spinner maxMs 71215, heldBy 'public', while the public phase of the tick itself
+// cost 1974ms. It was not reporting activity, it was reporting "this has not succeeded yet" — and the private
+// lane, which begins its own phase explicitly (beginMessageSyncUi), never had this. [2026-08-04]
+let publicSyncPhase = 'idle';
 let messageAutoSyncLastResult = null;
 let messageAutoSyncLastErrorLabel = null;
 // True while the MANUAL "Sync messages" run is in flight, so a profile re-render (refreshMessagingControls) does not
@@ -9914,6 +9920,10 @@ async function syncPublicChannels() {
   return await syncPublicChannelsRun();
 }
 async function syncPublicChannelsRun() {
+  // Mark the phase where the work BEGINS — the symmetric twin of beginMessageSyncUi on the private side. Both
+  // exits below ('synced' / 'delayed') already existed; the entry did not, which is how the flag came to mean
+  // "never succeeded" instead of "running now".
+  setPublicSyncPhase('syncing');
   let chainSyncError = null;
   try {
     // First cycle on a fresh load pays the verifier failure that parks a dead
