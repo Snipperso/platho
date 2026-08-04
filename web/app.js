@@ -220,7 +220,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=34';
+} from './i18n.mjs?v=35';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v832';
+const PLATHO_APP_RUNTIME_VERSION = 'v833';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4727,11 +4727,12 @@ async function openEditChannelProfileDialog() {
     checkingHint: t('public.descriptionSaving'),
     summary: (values) => {
       // Show the publish cost, same as the mint / avatar modals — a channel profile is a public post, so saving it
-      // holds GRAM from the Vault (the bulk is a refundable over-reserve, hence "up to"). Reuses the generic GRAM-hold
-      // strings for wording parity with the mint dialog. Best-effort: a pricing hiccup must never blank the dialog.
+      // is paid straight from the WALLET (the attached value slightly overstates what settles, hence "up to").
+      // Shares the generic GRAM-cost strings with the mint dialog. Best-effort: a pricing hiccup must never blank
+      // the dialog.
       try {
-        const hold = estimatedChannelProfileHoldNanotons(values.description, values.tags);
-        return [{ label: t('username.gramHold'), value: t('username.gramHoldValue', { amount: formatTonNanotons(hold) }) }];
+        const charge = estimatedChannelProfileChargeNanotons(values.description, values.tags);
+        return [{ label: t('common.gramCost'), value: t('common.gramCostValue', { amount: formatTonNanotons(charge) }) }];
       } catch {
         return [];
       }
@@ -13431,6 +13432,16 @@ function composerProfileKindLabel(profile) {
 // batches (SHARED_BASE per part): a deliberate, SAFE over-estimate for affordability, since the real grouped
 // batch hold is never higher than the per-capsule sum.
 function composerEstimatedMaxChargeNanotons(profile, parts = 1) {
+  // [CORRECTED 2026-08-04] THE THIRD SITE OF THE SAME DEFECT, and this time fixed at the source instead of at the
+  // caller. Under direct pay there is no hold and no batch: the client attaches a flat per-publish value straight to
+  // the shard, so the MAXIMUM charge and the attached value are the same number. The model below — SHARED_BASE
+  // amortised over a batch, refunded by a mode-128 ACK — is the Vault's, and clean-17 deleted the Vault.
+  //
+  // MEASURED from the owner's screen: the channel-description dialog quoted 0.1698 GRAM (127.8M Vault batch base +
+  // per-part) where the publish actually attaches 20.3M + surcharge. Eight times the truth, on a money figure, in a
+  // dialog whose whole job is to tell the user what saving will cost. The composer cost line and the avatar fee were
+  // corrected for exactly this on 2026-08-03; the dialog was their twin and was missed.
+  if (privateLaneDirectPayEnabled()) return composerEstimatedNetCostNanotons(profile, parts);
   if (Array.isArray(profile)) {
     if (profile.length === 0) return 0n;
     const hold = batchHoldNanotons(profile.map((item) => ({
@@ -13620,7 +13631,7 @@ function profileAvatarTonFeeLabel(attachment) {
 // but for a document instead of an image: encode the SAME bytes publishChannelProfile will (incl. the owner-username
 // trailer, which affects the byte size), split into capsule parts, and price the public batch. No extra Vault charge —
 // a profile is a plain public post (createPublicPayloadParts type:'post'), unlike the avatar's ProfileRegistry write.
-function estimatedChannelProfileHoldNanotons(description, tags) {
+function estimatedChannelProfileChargeNanotons(description, tags) {
   const desc = String(description ?? '').trim();
   const normalizedTags = normalizeProfileTags(tags);
   const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
@@ -19207,8 +19218,11 @@ async function requestUsernameMintName() {
           const short = priceAtomic !== null && athBalance < priceAtomic;
           lines.push({ label: t('username.yourAth'), value: short ? t('username.athBalanceNotEnough', { amount: formatAthAtomic(athBalance) }) : t('username.athBalance', { amount: formatAthAtomic(athBalance) }) });
         }
-        lines.push({ label: t('username.gramHold'), value: t('username.gramHoldValue', { amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()) }) });
-        lines.push({ label: t('username.route'), value: t('vault.name') });
+        lines.push({ label: t('common.gramCost'), value: t('common.gramCostValue', { amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()) }) });
+        // The "Route: Vault" line is GONE with the Vault. Under direct pay the mint request goes from the wallet
+        // straight to UsernameRegistry (USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS — the constant says so), so the
+        // line named a hop that no longer exists. Naming the wallet as a "route" instead would say nothing: there
+        // is only one way a mint can be paid now, and the cost line above already says where the GRAM comes from.
         return lines;
       },
     });
