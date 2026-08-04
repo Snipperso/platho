@@ -244,8 +244,8 @@
     "sha256": "5c559094b5b6cda9846a58963cde62c6e317bcddd8f9cb19172a2d4326f969a7"
   },
   "styles.css": {
-    "version": "283",
-    "sha256": "6733ca2540a37ae88c844456b709e1f9dfa56dbdc0f75e588d2e6244567165a2"
+    "version": "285",
+    "sha256": "73ca027b566f4154db66d88b9fc035a1fe41b1d8133379f480f057063e43bdd1"
   },
   "ton-dns-provider.mjs": {
     "version": "46",

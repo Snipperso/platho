@@ -3467,12 +3467,21 @@ button.feed-item:hover {
   background: var(--panel-2);
 }
 
+/* The label COLUMN was a fixed 108px and the label itself `white-space: nowrap` — a pair that only works while
+   every translation is short. Several are not: the Russian strings for "App language" and "Private message
+   sender" both run past 108px, and grid does not clip overflow, so the text ran out of its own column and under
+   the select. [OWNER 2026-08-04: "some phrases in the profile do not fit and overlap"]
+   Now the column has a floor and a ceiling instead of one exact size, and the label wraps inside it. Columns
+   cannot overlap by construction, so this cannot come back for a longer word in some other language — the row
+   simply grows taller (min-height, never a fixed height). */
 .settings-select-row.compact-select-row {
-  grid-template-columns: 108px minmax(0, 1fr);
+  grid-template-columns: minmax(108px, 38%) minmax(0, 1fr);
 }
 
 .settings-select-row.compact-select-row > span {
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .settings-select-row strong {
