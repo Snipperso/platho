@@ -17,17 +17,40 @@
 // user's toncenter budget, and the whole per-client-key rate model (8 rps under one key, one queue inside one
 // client) depends on there being exactly one queue.
 
-import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint } from './ton-rpc-transport.mjs?v=66';
+import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=67';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=35';
 
-/** A scan is background work: it must yield to anything the user is waiting on. */
+/**
+ * A scan is background work: it must yield to anything the user is waiting on.
+ *
+ * `background` IS THE LOW TIER — it is the largest weight in TONCENTER_REQUEST_PRIORITY_WEIGHTS, i.e. the last to
+ * be served. This used to say 'low', which is not in that table at all and silently fell through to `background`:
+ * the intent survived by accident, and the name promised a tier that does not exist.
+ */
 const SCAN_REQUEST_OPTIONS = Object.freeze({
-  rateLimitKey: 'shard-scan',
-  priority: 'low',
+  priority: 'background',
   // A scan pass that cannot get through right now is not worth queueing behind foreground work — the next pass
   // is a minute away and the cursor makes it cheap. Better a skipped pass than a backlog of stale ones.
   skipIfRateLimited: true,
 });
+
+/**
+ * The scan options for RIGHT NOW: the shared defaults above plus the pump coordinates of the configured primary
+ * provider — its limiter key and its request spacing.
+ *
+ * RESOLVED PER CALL, not frozen at module load, for the same reason the endpoint and the key are: the transport is
+ * rebuilt when the user adds their toncenter key (applyToncenterApiKey), and a lane holding the pre-key spacing
+ * would keep the whole receive path at the keyless ~1 rps forever.
+ *
+ * See toncenterScanLaneOptions for what this cost before it existed — the header above claims the whole rate model
+ * "depends on there being exactly one queue", and this lane was quietly running a second one at 12x the spacing.
+ */
+function scanRequestOptions(overrides = null) {
+  const lane = toncenterScanLaneOptions();
+  return overrides
+    ? { ...SCAN_REQUEST_OPTIONS, ...lane, ...overrides }
+    : { ...SCAN_REQUEST_OPTIONS, ...lane };
+}
 
 /**
  * The v3 endpoint for `leaf`, derived from whatever base is configured.
@@ -73,8 +96,8 @@ const resolveApiKey = (explicit) => explicit ?? globalThis.plathoToncenterApiKey
 export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, requestOptions = null, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
-  const options = requestOptions ? Object.freeze({ ...SCAN_REQUEST_OPTIONS, ...requestOptions }) : SCAN_REQUEST_OPTIONS;
   return async ({ path }) => {
+    const options = scanRequestOptions(requestOptions);
     const base = resolveEndpoint('accountStates', endpoint);
     const key = resolveApiKey(apiKey);
     // `path` already starts with /accountStates?… — take the origin and the directory above the leaf from base.
@@ -155,7 +178,7 @@ function rowIsForeign(row, opcode) {
  * Returns `{ rows, serverFiltered, pages }`. `serverFiltered` is false when the endpoint handed back rows we
  * did not ask for — the caller may want to know its window was assembled the expensive way.
  */
-async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages }) {
+async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false }) {
   const headers = { Accept: 'application/json' };
   if (key) headers['X-API-Key'] = key;
   const rows = [];
@@ -173,8 +196,18 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     if (offset > 0) url.searchParams.set('offset', String(offset));
 
     const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), SCAN_REQUEST_OPTIONS);
-    if (!response) break;                       // declined by the pump: an empty pass, not an error
+      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), scanRequestOptions());
+    if (!response) {
+      // DECLINED BY THE PUMP (a 429 backoff, with skipIfRateLimited set) — the request never ran.
+      //
+      // For a lane that re-reads its whole window every pass, treating that as "no messages" is harmless: the next
+      // pass reads it again anyway. For a lane that REMEMBERS what it read it is a silent loss — conv-lane's change
+      // marker would record the shard as read at its current marker, and skip it until somebody writes to it again.
+      // A capsule sitting in that shard would never be delivered, and every counter would say the pass was clean.
+      // Strict callers get a throw, which their per-shard catch turns into "not read, try next pass".
+      if (strict) throw new Error(`messages: the request for ${address} did not run (rate-limited or dropped)`);
+      break;
+    }
     if (!response.ok) throw new Error(`messages failed with HTTP ${response.status}`);
     const body = await response.json();
     const pageRows = body?.messages ?? [];
@@ -258,13 +291,13 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
 // `opcode` is what keeps that budget spent on real publishes rather than on whatever a stranger chose to send —
 // see the measured block above. Each lane passes its own: PSP1 for public posts, ISP1 for first contacts, RSP1
 // for CONV capsules. Omitting it preserves the take-everything behaviour.
-export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8 } = {}) {
+export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
   return async (address) => {
     const base = resolveEndpoint('messages', endpoint);
     const key = resolveApiKey(apiKey);
-    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages });
+    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict });
     const out = [];
     for (const message of rows) {
       const raw = message?.message_content?.body;

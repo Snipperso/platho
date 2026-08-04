@@ -79,3 +79,123 @@ describe('CONV-LANE (read assembly)', () => {
     expect(entries).toEqual([]);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// THE CHANGE-MARKER GATE — a quiet conversation must cost NO history reads, and a message must never be the price.
+//
+// MEASURED 2026-08-04: one conversation, nothing new, and every pass still fetched all three window epochs — three
+// sequential requests, every 12 seconds, to learn nothing. At N conversations it is 3N and the pass stops fitting
+// between ticks. `last_transaction_lt` answers "did anyone write here" out of a batch the pass makes anyway.
+//
+// Every test below is about the DANGEROUS direction: a gate that skips a shard it should have read loses messages
+// silently, which is the one failure this lane exists to prevent.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+describe('CONV-LANE — the change-marker gate', () => {
+  const window = { kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2 };
+
+  /** A lane over a stub that records which addresses were actually asked for. */
+  function countingLane(bodiesByAddress = new Map<string, any[]>()) {
+    const reads: string[] = [];
+    const lane = createConvReadLane({
+      verifyWriteSig: false,
+      readMessagesWithSource: async (address: string) => {
+        reads.push(addrKey(address));
+        return bodiesByAddress.get(addrKey(address)) ?? [];
+      },
+    });
+    return { lane, reads };
+  }
+
+  /** The state map readAccountStates hands back: only addresses the indexer has seen appear at all. */
+  const statesFor = (addresses: string[], lt: string) =>
+    new Map(addresses.map((address) => [addrKey(address), { address, status: 'active', lastLt: lt } as any]));
+
+  it('CONV-MARK-01: an unchanged shard is read ONCE, then skipped — and a moved marker re-reads it', async () => {
+    const { lane, reads } = countingLane();
+    const shards = await (await import('../web/conv-discovery.mjs')).incomingRecordShards(window as any);
+    const addresses = shards.map((s: any) => s.address);
+
+    await lane.readIncoming({ ...window, shards, states: statesFor(addresses, '100') });
+    expect(reads.length, 'first pass reads the whole window — nothing is known yet').toBe(addresses.length);
+
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards, states: statesFor(addresses, '100') });
+    expect(reads, 'second pass at the same marker: not one history request').toEqual([]);
+
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards, states: statesFor(addresses, '101') });
+    expect(reads.length, 'the marker moved — every shard is read again').toBe(addresses.length);
+  }, 120_000);
+
+  it('CONV-MARK-02: a shard the indexer has never seen costs nothing, and no states at all reads everything', async () => {
+    const { lane, reads } = countingLane();
+    const shards = await (await import('../web/conv-discovery.mjs')).incomingRecordShards(window as any);
+
+    // toncenter omits an address it has never seen: no row means no history to read.
+    await lane.readIncoming({ ...window, shards, states: new Map() });
+    expect(reads, 'an empty state map is an ANSWER: none of these shards was ever written to').toEqual([]);
+
+    // No states argument is NOT that answer — it is "nobody asked", and the lane must fall back to reading.
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards });
+    expect(reads.length, 'without a state probe the lane reads every shard, exactly as it always did').toBe(shards.length);
+  }, 120_000);
+
+  it('CONV-MARK-03: a FAILED history read leaves no mark — the next pass tries again', async () => {
+    // The dangerous direction. A read that threw returned nothing; marking it would declare the shard handled and
+    // skip it until somebody writes to it again, i.e. permanently lose whatever was in it.
+    const reads: string[] = [];
+    let failing = true;
+    const lane = createConvReadLane({
+      verifyWriteSig: false,
+      readMessagesWithSource: async (address: string) => {
+        reads.push(addrKey(address));
+        if (failing) throw new Error('transient');
+        return [];
+      },
+    });
+    const shards = await (await import('../web/conv-discovery.mjs')).incomingRecordShards(window as any);
+    const states = statesFor(shards.map((s: any) => s.address), '100');
+
+    await lane.readIncoming({ ...window, shards, states });
+    expect(reads.length).toBe(shards.length);
+
+    failing = false;
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards, states });
+    expect(reads.length, 'the same unchanged marker, but nothing was ever read from it').toBe(shards.length);
+  }, 120_000);
+
+  it('CONV-MARK-05: a row with no lt and no data hash is UNKNOWN — read every time, never marked', async () => {
+    // changeMarkerOf would still return a string for such a row ("null"), and a CONSTANT marker is the worst
+    // possible one: it matches itself on the next pass and silences the shard permanently.
+    const { lane, reads } = countingLane();
+    const shards = await (await import('../web/conv-discovery.mjs')).incomingRecordShards(window as any);
+    const blank = new Map(shards.map((s: any) => [addrKey(s.address), { address: s.address, status: 'active' } as any]));
+
+    await lane.readIncoming({ ...window, shards, states: blank });
+    expect(reads.length).toBe(shards.length);
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards, states: blank });
+    expect(reads.length, 'still unknown, so still read — no mark was ever taken').toBe(shards.length);
+  }, 120_000);
+
+  it('CONV-MARK-04: forgetShard drops the mark, so a caller whose DECRYPT failed gets the bytes again', async () => {
+    // The lane only knows the bytes arrived. The app decrypts them, and a capsule that failed to open for a
+    // transient reason has to come back — but the shard's marker has not moved, so only this can bring it back.
+    const { lane, reads } = countingLane();
+    const shards = await (await import('../web/conv-discovery.mjs')).incomingRecordShards(window as any);
+    const addresses = shards.map((s: any) => s.address);
+    const states = statesFor(addresses, '100');
+
+    await lane.readIncoming({ ...window, shards, states });
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards, states });
+    expect(reads, 'skipped, as designed').toEqual([]);
+
+    lane.forgetShard(addresses[0]);
+    reads.length = 0;
+    await lane.readIncoming({ ...window, shards, states });
+    expect(reads, 'exactly the forgotten one comes back — the others stay skipped').toEqual([addrKey(addresses[0])]);
+  }, 120_000);
+});

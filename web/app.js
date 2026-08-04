@@ -37,13 +37,13 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=110';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=111';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   TON_RPC_REQUEST_TIMEOUT_MS,
   decodeTonAddressSliceBoc,
-} from './ton-rpc-transport.mjs?v=66';
+} from './ton-rpc-transport.mjs?v=67';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -153,26 +153,26 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=8';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=45';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=48';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=46';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=49';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=7';
+import { createPublicLane } from './public-lane.mjs?v=9';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=4';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=4';
-import { createIntroLane } from './intro-lane.mjs?v=7';
+import { createIntroLane } from './intro-lane.mjs?v=9';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard } from './conv-discovery.mjs?v=4';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=4';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=4';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=4';
+import { createConvReadLane } from './conv-lane.mjs?v=6';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=5';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=5';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=7';
 import { readAccountStates } from './shard-reader.mjs?v=4';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
@@ -200,13 +200,13 @@ import {
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
 } from './shard-discovery.mjs?v=6';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=44';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=45';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=50';
+} from './username-ton-rpc-provider.mjs?v=51';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v828';
+const PLATHO_APP_RUNTIME_VERSION = 'v829';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -3517,6 +3517,12 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   localVaultDraft = null;
   // Stop the INTRO scan and drop its per-wallet K_root state — a different wallet must never inherit these (bleed).
   stopIntroReceiveLane();
+  // The CONV read lane and its per-shard marks are derived from THIS wallet's conversation keys. A shard address
+  // cannot collide across wallets (it is f(K_root), and K_root is per key-id pair), so inheriting them could only
+  // ever suppress a re-read — but "could only skip work" is precisely how the identity-bleed class starts, and the
+  // marks cost nothing to rebuild: one full pass.
+  convReadLaneInstance = null;
+  convBucketSeqMarks.clear();
   cancelAllConvDeliveryConfirms();   // drop pending delivery-confirm timers so none fires against a torn-down transport
   convKeyStore = null;
   introReplayGuard = null;
@@ -11188,17 +11194,69 @@ const CONV_SCAN_CATCHUP_CAP_EPOCHS = 366;
 // which is the whole point on a slow single-thread device. Used between synchronous-crypto iterations.
 const cooperativeYield = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+// A RecordShard address is derived from the conversation's K_root, so a stranger cannot address it and cannot grief
+// this window the way a public or intro shard can be griefed. The opcode filter still earns its place: the shard's
+// own fee deposits and top-ups stop consuming the 128-row budget, so the window holds 128 CAPSULES.
+//
+// ONE INSTANCE FOR THE SESSION, not one per pass. The lane now carries the per-shard change marks that let a quiet
+// conversation cost nothing, and a lane rebuilt every 12 seconds would throw them away every 12 seconds. Dropped by
+// the lock/account-switch teardown along with the rest of the per-wallet state.
+let convReadLaneInstance = null;
+
+function convReadLane() {
+  if (!convReadLaneInstance) {
+    convReadLaneInstance = createConvReadLane({
+      // STRICT, and this lane is the reason the flag exists on the reader. It REMEMBERS which shards it has read
+      // (the change-marker gate), so a request the pump declined during a 429 backoff must not come back as "this
+      // shard had no messages" — that answer would be recorded as read and the shard skipped until somebody writes
+      // to it again. A throw lands on the lane's per-shard catch, which leaves no mark and retries next pass.
+      readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CAPSULE_PUBLISH_OPCODE, strict: true }),
+    });
+  }
+  return convReadLaneInstance;
+}
+
+/**
+ * WHICH of this device's incoming RecordShards have been written to since the last pass — every conversation's,
+ * in ONE request.
+ *
+ * Returns a Map(addrKey -> state), or NULL when the question could not be answered. Null is not "nothing there":
+ * it means the caller must read every shard, which is exactly what it did before this existed.
+ *
+ * BUILT STRICT, AND THAT IS THE WHOLE SAFETY ARGUMENT. A non-strict reader resolves a request the pump DECLINED
+ * (a 429 backoff, with skipIfRateLimited set) into `{ accounts: [] }` — indistinguishable from "none of these
+ * shards has ever been written to". The caller would then skip every history read, find nothing, and report a
+ * clean pass: every message on chain, none of them delivered, no error anywhere. Strict throws instead, and the
+ * throw lands on the fallback that reads everything.
+ */
+async function readConvShardStates(plans) {
+  const addresses = [];
+  const seen = new Set();
+  for (const plan of plans) {
+    for (const root of plan.rootShards) {
+      for (const shard of root.shards) {
+        if (!shard?.address || seen.has(shard.address)) continue;
+        seen.add(shard.address);
+        addresses.push(shard.address);
+      }
+    }
+  }
+  if (addresses.length === 0) return new Map();
+  try {
+    return await readAccountStates(addresses, { request: createShardStatesRequest({ strict: true }) });
+  } catch (error) {
+    // Rate-limited, offline, or an endpoint that would not answer. Read everything — slower, never wrong.
+    if (!noteTonRpcRateLimit(error)) console.warn('[conv] shard state probe failed, reading every shard', error);
+    return null;
+  }
+}
+
 async function syncConvCapsulesFromShards() {
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
   const selfKeyId = localRecipientKeyPair.keyId;
-  // A RecordShard address is derived from the conversation's K_root, so a stranger cannot address it and cannot
-  // grief this window the way a public or intro shard can be griefed. The opcode filter still earns its place:
-  // the shard's own fee deposits and top-ups stop consuming the 128-row budget, so the window holds 128 CAPSULES.
-  const lane = createConvReadLane({
-    readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CAPSULE_PUBLISH_OPCODE }),
-  });
+  const lane = convReadLane();
   const epochNow = epochFromCreatedAtSeconds(Math.floor(Date.now() / 1000));
   // Per-tick cheap heal (Saved-only form, no args): a session whose thread routing was poisoned MID-flight
   // self-corrects on the next sync instead of needing a full re-unlock. This ran on every CapsuleHub sync tick
@@ -11208,14 +11266,14 @@ async function syncConvCapsulesFromShards() {
   healCrossWalletIdentityBleed();
   let imported = 0;
   let skipped = 0;
-  let conversations = 0;
   let rateLimited = false;
   let allClean = true;
+
+  // PASS 1 — every conversation's window, and every incoming shard address in it. Pure key derivation, ZERO RPC.
+  const plans = [];
   for (const record of convKeyStore.snapshot().values()) {
     if (!record?.kRootCurrent || !record?.peerKeyId) continue;
-    conversations += 1;
     const peerKeyId = record.peerKeyId;
-    const targetThread = resolveConvReceiveThread(introKeyIdString(peerKeyId));
     // OFFLINE CATCH-UP. Always scan at least the last CONV_RECV_WINDOW_W epochs (the ±1 publish-slack window), and
     // extend BACK to this conversation's scan cursor if it is older — so a message whose epoch scrolled past the
     // steady window while the client was offline is still read. Capped at CONV_SCAN_CATCHUP_CAP_EPOCHS (retention).
@@ -11228,15 +11286,39 @@ async function syncConvCapsulesFromShards() {
     // The current root plus any retired roots (a re-INTRO minted a new K_root; old messages still in the window
     // decrypt under the retired one). kRootsForRead holds { kRoot, adoptedAt }.
     const roots = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry.kRoot)];
+    const rootShards = [];
+    for (const kRoot of roots) {
+      rootShards.push({ kRoot, shards: await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
+    }
+    plans.push({ peerKeyId, windowW, rootShards });
+    // Deriving one conversation's window is HKDF plus an ed25519 public key per bucket, and a conversation in full
+    // offline catch-up derives up to CONV_SCAN_CATCHUP_CAP_EPOCHS of them. That burst is not new — readIncoming did
+    // exactly the same work — but it used to be separated by each conversation's network reads, and this pass runs
+    // them back to back. One real macrotask between conversations keeps a device with many dialogs able to paint.
+    await cooperativeYield();
+  }
+  const conversations = plans.length;
+
+  // PASS 2 — ONE batched accountStates over every address of every conversation, so the pass can tell which shards
+  // were written to at all. 1024 addresses fit a single request, so this is one request for the whole device, not
+  // one per conversation. `null` means the question could not be answered; then pass 3 reads everything, as before.
+  const shardStates = await readConvShardStates(plans);
+
+  // PASS 3 — history reads, decryption, append. Only for shards the batch above says have moved.
+  for (const plan of plans) {
+    const peerKeyId = plan.peerKeyId;
+    const targetThread = resolveConvReceiveThread(introKeyIdString(peerKeyId));
     const collected = [];
     const bucketMaxSeq = new Map();   // shard address -> highest seq handled THIS pass
     const bucketBlocked = new Set();  // shard address -> a transient failure: do not advance its mark at all
     let seqSkipped = 0;
     let convClean = true; // every shard read for this conversation succeeded — only then may the cursor advance
-    for (const kRoot of roots) {
+    for (const { kRoot, shards } of plan.rootShards) {
       let entries;
       try {
-        entries = await lane.readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
+        entries = await lane.readIncoming({
+          kRoot, selfKeyId, peerKeyId, epochNow, windowW: plan.windowW, shards, states: shardStates,
+        });
       } catch (error) {
         convClean = false; allClean = false;
         if (noteTonRpcRateLimit(error)) rateLimited = true;
@@ -11294,6 +11376,11 @@ async function syncConvCapsulesFromShards() {
     for (const [bucket, seq] of bucketMaxSeq) {
       if (!bucketBlocked.has(bucket)) advanceConvBucketSeqHighWater(bucket, seq);
     }
+    // A blocked bucket must be re-read next pass, and BOTH marks stand in the way of that: the seq high-water above
+    // (barred) and the lane's change marker (dropped here). The lane already read those bytes successfully, so its
+    // marker moved; leaving it would skip the shard for as long as nobody writes to it again — i.e. forever, for a
+    // capsule that failed to decrypt for a transient reason. One decision, two places to say it.
+    for (const bucket of bucketBlocked) lane.forgetShard(bucket);
     imported += appendedNow;
     // Feed the on-device routing diagnostic (copyPrivateThreadDiagnostic). Under direct pay routing is no longer a
     // guess: the conversation record's keyId PAIR selects the thread, so the useful record is which pair mapped to
@@ -11308,7 +11395,12 @@ async function syncConvCapsulesFromShards() {
     if (convClean) await convKeyStore.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
   }
   if (imported > 0) { renderThreads(); renderConversation(); }
-  globalThis.plathoLastConvSync = { at: new Date().toISOString(), conversations, imported, skipped, epochNow, rateLimited };
+  globalThis.plathoLastConvSync = {
+    at: new Date().toISOString(), conversations, imported, skipped, epochNow, rateLimited,
+    // shards.skipped climbing while read stays flat IS the healthy steady state: nothing was written, so nothing
+    // was fetched. `probe: false` means the state batch could not run and every shard was read the old way.
+    shards: lane.shardReadStats(), probe: shardStates !== null,
+  };
   // scanComplete reflects the truth: false if any read failed (so the UI does not claim 'up to date' over a gap).
   return privateSyncResult({ ok: true, imported, skipped, scanComplete: allClean, rateLimited });
 }
