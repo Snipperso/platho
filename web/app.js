@@ -233,7 +233,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v849';
+const PLATHO_APP_RUNTIME_VERSION = 'v850';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -856,6 +856,7 @@ function copyPrivateThreadDiagnostic() {
       // accountStates could not run and every shard is being read the old way.
       convSync: globalThis.plathoLastConvSync ?? null,
       syncProfile: globalThis.plathoLastSyncProfile ?? null,
+      spinner: globalThis.plathoLastSpinnerSpan ?? null,
       // The restore's own numbers. I told the owner twice today to look at a counter that the dump did not carry —
       // first the shard stats, now seededSeqMarks. A diagnostic that exists only in a global nobody prints is not
       // a diagnostic; it is a note to myself. `seeded: 0` with a non-empty history is the exact signature of the
@@ -5033,8 +5034,47 @@ function isGlobalSyncActive() {
 // Drive the green header sync indicator (spinner while any sync runs, check when synced) — shown in the corner on
 // every tab. Toggled at every sync phase transition: private via refreshConversationSubtitle (which all private
 // transitions call), public via setPublicSyncPhase, prefs via publishPrefsSnapshot.
+/**
+ * HOW LONG THE SPINNER ACTUALLY SPINS, and which of the three flags held it.
+ *
+ * MEASURED 2026-08-04: a sync TICK costs 2.7s and three requests, and the whole page had spent 16 requests since
+ * load — yet the owner still saw a long "syncing". So the tick was never the thing to measure: the spinner is an
+ * OR over three independent flags (private phase, public phase, prefs publish), and any one of them can hold it
+ * long after the others are done. I instrumented the tick and learned it was fast, which is the right answer to
+ * the wrong question. This records the spinner's own lifetime and names the flag that outlasted the rest.
+ */
+let globalSyncSpinnerSince = 0;
+let globalSyncSpinnerHeldBy = null;
+
 function refreshGlobalSyncIndicator() {
   const active = isGlobalSyncActive();
+  if (active) {
+    if (!globalSyncSpinnerSince) globalSyncSpinnerSince = Date.now();
+    // WHICH flag is still up, sampled every refresh. The last sample before the spinner clears names whatever
+    // outlasted the others — the OR hides that completely, and it is the whole question.
+    globalSyncSpinnerHeldBy = [
+      messageAutoSyncPhase === 'syncing' ? 'private' : null,
+      publicSyncPhase === 'syncing' ? 'public' : null,
+      prefsSyncInFlight === true ? 'prefs' : null,
+    ].filter(Boolean).join('+') || 'unknown';
+  }
+  if (!active && globalSyncSpinnerSince) {
+    const spanMs = Date.now() - globalSyncSpinnerSince;
+    const heldBy = globalSyncSpinnerHeldBy;
+    globalSyncSpinnerSince = 0;
+    globalSyncSpinnerHeldBy = null;
+    const previous = globalThis.plathoLastSpinnerSpan;
+    globalThis.plathoLastSpinnerSpan = {
+      at: new Date().toISOString(),
+      ms: spanMs,
+      heldBy,
+      // The longest one seen this session — a boot that spins once is a different problem from one that spins
+      // on every tick, and only the maximum tells them apart.
+      maxMs: Math.max(spanMs, Number(previous?.maxMs ?? 0)),
+      maxHeldBy: spanMs >= Number(previous?.maxMs ?? 0) ? heldBy : (previous?.maxHeldBy ?? null),
+      spans: Number(previous?.spans ?? 0) + 1,
+    };
+  }
   for (const el of globalSyncIndicators) {
     el.dataset.syncing = active ? 'true' : 'false';
     // Idle = a tappable "sync now" button (see syncNowForCurrentScreen); the tooltip says so.
