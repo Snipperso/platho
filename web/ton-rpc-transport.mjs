@@ -1492,6 +1492,53 @@ export function effectiveToncenterRequestSpacingMs(provider = {}, defaults = {})
  * because iOS WebKit stalls its run loop on parallel connections to one host (the iPhone freeze). Dropping the
  * spacing without merging the queues would also have put two lanes x 8 rps against a 10 rps key cap.
  */
+/**
+ * A per-phase stopwatch: wall time AND toncenter requests spent, by phase. ONE primitive for every lane that wants
+ * to answer "where did the seconds go" — the sync tick has used this shape since the 71-second phantom spinner, and
+ * the send path needs the identical breakdown.
+ *
+ * The request count is the half that matters. Wall time alone cannot separate "this phase is doing work" from "this
+ * phase is queued behind someone else's work in the shared serial pump" — and the pump's spacing differs by an order
+ * of magnitude between a keyed client (125ms) and a KEYLESS one (1100ms), so the same phase costs wildly different
+ * wall time for two users doing the same thing. `spacingMs` is recorded with the profile for exactly that reason:
+ * without it a number here cannot be compared against a number from another device.
+ */
+export function beginTonRpcPhaseProfile() {
+  const startedAt = Date.now();
+  const before = { at: startedAt, n: tonRpcRequestCounters.total, ms: tonRpcRequestCounters.ms };
+  const phases = {};
+  let cursor = before;
+  return {
+    startedAt,
+    phases,
+    mark(name) {
+      const now = { at: Date.now(), n: tonRpcRequestCounters.total, ms: tonRpcRequestCounters.ms };
+      const prior = phases[name];
+      const span = { ms: now.at - cursor.at, req: now.n - cursor.n, netMs: now.ms - cursor.ms };
+      // A phase marked twice (per-chunk work) ACCUMULATES rather than overwriting — otherwise a two-external send
+      // reports only its last chunk and the total stops adding up.
+      phases[name] = prior
+        ? { ms: prior.ms + span.ms, req: prior.req + span.req, netMs: prior.netMs + span.netMs, n: (prior.n ?? 1) + 1 }
+        : span;
+      cursor = now;
+    },
+    summary() {
+      return {
+        at: new Date().toISOString(),
+        totalMs: Date.now() - startedAt,
+        // The pump cadence this ran at: 125ms keyed vs 1100ms keyless changes every number above.
+        spacingMs: toncenterScanLaneOptions()?.requestSpacingMs ?? null,
+        phases,
+        sinceLoad: {
+          req: tonRpcRequestCounters.total,
+          netMs: tonRpcRequestCounters.ms,
+          byLeaf: { ...tonRpcRequestCounters.byLeaf },
+        },
+      };
+    },
+  };
+}
+
 export function toncenterScanLaneOptions(config = null) {
   const resolved = config ?? globalThis.plathoTonRpcConfig ?? null;
   if (!resolved) return {};

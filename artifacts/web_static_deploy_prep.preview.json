@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-04T18:54:45.055Z",
+  "generatedAt": "2026-08-04T19:44:48.678Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 223,
-    "totalBytes": 5712332,
-    "bundleSha256": "01732d221ef939453a2e5cede39c8a56a27c8e6e5eba108aa238fe947d6ead08",
+    "totalBytes": 5717468,
+    "bundleSha256": "3dcd26ad683c7fc1637c0968c1f098dfe9f26b9a07c25dbdee947a4754d46505",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -20,12 +20,12 @@
       {
         "path": "airdrop-ticket-read.mjs",
         "bytes": 3594,
-        "sha256": "369985cdff3eec813dd67351000de6226df308128034512a1f5ea85ea8a58adb"
+        "sha256": "3e4ad156a3aa2f670774bff47ac517948c319178dd89bdde2d23244b2e43571d"
       },
       {
         "path": "app.js",
-        "bytes": 1251245,
-        "sha256": "0e08d0f43967060c230ea833ee214efd4c3fe5cd0028cba5b2eb5a247acdf86b"
+        "bytes": 1253267,
+        "sha256": "0d766e2fd0c399bb07e856e20286ebcf4b4e1ffec8223db61875a30c644d74c7"
       },
       {
         "path": "assets/icons/about.svg",
@@ -255,7 +255,7 @@
       {
         "path": "ath-ton-rpc-provider.mjs",
         "bytes": 6593,
-        "sha256": "4dbb293bb696eda7a96188d4e4a708c80679f1d059a889cec7a15f3c8c65cca2"
+        "sha256": "a6ac247f5a1ddccd9124876f10952976ac2f23f6656a045cebe183f3856ac1e7"
       },
       {
         "path": "boot-guard.js",
@@ -285,7 +285,7 @@
       {
         "path": "conv-discovery.mjs",
         "bytes": 4668,
-        "sha256": "a39bc1577e40347f5b2c57ed0f68881971a5afa868e72e2377a50175146998c4"
+        "sha256": "a938452f19d75b82073a2277744b005154c80fb6c4a91f1def92aa9238f7d86a"
       },
       {
         "path": "conv-key-persist.mjs",
@@ -300,17 +300,17 @@
       {
         "path": "conv-lane-read.mjs",
         "bytes": 18864,
-        "sha256": "276885d64f8a45a4017ac62a4c0cac2f1c51787e3874398e81c3cbe14616a073"
+        "sha256": "1cfc60055d5438cc08d17926511198b81531e696ff8bcb7dc3edef61f8aaa46b"
       },
       {
         "path": "conv-lane-send.mjs",
         "bytes": 7547,
-        "sha256": "00167c05e0dfa3955d6e7ffcf209e53988253bdb21889ad801dba58a0b4584b2"
+        "sha256": "3466e20ed8364ffab3cf7e3daf80bc35637952234131164d4a99867b1bdb339b"
       },
       {
         "path": "conv-lane.mjs",
         "bytes": 10610,
-        "sha256": "61b62b1b5cfb279e1e3601c75bcaeaac9909ed49e7b779c9e665da2da0c7407c"
+        "sha256": "7777407999ddc913bcb87556e1475a5c4e6968bece64cf8339aa3da02c06927c"
       },
       {
         "path": "conv-publish-browser.mjs",
@@ -505,12 +505,12 @@
       {
         "path": "index.html",
         "bytes": 59877,
-        "sha256": "b54a6c9ea658f82ae2bc4c2f392a90192c43912141d9fcce1ad735a48699a116"
+        "sha256": "811db0d38c71a9ec350ec5e8f0cbc2fa6c75b180e6f99031691913a5b21fcd8c"
       },
       {
         "path": "intro-bucket.mjs",
         "bytes": 6066,
-        "sha256": "1eff0f696374cd47199c80a3bce2fac84d2f5315aae2d15061d060418d861483"
+        "sha256": "d0d5dd7e501127b7c9f9c22f07a099549b26cce9d47650d5ecb54aa57903d160"
       },
       {
         "path": "intro-codec.mjs",
@@ -525,17 +525,17 @@
       {
         "path": "intro-lane-send.mjs",
         "bytes": 6154,
-        "sha256": "5a5a82f174a90d108f45af728c25b9063457ddeb1030f02d123b5eb97ebb5320"
+        "sha256": "8ad3c447b6fc043a16df7a267b94d9ea596ceb96726986eef651fb38c5956b0f"
       },
       {
         "path": "intro-lane.mjs",
-        "bytes": 6024,
-        "sha256": "8e437abf3e0adea49ed866fe8e46af2410bf1bd78a7c5f94bca70dd25870bd9f"
+        "bytes": 6025,
+        "sha256": "d9693b3aa09ca2d6468ed02414623e3186f69002b7fc92b1f619277fd0aa632b"
       },
       {
         "path": "intro-publish-browser.mjs",
         "bytes": 3142,
-        "sha256": "d910b017a0efc6f2ab3f8e152fb0bb37467ccfd742bb35981fa97ed5ac8fbaf2"
+        "sha256": "93501a0c45e3e316766687489f4238b3ee4a4afab7d4d8d98ad08768c6655a94"
       },
       {
         "path": "intro-receive-handler.mjs",
@@ -545,7 +545,7 @@
       {
         "path": "intro-receive.mjs",
         "bytes": 15326,
-        "sha256": "2ede71c96757369b29f66436343933efa132b6d36a50c658874cc9e93a1ce874"
+        "sha256": "9601ea70f1e025f8b58fdf57a53681b970540b0ef0e40635996f7e00cb61cdd3"
       },
       {
         "path": "intro-scan-policy.mjs",
@@ -555,7 +555,7 @@
       {
         "path": "intro-scan-runner.mjs",
         "bytes": 10658,
-        "sha256": "1e21c6c21cd6cf7484315bbbf9162de8c73440dffd522cbdba0a194f0443603e"
+        "sha256": "aa37b804e394eb9d9ede02056e12006984005c97fea2ab972799728437a89c3e"
       },
       {
         "path": "intro-scan.mjs",
@@ -565,7 +565,7 @@
       {
         "path": "intro-send-coords.mjs",
         "bytes": 3503,
-        "sha256": "35fb66a59d8878d51b84522afc6af2fbd81fa1f58859e8f501ec19f3c66b3630"
+        "sha256": "3154fb299f9ce0f36e02d409fa61f86e0a391b9ce0f3b34ae6332dd2760caf3f"
       },
       {
         "path": "intro-send-state.mjs",
@@ -575,7 +575,7 @@
       {
         "path": "intro-transport.mjs",
         "bytes": 11913,
-        "sha256": "87a155098e00e4007c3fe64f6ab778f0f8c65d2c9aae9132ae5b518089114fe9"
+        "sha256": "8f6f411a4ee3c88271aa093607bce09f12a4c256b045f439769641e5e4712359"
       },
       {
         "path": "key-shard-register-browser.mjs",
@@ -585,7 +585,7 @@
       {
         "path": "key-shard-register-send.mjs",
         "bytes": 2374,
-        "sha256": "f0cc39c9d12a70e7def2130e479ca2eff45ca56ced69c01b82fd82bafce5a55b"
+        "sha256": "fef5534cb7dc86757ba6c2b938376e176ef61a1a608f17fc66d4660760f01a10"
       },
       {
         "path": "key-shard-ton-rpc-provider.mjs",
@@ -605,17 +605,17 @@
       {
         "path": "notes-lane.mjs",
         "bytes": 11428,
-        "sha256": "dfd9b30aca6116f31437eaca4f63a4ce7ebe9d5a8523e3227335c419dcc5b209"
+        "sha256": "fca45b3c27604f9f373b12cf3f81ba11b288d2c074ca0d8a82654cbe67e0b7c7"
       },
       {
         "path": "platho-config.mjs",
         "bytes": 20073,
-        "sha256": "4940e7a6371a5ecc4523208b996d1b6e3a3a294fcb5044707c4f50490ef1c375"
+        "sha256": "5dc90e4ccb8027e592809453c5b53c3486e45fed43af826c55d4cabd3c5e894f"
       },
       {
         "path": "platho-wallet.mjs",
-        "bytes": 39623,
-        "sha256": "ad510c1de1d8d4e50683079a3f072f64506ec691c7d19aaa015dbd27f7c0bbec"
+        "bytes": 40513,
+        "sha256": "871b1218a73bd224c0a526e96039918d966d0da5297ae56a7cb671a0cda488fe"
       },
       {
         "path": "profile-avatar-media-store.mjs",
@@ -625,7 +625,7 @@
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
         "bytes": 7717,
-        "sha256": "189dcf2f91ae85faa6d2246fb044466673c76f719d3e71745fca8a0eda1d80d5"
+        "sha256": "e0c1b6a6dbac4df0d867f2258aa7d848053722ce6fab788e2768998ba2120dde"
       },
       {
         "path": "public-channel-subscriptions.mjs",
@@ -635,12 +635,12 @@
       {
         "path": "public-lane-send.mjs",
         "bytes": 5122,
-        "sha256": "0b35b219f763085b538ea724916d2b860c9b1f2272464f5462abc8ec329e7341"
+        "sha256": "49a1f3db1dbec61cc7627f31581cffeeacc66ba047382be5e4c6953f2f09182b"
       },
       {
         "path": "public-lane.mjs",
-        "bytes": 18330,
-        "sha256": "cc88cec709ea0529fccb579754d7846bece95bc22aec652214a8366822ec3ef0"
+        "bytes": 18331,
+        "sha256": "1815192f64333e7153ed585d104e5e187ef5cea6214fe606d45ac452254b7046"
       },
       {
         "path": "public-publish-browser.mjs",
@@ -685,17 +685,17 @@
       {
         "path": "recovery-lane.mjs",
         "bytes": 14119,
-        "sha256": "ce4a45be2d28f2b3379c815cac076c00dc5eb27f731abb5f3bdbded634ee6047"
+        "sha256": "ef7e4359b3d06a24780bb78c6b72770ae0ea4ceec460ad2296163cb092187e8a"
       },
       {
         "path": "recovery-publish-browser.mjs",
         "bytes": 4607,
-        "sha256": "e8eb9a7355a9e87df2aa58f5420e515a5e931ce70c1e54fe1a8072166e72e1e2"
+        "sha256": "e884d1b4aa3401c4c45d83216f7787fc97c302eddb83cdc0ef81ca90288f2cef"
       },
       {
         "path": "recovery-transport.mjs",
         "bytes": 4772,
-        "sha256": "b249bec5a3f8750a3491b41db57b5ef10c2e26eb50d6b5a3fd4287ef7128866a"
+        "sha256": "6448802df1616b133862e7781afef5b2666838d5c88ae21ac5f38d64e2eef73d"
       },
       {
         "path": "replay-store.mjs",
@@ -715,17 +715,17 @@
       {
         "path": "shard-discovery.mjs",
         "bytes": 20355,
-        "sha256": "6cf25f0014ef5e3983522141ec3287b26a744af5414ef3d34ff67c5a7be40e3d"
+        "sha256": "17930cb40e203c27050db6812f8a11dee956559200c4efd63391f5d6b417129b"
       },
       {
         "path": "shard-reader.mjs",
         "bytes": 8075,
-        "sha256": "2d6894e0560be7a369ffee53a37965fcffa0dce7471688c35d74b27e4026854b"
+        "sha256": "f5254e06ca327673d72fba35da812950630e0f50633fcd66abf9ae6271b581e6"
       },
       {
         "path": "shard-rpc.mjs",
         "bytes": 19743,
-        "sha256": "43cd59445f87207d00a88479786be722df20c7f3a48cf777e59f839fc8de3e0e"
+        "sha256": "db562368292a46a7ab01d7c1febb98c684b8f05cd6966528fb6a5cba38e486b1"
       },
       {
         "path": "styles.css",
@@ -735,12 +735,12 @@
       {
         "path": "sw.js",
         "bytes": 7739,
-        "sha256": "e4761be33890042c1194b27aea2e66372adabb433406ce0d5796482a1230f686"
+        "sha256": "c23f74348c463bb28294d91c20fde274126a1acf38d54fbd53186718c38b0e15"
       },
       {
         "path": "ton-dns-provider.mjs",
         "bytes": 11658,
-        "sha256": "58c73513cb8e2047b88a18c5ce7b74870e3784d6915cda226c97ff1c134d5c8c"
+        "sha256": "c7761ed654bf7a306a1febe5c3587b91fb75c7ce457bd35622ae4aecba1df658"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",
@@ -749,8 +749,8 @@
       },
       {
         "path": "ton-rpc-transport.mjs",
-        "bytes": 85126,
-        "sha256": "90f63ec3eba3c0e7369d3011fae88a7191b62a10d05da267789b131b8627557c"
+        "bytes": 87348,
+        "sha256": "4f48bf4c663962c26817a9f9e2dae355cb1d7a11e9312737ededb2345b74d50b"
       },
       {
         "path": "ton-stack-num.mjs",
@@ -760,7 +760,7 @@
       {
         "path": "username-ton-rpc-provider.mjs",
         "bytes": 17352,
-        "sha256": "115b572359481d12377666d18d342bb2addc69d7b096c13721c514e53ba5faae"
+        "sha256": "247b696bcc961d661cf646ef663ed30c4556dca1450a81a2d9880f978291692a"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",

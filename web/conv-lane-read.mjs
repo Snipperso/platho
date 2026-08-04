@@ -16,7 +16,7 @@
 // (derived from the shared K_root), so this authenticates the transport, not the message content.
 
 import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=35';
-import { toWireAddress } from './shard-reader.mjs?v=6';
+import { toWireAddress } from './shard-reader.mjs?v=7';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
