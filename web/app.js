@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v838';
+const PLATHO_APP_RUNTIME_VERSION = 'v839';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14551,8 +14551,22 @@ function reconcileComposerAttachments(el) {
   const fileArr = kind === 'public' ? publicFileAttachments : privateFileAttachments;
   const rf = reconcileMarkerArray(value, fileArr, /\[file\s+(\d+)\]/ig, (n) => `[file ${n}]`);
   if (rf.changed) { changed = true; value = rf.value; if (kind === 'public') publicFileAttachments = rf.arr; else privateFileAttachments = rf.arr; }
-  const share = kind === 'public' ? publicShareDraft : privateShareDraft;
-  if (share && !/\[post\](?!\()/i.test(value)) { if (kind === 'public') setPublicShareDraft(null); else setPrivateShareDraft(null); changed = true; }
+  // THE SHARE DRAFT IS NOT RECONCILED AGAINST THE MARKER, and that is the whole fix.
+  //
+  // OBSERVED 2026-08-04 (owner): share a post into a private chat, type one character, and the attached post
+  // vanishes — with the caret thrown to the front of what was just typed. This line was why. It read "no [post]
+  // marker in the text" as "the user cancelled the share", so the first keystroke after a share whose marker had
+  // not landed in the editor destroyed the draft, and the `el.value = value` rebuild below moved the caret.
+  //
+  // It also contradicted composerBlocksFromDraft outright: that function has always emitted a markerless share as
+  // the LEADING block, and its comment calls a share-only draft "a legitimate send by itself". So one half of the
+  // app said a markerless share is a normal message and the other half deleted it. The half that decides what
+  // actually goes on the wire wins.
+  //
+  // The model is now single-valued: the DRAFT (with its own Cancel button on the strip) is whether you are
+  // forwarding; the [post] marker is only WHERE in the text the forward sits. Deleting the chip moves the share to
+  // the front of the message — it does not silently cancel something the user asked for, which is not a decision a
+  // keystroke should ever make on their behalf.
   if (!changed) return false;
   el.value = value; // rebuild once with the pruned arrays + renumbered markers (caret loss OK — a big edit just ran)
   if (kind === 'private') { updatePrivateAttachmentUi(); updatePrivateFileAttachmentUi(); }

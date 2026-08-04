@@ -4546,6 +4546,21 @@ describe('PWA runtime config guard', () => {
     // private empty-submit early-return lets it through.
     expect(app).toMatch(/if \(shareDraft\?\.entryId && !usedShare\) \{\s*usedShare = true;\s*blocks\.unshift\(\{ type: 'share', \.\.\.shareDraft \}\);/);
     expect(app).toMatch(/!text && attachments\.length === 0 && !privateShareDraft/);
+    // ...AND NOTHING MAY QUIETLY UNDO THAT. [OWNER 2026-08-04] Sharing a post into a private chat and typing one
+    // character made the attached post vanish and threw the caret to the front of what was typed.
+    // reconcileComposerAttachments read "no [post] marker in the text" as "the user cancelled the share" and
+    // dropped the draft on the first keystroke; the rebuild that followed moved the caret. It also contradicted
+    // the block builder pinned just above, which has always treated a markerless share as a normal leading block.
+    // One half of the app called it a legitimate message, the other half deleted it — the half that decides what
+    // reaches the wire wins. Cancelling is what the strip's Cancel button is for; a keystroke does not get to
+    // discard something the user explicitly attached.
+    const reconcileFn = app.slice(app.indexOf('function reconcileComposerAttachments(el) {'), app.indexOf('function composerEditorToggleFormat('));
+    expect(reconcileFn.length).toBeGreaterThan(400);
+    expect(reconcileFn, 'the share draft is no longer pruned against the marker')
+      .not.toMatch(/setPublicShareDraft\(null\)|setPrivateShareDraft\(null\)/);
+    expect(reconcileFn, 'images and files still reconcile — only the SHARE stopped').toMatch(/reconcileMarkerArray\(value, imgArr/);
+    expect(reconcileFn).toMatch(/reconcileMarkerArray\(value, fileArr/);
+
     // The [post] marker is positional (like [image]/[file]); cancel strips it with the chip.
     expect(app).toMatch(/\(\\\[post\\\]\)/); // the marker alternative inside COMPOSER_MARKER_RE
     expect(app).toMatch(/function removeShareMarkerForComposer\(textarea\)/);
