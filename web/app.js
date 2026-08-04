@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v824';
+const PLATHO_APP_RUNTIME_VERSION = 'v825';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10346,8 +10346,25 @@ function ownerWalletFromThread(thread) {
   return walletIdentity?.value ?? null;
 }
 
-function avatarPointerFromPrivateHeader(header0) {
-  return avatarPointerFromFields(header0?.profileVersion ?? header0?.profile_version, header0?.avatarHash ?? header0?.avatar_hash);
+/**
+ * The peer's avatar pointer from an OPENED capsule.
+ *
+ * It takes the opened capsule, NOT header0, and that is the whole point: a CONV header0 is 40 wire bytes (magic,
+ * version, publishKind, sizeClass, cryptoSuite, bucketKey) with nowhere to put a version plus a 32-byte hash — it
+ * does not carry the pointer even in memory. The pointer rides the AEAD-protected IDENTITY section inside the body
+ * and openPrivateCapsuleChainEntry surfaces it at the TOP level.
+ *
+ * MEASURED 2026-08-04: v824 fixed the same wrong read in messageFromOpenedCapsule, so the message RECORD got the
+ * right pointer and the dialog still showed no avatar — because THIS reader, the one that actually fetches the
+ * media, was the twin nobody checked. Chain state was provably fine the whole time: glasnost's KeyShard version 1,
+ * hash 204c05d3…, stream ac0cbbe3…, and the single media part present and matching.
+ */
+function avatarPointerFromOpenedCapsule(opened) {
+  const header0 = opened?.capsule?.header0;
+  return avatarPointerFromFields(
+    opened?.profileVersion ?? header0?.profileVersion ?? header0?.profile_version,
+    opened?.avatarHash ?? header0?.avatarHash ?? header0?.avatar_hash,
+  );
 }
 
 async function hydrateThreadAvatarFromPointer(thread, ownerWallet, pointer) {
@@ -10920,7 +10937,7 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
     hydrateThreadAvatarFromPointer(
       targetThread,
       ownerWalletFromThread(targetThread),
-      avatarPointerFromPrivateHeader(opened.capsule?.header0),
+      avatarPointerFromOpenedCapsule(opened),
     ).catch((error) => console.error(error));
   }
   return true;
@@ -10944,7 +10961,7 @@ async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
     hydrateThreadAvatarFromPointer(
       targetThread,
       ownerWalletFromThread(targetThread),
-      avatarPointerFromPrivateHeader(firstOpened?.capsule?.header0),
+      avatarPointerFromOpenedCapsule(firstOpened),
     ).catch((error) => console.error(error));
   }
   return true;

@@ -71,4 +71,17 @@ describe('AVPTR — the avatar pointer survives a CONV seal, and is read where i
     expect(APP, 'a header0-only pointer read is back').not.toContain('profileVersion: opened.capsule?.header0?.profileVersion ?? 0,');
     expect(APP, 'a header0-only pointer read is back').not.toContain('profileVersion: first?.capsule?.header0?.profileVersion ?? 0,');
   });
+
+  it('AVPTR-04: the MEDIA FETCH is fed from the opened capsule too — the twin reader', () => {
+    // v824 fixed the message RECORD and the dialog still showed no avatar, because a SECOND reader feeds the fetch
+    // and it was still handed header0. Two readers of one wrong source; fixing one and shipping is the "fix one lane,
+    // check the twin" failure this project has hit before.
+    expect(APP, 'the header0-only pointer reader is back').not.toContain('function avatarPointerFromPrivateHeader(');
+    expect(APP).toContain('function avatarPointerFromOpenedCapsule(opened) {');
+    expect(APP).toContain('opened?.profileVersion ?? header0?.profileVersion ?? header0?.profile_version,');
+    // Both hydration sites — single-part and multipart — pass the OPENED capsule, never its header.
+    expect(APP).toContain('avatarPointerFromOpenedCapsule(opened),');
+    expect(APP).toContain('avatarPointerFromOpenedCapsule(firstOpened),');
+    expect((APP.match(/avatarPointerFromOpenedCapsule\(/g) ?? []).length, 'a hydration site was missed').toBe(3);
+  });
 });
