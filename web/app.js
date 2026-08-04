@@ -227,7 +227,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v826';
+const PLATHO_APP_RUNTIME_VERSION = 'v827';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -8509,13 +8509,29 @@ async function readAvatarPartsFromShard(ownerWallet, pointer) {
   try { ({ messages } = await lane.readAvatarParts(ownerWallet)); }
   catch (error) { noteShard('read-failed', { error: String(error?.message ?? error).slice(0, 120) }); console.warn('[public] avatar shard read failed', error); return null; }
   const parts = [];
+  // THREE separate ways a message is dropped before it can become a part, and they were indistinguishable: all three
+  // just left `parts` empty. Counted individually because reproducing the whole read against the live chain in node
+  // showed all three PASSING on exactly this data, so the difference is on the device and only the device can say.
+  const drop = { unparsed: 0, undecodable: 0, unmatched: 0 };
+  let lastMismatch = null;
   for (const message of messages ?? []) {
     const parsed = parsePublicPublish(message.bodyCell);
-    if (!parsed) continue;
+    if (!parsed) { drop.unparsed += 1; continue; }
     let payload;
-    try { payload = readPublicPostPayloadV2({ header: parsed.header, body: parsed.body }); } catch { continue; }
+    try { payload = readPublicPostPayloadV2({ header: parsed.header, body: parsed.body }); }
+    catch (error) { drop.undecodable += 1; lastMismatch = `decode: ${String(error?.message ?? error).slice(0, 60)}`; continue; }
     payload.authorWallet = message.source ? (rawWalletAddress(publicAddrKey(message.source)) ?? publicAddrKey(message.source)) : ownerWallet;
-    if (!publicAvatarPartMatchesShard(payload, ownerWallet, pointer)) continue;
+    if (!publicAvatarPartMatchesShard(payload, ownerWallet, pointer)) {
+      drop.unmatched += 1;
+      // Name the gate rather than the fact of rejection — four conditions, one `false`.
+      lastMismatch = payload?.type !== 'avatar' ? `type=${payload?.type}`
+        : String(payload.stream_id ?? '').toLowerCase() !== String(pointer.avatarStreamId ?? '').toLowerCase()
+          ? `stream=${String(payload.stream_id ?? 'none').slice(0, 14)}`
+          : Number(payload.partCount ?? payload.part_count ?? 0) !== Number(pointer.avatarPartCount)
+            ? `parts=${payload.partCount ?? payload.part_count}`
+            : `owner=${String(payload.authorWallet ?? 'none').slice(0, 14)}`;
+      continue;
+    }
     parts.push({ ...payload, imageBytes: payload.imageBytes ?? payload.image_bytes });
   }
   const assembled = await assembledAvatarPartGroup(parts, pointer);
@@ -8526,6 +8542,9 @@ async function readAvatarPartsFromShard(ownerWallet, pointer) {
     matched: parts.length,
     want: Number(pointer.avatarPartCount ?? 0),
     stream: String(pointer.avatarStreamId ?? '').slice(0, 12),
+    owner: String(ownerWallet ?? '').slice(0, 14),
+    drop,
+    why: lastMismatch,
   });
   return assembled?.imageUrl ?? null;
 }
@@ -8617,7 +8636,9 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
       return null;
     }
     const url = await readAvatarPartsFromShard(ownerWallet, recordPointer);
-    if (url) note('ok');
+    // Both outcomes, or a failed peer load leaves the previous SUCCESSFUL own-avatar record standing and the dump
+    // reads "ok" for a load that failed — which is exactly what the first instrumented dump showed.
+    note(url ? 'ok' : 'shard-empty');
     return url;
   }).catch((error) => {
     note('threw', { error: String(error?.message ?? error).slice(0, 120) });

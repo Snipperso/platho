@@ -5570,7 +5570,9 @@ describe('PWA runtime config guard', () => {
 
     // The reader trusts the PAID pointer, never the part header: PPH2 dropped avatar_hash/profile_version from
     // the header, so a part is matched by streamId + partCount + owner and AUTHENTICATED by whole-image sha256.
-    expect(shardReadSource).toMatch(/if \(!publicAvatarPartMatchesShard\(payload, ownerWallet, pointer\)\) continue/);
+    // The reject branch now counts and NAMES the failing gate before continuing (four conditions used to collapse
+    // into one silent `false`), so the call is no longer a one-line guard.
+    expect(shardReadSource).toMatch(/if \(!publicAvatarPartMatchesShard\(payload, ownerWallet, pointer\)\) \{/);
     expect(shardReadSource).toMatch(/const assembled = await assembledAvatarPartGroup\(parts, pointer\)/);
     expect(app).toMatch(/if \(hash\.toLowerCase\(\) !== pointer\.avatarHash\.toLowerCase\(\)\) return null/);
     expect(app).toMatch(/function publicAvatarPartMatchesShard\(payload, ownerWallet, pointer\)/);
@@ -6159,7 +6161,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v902/);
+    expect(sw).toMatch(/platho-pwa-prototype-v903/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".

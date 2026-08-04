@@ -89,12 +89,24 @@ describe('AVPTR — the avatar pointer survives a CONV seal, and is read where i
     // Six returns hand back the same null, and from outside they are one symptom: the letter tile stays. Three
     // rounds were spent proving the chain healthy link by link because nothing said WHICH step gave up. Each exit
     // now names itself, and the shard read reports the three counts that separate its own gates.
-    for (const step of ["note('no-provider')", "note('no-record'", "note('hash-mismatch'", "note('threw'", "note('ok')"]) {
+    for (const step of ["note('no-provider')", "note('no-record'", "note('hash-mismatch'", "note('threw'", "note(url ? 'ok' : 'shard-empty')"]) {
       expect(APP, `an unlabelled avatar-load exit: ${step}`).toContain(step);
     }
     for (const step of ["noteShard('no-lane')", "noteShard('read-failed'", "noteShard(assembled?.imageUrl ? 'ok' : 'not-assembled'"]) {
       expect(APP, `an unlabelled avatar-shard exit: ${step}`).toContain(step);
     }
+    // A load that FAILED must overwrite a previous success, or the dump reports the last good own-avatar load as the
+    // outcome of a peer load that returned nothing — which is what the first instrumented dump actually showed.
+    expect(APP).toContain("note(url ? 'ok' : 'shard-empty');");
+    // The three drop points inside the loop are counted separately: all three merely left `parts` empty, and a live
+    // reproduction in node had all three PASSING on the same chain data, so only the device can say which one fires.
+    expect(APP).toContain('const drop = { unparsed: 0, undecodable: 0, unmatched: 0 };');
+    for (const counter of ['drop.unparsed += 1;', 'drop.undecodable += 1;', 'drop.unmatched += 1;']) {
+      expect(APP, `a drop point is not counted: ${counter}`).toContain(counter);
+    }
+    // …and the rejected gate NAMES itself: four conditions collapse into one `false` otherwise.
+    expect(APP).toContain('why: lastMismatch,');
+    expect(APP).toContain('drop,');
     // messages -> matched -> assembled: which number collapses says which gate rejected the parts.
     expect(APP).toContain('messages: messages?.length ?? 0,');
     expect(APP).toContain('matched: parts.length,');
