@@ -1084,8 +1084,13 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/async function assertVaultHasPrivatePublishHold/);
     expect(app).toMatch(/async function assertConnectedAthAtLeast\(requiredAtomic, action\)/);
     expect(app).toMatch(/async function assertWalletGramAtLeast\(requiredNanotons, action\)/);
-    expect(app).toMatch(/Not enough ATH to \$\{action\}/);
-    expect(app).toMatch(/Wallet needs ~\$\{formatTonNanotons\(required\)\} GRAM to \$\{action\}/);
+    // The shortfall message is LOCALIZED (2026-08-04): both handlers print error.message verbatim into the status
+    // line, so an English template was a status only English readers could act on — on the one screen where the
+    // number is the whole point. The action is no longer in the sentence; it rides on the error for the console.
+    expect(app).toMatch(/new Error\(t\('errors\.notEnoughAth', \{ need: formatAthAtomic\(required\), have: formatAthAtomic\(balance\) \}\)\)/);
+    expect(app).toMatch(/new Error\(t\('errors\.walletNeedsGram', \{ amount: formatTonNanotons\(required\) \}\)\)/);
+    expect(app, 'no English shortfall template survives').not.toMatch(/Not enough ATH to |Wallet needs ~/);
+    expect(app, 'which flow refused stays available to the console').toMatch(/error\.action = action;/);
     expect(app).not.toMatch(/Checking Vault balance/);
     expect(app).toMatch(/privateComposerKnownVaultTonShortfall/);
     expect(app).toMatch(/networkFeeSurchargeNanotons/);
@@ -1497,8 +1502,9 @@ describe('PWA runtime config guard', () => {
     // Direct pay raises both by CODE, so the classification cannot drift with the wording of the message.
     expect(helperSource).toMatch(/error\?\.code === 'PLATHO_ATH_REQUIRED' \|\| error\?\.code === 'PLATHO_WALLET_GRAM_REQUIRED'/);
     expect(app).toMatch(/function isFatalPrivateSendError\(error\)[\s\S]*error\?\.code === 'PLATHO_ATH_REQUIRED'[\s\S]*error\?\.code === 'PLATHO_WALLET_GRAM_REQUIRED'/);
-    // ...and the message the user sees names the asset, the amount needed and the amount held.
-    expect(app).toMatch(/Not enough ATH to \$\{action\}: need \$\{formatAthAtomic\(required\)\} ATH, have/);
+    // ...and the message the user sees names the asset, the amount needed and the amount held — in their language.
+    expect(app).toMatch(/t\('errors\.notEnoughAth', \{ need: formatAthAtomic\(required\), have: formatAthAtomic\(balance\) \}\)/);
+    expect(EN_STRINGS['errors.notEnoughAth']).toBe('Not enough ATH: need {need} ATH, have {have} ATH');
     expect(messageIndex).toBeGreaterThanOrEqual(0);
     expect(insertIndex).toBeGreaterThan(messageIndex);
     expect(preflightIndex).toBeGreaterThan(insertIndex);
@@ -3400,8 +3406,10 @@ describe('PWA runtime config guard', () => {
     const dlg = app.slice(app.indexOf('async function openEditChannelProfileDialog('), app.indexOf('async function openEditChannelProfileDialog(') + 1600);
     expect(dlg).toMatch(/summary: \(values\) =>/);
     expect(dlg).toMatch(/estimatedChannelProfileChargeNanotons\(values\.description, values\.tags\)/);
-    expect(dlg).toMatch(/label: t\('common\.gramCost'\), value: t\('common\.gramCostValue', \{ amount: formatTonNanotons\(charge\) \}\)/);
-    expect(EN_STRINGS['common.gramCost']).toBe('GRAM cost');
+    // The label is just "Cost": the VALUE already names the unit ("до 0.0203 GRAM с кошелька"), so "GRAM cost:
+    // up to 0.0203 GRAM" said GRAM twice in one line. [owner, 2026-08-04]
+    expect(dlg).toMatch(/label: t\('common\.cost'\), value: t\('common\.gramCostValue', \{ amount: formatTonNanotons\(charge\) \}\)/);
+    expect(EN_STRINGS['common.cost']).toBe('Cost');
     expect(EN_STRINGS['common.gramCostValue']).toBe('up to {amount} GRAM from your wallet');
     // The Vault vocabulary is GONE from this pair, key and value, in every locale — a key called `gramHold` is how
     // the wrong number kept its cover for a release.

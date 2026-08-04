@@ -45,6 +45,11 @@ if (readers.length === 0) {
 const imports = spawnSync(process.execPath, ['scripts/check_app_imports.mjs'], { stdio: 'inherit' });
 if (imports.status !== 0) process.exit(imports.status ?? 1);
 
+// Same shape of silent, user-visible defect: a key nobody defined renders as the literal `[key]` on screen. Also
+// instant, also invisible to every test that reads app.js as text.
+const i18nKeys = spawnSync(process.execPath, ['scripts/check_i18n_keys.mjs'], { stdio: 'inherit' });
+if (i18nKeys.status !== 0) process.exit(i18nKeys.status ?? 1);
+
 // The artefacts FIRST: static-web-deploy-prep pins them, so running it against a stale bundle fails for a reason
 // that has nothing to do with the change being made.
 const prep = spawnSync(process.execPath, ['scripts/prepare_static_web_deploy.mjs', '--mode', 'both'], { stdio: 'inherit' });

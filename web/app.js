@@ -220,7 +220,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=35';
+} from './i18n.mjs?v=37';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -232,7 +232,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v833';
+const PLATHO_APP_RUNTIME_VERSION = 'v834';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -4732,7 +4732,7 @@ async function openEditChannelProfileDialog() {
       // the dialog.
       try {
         const charge = estimatedChannelProfileChargeNanotons(values.description, values.tags);
-        return [{ label: t('common.gramCost'), value: t('common.gramCostValue', { amount: formatTonNanotons(charge) }) }];
+        return [{ label: t('common.cost'), value: t('common.gramCostValue', { amount: formatTonNanotons(charge) }) }];
       } catch {
         return [];
       }
@@ -17164,7 +17164,7 @@ async function submitAirdropClaim() {
   const required = value + WALLET_FEE_HEADROOM_NANOTONS;
   const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
   if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < required) {
-    const error = new Error(`Wallet needs ~${formatTonNanotons(required)} GRAM to claim`);
+    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(required) }));
     error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
     throw error;
   }
@@ -19218,7 +19218,7 @@ async function requestUsernameMintName() {
           const short = priceAtomic !== null && athBalance < priceAtomic;
           lines.push({ label: t('username.yourAth'), value: short ? t('username.athBalanceNotEnough', { amount: formatAthAtomic(athBalance) }) : t('username.athBalance', { amount: formatAthAtomic(athBalance) }) });
         }
-        lines.push({ label: t('common.gramCost'), value: t('common.gramCostValue', { amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()) }) });
+        lines.push({ label: t('common.cost'), value: t('common.gramCostValue', { amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()) }) });
         // The "Route: Vault" line is GONE with the Vault. Under direct pay the mint request goes from the wallet
         // straight to UsernameRegistry (USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS — the constant says so), so the
         // line named a hop that no longer exists. Naming the wallet as a "route" instead would say nothing: there
@@ -19876,8 +19876,18 @@ async function assertConnectedAthAtLeast(requiredAtomic, action) {
   if (required <= 0n) return;
   const balance = await loadConnectedAthWalletBalance();
   if (balance < required) {
-    const error = new Error(`Not enough ATH to ${action}: need ${formatAthAtomic(required)} ATH, have ${formatAthAtomic(balance)} ATH`);
+    // THE MESSAGE IS SHOWN VERBATIM, so it has to be in the user's language. The avatar and mint handlers print
+    // error.message straight into the status line precisely because it carries the exact shortfall — which made an
+    // English template a status nobody outside English could read, on the one screen where the number matters.
+    //
+    // The ACTION is deliberately no longer part of the sentence. It used to be interpolated as an English verb
+    // phrase ('set an avatar', 'mint a name'), and translating THAT would mean a localized fragment per call site;
+    // the status already sits inside the flow the user just started, so naming it again said nothing.
+    const error = new Error(t('errors.notEnoughAth', { need: formatAthAtomic(required), have: formatAthAtomic(balance) }));
     error.code = 'PLATHO_ATH_REQUIRED';
+    // Kept for the console, not for the screen: which flow refused is a DIAGNOSTIC, and it is the reason the
+    // action argument still earns its place at six call sites now that the sentence no longer carries it.
+    error.action = action;
     throw error;
   }
 }
@@ -19888,8 +19898,9 @@ async function assertWalletGramAtLeast(requiredNanotons, action) {
   const balance = await loadConnectedTonWalletBalance().catch(() => null);
   if (balance === null) return;   // fail-open: unreadable balance must not block a funded wallet
   if (nonNegativeBigInt(balance) < required) {
-    const error = new Error(`Wallet needs ~${formatTonNanotons(required)} GRAM to ${action}`);
+    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(required) }));
     error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
+    error.action = action;   // diagnostic only — see assertConnectedAthAtLeast
     throw error;
   }
 }
@@ -20768,7 +20779,7 @@ async function submitAthDueFlush() {
     + WALLET_FEE_HEADROOM_NANOTONS;
   const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
   if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < requiredNanotons) {
-    const error = new Error(`Wallet needs ~${formatTonNanotons(requiredNanotons)} GRAM to flush`);
+    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(requiredNanotons) }));
     error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
     throw error;
   }
