@@ -973,7 +973,12 @@ html[data-platho-telegram="true"] .install-header-button {
   top: 0;
   left: 100%;
   right: auto;
-  margin-left: 4px;
+  /* PADDING, NOT MARGIN, on the side facing the bubble. A margin puts the breathing room OUTSIDE the cluster's box,
+     and on an outgoing row — where .message shrinks to its bubble — those few pixels belong to neither the bubble,
+     the row, nor the cluster. The pointer crossing them is over nothing, :hover drops, and the buttons vanish just
+     as the cursor arrives (owner: "I can't press them, they disappear as soon as I move the mouse there").
+     As padding the gap is INSIDE the cluster: the hit area touches the bubble, the eye still sees the space. */
+  padding-left: 4px;
   gap: 2px;
   align-items: flex-start;
 }
@@ -983,8 +988,8 @@ html[data-platho-telegram="true"] .install-header-button {
 .message.out .row-actions {
   left: auto;
   right: 100%;
-  margin-left: 0;
-  margin-right: 4px;
+  padding-left: 0;
+  padding-right: 4px;   /* the facing side flips with the cluster — see the note above */
   flex-direction: row-reverse;
 }
 
@@ -994,7 +999,7 @@ html[data-platho-telegram="true"] .install-header-button {
   top: 2px;
   right: 2px;
   left: auto;
-  margin-left: 0;
+  padding-left: 0;
   flex-direction: row-reverse;
 }
 
