@@ -1740,6 +1740,16 @@ a .avatar.has-image,
   display: none;
 }
 
+/* MEASURED 2026-08-04 at 375 CSS px (iPhone SE2, the narrowest device this project targets): the eight buttons
+   are 8x28 = 224px and the seven 2px gaps make 238 — the row fit with 7px to spare, and the Heading button
+   returning in v831 pushed it 11px over. It is a horizontal scroller, so nothing was unreachable, but the last
+   button sat half-cut on exactly the device with the least room to swipe.
+   Closing the gap on narrow screens buys back 14px and touches nothing wider: the buttons keep their 28px hit
+   target (they are already separated by their own padding), and the separators keep the groups readable. */
+@media (max-width: 380px) {
+  .composer-toolbar-scroll { gap: 0; }
+}
+
 .composer-toolbar-button {
   display: grid;
   place-items: center;
