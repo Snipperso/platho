@@ -3764,7 +3764,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function appendRowReplyButton\(row, onReply\)/);
     expect(app).toMatch(/appendRowReplyButton\(row, beginPrivateReplyForRow\);/);
     expect(app).toMatch(/appendRowReplyButton\(row, beginPublicCommentReplyForRow\);/);
-    expect(css).toMatch(/@media \(hover: hover\) \{[\s\S]*?\.message:hover > \.row-actions/);
+    // A DESCENDANT selector, not a direct child: the cluster hangs off the BUBBLE now (the row is a grid stretched
+    // to its max width, so a short incoming message left its row box 240px wider than the bubble). :hover still
+    // holds while the pointer is over the cluster because hover follows the DOM tree, not the box.
+    expect(css).toMatch(/@media \(hover: hover\) \{[\s\S]*?\.message:hover \.row-actions/);
     // Fullscreen lightbox (v647): the dialog fills the viewport — zooming needs the room, not a content card. v742
     // bounds the height to --app-viewport-height on EVERY platform (bare height:100% didn't resolve on desktop -> a
     // tall image overflowed the window).
