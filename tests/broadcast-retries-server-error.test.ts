@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { scheduleToncenterHttpRequest } from '../web/ton-rpc-transport.mjs';
+import { scheduleToncenterHttpRequest, toncenterBroadcastExitCode } from '../web/ton-rpc-transport.mjs';
 
 // A BROADCAST MUST NOT DIE ON ONE 500.
 //
@@ -78,5 +78,51 @@ describe('SENDRETRY — a 5xx on broadcast is retried, a 5xx on a read is not', 
     expect(TRANSPORT).toContain('options.sendBocServerErrorRetries, TONCENTER_SEND_BOC_SERVER_ERROR_RETRIES,');
     expect((TRANSPORT.match(/serverErrorRetries:/g) ?? []).length, 'a second opt-in appeared').toBe(1);
     expect(TRANSPORT).toMatch(/signed and bound to one wallet seqno, so the chain runs it AT MOST ONCE/);
+  });
+
+  // THE COUNTER-CASE TO THIS WHOLE FILE, MEASURED 2026-08-04 on the owner's mainnet wallet: twelve
+  // `POST /api/v3/message 500` in a row, every one carrying `exit code 133` — the wallet contract rejecting a seqno
+  // the chain had not reached. Those bytes are signed, so every copy is rejected identically: the retry above, which
+  // is right for toncenter's own 5xx, turns into a hammer that can never land. Retrying is for a broken ENDPOINT;
+  // a chain verdict must come straight back so the caller re-SIGNS.
+  const rejection = (exitCode: number) => {
+    const body = 'LITE_SERVER_UNKNOWN: cannot apply external message to current state : External message was not '
+      + `accepted, terminating vm with exit code ${exitCode}`;
+    const response: any = {
+      status: 500,
+      ok: false,
+      async json() { return { ok: false, error: body }; },
+      async text() { return body; },
+    };
+    response.clone = () => response;
+    return response;
+  };
+
+  it('SENDRETRY-06: a 500 carrying a CHAIN exit code is not retried even once', async () => {
+    let calls = 0;
+    const response: any = await scheduleToncenterHttpRequest(ENDPOINT, null, async () => {
+      calls += 1;
+      return rejection(133);
+    }, { serverErrorRetries: 3, serverErrorBackoffMs: 1, requestSpacingMs: 0, rateLimitKey: 'sendretry-06' });
+    expect(calls, 'proven-dead bytes were re-POSTed').toBe(1);
+    expect(response.status).toBe(500);
+  });
+
+  it('SENDRETRY-07: a 500 with no chain verdict still gets the full retry budget', async () => {
+    // The classifier must not swallow the case this file was written for.
+    let calls = 0;
+    await scheduleToncenterHttpRequest(ENDPOINT, null, async () => {
+      calls += 1;
+      return calls <= 2 ? boom(500) : ok();
+    }, { serverErrorRetries: 3, serverErrorBackoffMs: 1, requestSpacingMs: 0, rateLimitKey: 'sendretry-07' });
+    expect(calls).toBe(3);
+  });
+
+  it('SENDRETRY-08: the exit-code parser reads the real lite-server wording, and only that', () => {
+    expect(toncenterBroadcastExitCode('terminating vm with exit code 133')).toBe(133);
+    expect(toncenterBroadcastExitCode('exit_code: -13')).toBe(-13);
+    expect(toncenterBroadcastExitCode('{"error":"rate limit exceeded"}')).toBeNull();
+    expect(toncenterBroadcastExitCode('')).toBeNull();
+    expect(toncenterBroadcastExitCode(null as any)).toBeNull();
   });
 });

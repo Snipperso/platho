@@ -33,8 +33,15 @@ import {
 //   • And the 15-second window does not exist on the send path at all: ton-rpc-transport clears the whole
 //     run-get-method cache after every successful sendBoc (twice — scoped at the leaf, unscoped in the fallback
 //     wrapper), so the first send of a burst wipes the value before the second reads it.
-// The real cause of that burst is still open; it looks like RPC saturation / ambiguous broadcast, and the send path
-// carries no diagnostics to tell those apart from one screenshot.
+// THAT CAUSE IS NO LONGER OPEN — FOUND 2026-08-04, against the chain rather than by reasoning. The floor itself was
+// half of it. A 200 from toncenter /message means "queued", not "executed", and the floor is raised on that 200, so
+// it can lead a chain that never actually consumed the external. Signing that lead is not optimism: a validator that
+// sees seqno N+1 before N has executed throws exit code 133 and DROPS the external — TON does not hold it for its
+// turn. Chain read at seqno 149 while the client signed 150; twelve rejected broadcasts; one image stuck 6.5 minutes
+// until the 90s floor grace expired. The image before it had reported "the shard did not store it" — that was the
+// dropped predecessor, the same defect seen from the other end, and it is the "two of eight arrived" shape too.
+// The exit code was MEASURED in the sandbox against our own wallet code, not looked up: ahead -> 133, behind -> 133,
+// expired -> 136 (tests/platho-wallet.test.ts, PLATHO-WALLET-04J/04K/04L).
 // The same throwaway test mnemonic tests/platho-wallet.test.ts uses — never a real wallet.
 const MNEMONIC = [
   'hospital', 'stove', 'relief', 'fringe', 'tongue', 'always', 'charge', 'angry',
@@ -42,11 +49,22 @@ const MNEMONIC = [
   'label', 'tumble', 'carry', 'category', 'beauty', 'bean', 'road', 'solution',
 ];
 
-/** A chain that is HONEST but SLOW: it reports the same seqno until told the block landed. */
-function frozenChainTransport(startSeqno: number) {
+/**
+ * A chain that is HONEST but SLOW: a broadcast advances the seqno only after `lagReads` further reads.
+ *
+ * FIXTURE CORRECTED 2026-08-04. It used to never advance at all unless a test called advance() by hand, and
+ * BURSTSEQ-02/03 never called it — so they asserted the client's behaviour against a chain frozen FOREVER. That is
+ * not the index lag they meant to model, it is a LOST external, and pinning "sign the next seqno anyway" there
+ * pinned the wedge: MEASURED on the owner's mainnet wallet, chain at 149, client signing 150, twelve rejected
+ * broadcasts and an image stuck 6.5 minutes. `lagReads` is the honest shape — the chain DOES move, our read is
+ * merely behind it (toncenter index lag MEASURED 1-5s).
+ */
+function frozenChainTransport(startSeqno: number, options: { lagReads?: number } = {}) {
   const calls: any[] = [];
   const sent: any[] = [];
+  const lagReads = options.lagReads ?? 0;
   let seqno = startSeqno;
+  let pending: number[] = [];
   return {
     calls,
     sent,
@@ -54,10 +72,16 @@ function frozenChainTransport(startSeqno: number) {
     transport: {
       async runGetMethod(call: any) {
         calls.push(call);
-        return { stack: [{ type: 'num', value: `0x${seqno.toString(16)}` }] };
+        const current = seqno;
+        pending = pending.filter((countdown) => {
+          if (countdown <= 1) { seqno += 1; return false; }
+          return true;
+        }).map((countdown) => countdown - 1);
+        return { stack: [{ type: 'num', value: `0x${current.toString(16)}` }] };
       },
       async sendBoc(input: any) {
         sent.push(input);
+        if (lagReads > 0) pending.push(lagReads);
         return { ok: true };
       },
     },
@@ -77,14 +101,16 @@ describe('BURSTSEQ — consecutive sends must not collide on one wallet seqno', 
     expect(chain.calls[0].cacheTtlMs, 'the seqno read may not be served from cache').toBe(0);
   });
 
-  it('BURSTSEQ-02: two sends against an UNCHANGED chain seqno still sign different seqnos', async () => {
-    // The exact shape of the owner's burst: the chain has not included the first external when the second is signed.
+  it('BURSTSEQ-02: two sends against a LAGGING chain seqno still sign different seqnos', async () => {
+    // The exact shape of the owner's burst: our READ has not caught up with the first external when the second is
+    // signed. The chain itself has — that is the difference between a lag and a loss.
     __resetWalletSeqnoFloorsForTests();
     const wallet = await createPlathoWallet({ mnemonic: MNEMONIC });
-    const chain = frozenChainTransport(7);
+    const chain = frozenChainTransport(7, { lagReads: 1 });
 
-    const first = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, { transport: chain.transport });
-    const second = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, { transport: chain.transport });
+    const opts = { transport: chain.transport, seqnoCatchupMs: 0 };
+    const first = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, opts);
+    const second = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, opts);
 
     expect(first.seqno).toBe(7);
     expect(second.seqno, 'the second message reused the first seqno — the chain drops it').toBe(8);
@@ -94,14 +120,33 @@ describe('BURSTSEQ — consecutive sends must not collide on one wallet seqno', 
   it('BURSTSEQ-03: a whole burst of eight gets eight distinct seqnos', async () => {
     __resetWalletSeqnoFloorsForTests();
     const wallet = await createPlathoWallet({ mnemonic: MNEMONIC });
-    const chain = frozenChainTransport(100);
+    const chain = frozenChainTransport(100, { lagReads: 1 });
     const seqnos: number[] = [];
     for (let i = 0; i < 8; i += 1) {
-      const res = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, { transport: chain.transport });
+      const res = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, {
+        transport: chain.transport, seqnoCatchupMs: 0,
+      });
       seqnos.push(res.seqno);
     }
     expect(seqnos).toEqual([100, 101, 102, 103, 104, 105, 106, 107]);
     expect(new Set(seqnos).size, 'a repeated seqno means a silently dropped message').toBe(8);
+  });
+
+  it('BURSTSEQ-06: a chain that NEVER advances is a LOST external, and must not be signed past', async () => {
+    // The counter-case to 02/03, and the one the old frozen fixture accidentally asserted the wrong way round. When
+    // the chain genuinely does not move, the previous external was dropped by the network — toncenter answers 200
+    // for "queued", not "executed". Leading it by one then produces exit code 133 on every copy, forever.
+    __resetWalletSeqnoFloorsForTests();
+    const wallet = await createPlathoWallet({ mnemonic: MNEMONIC });
+    const chain = frozenChainTransport(200);   // no lagReads: this chain is stuck, not slow
+    const seqnos: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const res = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, {
+        transport: chain.transport, seqnoCatchupAttempts: 3, seqnoCatchupMs: 0,
+      });
+      seqnos.push(res.seqno);
+    }
+    expect(seqnos, 'signing past a stuck chain is the 133 wedge').toEqual([200, 200, 200]);
   });
 
   it('BURSTSEQ-04: the chain WINS when it runs ahead — another device on the same wallet', async () => {

@@ -24,12 +24,17 @@ describe('publish double-spend gate — direct pay', () => {
 
   it('PUBLISH-RETRY-01: a wallet external is bound to a seqno and its BOC is handed back on an ambiguous send', () => {
     // The signed external carries the seqno it was built for; re-broadcasting the same bytes cannot double-execute.
-    // An explicit options.seqno still wins — that is what makes a re-broadcast idempotent. The chain read is now
-    // passed through applyWalletSeqnoFloor so two overlapping sends cannot sign the same value; see
-    // tests/burst-send-seqno-collision.test.ts.
-    expect(wallet).toMatch(/seqno = options\.seqno \?\? applyWalletSeqnoFloor\(wallet, await getPlathoWalletSeqno\(wallet, transport, options\)\)/);
+    // An explicit options.seqno still wins — that is what makes a re-broadcast idempotent. The chain read goes
+    // through resolveWalletSendSeqno, which both keeps two overlapping sends off one value AND refuses to sign
+    // past a chain that has not consumed the previous external; see tests/burst-send-seqno-collision.test.ts and
+    // PLATHO-WALLET-04J/04K.
+    expect(wallet).toMatch(/seqno = options\.seqno \?\? await resolveWalletSendSeqno\(wallet, transport, options\)/);
     // On a throw the built BOC (and its seqno) travel with the error so the caller can re-broadcast verbatim
     // instead of re-signing under a fresh seqno.
     expect(wallet).toMatch(/error\.builtBoc = built\.boc; error\.builtSeqno = seqno;/);
+    // ...but ONLY when the failure was ambiguous. A chain verdict (exit code 133) proves the bytes dead, and
+    // handing a corpse to the re-broadcast path is what kept the owner's image on "sending" for 6.5 minutes.
+    expect(wallet).toMatch(/if \(!definitivelyRejected && error && typeof error === 'object' && built\?\.boc/);
+    expect(wallet).toMatch(/if \(definitivelyRejected\) resetWalletSeqnoFloor\(wallet\)/);
   });
 });

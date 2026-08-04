@@ -761,10 +761,45 @@ async function toncenterHttpErrorWithBody(label, response, fallbackBackoffMs = T
       error.message = `${error.message}: ${detail}`;
       error.responseBody = detail;
     }
+    // Carry the CONTRACT's verdict, not just the HTTP status: the caller decides re-broadcast vs re-sign from it.
+    const exitCode = toncenterBroadcastExitCode(body);
+    if (exitCode != null) error.chainExitCode = exitCode;
   } catch {
     // HTTP status is still enough to classify the error.
   }
   return error;
+}
+
+// A toncenter 5xx on /message is TWO different failures wearing one status code, and telling them apart is the
+// whole point of this parser.
+//
+// MEASURED 2026-08-04 from the owner's console: twelve `POST /api/v3/message 500` in a row, every one carrying
+// `LITE_SERVER_UNKNOWN: cannot apply external message ... terminating vm with exit code 133`. That is NOT toncenter
+// breaking — it is the lite-server reporting that the wallet contract rejected these exact bytes. Re-POSTing them
+// can never succeed: the external is signed, so every copy is rejected identically. Retrying only burns the budget
+// and hammers the endpoint while the user's message sits on "sending".
+//
+// A 5xx with NO exit code is the other failure — toncenter's own broadcast endpoint erroring — and that one is
+// worth retrying, which is why this is a classifier instead of a blanket "never retry a 5xx broadcast".
+const TONCENTER_EXIT_CODE_PATTERN = /exit[ _]?code[^0-9-]{0,8}(-?\d+)/i;
+
+/** The TVM exit code a broadcast rejection carries, or null when the failure is not a chain verdict. */
+export function toncenterBroadcastExitCode(text) {
+  if (typeof text !== 'string' || text.length === 0) return null;
+  const found = TONCENTER_EXIT_CODE_PATTERN.exec(text);
+  if (!found) return null;
+  const code = Number(found[1]);
+  return Number.isFinite(code) ? code : null;
+}
+
+async function toncenterResponseCarriesChainRejection(response) {
+  try {
+    const text = typeof response?.clone === 'function' ? await response.clone().text() : null;
+    return text != null && toncenterBroadcastExitCode(text) != null;
+  } catch {
+    // An unreadable body proves nothing — fall through to the retry, which is the right default for a bare 5xx.
+    return false;
+  }
 }
 
 // Exported for web/shard-rpc.mjs, which needs the accountStates and messages leaves of the same v3 base the
@@ -838,6 +873,9 @@ export async function scheduleToncenterHttpRequest(endpoint, apiKey, request, op
     // Retrying the one modern provider we have is therefore the whole available answer here. A DIFFERENT, v3-capable
     // provider would be a legitimate second lane — Orbs specifically is not.
     if (response && response.status >= 500 && serverErrors < serverErrorRetries) {
+      // A chain verdict is DEFINITIVE: the same signed bytes are rejected identically forever. Hand it straight
+      // back so the caller re-SIGNS instead of re-POSTing a corpse.
+      if (await toncenterResponseCarriesChainRejection(response)) return response;
       serverErrors += 1;
       await delay(serverErrorBackoffMs * serverErrors);   // 400ms, 800ms, 1200ms — bounded, never a hammer
       continue;
