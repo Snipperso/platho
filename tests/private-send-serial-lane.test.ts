@@ -85,7 +85,12 @@ describe('SENDLANE — private sends are serialised', () => {
     // The same eight lines had been written by hand three times (avatar reads, username hygiene, then sends).
     expect((APP.match(/function createSerialLane\(\)/g) ?? []).length).toBe(1);
     expect(APP).toContain('const enqueueAvatarChainRead = createSerialLane();');
-    expect(APP).toContain('const enqueueOutgoingPublish = createSerialLane();');
+    // The outgoing lane keeps the shared primitive but is no longer a bare alias: enqueueOutgoingPublish wraps it
+    // to attach a send phase profile to every queued task (see PWA-SENDPROFILE-01). The invariant this line guards —
+    // ONE createSerialLane implementation behind every lane — is unchanged.
+    expect(APP).toContain('const outgoingPublishLane = createSerialLane();');
+    expect(APP).toContain('function enqueueOutgoingPublish(task) {');
+    expect(APP).toContain('return outgoingPublishLane(async () => {');
     expect(APP).toContain('const enqueueUsernameHygiene = createSerialLane();');
     // The hand-rolled chains are gone, not merely unused.
     expect(APP, 'a hand-rolled promise chain came back').not.toContain('usernameHygieneChain');

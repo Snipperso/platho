@@ -14,7 +14,7 @@ import {
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=13';
 import { tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=69';
+import { beginTonRpcPhaseProfile, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=70';
 
 const {
   beginCell,
@@ -787,7 +787,14 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
   // An explicit options.seqno is a deliberate caller choice (an idempotent re-broadcast of an already-signed
   // external) and must pass through untouched — re-signing it under a NEW seqno would double-execute if the first
   // copy had in fact landed.
+  // The caller may hand in a phase stopwatch (beginTonRpcPhaseProfile) to learn WHERE a slow publish spent its
+  // seconds. Optional and inert when absent — nothing on this path may depend on being measured.
+  const profile = options.profile ?? globalThis.plathoSendPhaseProfile ?? null;
+  // Everything the CALLER did before reaching the wallet — capsule construction and encryption for a media post.
+  // Marking it here costs the lane modules no threading and still separates "the app was busy" from "the chain was".
+  profile?.mark('build');
   let seqno = options.seqno ?? await resolveWalletSendSeqno(wallet, transport, options);
+  profile?.mark('seqno');
   if (chunks.length > 1 && !transport.runGetMethod && options.seqno === undefined) {
     throw new Error('TON RPC runGetMethod transport is required for multi-transfer wallet publish');
   }
@@ -802,6 +809,7 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
       timeout: options.timeout ?? transaction?.validUntil,
       includeStateInit: options.includeStateInit ?? seqno === 0,
     });
+    profile?.mark('sign');
     let result = null;
     try {
       result = await transport.sendBoc({ boc: built.boc, walletAddress: wallet.address });
@@ -830,10 +838,14 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
       }
       throw error;
     }
+    profile?.mark('broadcast');
     noteWalletSeqnoBroadcast(wallet, seqno);
     batches.push({ ...built, result, messageCount: chunk.length });
     if (index < chunks.length - 1) {
+      // The gap between externals of ONE message. Its poll cadence is the prime suspect for a slow multi-external
+      // publish, so it gets its own phase rather than hiding inside the loop.
       seqno = await waitForWalletSeqnoAtLeast(wallet, transport, seqno + 1, options);
+      profile?.mark('chunkWait');
     }
   }
 

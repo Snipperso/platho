@@ -6642,6 +6642,42 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain("t('vault.activateAccount')");
   });
 
+  it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {
+    // Owner, 2026-08-04: "скорость важна". Two large images landed 22s and 37s apart on chain — both published, but
+    // far past the 1-5s of index lag the seqno fix was expected to cost. Guessing the owner phase is the mistake
+    // this project keeps paying for, so the send path gets the same instrument the sync tick has.
+    const app = readFileSync('web/app.js', 'utf8');
+    const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
+    const transport = readFileSync('web/ton-rpc-transport.mjs', 'utf8');
+
+    // ONE primitive. The sync profile used to carry its own copy of this stopwatch; a second copy in the wallet
+    // would make the two lanes' numbers quietly incomparable.
+    expect(transport).toContain('export function beginTonRpcPhaseProfile()');
+    expect((app.match(/const before = \{ at: startedAt, n: tonRpcRequestCounters\.total/g) ?? []).length,
+      'a second copy of the stopwatch reappeared in app.js').toBe(0);
+    expect(app).toMatch(/function beginSyncPhaseProfile\(\) \{\s*const profile = beginTonRpcPhaseProfile\(\);/);
+
+    // The phases that answer the question: app work, chain waits, and the per-external gap.
+    for (const phase of ['build', 'seqno', 'sign', 'broadcast', 'chunkWait']) {
+      expect(wallet, `phase ${phase} is not marked`).toContain(`profile?.mark('${phase}')`);
+    }
+    // Per-chunk phases are marked more than once and must ACCUMULATE, or a two-external send reports one chunk.
+    expect(transport).toMatch(/phases\[name\] = prior\s*\?\s*\{ ms: prior\.ms \+ span\.ms/);
+    // Keyed 125ms vs KEYLESS 1100ms multiplies every request-bound phase — a number without it cannot be compared
+    // across devices, and part of the userbase runs keyless.
+    expect(transport).toMatch(/spacingMs: toncenterScanLaneOptions\(\)\?\.requestSpacingMs \?\? null/);
+
+    // The profiler lives INSIDE the one serial lane, not at the call sites — so a publish path added later is
+    // measured automatically instead of silently unmeasured, and the lane's own pins stay byte-identical.
+    expect(app).toMatch(/function enqueueOutgoingPublish\(task\) \{\s*\n\s*return outgoingPublishLane\(async \(\) => \{/);
+    expect(app).toContain('globalThis.plathoSendPhaseProfile = profile;');
+    expect(app).toMatch(/finally \{\s*\n\s*globalThis\.plathoSendPhaseProfile = null;/);
+    expect((app.match(/outgoingPublishLane\(/g) ?? []).length, 'the raw lane leaked past the profiler').toBe(1);
+    // AND IT IS IN THE DUMP. Twice today I pointed the owner at a counter the dump did not carry; a diagnostic that
+    // lives only in a global nobody prints is a note to myself, not a diagnostic.
+    expect(app).toContain('sendProfile: globalThis.plathoLastSendProfile ?? null,');
+  });
+
   it('PWA-SPINNER-01: the sync indicator reports WORK, not "has not succeeded yet"', () => {
     // MEASURED on the owner's dump: spinner maxMs 71215, heldBy 'public' — while the public phase of the sync tick
     // itself cost 1974ms and the whole page had spent 16 requests since load. publicSyncPhase was BORN 'syncing'

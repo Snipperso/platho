@@ -30,21 +30,22 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=23';
+} from './platho-wallet.mjs?v=24';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=113';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=114';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
   TON_RPC_REQUEST_TIMEOUT_MS,
   decodeTonAddressSliceBoc,
   tonRpcRequestCounters,
-} from './ton-rpc-transport.mjs?v=69';
+  beginTonRpcPhaseProfile,
+} from './ton-rpc-transport.mjs?v=70';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -154,41 +155,41 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=8';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=48';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=51';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=49';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=52';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=13';
+import { createPublicLane } from './public-lane.mjs?v=14';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=6';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=7';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=6';
-import { createIntroLane } from './intro-lane.mjs?v=12';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=7';
+import { createIntroLane } from './intro-lane.mjs?v=13';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=6';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=6';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=7';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=7';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=8';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=7';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=9';
-import { readAccountStates } from './shard-reader.mjs?v=6';
+import { createConvReadLane } from './conv-lane.mjs?v=9';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=8';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=10';
+import { readAccountStates } from './shard-reader.mjs?v=7';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=6';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=7';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=6';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=7';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=6';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=7';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=8';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=7';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=6';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=6';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=7';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=7';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=7';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=8';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -200,14 +201,14 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=8';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=47';
+} from './shard-discovery.mjs?v=9';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=48';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=53';
+} from './username-ton-rpc-provider.mjs?v=54';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -233,7 +234,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v854';
+const PLATHO_APP_RUNTIME_VERSION = 'v855';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -856,6 +857,11 @@ function copyPrivateThreadDiagnostic() {
       // accountStates could not run and every shard is being read the old way.
       convSync: globalThis.plathoLastConvSync ?? null,
       syncProfile: globalThis.plathoLastSyncProfile ?? null,
+      // WHERE A SLOW PUBLISH SPENT ITS SECONDS. Read `spacingMs` first — 125 keyed vs 1100 KEYLESS multiplies every
+      // request-bound phase by ~9, so the same post is a different animal on the two lanes and the numbers below are
+      // only comparable within one of them. `phases.build` is app work (capsule construction, encryption);
+      // `seqno`/`chunkWait` are chain waits; `req` on a phase is how many toncenter calls it queued behind.
+      sendProfile: globalThis.plathoLastSendProfile ?? null,
       spinner: globalThis.plathoLastSpinnerSpan ?? null,
       // The restore's own numbers. I told the owner twice today to look at a counter that the dump did not carry —
       // first the shard stats, now seededSeqMarks. A diagnostic that exists only in a global nobody prints is not
@@ -1097,7 +1103,50 @@ const enqueueAvatarChainRead = createSerialLane();
  * username mint, GRAM transfer). They are user-initiated one at a time and some hold minute-long confirm loops that
  * would block sending. Their overlap risk is the wallet seqno, which platho-wallet's own monotonic floor covers.
  */
-const enqueueOutgoingPublish = createSerialLane();
+const outgoingPublishLane = createSerialLane();
+
+/**
+ * The label for a profiled publish, read off the queued thunk (`() => submitPublicPostDirect(...)`).
+ *
+ * DIAGNOSTIC ONLY, and deliberately so: it exists to say "post" or "private" next to the timings, and returning null
+ * costs nothing. Taking it from the thunk is what lets the profiler live INSIDE the lane instead of at four call
+ * sites — which is the point, because a fifth call site added later is then profiled automatically rather than
+ * silently unmeasured.
+ */
+function outgoingPublishKind(task) {
+  try {
+    return /=>\s*([A-Za-z_$][\w$]*)/.exec(String(task))?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The ONE lane every outgoing message goes through — now with a phase stopwatch on each task, and the breakdown
+ * left in the dump.
+ *
+ * Owner, 2026-08-04, on speed being a priority: two large images back-to-back landed 22s and 37s apart on chain —
+ * both published, nothing dropped, but far more than the 1-5s of index lag the seqno fix was expected to cost.
+ * Guessing which phase owns the rest is the mistake this project keeps paying for, so this measures instead:
+ * build (everything before the wallet call — capsule construction and encryption), seqno (resolving what to sign,
+ * INCLUDING waiting for a predecessor the chain has not consumed), sign, broadcast, chunkWait (the gap between the
+ * externals of one message). Whatever totalMs has left over is post-send app work.
+ *
+ * The profile reaches platho-wallet through a global rather than four lane modules' option bags — the same shape
+ * that module already uses for its transport fallback. The lane is serial, so exactly one profile is ever current.
+ */
+function enqueueOutgoingPublish(task) {
+  return outgoingPublishLane(async () => {
+    const profile = beginTonRpcPhaseProfile();
+    globalThis.plathoSendPhaseProfile = profile;
+    try {
+      return await task();
+    } finally {
+      globalThis.plathoSendPhaseProfile = null;
+      globalThis.plathoLastSendProfile = { kind: outgoingPublishKind(task), ...profile.summary() };
+    }
+  });
+}
 let deferredInstallPrompt = null;
 let installedRelatedPwaDetected = false;
 let walletIdentityFlashTimer = null;
@@ -11677,32 +11726,19 @@ function usingKeylessTonRpc() {
 // The public feed shares the unified background sync loop but at a gentler cadence than the private fast-idle
 // tier (it is less time-sensitive, and keyless reads share one toncenter budget).
 /**
- * A per-phase stopwatch for one sync tick: wall time AND toncenter requests spent, by phase.
+ * The sync tick's phase stopwatch — the shared beginTonRpcPhaseProfile primitive plus this lane's landing place.
  *
- * The request count is the half that matters. Wall time alone cannot separate "this phase is doing a lot of work"
- * from "this phase is waiting behind someone else's work in the shared pump" — and with one serial queue for the
- * whole client, that difference is the entire diagnosis. tonRpcRequestCounters is cumulative, so a phase is the
- * delta across it.
+ * It used to be a second copy of that stopwatch living here. When the send path needed the identical breakdown the
+ * honest move was one primitive with two commit sites, not a third copy: `sinceLoad` (a boot slow ONCE looks nothing
+ * like a tick slow EVERY time) and `spacingMs` (125 keyed vs 1100 keyless) matter equally to both, and a divergence
+ * between two copies would show up as two lanes that cannot be compared.
  */
 function beginSyncPhaseProfile() {
-  const startedAt = Date.now();
-  const before = { at: startedAt, n: tonRpcRequestCounters.total, ms: tonRpcRequestCounters.ms };
-  const phases = {};
-  let cursor = before;
+  const profile = beginTonRpcPhaseProfile();
   return {
-    mark(name) {
-      const now = { at: Date.now(), n: tonRpcRequestCounters.total, ms: tonRpcRequestCounters.ms };
-      phases[name] = { ms: now.at - cursor.at, req: now.n - cursor.n, netMs: now.ms - cursor.ms };
-      cursor = now;
-    },
+    mark: (name) => profile.mark(name),
     commit() {
-      globalThis.plathoLastSyncProfile = {
-        at: new Date().toISOString(),
-        totalMs: Date.now() - startedAt,
-        phases,
-        // Since page load: a boot that is slow ONCE looks completely different from one that is slow every tick.
-        sinceLoad: { req: tonRpcRequestCounters.total, netMs: tonRpcRequestCounters.ms, byLeaf: { ...tonRpcRequestCounters.byLeaf } },
-      };
+      globalThis.plathoLastSyncProfile = profile.summary();
     },
   };
 }
