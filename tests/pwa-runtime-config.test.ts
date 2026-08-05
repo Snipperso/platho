@@ -6651,6 +6651,31 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain("t('vault.activateAccount')");
   });
 
+  it('PWA-HONESTGREEN-01: the green means the CHAIN has it, not that the POST returned', () => {
+    // OWNER, 2026-08-05: "вижу, что она published и закрываю приложение... придёт это сообщение адресату?" The old
+    // answer was "maybe": 'published' was painted the instant toncenter accepted the broadcast, while the external
+    // was still in flight — MEASURED at 4-200s to reach a block, and the network demonstrably drops some. With the
+    // app closed nothing re-sends it, and the confirm driver only reddened the message on the next launch.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // The broadcast return says 'sending', which is what is actually true at that moment.
+    expect(app).toMatch(/function markDirectSendBroadcast\(thread, message\) \{[\s\S]{0,400}?message\.meta = 'sending';/);
+    expect(app, 'the optimistic-green helper came back').not.toContain('function markDirectSendPublished(');
+    // ...and the ONLY place that paints green is the branch that has READ the record out of the shard.
+    expect(app).toMatch(/if \(res\.landed\) \{[\s\S]{0,400}?message\.meta = 'published';/);
+    expect((app.match(/message\.meta = 'published';/g) ?? []).length, 'a second optimistic green appeared').toBe(1);
+
+    // The deadline case that can prove neither side says so, in the SENT bucket — an unverified success, not a failure.
+    expect(app).toContain("message.meta = 'sent, not verified';");
+    expect(app).toMatch(/else markConvDeliveryUnverified\(thread, message\);/);
+
+    // And the corrected false green must LOOK like a failure. It did not: 'not delivered: ...' matched none of the
+    // failure keywords, so the most important negative status in the app rendered as a neutral grey note — visible
+    // in the owner's own screenshot next to a genuinely red 'not sent'.
+    const bucket = app.slice(app.indexOf('function messageStatusKey'), app.indexOf('function messageStatusKey') + 700);
+    expect(bucket).toContain("text.includes('not delivered')");
+  });
+
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {
     // Owner, 2026-08-04: "скорость важна". Two large images landed 22s and 37s apart on chain — both published, but
     // far past the 1-5s of index lag the seqno fix was expected to cost. Guessing the owner phase is the mistake

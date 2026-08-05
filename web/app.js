@@ -234,7 +234,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v857';
+const PLATHO_APP_RUNTIME_VERSION = 'v858';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11096,6 +11096,7 @@ function messageStatusKey(message) {
     text.includes('failed')
     || text.includes('blocked')
     || text.includes('not sent')
+    || text.includes('not delivered')
     || text.includes('not confirmed')
     || text.includes('cancel required')
   ) return 'failed';
@@ -22210,7 +22211,7 @@ async function attemptIntroFirstContactDirect(context) {
   scheduleRecoveryBackup(conversationId(selfKeyId, sendState.peerKeyId));   // a new K_root — back its slot up (debounced)
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
-  markDirectSendPublished(thread, message);
+  markDirectSendBroadcast(thread, message);
   return { peerKeyId: sendState.peerKeyId };
 }
 
@@ -22221,10 +22222,22 @@ async function attemptIntroFirstContactDirect(context) {
 const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
 
 /** The identical terminal-delivered bookkeeping both direct-pay send paths (and their idempotent re-broadcast) run. */
-function markDirectSendPublished(thread, message) {
+/**
+ * The broadcast returned. That is NOT delivery, and this no longer claims it is.
+ *
+ * OWNER, 2026-08-05, on seeing a message go green and then closing the app: would it still reach the peer? The honest
+ * answer was: maybe. 'published' used to be painted here, the instant toncenter accepted the POST — while the
+ * external was still in flight and MEASURED to take 4-200s to reach a block. If the network then dropped it (which
+ * it demonstrably does), the sender had already been told it was delivered, and nothing re-sent it once the app was
+ * closed. The confirm driver reddened it — but only on the next launch, up to 24h later.
+ *
+ * So the green now waits for the chain: `armConvDeliveryConfirm` upgrades this to 'published' when it has actually
+ * READ the record out of the shard. Until then the message stays in the sending bucket, which is the truth.
+ */
+function markDirectSendBroadcast(thread, message) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  message.meta = 'published';        // OPTIMISTIC green — the background confirm driver below verifies (or corrects) it.
+  message.meta = 'sending';          // truthful: signed and handed to the network, not yet seen on chain
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
@@ -22350,8 +22363,15 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   if (generation !== convDeliveryConfirmGeneration || !thread?.messages?.includes(message)) return;
   if (res.landed) {
     message.convDelivery = 'verified';                                    // upgrade: proven on chain
+    // THE GREEN IS PAINTED HERE, and only here. Before this the message sits in the sending bucket: the broadcast
+    // returning is not delivery, and MEASURED the gap between the two is 4-200s. See markDirectSendBroadcast.
+    message.meta = 'published';
     cancelConvDeliveryConfirm(message);
+    refreshThreadAfterMessageChange(thread);
+    renderThreads();
+    renderConversation();
     updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+    refreshMessagingControls();
     return;
   }
   // Definitive non-delivery needs BOTH: the external is provably dead (past max age — it can never land now) AND the read
@@ -22359,9 +22379,31 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   // mine-only + strictly-increasing ⇒ it never will now). Before max age it is indexer lag, not loss — keep polling.
   if (ageMs >= CONV_CONFIRM_MAX_AGE_MS) {
     if (res.complete || res.seqShort) markConvDeliveryUnlanded(thread, message);
-    return;   // inconclusive at the deadline (couldn't reach bottom, shard past my seq) — leave optimistic green, never false-red
+    else markConvDeliveryUnverified(thread, message);
+    return;
   }
   reArm();
+}
+
+/**
+ * The deadline passed and the read could prove NEITHER side — the scan never reached the bottom and the shard is not
+ * past my seq, so "landed" and "lost" are both still open.
+ *
+ * This used to fall through and leave the optimistic green, which is the one case where staying silent is a lie in
+ * BOTH directions. Neither red (a landed message must never be reddened) nor green (that is the claim we cannot
+ * support) is honest here, so the message says exactly what is known: it went out, and we could not confirm it.
+ * The status stays in the SENT bucket — this is not a failure, it is an unverified success.
+ */
+function markConvDeliveryUnverified(thread, message) {
+  cancelConvDeliveryConfirm(message);
+  if (!thread?.messages?.includes(message)) return;
+  if (message.convDelivery === 'verified' || message.convDelivery === 'unlanded') return;
+  message.meta = 'sent, not verified';
+  refreshThreadAfterMessageChange(thread);
+  renderThreads();
+  renderConversation();
+  updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+  refreshMessagingControls();
 }
 
 /** A false green corrected: the shard never stored this message. Red terminal status (no Retry button — the owner's
@@ -22419,7 +22461,7 @@ async function attemptConvMessagePublishDirect(context) {
   const captured = message.convDirectSend;
   if (captured?.boc && (Date.now() - captured.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
     if (transport?.sendBoc) await transport.sendBoc({ boc: captured.boc, walletAddress: plathoWallet.address });
-    markDirectSendPublished(thread, message);
+    markDirectSendBroadcast(thread, message);
     armConvDeliveryConfirm(thread, message);   // re-broadcast re-arms on the SAME captured commits (idempotent)
     return { rebroadcast: true };
   }
@@ -22552,7 +22594,7 @@ async function attemptConvMessagePublishDirect(context) {
   }
 
   globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
-  markDirectSendPublished(thread, message);
+  markDirectSendBroadcast(thread, message);
   armConvDeliveryConfirm(thread, message);   // verify the optimistic green (or correct it to red) in the background
   return result;
 }
@@ -22594,7 +22636,7 @@ async function publishSelfNoteSnapshot(context) {
     throw error;
   }
   const wrote = await publishSelfNotesSnapshotForThread(thread);
-  markDirectSendPublished(thread, message);
+  markDirectSendBroadcast(thread, message);
   return { selfNote: true, wrote };
 }
 
