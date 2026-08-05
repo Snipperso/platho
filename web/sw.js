@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v905';
+const CACHE_NAME = 'platho-pwa-prototype-v906';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=285',
-  './app.js?v=856',
+  './app.js?v=857',
   './i18n.mjs?v=39',
   './i18n-strings.mjs?v=41',
   './boot-signal-field.mjs?v=1',
@@ -121,9 +121,13 @@ self.addEventListener('install', (event) => {
   // cache without boot-guard can pin a device to a dark screen). Cache each
   // asset independently and never let one failure block activation; the
   // runtime fetch handler backfills anything that slipped through.
+  // `cache: 'reload'` is what makes a CACHE_NAME bump actually mean something. A plain cache.add() fetches through
+  // the browser HTTP cache, so an asset whose URL carries no ?v= — every icon SVG, the manifest, the images — was
+  // re-cached from the SAME stale bytes and the new build shipped the old file. MEASURED: the owner reloaded onto
+  // v856 and still saw the pre-fix toolbar glyph; only the URL-versioned modules had actually changed.
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => Promise.allSettled(
-      ASSETS.map((asset) => cache.add(asset)),
+      ASSETS.map((asset) => cache.add(new Request(asset, { cache: 'reload' }))),
     )),
   );
   self.skipWaiting();
