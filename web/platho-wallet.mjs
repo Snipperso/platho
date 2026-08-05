@@ -752,16 +752,23 @@ const WALLET_SEQNO_CATCHUP_MS = 700;
 async function resolveWalletSendSeqno(wallet, transport, options) {
   const chainSeqno = await getPlathoWalletSeqno(wallet, transport, options);
   const floored = applyWalletSeqnoFloor(wallet, chainSeqno);
-  if (floored <= chainSeqno) return floored;
+  if (floored <= chainSeqno) {
+    clearPendingWalletExternal(wallet);
+    return floored;
+  }
   try {
-    return await waitForWalletSeqnoAtLeast(wallet, transport, floored, {
-      seqnoPollAttempts: options?.seqnoCatchupAttempts ?? WALLET_SEQNO_CATCHUP_ATTEMPTS,
+    return await awaitWalletSeqnoConsumed(wallet, transport, floored, {
+      seqnoPollAttempts: options?.seqnoCatchupAttempts,
       seqnoPollMs: options?.seqnoCatchupMs ?? WALLET_SEQNO_CATCHUP_MS,
+      rebroadcastIntervalMs: options?.rebroadcastIntervalMs,
     });
-  } catch {
-    // The predecessor never landed: toncenter answered 200 for an external the network then dropped. Believe the
-    // chain rather than signing a seqno it will never reach.
+  } catch (error) {
+    // The predecessor outlived its validity window: it can never be included now, so its seqno is provably free.
+    // THIS IS THE ONLY SAFE RELEASE. Releasing on a timer (14s, as this did) fires while a copy is still live, and
+    // then two externals sit on one seqno and the chain drops one of them.
+    if (error?.walletExternalExpired !== true) throw error;
     resetWalletSeqnoFloor(wallet);
+    clearPendingWalletExternal(wallet);
     return getPlathoWalletSeqno(wallet, transport, options);
   }
 }
@@ -775,6 +782,100 @@ async function waitForWalletSeqnoAtLeast(wallet, transport, targetSeqno, options
     if (delayMs > 0) await wait(delayMs);
   }
   throw new Error(`Wallet seqno did not reach ${targetSeqno}`);
+}
+
+// THE EXTERNAL WE BROADCAST BUT THE CHAIN HAS NOT CONSUMED YET, kept per wallet so it can be RE-BROADCAST verbatim.
+//
+// MEASURED 2026-08-05 on the owner's mainnet wallet, counting POSTs against externals that actually landed in one
+// page session: 5 broadcasts -> 4 on chain, then 19 -> 17. Exactly two vanished, and they are exactly the two
+// messages the user saw fail. Inclusion itself is FAST — eleven text externals landed 2-5s apart, and the two
+// halves of a successful image landed 17s and 2s after their broadcasts — so these were not slow, they were
+// dropped. Re-sending the SAME bytes minutes later worked on the same seqno.
+//
+// Re-broadcasting is safe for the one reason that matters: the external is signed and bound to a seqno, so the
+// chain executes it AT MOST ONCE however many copies arrive. That is the same property the ambiguous-broadcast
+// path has always relied on; it was simply never applied to "the POST succeeded and the message never landed".
+const walletPendingExternals = new Map();
+
+// How often to re-send a pending external while waiting. Inclusion is seconds, so anything that has not landed in
+// this long is very likely gone rather than slow — and a duplicate costs one POST, never a duplicate execution.
+const WALLET_REBROADCAST_INTERVAL_MS = 15_000;
+// Validity of a message external. It is the ONLY provable answer to "may this seqno be reused" — before it passes
+// the external can still land, after it never can.
+const WALLET_EXTERNAL_VALIDITY_S = 300;
+
+function notePendingWalletExternal(wallet, seqno, boc, validUntil) {
+  const key = walletSeqnoFloorKey(wallet);
+  if (key) walletPendingExternals.set(key, { seqno: Number(seqno), boc, validUntil: Number(validUntil) || 0 });
+}
+
+function clearPendingWalletExternal(wallet) {
+  const key = walletSeqnoFloorKey(wallet);
+  if (key) walletPendingExternals.delete(key);
+}
+
+function pendingWalletExternal(wallet) {
+  const key = walletSeqnoFloorKey(wallet);
+  return key ? walletPendingExternals.get(key) ?? null : null;
+}
+
+/** Test seam only — pending externals are module state, like the floors. */
+export function __resetWalletPendingExternalsForTests() {
+  walletPendingExternals.clear();
+}
+
+/**
+ * Wait until the chain has CONSUMED our seqno, RE-BROADCASTING the pending external while we wait.
+ *
+ * The old wait was a plain 40x1500ms poll that gave up after a minute and threw the signed bytes away, so the app's
+ * only recovery was to re-BUILD and re-SIGN the message — which is both slower and riskier than re-sending what was
+ * already signed. A dropped external is invisible from here (toncenter answered 200 and the chain simply never ran
+ * it), so the only honest response is to keep offering the same bytes until either the chain takes them or their
+ * validity window closes.
+ *
+ * DEADLINE: the external's own valid_until, not a timer. Giving up earlier is what let the seqno be re-signed while
+ * a copy was still live — two externals on one slot, one of them silently dropped.
+ */
+async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options = {}) {
+  const pending = options.pending ?? pendingWalletExternal(wallet);
+  const delayMs = Number(options.seqnoPollMs ?? 1500);
+  const rebroadcastMs = Number(options.rebroadcastIntervalMs ?? WALLET_REBROADCAST_INTERVAL_MS);
+  const validUntilMs = Number(pending?.validUntil) > 0 ? Number(pending.validUntil) * 1000 : 0;
+  // With a validity deadline the deadline rules; without one (or when a caller pins it) fall back to a bounded count
+  // so no code path can spin forever against a transport that never advances.
+  const attemptsCap = options.seqnoPollAttempts != null
+    ? Number(options.seqnoPollAttempts)
+    : (validUntilMs > 0 ? Number.POSITIVE_INFINITY : 40);
+  let lastBroadcastAt = Date.now();
+  let rebroadcasts = 0;
+  for (let attempt = 0; ; attempt += 1) {
+    const seqno = await getPlathoWalletSeqno(wallet, transport);
+    if (seqno >= targetSeqno) {
+      if (rebroadcasts > 0) console.info('[platho] wallet external landed after re-broadcast', { targetSeqno, rebroadcasts });
+      clearPendingWalletExternal(wallet);
+      return seqno;
+    }
+    const now = Date.now();
+    const expired = validUntilMs > 0 && now >= validUntilMs;
+    if (expired || attempt + 1 >= attemptsCap) {
+      const error = new Error(`Wallet seqno did not reach ${targetSeqno}`);
+      // ONLY expiry frees the seqno. Running out of polls means we stopped looking, not that the external died —
+      // releasing on that would put a fresh signature on a slot a live copy can still take.
+      if (expired) error.walletExternalExpired = true;
+      throw error;
+    }
+    if (pending?.boc && rebroadcastMs >= 0 && (now - lastBroadcastAt) >= rebroadcastMs) {
+      try {
+        await transport.sendBoc({ boc: pending.boc, walletAddress: wallet.address });
+        rebroadcasts += 1;
+      } catch {
+        // The seqno read is the verdict here, not this POST. A failed re-send changes nothing: the earlier copy may
+        // still land, so we keep waiting rather than treating this as the message's outcome.
+      }
+      lastBroadcastAt = Date.now();
+    }
+    if (delayMs > 0) await wait(delayMs);
+  }
 }
 
 export async function sendPlathoWalletTransaction(wallet, transaction, options = {}) {
@@ -793,8 +894,15 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
   // Everything the CALLER did before reaching the wallet — capsule construction and encryption for a media post.
   // Marking it here costs the lane modules no threading and still separates "the app was busy" from "the chain was".
   profile?.mark('build');
-  let seqno = options.seqno ?? await resolveWalletSendSeqno(wallet, transport, options);
-  profile?.mark('seqno');
+  let seqno;
+  // Marked in `finally` so a phase that THREW is still attributed. MEASURED: a failed send reported 92.7s total with
+  // only 21.9s across its phases — the 71s that mattered fell into a hole precisely because the throwing wait never
+  // reached its mark, which is the one number the owner needed.
+  try {
+    seqno = options.seqno ?? await resolveWalletSendSeqno(wallet, transport, options);
+  } finally {
+    profile?.mark('seqno');
+  }
   if (chunks.length > 1 && !transport.runGetMethod && options.seqno === undefined) {
     throw new Error('TON RPC runGetMethod transport is required for multi-transfer wallet publish');
   }
@@ -802,11 +910,16 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
   const batches = [];
   for (let index = 0; index < chunks.length; index += 1) {
     const chunk = chunks[index];
+    // Pinned here rather than left to the builder's default so the wait knows EXACTLY when these bytes die. The
+    // validity window is what makes "may this seqno be reused" answerable instead of guessed.
+    const validUntil = Number(
+      options.timeout ?? transaction?.validUntil ?? (Math.floor(Date.now() / 1000) + WALLET_EXTERNAL_VALIDITY_S),
+    );
     const built = await buildPlathoWalletExternalBoc(wallet, chunk, {
       ...options,
       transport,
       seqno,
-      timeout: options.timeout ?? transaction?.validUntil,
+      timeout: validUntil,
       includeStateInit: options.includeStateInit ?? seqno === 0,
     });
     profile?.mark('sign');
@@ -840,12 +953,18 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
     }
     profile?.mark('broadcast');
     noteWalletSeqnoBroadcast(wallet, seqno);
+    // The bytes are now the ONLY copy of this message that can ever execute. Keep them so the wait can re-offer
+    // them instead of the caller re-signing from scratch — the whole recovery hangs on this line.
+    notePendingWalletExternal(wallet, seqno, built.boc, validUntil);
     batches.push({ ...built, result, messageCount: chunk.length });
     if (index < chunks.length - 1) {
-      // The gap between externals of ONE message. Its poll cadence is the prime suspect for a slow multi-external
-      // publish, so it gets its own phase rather than hiding inside the loop.
-      seqno = await waitForWalletSeqnoAtLeast(wallet, transport, seqno + 1, options);
-      profile?.mark('chunkWait');
+      // The gap between the externals of ONE message: wait for the chain to actually consume this one, re-sending
+      // it meanwhile. Marked in `finally` so a wait that throws is still attributed.
+      try {
+        seqno = await awaitWalletSeqnoConsumed(wallet, transport, seqno + 1, options);
+      } finally {
+        profile?.mark('chunkWait');
+      }
     }
   }
 

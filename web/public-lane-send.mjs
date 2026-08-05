@@ -16,7 +16,7 @@
 
 import { buildPublicPublishBrowser } from './public-publish-browser.mjs?v=2';
 import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=24';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=25';
 
 /**
  * Shape a PublicPublish as the wallet-message form sendPlathoWalletTransaction consumes:

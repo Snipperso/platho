@@ -6232,7 +6232,10 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONFIG-08: service worker precaches runtime crypto vendor modules', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
 
-    expect(sw).toMatch(/platho-pwa-prototype-v904/);
+    // Membership, not version — the same convention the styles.css line below states explicitly. The invariant is
+    // that the precache is NAMED and VERSIONED (a bump is how a changed asset without a ?v= query, e.g. an icon
+    // SVG, reaches devices at all); pinning the exact number only manufactured churn on every such bump.
+    expect(sw).toMatch(/const CACHE_NAME = 'platho-pwa-prototype-v\d+';/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".

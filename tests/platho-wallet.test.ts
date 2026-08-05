@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { __resetWalletSeqnoFloorsForTests } from '../web/platho-wallet.mjs';
+import { __resetWalletSeqnoFloorsForTests, __resetWalletPendingExternalsForTests } from '../web/platho-wallet.mjs';
 import { Address, Cell, toNano } from '@ton/core';
 import { Blockchain } from '@ton/sandbox';
 import { WalletContractV5R1 } from '@ton/ton';
@@ -45,7 +45,7 @@ describe('embedded Platho wallet', () => {
   // The per-wallet seqno floor is MODULE state and every case here shares one mnemonic, so a floor left by an earlier
   // case leaks into the next. That is how the floor's own bug hid: it overrode the seqno-0 of an uninitialized wallet
   // (PLATHO-WALLET-04E/04G went red with 44 where the chain said 0).
-  beforeEach(() => __resetWalletSeqnoFloorsForTests());
+  beforeEach(() => { __resetWalletSeqnoFloorsForTests(); __resetWalletPendingExternalsForTests(); });
 
   it('PLATHO-WALLET-01: derives the same v5r1 wallet address as @ton/ton', async () => {
     const wallet = await derivePlathoWalletFromMnemonic(mnemonic);
@@ -428,6 +428,93 @@ describe('embedded Platho wallet', () => {
     signed.push(result.seqno);
     // The floor was dropped by its own disproof, so the very next attempt signs what the chain actually wants.
     expect(signed).toEqual([chainSeqno]);
+  });
+
+  // A DROPPED EXTERNAL IS RECOVERED BY RE-SENDING THE SAME BYTES, NOT BY RE-SIGNING THE MESSAGE.
+  //
+  // MEASURED 2026-08-05 on the owner's mainnet wallet, counting broadcast POSTs against externals that actually
+  // landed inside ONE page session: 5 -> 4, then 19 -> 17. Exactly two vanished, and they are exactly the two the
+  // user saw fail. Inclusion is fast (eleven text externals landed 2-5s apart; the two halves of a successful image
+  // landed 17s and 2s after their broadcasts), so those two were dropped, not slow — toncenter answered 200 and the
+  // chain never ran them. Re-sending the same signed bytes on the same seqno worked.
+  // Two messages forced into two externals. Splitting by COUNT keeps the fixture honest about the wallet layer:
+  // a real media message splits by BYTES instead, but the streaming path under test is the same one.
+  const twoChunkMessages = [0, 1].map((index) => ({
+    address: `0:${(index + 1).toString(16).padStart(64, '0')}`,
+    amount: '1000000',
+    payload: null,
+  }));
+
+  it('PLATHO-WALLET-04M: a dropped external is RE-BROADCAST verbatim instead of the message being re-signed', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    let chainSeqno = 300;
+    const sent: string[] = [];
+    let swallowNext = true;
+    const transport = {
+      async runGetMethod() { return { stack: [{ type: 'num', value: `0x${chainSeqno.toString(16)}` }] }; },
+      async sendBoc(input: any) {
+        sent.push(input.boc);
+        // The first copy is swallowed exactly as measured on mainnet: the POST succeeds, the chain never runs it.
+        if (swallowNext) { swallowNext = false; return { ok: true }; }
+        chainSeqno += 1;
+        return { ok: true };
+      },
+    };
+
+    const result: any = await sendPlathoWalletTransaction(wallet, { messages: twoChunkMessages }, {
+      transport, seqnoPollMs: 0, rebroadcastIntervalMs: 0, seqnoPollAttempts: 30, maxMessagesPerTransfer: 1,
+    });
+
+    expect(result.batchCount, 'the fixture must exercise the multi-external path').toBe(2);
+    // Copy #2 is byte-identical to copy #1 — the SAME signed external, not a fresh signature. A re-sign would
+    // consume a new conversation seq and could double-publish if the first copy were merely late.
+    expect(sent[1]).toBe(sent[0]);
+    expect(sent.length).toBeGreaterThanOrEqual(3);   // dropped copy, its re-send, then chunk 2
+    // And the second external carries the NEXT seqno, i.e. the wait really did observe the chain consume the first.
+    expect(result.batches.map((batch: any) => batch.seqno)).toEqual([300, 301]);
+  });
+
+  it('PLATHO-WALLET-04N: a still-VALID external keeps its seqno reserved — the send fails rather than re-sign', async () => {
+    // The counter-case, and the defect this replaced: releasing the seqno on a TIMER re-signs onto a slot a live
+    // copy can still take, and then the chain drops one of the two. Only expiry may free it.
+    const wallet = await createPlathoWallet({ mnemonic });
+    const signedSeqnos: number[] = [];
+    const transport = {
+      async runGetMethod() { return { stack: [{ type: 'num', value: '0x64' }] }; },   // stuck at 100 forever
+      async sendBoc() { return { ok: true }; },
+    };
+    const send = () => sendPlathoWalletTransaction(wallet, { messages: twoChunkMessages }, {
+      transport, seqnoPollMs: 0, seqnoPollAttempts: 3, seqnoCatchupAttempts: 3, maxMessagesPerTransfer: 1,
+    }).then((r: any) => { signedSeqnos.push(r.seqno); });
+
+    await expect(send()).rejects.toThrow(/did not reach/);
+    // The next attempt must NOT quietly take 100 again while the first copy is still inside its validity window.
+    await expect(send()).rejects.toThrow(/did not reach/);
+    expect(signedSeqnos, 'a second signature landed on a reserved seqno').toEqual([]);
+  });
+
+  it('PLATHO-WALLET-04P: an EXPIRED external frees its seqno, and a phase that throws is still measured', async () => {
+    const wallet = await createPlathoWallet({ mnemonic });
+    const transport = {
+      async runGetMethod() { return { stack: [{ type: 'num', value: '0x64' }] }; },
+      async sendBoc() { return { ok: true }; },
+    };
+    const marks: string[] = [];
+    const profile = { mark: (name: string) => marks.push(name) };
+    // validUntil in the PAST: these bytes can never be included, so the seqno is provably free.
+    const past = Math.floor(Date.now() / 1000) - 10;
+    await expect(sendPlathoWalletTransaction(wallet, { messages: twoChunkMessages }, {
+      transport, seqnoPollMs: 0, rebroadcastIntervalMs: 0, timeout: past, profile, maxMessagesPerTransfer: 1,
+    })).rejects.toThrow(/did not reach/);
+    // The throwing wait is the number the owner needed: without a mark in `finally` it vanished from the profile
+    // and a 92.7s send reported only 21.9s of phases.
+    expect(marks, 'the failing phase went unmeasured').toContain('chunkWait');
+
+    // And the release is real: with the pending external expired, the next send signs the chain value again.
+    const ok: any = await sendPlathoWalletTransaction(wallet, { messages: [twoChunkMessages[0]] }, {
+      transport, seqnoPollMs: 0, rebroadcastIntervalMs: 0, timeout: past, maxMessagesPerTransfer: 1,
+    });
+    expect(ok.seqno).toBe(100);
   });
 
   it('PLATHO-WALLET-05: encrypts to a recipient Vault key record derived from their wallet recovery phrase', async () => {

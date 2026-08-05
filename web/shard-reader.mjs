@@ -24,7 +24,7 @@
 //   4. include_boc is all-or-nothing: with it on you also download code_boc, which is identical for every shard.
 //      The cheap pass therefore runs with it OFF and uses data_hash / last_transaction_lt to spot changes.
 
-import { addrKey } from './shard-discovery.mjs?v=9';
+import { addrKey } from './shard-discovery.mjs?v=10';
 
 // One request covers a full 1024-bucket read space with headroom under the measured 1149 ceiling. Deliberately
 // NOT set to 1149: the limit is in bytes, so a longer address form or an extra query parameter would silently
