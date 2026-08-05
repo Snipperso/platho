@@ -3,7 +3,7 @@ const ASSETS = [
   './',
   './index.html',
   './styles.css?v=285',
-  './app.js?v=859',
+  './app.js?v=860',
   './i18n.mjs?v=39',
   './i18n-strings.mjs?v=41',
   './boot-signal-field.mjs?v=1',

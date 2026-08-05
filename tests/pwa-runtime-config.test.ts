@@ -6659,7 +6659,8 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
 
     // The broadcast return says 'sending', which is what is actually true at that moment.
-    expect(app).toMatch(/function markDirectSendBroadcast\(thread, message\) \{[\s\S]{0,400}?message\.meta = 'sending';/);
+    // A confirm-backed lane lands in the sending bucket; the lanes with no verifier opt out — see PWA-HONESTGREEN-03.
+    expect(app).toMatch(/function markDirectSendBroadcast\(thread, message, options = \{\}\) \{[\s\S]{0,900}?: 'sending';/);
     expect(app, 'the optimistic-green helper came back').not.toContain('function markDirectSendPublished(');
     // ...and the ONLY place that paints green is the branch that has READ the record out of the shard.
     expect(app).toMatch(/if \(res\.landed\) \{[\s\S]{0,400}?message\.meta = 'published';/);
@@ -6674,6 +6675,28 @@ describe('PWA runtime config guard', () => {
     // in the owner's own screenshot next to a genuinely red 'not sent'.
     const bucket = app.slice(app.indexOf('function messageStatusKey'), app.indexOf('function messageStatusKey') + 700);
     expect(bucket).toContain("text.includes('not delivered')");
+  });
+
+  it('PWA-HONESTGREEN-03: only a lane WITH a confirm may leave a message in the sending bucket', () => {
+    // A REGRESSION I SHIPPED AND THEN FOUND, twenty minutes live. Making the green conditional on the CONV delivery
+    // confirm silently broke the two lanes that have no confirm at all: the INTRO first contact (IntroShard) and
+    // self-notes (RecoveryShard slots, never read back). Both called the same helper, so both started saying
+    // 'sending' — and nothing anywhere would ever lift them out of it. The message would hang forever.
+    //
+    // 'sending' is a PROMISE that something resolves it. A lane that cannot keep that promise says 'sent': broadcast,
+    // never claimed confirmed. Lying 'published' again would be the other wrong answer.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/message\.meta = options\.awaitsConfirm === false \? 'sent' : 'sending';/);
+
+    // Every caller is accounted for: with a confirm armed right after, or explicitly opted out.
+    const callers = [...app.matchAll(/markDirectSendBroadcast\(thread, message([^)]*)\);\n(.*)/g)]
+      .map((m) => ({ opts: m[1], next: m[2] }));
+    expect(callers.length, 'a caller appeared or vanished — re-check each one').toBe(4);
+    for (const caller of callers) {
+      const optedOut = caller.opts.includes('awaitsConfirm: false');
+      const confirmed = caller.next.includes('armConvDeliveryConfirm(thread, message)');
+      expect(optedOut || confirmed, `a caller neither arms a confirm nor opts out: ${caller.opts}`).toBe(true);
+    }
   });
 
   it('PWA-HONESTGREEN-02: the LAST external keeps a watcher after the send call returns', () => {
