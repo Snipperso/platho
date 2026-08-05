@@ -6677,6 +6677,30 @@ describe('PWA runtime config guard', () => {
     expect(bucket).toContain("text.includes('not delivered')");
   });
 
+  it('PWA-HONESTGREEN-04: a pending PUBLIC post is watched while the tab stays open, not only on focus', () => {
+    // The public lane's RECORD was already honest — 'public published, confirming' until the feed merge finds the
+    // chain twin with the same bodyHash. Two holes around it:
+    //   1. The re-broadcast of a retained external and the terminal verdict ran ONLY from focus/pageshow/restore.
+    //      A user who published and never left the tab got NEITHER: a dropped external (MEASURED: 2 of 19 in one
+    //      session) left the post saying "confirming" forever.
+    //   2. The composer status line announced a flat 'public published' on the broadcast return — the same
+    //      optimistic claim the private lane was making, just in a different place.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    expect(app).toContain("setPublicStatus('public published, confirming');");
+    expect(app, 'the flat optimistic claim came back').not.toMatch(/setPublicStatus\('public published'\)/);
+
+    // The visibility loop keeps a tail cadence and drives the resume itself.
+    expect(app).toMatch(/const delayMs = PUBLIC_VISIBILITY_SCHEDULE_MS\[attempt\] \?\? PUBLIC_VISIBILITY_TAIL_MS;/);
+    expect(app).toMatch(/try \{ await syncPublicChannels\(\); \}[\s\S]{0,260}?resumePendingPublicPublishConfirmations\(\);/);
+
+    // ...and it STOPS. A terminaled record keeps a truthy publishStatus (that flag marks the local copy the merge
+    // must carry), so re-arming on "anything pending" would spin forever.
+    expect(app).toMatch(/if \(anyPublicPublishStillResolving\(\)\) schedulePublicPublishVisibilityChecks\(attempt \+ 1\);/);
+    expect(app).toMatch(/if \(String\(item\.publishStatus \?\? ''\)\.includes\('failed'\)\) continue;/);
+    expect(app).toMatch(/if \(Date\.now\(\) - createdAt < PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS\) return true;/);
+  });
+
   it('PWA-HONESTGREEN-03: only a lane WITH a confirm may leave a message in the sending bucket', () => {
     // A REGRESSION I SHIPPED AND THEN FOUND, twenty minutes live. Making the green conditional on the CONV delivery
     // confirm silently broke the two lanes that have no confirm at all: the INTRO first contact (IntroShard) and
@@ -6804,10 +6828,13 @@ describe('PWA runtime config guard', () => {
     expect(app.match(/schedulePublicPublishVisibilityChecks\(\);/g)?.length, 'post AND comment').toBe(2);
     // It reuses the existing merge (which already retires a pending record when the chain twin appears) rather
     // than growing a second confirm driver.
-    const sched = app.slice(app.indexOf('function schedulePublicPublishVisibilityChecks('), app.indexOf('function schedulePublicPublishVisibilityChecks(') + 900);
+    const sched = app.slice(app.indexOf('function schedulePublicPublishVisibilityChecks('), app.indexOf('function schedulePublicPublishVisibilityChecks(') + 1600);
     expect(sched).toMatch(/if \(!anyPendingPublicFeedItem\(\)\) return;/);
     expect(sched).toMatch(/await syncPublicChannels\(\);/);
-    expect(sched, 'it stops once nothing is pending — no standing timer').toMatch(/if \(anyPendingPublicFeedItem\(\)\) schedulePublicPublishVisibilityChecks\(attempt \+ 1\);/);
+    // It stops — no standing timer. The re-arm gate is STRICTER than "anything pending": a record that already
+    // lost keeps a truthy publishStatus (that flag marks the local copy the merge carries), so the loop also has to
+    // stop on it, and on anything past the no-progress deadline. See PWA-HONESTGREEN-04.
+    expect(sched, 'no standing timer').toMatch(/if \(anyPublicPublishStillResolving\(\)\) schedulePublicPublishVisibilityChecks\(attempt \+ 1\);/);
     // And it dies with the wallet, like every other timer that holds a transport.
     expect(app.match(/cancelPublicPublishVisibilityChecks\(\);/g)?.length, 'both teardown sites').toBeGreaterThanOrEqual(2);
   });

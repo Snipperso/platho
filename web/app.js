@@ -234,7 +234,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v860';
+const PLATHO_APP_RUNTIME_VERSION = 'v861';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22963,17 +22963,50 @@ function anyPendingPublicFeedItem() {
   return false;
 }
 
+// After the three fast checks, keep looking at this cadence while anything is still resolving. The fast ticks were
+// calibrated to the indexer, but MEASURED 2026-08-05 a public-sized external can take 100-200s to reach a block —
+// and if it is DROPPED, nothing was watching at all: the re-broadcast and the terminal verdict lived ONLY on
+// focus/pageshow/restore, so a user who never left the tab got neither. The post then said "confirming" forever.
+const PUBLIC_VISIBILITY_TAIL_MS = 30_000;
+
 function schedulePublicPublishVisibilityChecks(attempt = 0) {
-  if (attempt >= PUBLIC_VISIBILITY_SCHEDULE_MS.length) return;
+  const delayMs = PUBLIC_VISIBILITY_SCHEDULE_MS[attempt] ?? PUBLIC_VISIBILITY_TAIL_MS;
   const timer = window.setTimeout(async () => {
     publicVisibilityTimers.delete(timer);
     // Nothing pending any more (a background sync got there first, or the user cleared it) — stop, do not spend
     // reads proving something already proven.
     if (!anyPendingPublicFeedItem()) return;
     try { await syncPublicChannels(); } catch (error) { noteTonRpcRateLimit(error); }
-    if (anyPendingPublicFeedItem()) schedulePublicPublishVisibilityChecks(attempt + 1);
-  }, PUBLIC_VISIBILITY_SCHEDULE_MS[attempt]);
+    // Re-broadcast a retained external and pronounce the verdict past the deadline. Both used to happen only when
+    // the window lost and regained focus.
+    resumePendingPublicPublishConfirmations();
+    // Keep going only while something is still WITHIN its deadline: a terminaled record keeps its publishStatus
+    // (that flag marks the local copy the merge must carry, not work in progress), so gating on "anything pending"
+    // would spin forever.
+    if (anyPublicPublishStillResolving()) schedulePublicPublishVisibilityChecks(attempt + 1);
+  }, delayMs);
   publicVisibilityTimers.add(timer);
+}
+
+/**
+ * Is any published record still WORTH another look — i.e. pending and still inside the no-progress deadline?
+ *
+ * `isPendingPublicFeedItem` is true for a record that already lost ('public publish failed' is still a truthy
+ * publishStatus, because that flag marks the local copy the feed merge must carry, not work in progress). Looping
+ * on that predicate would never stop, which is why the tail below gates on this one instead.
+ */
+function anyPublicPublishStillResolving() {
+  for (const entry of Object.values(publicChannelFeedCache ?? {})) {
+    for (const post of entry?.feed?.posts ?? entry?.posts ?? []) {
+      for (const item of [post, ...(post?.comments ?? [])]) {
+        if (!isPendingPublicFeedItem(item)) continue;
+        if (String(item.publishStatus ?? '').includes('failed')) continue;
+        const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
+        if (Date.now() - createdAt < PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function resumePendingPublicPublishConfirmations() {
@@ -23315,7 +23348,10 @@ async function submitPublicPostDirect(draft = null) {
   // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
   // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
   schedulePublicPublishVisibilityChecks();
-  setPublicStatus('public published');
+  // Match the RECORD, which correctly says 'public published, confirming' one line above. The composer used to
+  // announce a flat 'public published' on the broadcast return — the same optimistic claim the private lane was
+  // making, just in the status line instead of on the post.
+  setPublicStatus('public published, confirming');
   globalThis.plathoLastPublicPublish = { text: resolvedDraft.text, blocks, commentsAllowed: resolvedDraft.commentsAllowed, payloads, result, direct: true };
   return result;
 }
