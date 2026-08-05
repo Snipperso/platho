@@ -234,7 +234,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v859';
+const PLATHO_APP_RUNTIME_VERSION = 'v860';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22211,7 +22211,8 @@ async function attemptIntroFirstContactDirect(context) {
   scheduleRecoveryBackup(conversationId(selfKeyId, sendState.peerKeyId));   // a new K_root — back its slot up (debounced)
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
-  markDirectSendBroadcast(thread, message);
+  // INTRO writes to IntroShard, which has no delivery confirm — nothing would ever lift this out of 'sending'.
+  markDirectSendBroadcast(thread, message, { awaitsConfirm: false });
   return { peerKeyId: sendState.peerKeyId };
 }
 
@@ -22234,10 +22235,15 @@ const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
  * So the green now waits for the chain: `armConvDeliveryConfirm` upgrades this to 'published' when it has actually
  * READ the record out of the shard. Until then the message stays in the sending bucket, which is the truth.
  */
-function markDirectSendBroadcast(thread, message) {
+function markDirectSendBroadcast(thread, message, options = {}) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  message.meta = 'sending';          // truthful: signed and handed to the network, not yet seen on chain
+  // 'sending' is a PROMISE that something will resolve it: only the CONV lane has a delivery confirm, and only it
+  // may leave a message in that bucket. The INTRO first contact and self-notes write to different contracts with no
+  // verifier, so they would sit in 'sending' forever — a hang I shipped for twenty minutes by making the green
+  // conditional without checking every caller. They say 'sent', which is the whole truth available for them:
+  // broadcast, never claimed confirmed. Making them lie 'published' again would be the other wrong answer.
+  message.meta = options.awaitsConfirm === false ? 'sent' : 'sending';
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
@@ -22684,7 +22690,8 @@ async function publishSelfNoteSnapshot(context) {
     throw error;
   }
   const wrote = await publishSelfNotesSnapshotForThread(thread);
-  markDirectSendBroadcast(thread, message);
+  // Self-notes write RecoveryShard slots and are never read back — no verifier exists to lift this out of 'sending'.
+  markDirectSendBroadcast(thread, message, { awaitsConfirm: false });
   return { selfNote: true, wrote };
 }
 
