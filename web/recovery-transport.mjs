@@ -7,7 +7,7 @@
 // h0/h1/bh so the read is self-verifying: bh must equal the body cell's hash. The address-decoding + rate-limited
 // pump are shared with the other lanes (toWireAddress / the injected runGetMethod).
 
-import { toWireAddress } from './shard-reader.mjs?v=8';
+import { toWireAddress } from './shard-reader.mjs?v=9';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=35';
 

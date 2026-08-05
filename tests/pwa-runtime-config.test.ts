@@ -6676,6 +6676,35 @@ describe('PWA runtime config guard', () => {
     expect(bucket).toContain("text.includes('not delivered')");
   });
 
+  it('PWA-HONESTGREEN-02: the LAST external keeps a watcher after the send call returns', () => {
+    // The final hole in the send path. The wallet re-broadcasts only while a send is RUNNING, so the last external
+    // of a message had nobody watching it once the call returned — MEASURED on the owner's wallet at 148s to reach a
+    // block on one send, and needing two re-broadcasts on another. Worse, the record that was supposed to enable
+    // recovery persisted `result?.result?.boc` — the RPC RESPONSE, which carries no boc — so it stored null on every
+    // successful send and the whole idempotent re-broadcast path was dead except after a throw.
+    const app = readFileSync('web/app.js', 'utf8');
+    const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
+
+    // The wallet hands back the LAST chunk's signed bytes. The top-level `boc` is the FIRST chunk's (it spreads
+    // `first`), which is the wrong one for this job.
+    expect(wallet).toContain('pendingBoc: last.boc ?? null,');
+    expect(wallet).toContain('pendingValidUntil: last.validUntil ?? null,');
+    // ...and the app persists them, with the validity that says when they stop being re-sendable.
+    expect(app).toContain('boc: result?.result?.pendingBoc ?? null,');
+    expect(app).toContain('validUntil: result?.result?.pendingValidUntil ?? null,');
+    expect(app, 'the RPC response was persisted as if it were the external').not.toContain('boc: result?.result?.boc ?? null');
+
+    // The confirm driver re-sends while the shard has not shown the record and the bytes are still alive.
+    expect(app).toMatch(/await rebroadcastPendingDirectSend\(send, transport\);\s*\n\s*reArm\(\);/);
+    expect(app).toMatch(/if \(now >= validUntilMs\) return;/);
+    expect(app).toMatch(/if \(now - Number\(send\.lastRebroadcastAt \?\? 0\) < DIRECT_SEND_CONFIRM_REBROADCAST_MS\) return;/);
+    // NEVER a rebuild here: that would bump the conversation seq and seal a new capsule, double-publishing if the
+    // first copy was merely late. Only the captured bytes go back out.
+    expect(app).toMatch(/await transport\.sendBoc\(\{ boc: send\.boc, walletAddress: plathoWallet\.address \}\)/);
+    // Re-armed after a reload too — the record is persisted, which is what covers "the app was closed".
+    expect(app).toContain('convDirectSend: safeJsonClone(message.convDirectSend) ?? null,');
+  });
+
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {
     // Owner, 2026-08-04: "скорость важна". Two large images landed 22s and 37s apart on chain — both published, but
     // far past the 1-5s of index lag the seqno fix was expected to cost. Guessing the owner phase is the mistake
