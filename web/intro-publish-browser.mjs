@@ -15,7 +15,7 @@
 import { beginCell } from './pwa-contract-transactions.mjs?v=35';
 import { introShardAddressBytes, introShardStateInit, rawAddress } from './shard-address.mjs?v=5';
 import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=2';
-import { assertReadableBucket } from './intro-bucket.mjs?v=9';
+import { assertReadableBucket } from './intro-bucket.mjs?v=10';
 
 /** Mirrors `message(0x49535031) IntroPublish` — op | r:uint256 | view_tag:uint16 | ^header_0 | ^body. */
 export function buildIntroPublishBody({ r, viewTag, header0, body }) {

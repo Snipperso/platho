@@ -11,7 +11,7 @@
 
 import { buildKeyShardRegisterBrowser } from './key-shard-register-browser.mjs?v=2';
 import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=26';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=27';
 
 /**
  * Register (or replace) the user's messaging keys on their KeyShard. `wallet` is the app's WalletContractV5R1 handle;

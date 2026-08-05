@@ -540,6 +540,18 @@ export function clearToncenterMessagesCache() {
   return count;
 }
 
+/**
+ * Test seam: every limiter key the pump has ever created.
+ *
+ * ONE key means ONE queue with ONE worker, which is the property that keeps two fetches from racing the WebKit run
+ * loop (the iPhone freeze). A caller that omits rateLimitKey does NOT fail — it silently lands on the derived
+ * `origin|key-mode` key and gets a SECOND queue. That already happened once to the shard scan, which ran on a
+ * module-default pacing in a queue of its own until it was measured.
+ */
+export function __toncenterLimiterKeysForTests() {
+  return [...toncenterRequestStates.keys()];
+}
+
 function toncenterRequestState(key) {
   const existing = toncenterRequestStates.get(key);
   if (existing) return existing;

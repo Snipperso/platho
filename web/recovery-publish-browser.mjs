@@ -15,7 +15,7 @@
 
 import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=35';
 import { recoveryShardAddressBytes, recoveryShardStateInit, rawAddress } from './shard-address.mjs?v=5';
-import { recoveryOwnerSlotKey } from './shard-discovery.mjs?v=11';
+import { recoveryOwnerSlotKey } from './shard-discovery.mjs?v=12';
 import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=2';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
