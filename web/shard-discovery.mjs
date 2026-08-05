@@ -29,7 +29,7 @@
 
 import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=35';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
-import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=27';
+import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=28';
 import {
   recordShardStateInit,
   introShardStateInit,

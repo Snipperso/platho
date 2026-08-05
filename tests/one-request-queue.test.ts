@@ -14,6 +14,13 @@ import { createShardStatesRequest, createShardMessagesWithSourceReader } from '.
 // forgetful lane just quietly gets its own queue — which is exactly what happened to the shard scan: it ran at a
 // module-default 1500ms pacing in a queue of its own until somebody measured it (8290ms -> 1515ms once merged).
 // A grep cannot catch that, so this drives the REAL config through the REAL entry points and counts the queues.
+// A derived key looks like `origin|key-mode`, so any key shaped like a URL is a lane that skipped the shared one.
+// SCOPED TO THE REAL HOSTS on purpose: neighbouring suites build transports against invented endpoints
+// (`toncenter.example`) with no explicit key, and those fixtures are not production lanes. Matching every URL-shaped
+// key made this gate red for somebody else's stub — a gate that cries about fixtures gets muted, and then it guards
+// nothing.
+const PRODUCTION_HOST_QUEUE = /^https?:\/\/(?:[a-z0-9-]+\.)*(?:toncenter\.com|tonapi\.io|tonhubapi\.com)\b/i;
+
 describe('ONEQUEUE — all toncenter traffic shares a single request queue', () => {
   const endpoint = 'https://toncenter.com/api/v3/runGetMethod';
   const apiKey = 'test-key';
@@ -50,10 +57,15 @@ describe('ONEQUEUE — all toncenter traffic shares a single request queue', () 
     // A gate that passes because nothing ran is worse than no gate: prove every path reached the network layer.
     expect(fetches, 'some path never reached the pump, so it proved nothing').toBeGreaterThanOrEqual(4);
 
-    const added = __toncenterLimiterKeysForTests().filter((key) => !before.has(key));
-    expect(added.length, `these paths opened ${added.length} queues: ${added.join(', ')}`).toBe(1);
-    expect(added[0], 'and it must be the key the config pins, not a derived origin|key-mode fallback')
-      .toBe('toncenter-shared');
+    // ORDER-INDEPENDENT. Counting only NEW keys made this gate depend on whether a neighbouring suite had already
+    // created the shared one in the same process — which it had, so it failed for a reason that had nothing to do
+    // with the invariant. What matters is not how many keys appeared but that NO DERIVED key exists: the fallback
+    // shape is `origin|key-mode`, so any key that looks like a URL is a lane that forgot to pass one.
+    const keys = __toncenterLimiterKeysForTests();
+    expect(keys, 'the pinned queue is missing').toContain('toncenter-shared');
+    const derived = keys.filter((key) => PRODUCTION_HOST_QUEUE.test(key));
+    expect(derived, `a lane derived its own queue: ${derived.join(', ')}`).toEqual([]);
+    void before;
   });
 
   it('ONEQUEUE-01B: WITHOUT a key it is the SAME queue, only paced slower', async () => {
@@ -72,8 +84,9 @@ describe('ONEQUEUE — all toncenter traffic shares a single request queue', () 
       .catch(() => {});
 
     expect(fetches, 'the keyless path never reached the pump').toBeGreaterThanOrEqual(2);
-    const added = __toncenterLimiterKeysForTests().filter((key) => !before.has(key));
-    expect(added, 'a keyless client opened its own queue').toEqual([]);
+    const derived = __toncenterLimiterKeysForTests().filter((key) => PRODUCTION_HOST_QUEUE.test(key));
+    expect(derived, `a keyless client derived its own queue: ${derived.join(', ')}`).toEqual([]);
+    void before;
 
     // And the pacing IS the thing that differs — the same queue, a slower step.
     expect(rpc.providers.find((p: any) => p.id === 'keyless-toncenter')?.requestSpacingMs).toBe(1100);

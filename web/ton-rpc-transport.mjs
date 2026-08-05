@@ -1551,6 +1551,68 @@ export function beginTonRpcPhaseProfile() {
   };
 }
 
+// Which door the NEXT retry knocks on. Module state, because the point is to move on from whichever one just
+// failed to deliver — a per-call counter would restart at the primary every time and never rotate.
+let broadcastDoorCursor = 0;
+
+/** Test seam — the cursor is module state, and a test that cannot reset it cannot prove the rotation. */
+export function __resetBroadcastDoorCursorForTests() {
+  broadcastDoorCursor = 0;
+}
+
+export function broadcastDoors(config = null) {
+  const resolved = config ?? globalThis.plathoTonRpcConfig ?? null;
+  const doors = Array.isArray(resolved?.broadcastDoors) ? resolved.broadcastDoors : [];
+  return doors.filter((door) => typeof door?.sendBocEndpoint === 'string' && door.sendBocEndpoint);
+}
+
+/**
+ * Broadcast an ALREADY SIGNED external through the next retry door.
+ *
+ * Best-effort by construction: the caller never learns whether this worked, because the answer must not influence
+ * anything. Delivery is decided by reading the shard, and these bytes are seqno-bound, so the chain runs them at
+ * most once however many doors accept them.
+ *
+ * ON THE SHARED PUMP KEY, always. A door is a different HOST but must not be a different QUEUE: two queues mean two
+ * workers mean two simultaneous connections, which is what stalled the WebKit run loop on the iPhone. One worker
+ * alternating addresses is fine; two workers are not. Background priority + skipIfRateLimited keep it behind every
+ * read and send, and drop it outright when the lane is busy.
+ */
+export async function broadcastThroughNextDoor(boc, options = {}) {
+  const doors = broadcastDoors(options.config ?? null);
+  if (doors.length === 0 || typeof boc !== 'string' || !boc) return null;
+  broadcastDoorCursor = (broadcastDoorCursor + 1) % doors.length;
+  const door = doors[broadcastDoorCursor];
+  const lane = toncenterScanLaneOptions(options.config ?? null);
+  try {
+    const response = await scheduleToncenterHttpRequest(
+      door.sendBocEndpoint,
+      null,
+      () => fetchWithTonRpcTimeout(fetchImplFor(options), door.sendBocEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boc }),
+      }, finiteNonNegativeMs(door.requestTimeoutMs, BROADCAST_DOOR_TIMEOUT_MS)),
+      {
+        ...lane,
+        priority: 'background',
+        skipIfRateLimited: true,
+      },
+    );
+    return { door: door.id, status: response?.status ?? null };
+  } catch {
+    // Swallowed on purpose. A door that refuses proves nothing about delivery — the earlier copy may still land,
+    // and the next retry simply moves to the next door.
+    return { door: door.id, status: null };
+  }
+}
+
+const BROADCAST_DOOR_TIMEOUT_MS = 8_000;
+
+function fetchImplFor(options) {
+  return options.fetch ?? options.fetchImpl ?? globalThis.fetch;
+}
+
 export function toncenterScanLaneOptions(config = null) {
   const resolved = config ?? globalThis.plathoTonRpcConfig ?? null;
   if (!resolved) return {};

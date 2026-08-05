@@ -30,14 +30,14 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=27';
+} from './platho-wallet.mjs?v=28';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=115';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=116';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -45,7 +45,8 @@ import {
   decodeTonAddressSliceBoc,
   tonRpcRequestCounters,
   beginTonRpcPhaseProfile,
-} from './ton-rpc-transport.mjs?v=71';
+  broadcastThroughNextDoor,
+} from './ton-rpc-transport.mjs?v=72';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -155,41 +156,41 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=8';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=50';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=53';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=51';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=54';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=17';
+import { createPublicLane } from './public-lane.mjs?v=18';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=10';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=11';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=10';
-import { createIntroLane } from './intro-lane.mjs?v=16';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=11';
+import { createIntroLane } from './intro-lane.mjs?v=17';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=10';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=10';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=11';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=11';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=12';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=11';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=11';
-import { readAccountStates } from './shard-reader.mjs?v=10';
+import { createConvReadLane } from './conv-lane.mjs?v=13';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=12';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=12';
+import { readAccountStates } from './shard-reader.mjs?v=11';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=10';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=11';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=10';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=11';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=10';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=11';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=12';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=11';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=10';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=10';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=11';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=11';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=11';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=12';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -201,14 +202,14 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=12';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=49';
+} from './shard-discovery.mjs?v=13';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=50';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=55';
+} from './username-ton-rpc-provider.mjs?v=56';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -234,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v861';
+const PLATHO_APP_RUNTIME_VERSION = 'v862';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22398,7 +22399,7 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
 
 // Never re-send the same external more often than this. The confirm ticks accelerate early (4s, 9s, 18s...), and a
 // duplicate costs a POST on the one serial RPC pump every message shares — so the gate is time, not tick count.
-const DIRECT_SEND_CONFIRM_REBROADCAST_MS = 15_000;
+const DIRECT_SEND_CONFIRM_REBROADCAST_MS = 5_000;
 
 /**
  * Re-offer the last signed external of a message the shard has not shown us yet.
@@ -22421,7 +22422,10 @@ async function rebroadcastPendingDirectSend(send, transport) {
   if (now - Number(send.lastRebroadcastAt ?? 0) < DIRECT_SEND_CONFIRM_REBROADCAST_MS) return;
   send.lastRebroadcastAt = now;
   try {
-    await transport.sendBoc({ boc: send.boc, walletAddress: plathoWallet.address });
+    // Rotate the entry point, do not re-knock: see broadcastThroughNextDoor. Falls back to the primary
+    // transport when no doors are configured.
+    const rotated = await broadcastThroughNextDoor(send.boc);
+    if (!rotated) await transport.sendBoc({ boc: send.boc, walletAddress: plathoWallet.address });
     console.info('[conv] re-broadcast pending external while awaiting the shard', { seq: send.maxSeq ?? null });
   } catch (error) {
     // The SHARD READ is the verdict on delivery, never this POST. A failed re-send changes nothing: the earlier copy
