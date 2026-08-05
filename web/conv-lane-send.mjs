@@ -33,7 +33,7 @@
 
 import { buildConvPublishBrowser } from './conv-publish-browser.mjs?v=2';
 import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=27';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=28';
 
 /**
  * The capsule's three on-chain snake cells, as CLIENT cells buildConvPublishBrowser consumes. createEncryptedConvCapsule

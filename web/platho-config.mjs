@@ -101,6 +101,37 @@ export const PLATHO_APP_CONFIG = deepFreeze({
           rateLimitKey: 'toncenter-shared',
         },
       ],
+      // RETRY DOORS — a carousel of independent ways INTO the network, used only when a broadcast has not landed.
+      //
+      // An external reaches ONE node and spreads from there; until it reaches the collator of our shard it is
+      // nowhere. MEASURED 2026-08-05: small externals (3762 B) land in 2-3s every time, ours (36555 B) took 4, 17,
+      // 24, 33, 37, 73, 100, 121, 143, 181 and 200s with every configured limit satisfied twice over (56% of
+      // max_ext_msg_size, depth 262 of 512, 3.5% of the block byte limit, trivial gas). A spread that wide with no
+      // difference in the message is what luck-of-the-route looks like — so a retry should try a DIFFERENT door
+      // rather than knock on the same one.
+      //
+      // NOT A MIRROR, deliberately. The first broadcast still goes to the primary alone, so a message that lands
+      // quickly costs exactly what it costs today. Only the RETRY that already exists changes address, which is why
+      // this adds ZERO requests: a 2-part image would have cost 220KB of upload instead of 73KB if every send were
+      // mirrored to all three. And because the retry rotates, each individual door still sees one POST per ~15s at
+      // the 5s cadence — today's per-door rate, on somebody else's free service.
+      //
+      // VERIFIED anonymously 2026-08-05 (POST with a deliberately invalid body — a PARSE error, never 401/403, is
+      // what proves no key is needed; nothing real was broadcast): toncenter 422 "invalid base64", tonapi 400 "boc
+      // must be a base64 encoded string or hex string", tonhub 400 {"status":-5}. Rejected as key-only: dRPC
+      // (Cloudflare 403), NOWNodes ("Missing api-key header"), GetBlock and Chainstack (per-account token in the
+      // URL), TONX (520).
+      //
+      // BROADCAST ONLY. These never answer a read: a second source of truth would resurrect the cross-verification
+      // that made every critical read wait on the slower provider — the real reason Orbs was removed, not its API
+      // version. Their responses are ignored entirely; the shard read remains the only verdict on delivery.
+      broadcastDoors: [
+        // Door 0 is the primary itself: the carousel starts where the first attempt already went, so the ordering
+        // below IS the retry order.
+        { id: 'toncenter', sendBocEndpoint: 'https://toncenter.com/api/v3/message' },
+        { id: 'tonapi', sendBocEndpoint: 'https://tonapi.io/v2/blockchain/message' },
+        { id: 'tonhub-v4', sendBocEndpoint: 'https://mainnet-v4.tonhubapi.com/send' },
+      ],
       requestSpacingMs: 250,
       rateLimitBackoffMs: 7000,
       rateLimitRetries: 1,
@@ -113,7 +144,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=49',
+      moduleUrl: './ton-dns-provider.mjs?v=50',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
@@ -264,6 +295,21 @@ function isCanonicalTonRpcHost(host) {
   return h === 'toncenter.com' || h.endsWith('.toncenter.com');
 }
 
+// Hosts a RETRY DOOR may point at. The provider allow-list above stays toncenter-only — this is a separate, weaker
+// surface on purpose: a door only ever receives already-signed bytes and its answer is discarded, so it can never
+// feed the client a value. What the list still forbids is the thing the provider guard forbids: a bespoke host of
+// OURS, which would be one address to block or to subpoena.
+const PUBLIC_TON_BROADCAST_HOSTS = Object.freeze([
+  'toncenter.com',
+  'tonapi.io',
+  'tonhubapi.com',
+]);
+
+function isPublicTonBroadcastHost(host) {
+  const h = String(host ?? '').toLowerCase();
+  return PUBLIC_TON_BROADCAST_HOSTS.some((allowed) => h === allowed || h.endsWith(`.${allowed}`));
+}
+
 function tonRpcProviderEndpointHosts(provider) {
   return [
     provider?.runGetMethodEndpoint,
@@ -352,6 +398,25 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
             findings,
             'PWA_TON_RPC_CENTRAL_GATEWAY_FORBIDDEN',
             'Production PWA must not route through a central RPC proxy/gateway; every provider endpoint must be the canonical public TON host (toncenter.com), so clients talk to TON directly with no central host to block or DoS.',
+          );
+        }
+      }
+      // A retry door must be a PUBLIC TON service, never a host of ours, and it must carry a send endpoint and
+      // nothing else — a door that grew a read endpoint would quietly become a second source of truth.
+      for (const door of config?.network?.tonRpc?.broadcastDoors ?? []) {
+        const host = tonRpcEndpointHost(door?.sendBocEndpoint);
+        if (!host || !isPublicTonBroadcastHost(host)) {
+          addFinding(
+            findings,
+            'PWA_TON_RPC_BROADCAST_DOOR_FORBIDDEN',
+            'A broadcast retry door must point at a public TON service (toncenter.com, tonapi.io, tonhubapi.com), never at a bespoke host — one address of ours is one address to block.',
+          );
+        }
+        if (door?.runGetMethodEndpoint || door?.messagesEndpoint || door?.walletBalanceEndpoint) {
+          addFinding(
+            findings,
+            'PWA_TON_RPC_BROADCAST_DOOR_READS_FORBIDDEN',
+            'A broadcast retry door must carry ONLY a send endpoint: a door that can answer a read becomes a second source of truth, and cross-verifying reads against a slower provider is what made every critical read wait (the real reason the second provider was removed).',
           );
         }
       }

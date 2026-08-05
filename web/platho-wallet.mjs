@@ -14,7 +14,7 @@ import {
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=13';
 import { tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { beginTonRpcPhaseProfile, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=71';
+import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=72';
 
 const {
   beginCell,
@@ -799,7 +799,7 @@ const walletPendingExternals = new Map();
 
 // How often to re-send a pending external while waiting. Inclusion is seconds, so anything that has not landed in
 // this long is very likely gone rather than slow — and a duplicate costs one POST, never a duplicate execution.
-const WALLET_REBROADCAST_INTERVAL_MS = 15_000;
+const WALLET_REBROADCAST_INTERVAL_MS = 5_000;
 // Validity of a message external. It is the ONLY provable answer to "may this seqno be reused" — before it passes
 // the external can still land, after it never can.
 const WALLET_EXTERNAL_VALIDITY_S = 300;
@@ -866,7 +866,11 @@ async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options 
     }
     if (pending?.boc && rebroadcastMs >= 0 && (now - lastBroadcastAt) >= rebroadcastMs) {
       try {
-        await transport.sendBoc({ boc: pending.boc, walletAddress: wallet.address });
+        // A DIFFERENT DOOR each time, not the same one again. The external reaches one node and spreads from
+        // there; knocking twice on the door that already has it changes nothing, while another entry point is
+        // another route to the collator. Falls back to the primary transport when no doors are configured.
+        const rotated = await broadcastThroughNextDoor(pending.boc, options);
+        if (!rotated) await transport.sendBoc({ boc: pending.boc, walletAddress: wallet.address });
         rebroadcasts += 1;
       } catch {
         // The seqno read is the verdict here, not this POST. A failed re-send changes nothing: the earlier copy may
