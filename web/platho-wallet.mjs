@@ -956,7 +956,7 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
     // The bytes are now the ONLY copy of this message that can ever execute. Keep them so the wait can re-offer
     // them instead of the caller re-signing from scratch — the whole recovery hangs on this line.
     notePendingWalletExternal(wallet, seqno, built.boc, validUntil);
-    batches.push({ ...built, result, messageCount: chunk.length });
+    batches.push({ ...built, result, messageCount: chunk.length, validUntil });
     if (index < chunks.length - 1) {
       // The gap between the externals of ONE message: wait for the chain to actually consume this one, re-sending
       // it meanwhile. Marked in `finally` so a wait that throws is still attributed.
@@ -975,5 +975,13 @@ export async function sendPlathoWalletTransaction(wallet, transaction, options =
     result: last.result,
     batchCount: batches.length,
     batches,
+    // THE EXTERNAL THAT MAY STILL BE IN FLIGHT WHEN THIS RETURNS. Every earlier chunk was waited out against the
+    // chain; the last one was only broadcast. The caller persists these so a delivery confirm — including one
+    // re-armed after the app was CLOSED and reopened — can re-send the same signed bytes instead of only reddening
+    // the message. Note the top-level `boc` above is the FIRST chunk's (it spreads `first`), which is exactly the
+    // wrong one for that job.
+    pendingBoc: last.boc ?? null,
+    pendingSeqno: last.seqno ?? null,
+    pendingValidUntil: last.validUntil ?? null,
   };
 }

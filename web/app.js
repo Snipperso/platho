@@ -30,7 +30,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=25';
+} from './platho-wallet.mjs?v=26';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
@@ -159,37 +159,37 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=52';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=15';
+import { createPublicLane } from './public-lane.mjs?v=16';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=8';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=9';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=8';
-import { createIntroLane } from './intro-lane.mjs?v=14';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=9';
+import { createIntroLane } from './intro-lane.mjs?v=15';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=8';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=8';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=9';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=9';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=10';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=9';
+import { createConvReadLane } from './conv-lane.mjs?v=11';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=10';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=10';
-import { readAccountStates } from './shard-reader.mjs?v=8';
+import { readAccountStates } from './shard-reader.mjs?v=9';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=8';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=9';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=8';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=9';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=8';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=9';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=10';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=9';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=8';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=8';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=9';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=9';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=9';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=10';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -201,7 +201,7 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=10';
+} from './shard-discovery.mjs?v=11';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=48';
 import {
   computeUsernameNameHash,
@@ -234,7 +234,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v858';
+const PLATHO_APP_RUNTIME_VERSION = 'v859';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22382,7 +22382,46 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
     else markConvDeliveryUnverified(thread, message);
     return;
   }
+  // NOT FOUND YET, AND THE BYTES ARE STILL ALIVE — re-send them. This is the last hole in the send path: the wallet
+  // re-broadcasts only while a send is running, so the FINAL external of a message had nobody watching it once the
+  // call returned. MEASURED on the owner's wallet: that last external took 148s to reach a block on one send and
+  // needed two re-broadcasts on another; if it is dropped and the user sends nothing else, only this driver is left.
+  await rebroadcastPendingDirectSend(send, transport);
   reArm();
+}
+
+// Never re-send the same external more often than this. The confirm ticks accelerate early (4s, 9s, 18s...), and a
+// duplicate costs a POST on the one serial RPC pump every message shares — so the gate is time, not tick count.
+const DIRECT_SEND_CONFIRM_REBROADCAST_MS = 15_000;
+
+/**
+ * Re-offer the last signed external of a message the shard has not shown us yet.
+ *
+ * SAFE FOR THE ONE REASON THAT MATTERS: the external is bound to a wallet seqno, so the chain runs it AT MOST ONCE
+ * however many copies arrive. This never rebuilds — a rebuild would bump the conversation seq and seal a new capsule,
+ * which WOULD double-publish if the first copy was merely late.
+ *
+ * Bounded by the external's own validity: past `validUntil` the bytes can never be included, and re-sending them is
+ * pure noise. The persisted record survives a reload, so an app that was CLOSED during the risky window resumes
+ * re-sending when it reopens — which is exactly the case the owner asked about.
+ */
+async function rebroadcastPendingDirectSend(send, transport) {
+  if (!send?.boc || !transport?.sendBoc || !plathoWallet?.address) return;
+  const now = Date.now();
+  const validUntilMs = Number(send.validUntil) > 0
+    ? Number(send.validUntil) * 1000
+    : Number(send.at ?? 0) + DIRECT_SEND_REBROADCAST_WINDOW_MS;   // pre-v859 records carry no validUntil
+  if (now >= validUntilMs) return;
+  if (now - Number(send.lastRebroadcastAt ?? 0) < DIRECT_SEND_CONFIRM_REBROADCAST_MS) return;
+  send.lastRebroadcastAt = now;
+  try {
+    await transport.sendBoc({ boc: send.boc, walletAddress: plathoWallet.address });
+    console.info('[conv] re-broadcast pending external while awaiting the shard', { seq: send.maxSeq ?? null });
+  } catch (error) {
+    // The SHARD READ is the verdict on delivery, never this POST. A failed re-send changes nothing: the earlier copy
+    // may still land, so the confirm keeps polling instead of concluding anything here.
+    if (!noteTonRpcRateLimit(error)) console.warn('[conv] pending re-broadcast failed', error);
+  }
 }
 
 /**
@@ -22565,7 +22604,16 @@ async function attemptConvMessagePublishDirect(context) {
       externals: result?.result?.batchCount ?? 1,
       ms: Date.now() - sendStartedAt,
     };
-    message.convDirectSend = { boc: result?.result?.boc ?? null, at: Date.now() };
+    // The LAST external — the only one still possibly in flight when the send returned (every earlier chunk was
+    // waited out against the chain). `result.result` is the RPC RESPONSE, which carries no boc: this line used to
+    // read from it and therefore persisted null on every successful send, leaving the whole re-broadcast path dead
+    // except after a throw. `validUntil` travels with it because it is the only thing that says when these bytes
+    // stop being re-sendable.
+    message.convDirectSend = {
+      boc: result?.result?.pendingBoc ?? null,
+      validUntil: result?.result?.pendingValidUntil ?? null,
+      at: Date.now(),
+    };
     // Record the parts' frame_commits + shard address + my highest seq for the delivery confirm (below). commits come
     // from the built parts, so a message that later reddens does so on the SAME per-record identity the shard stores.
     captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: result.parts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
