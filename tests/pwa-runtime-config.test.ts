@@ -6236,6 +6236,10 @@ describe('PWA runtime config guard', () => {
     // that the precache is NAMED and VERSIONED (a bump is how a changed asset without a ?v= query, e.g. an icon
     // SVG, reaches devices at all); pinning the exact number only manufactured churn on every such bump.
     expect(sw).toMatch(/const CACHE_NAME = 'platho-pwa-prototype-v\d+';/);
+    // ...and the bump must actually FETCH. A plain cache.add() goes through the browser HTTP cache, so an asset
+    // whose URL has no ?v= (every icon SVG, the manifest) was re-cached from the same stale bytes and the new build
+    // shipped the old file — MEASURED on the owner's device, reloaded onto v856 and still showing the old glyph.
+    expect(sw).toMatch(/cache\.add\(new Request\(asset, \{ cache: 'reload' \}\)\)/);
     // The navigation network-first MUST bypass the browser HTTP cache (cache:'no-cache'): the server sends no
     // Cache-Control on the shell, so a plain fetch() let webviews (worst: Telegram Mini App) heuristically serve a
     // STALE index.html for hours — devices kept running old builds despite "network-first".
@@ -6306,7 +6310,9 @@ describe('PWA runtime config guard', () => {
     const sw = readFileSync('web/sw.js', 'utf8');
     // A single missing/transient asset must not abort install (atomic addAll
     // would strand the device on the previous worker and its stale shell).
-    expect(sw).toMatch(/Promise\.allSettled\(\s*ASSETS\.map\(\(asset\) => cache\.add\(asset\)\)/);
+    // The invariant is allSettled over per-asset adds, not the exact add argument — see PWA-CONFIG-08, where the
+    // add was rebuilt as a cache:'reload' Request so a CACHE_NAME bump actually refetches un-versioned assets.
+    expect(sw).toMatch(/Promise\.allSettled\(\s*ASSETS\.map\(\(asset\) => cache\.add\(/);
     expect(sw).not.toMatch(/cache\.addAll\(ASSETS\)/);
     // Navigation is network-first but bounded so a slow/filtered network falls
     // back to the cached shell instead of hanging on a blank screen.
