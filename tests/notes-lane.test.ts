@@ -212,7 +212,7 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
     // A snapshot identical to what is already stored writes nothing and still reports the note delivered — the
     // publish helper returns 0 slots written, which is a SUCCESS, and the send path marks the note published anyway.
     expect(app).toMatch(/if \(built\.publishes\.length === 0\) return 0;/);
-    expect(app).toMatch(/const wrote = await publishSelfNotesSnapshotForThread\(thread\);[\s\S]{0,40}?markDirectSendPublished\(thread, message\);/);
+    expect(app).toMatch(/const wrote = await publishSelfNotesSnapshotForThread\(thread\);[\s\S]{0,40}?markDirectSendBroadcast\(thread, message\);/);
     // Every user-facing notes string is localized (no developer text reaching the composer status).
     for (const key of ['notes.walletLocked', 'notes.rpcUnavailable', 'notes.full', 'notes.restoreIncomplete']) {
       expect(app.includes(`t('${key}')`), `${key} must be surfaced through the localizer`).toBe(true);
