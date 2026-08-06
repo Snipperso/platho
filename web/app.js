@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v868';
+const PLATHO_APP_RUNTIME_VERSION = 'v869';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22197,7 +22197,10 @@ async function attemptIntroFirstContactDirect(context) {
   // the confirm + adoption below identically. Only past the validity window is a fresh mint reached (old external dead).
   let sendState = message.introDirectSend;
   if (sendState?.boc && (Date.now() - sendState.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
-    if (transport?.sendBoc) await transport.sendBoc({ boc: sendState.boc, walletAddress: plathoWallet.address });
+    // Through the NEXT door, not the one that already has these bytes: a retry exists because the first entry point
+    // did not get them into a block, so re-knocking there is the one thing we know did not work.
+    const rotated = await broadcastThroughNextDoor(sendState.boc);
+    if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc: sendState.boc, walletAddress: plathoWallet.address });
   } else {
     // FRESH mint + publish (first attempt, or the prior external has expired so a re-mint cannot double-execute).
     // Resolve the recipient's FULL bundle from their KeyShard (by the wallet the thread targets — a KeyShard is
@@ -22587,7 +22590,9 @@ async function attemptConvMessagePublishDirect(context) {
   // (below) is a rebuild reached, when the old copy is guaranteed expired.
   const captured = message.convDirectSend;
   if (captured?.boc && (Date.now() - captured.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
-    if (transport?.sendBoc) await transport.sendBoc({ boc: captured.boc, walletAddress: plathoWallet.address });
+    // Another door, same bytes — see broadcastThroughNextDoor. Falls back to the primary when no doors exist.
+    const rotated = await broadcastThroughNextDoor(captured.boc);
+    if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc: captured.boc, walletAddress: plathoWallet.address });
     markDirectSendBroadcast(thread, message);
     armConvDeliveryConfirm(thread, message);   // re-broadcast re-arms on the SAME captured commits (idempotent)
     return { rebroadcast: true };
@@ -23008,7 +23013,11 @@ async function rebroadcastPublicPublish(job, retained) {
   if (!transport?.sendBoc || !plathoWallet?.address || !retained?.boc) return;
   persistPublicPublishProgress(job, { publicDirectSend: { ...retained, rebroadcastAt: Date.now() } });
   try {
-    await transport.sendBoc({ boc: retained.boc, walletAddress: plathoWallet.address });
+    // The public lane rotates too. Every lane that re-sends already-signed bytes goes through the carousel: the
+    // external is seqno-bound so the chain runs it at most once whichever door accepts it, and the door that already
+    // failed to deliver is the least promising place to knock again.
+    const rotated = await broadcastThroughNextDoor(retained.boc);
+    if (!rotated) await transport.sendBoc({ boc: retained.boc, walletAddress: plathoWallet.address });
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[public] re-broadcast of a retained external failed', error);
   }
