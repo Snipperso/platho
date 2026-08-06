@@ -16,6 +16,12 @@ const BOC_MAGIC = [0xb5, 0xee, 0x9c, 0x72];
 const ADDRESS_SLICE_BITS = 267;
 const ADDRESS_CELL_DATA_BYTES = 34;
 const TONCENTER_REQUEST_SPACING_MS = 1_500;
+// Consecutive-429 ladder for the shared pump. Step 1 is what a STRAY refusal costs, and it is deliberately close to
+// the bucket's own life: toncenter counts anonymous traffic per second and per IP, so a single burst — possibly not
+// even ours — must not cost the whole app a minute of silence. Later steps grow because a SUSTAINED 429 means the
+// budget really is gone, and hammering a rate-limited endpoint earns a ban far longer than the wait it skips.
+const TONCENTER_RATE_LIMIT_BACKOFF_STEPS_MS = Object.freeze([2_000, 5_000, 15_000, 40_000, 60_000]);
+// Kept as the default for callers that pass no ladder of their own (and as the ladder's last rung).
 const TONCENTER_RATE_LIMIT_BACKOFF_MS = 60_000;
 const TONCENTER_MAX_RETRY_AFTER_MS = 120_000;
 const TONCENTER_RATE_LIMIT_RETRIES = 0;
@@ -657,11 +663,29 @@ async function drainToncenterRequestQueue(state) {
         const response = await task.request();
         state.nextAt = Date.now() + spacingMs;
         if (response?.status === 429) {
-          const backoff = retryAfterMs(response) ?? finiteNonNegativeMs(
-            task.options.rateLimitBackoffMs,
-            TONCENTER_RATE_LIMIT_BACKOFF_MS,
-          );
+          // GROWING, NOT FLAT. A flat 60s park was the whole cost of ONE stray 429: sends waited up to a minute and
+          // every skipIfRateLimited read was dropped outright for that minute — which is exactly the "RPC busy" the
+          // owner hit on the keyless path. toncenter's anonymous bucket is counted PER SECOND and clears in about
+          // one, and it is counted per IP, so the burst that spent it may not even have been ours (carrier NAT, or
+          // a second instance on the same machine).
+          //
+          // So the first refusal costs seconds. A sustained one still ends up parked, because the delay grows with
+          // consecutive refusals — a short flat backoff would turn a real overload into hammering, and hammering a
+          // rate-limited endpoint earns a ban far longer than the minute it saves.
+          state.backoffStreak = Number(state.backoffStreak ?? 0) + 1;
+          const grown = TONCENTER_RATE_LIMIT_BACKOFF_STEPS_MS[
+            Math.min(state.backoffStreak - 1, TONCENTER_RATE_LIMIT_BACKOFF_STEPS_MS.length - 1)
+          ];
+          // An explicit Retry-After from the server outranks our guess; an explicit caller override outranks both.
+          const backoff = retryAfterMs(response)
+            ?? (task.options.rateLimitBackoffMs !== undefined
+              ? finiteNonNegativeMs(task.options.rateLimitBackoffMs, grown)
+              : grown);
           state.backoffUntil = Date.now() + backoff;
+        } else if (response?.status !== undefined && response.status < 500) {
+          // A request that got through resets the streak: the next stray 429 starts from seconds again, not from
+          // wherever a past overload left the ladder.
+          state.backoffStreak = 0;
         }
         task.resolve(response);
       } catch (error) {
@@ -859,7 +883,11 @@ export async function scheduleToncenterHttpRequest(endpoint, apiKey, request, op
       request,
       {
         spacingMs: requestSpacingMs,
-        rateLimitBackoffMs,
+        // The RAW option, not the resolved one. `rateLimitBackoffMs` above always carries a value (it falls back to
+        // the constant for the error objects below), so passing IT would look like an explicit caller override on
+        // every single request — and the pump's consecutive-429 ladder would never once apply. Only a caller that
+        // genuinely asked for a fixed backoff may override the ladder.
+        rateLimitBackoffMs: options.rateLimitBackoffMs,
         skipIfRateLimited: options.skipIfRateLimited,
         priority: options.priority,
         queueTimeoutMs: options.queueTimeoutMs,
