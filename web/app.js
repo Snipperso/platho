@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=39';
+} from './i18n.mjs?v=40';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v870';
+const PLATHO_APP_RUNTIME_VERSION = 'v871';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -11149,6 +11149,31 @@ function refreshThreadAfterMessageChange(thread) {
         : (last ? 'local' : 'route');
 }
 
+// WHAT THE STATE LINE IS ALLOWED TO SAY.
+//
+// `thread.state` is an INTERNAL token and three of its values were being printed raw under every row: SEALED, LOCAL,
+// ROUTE. The owner (2026-08-06) called them confusing and inconsistent, and asked what they were supposed to mean.
+//
+// It was worse than uneven. Measured against the code above: only an opened CHAIN capsule carries `capsule`, so
+// `sealed` meant "the last message is INCOMING" and `local` meant "the last message is MINE". A security word was
+// being used to say who wrote last — and `local` reads as "never left this device" on messages that were sent and
+// confirmed. All three were untranslated English tokens in all ten languages.
+//
+// Only states the user can act on get a line now. Everything else shows nothing: a private dialog is encrypted by
+// construction, so a word on every row is noise that hides the one row that needs attention.
+const THREAD_STATE_LABEL_KEYS = Object.freeze({
+  sending: 'chat.threadStateSending',
+  pending: 'chat.threadStateSending',
+  // Covers every failure messageStatusKey folds together — not sent, not delivered, not confirmed. "Not delivered"
+  // is the one claim true of all of them; "not sent" would be a lie about a message that did leave the device.
+  blocked: 'chat.threadStateUndelivered',
+});
+
+function threadStateLabel(thread) {
+  const key = THREAD_STATE_LABEL_KEYS[String(thread?.state ?? '')];
+  return key ? t(key) : '';
+}
+
 function threadUnreadCount(thread) {
   const count = Number(thread?.unreadCount ?? 0);
   return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
@@ -16429,7 +16454,8 @@ function renderThreads() {
       // real dialog only appears once resolved — no "Anonymous …" flicker. Shown after the grace window so a
       // genuinely anonymous or stuck message is never permanently hidden.
       if (isTransientPendingResolutionThread(thread)) return false;
-      return `${thread.name} ${thread.preview} ${thread.state} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
+      // The LABEL, not the internal token: searching must match what the row shows, in the user's own language.
+      return `${thread.name} ${thread.preview} ${threadStateLabel(thread)} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
     });
   // My notes is PINNED first regardless of activity order — a partition at render time, so no array mutation
   // (chain sync / history restore reorder `threads` freely and must not have to know about the pin). The other
@@ -16535,7 +16561,11 @@ function applyThreadRow(item, thread) {
   setThreadAvatarNode(avatar, thread);
   setIdentityLabel(name, thread, 'thread-name identity-label');
   preview.textContent = stripInlineFormatting(thread.preview); // thread.preview is plain text — drop raw **/*/` markers
-  state.textContent = thread.state;
+  // Hidden, not empty: `.thread-state` carries a top margin, so a blank line would still push the row apart.
+  const stateLabel = threadStateLabel(thread);
+  state.textContent = stateLabel;
+  state.hidden = stateLabel === '';
+  state.dataset.tone = thread.state === 'blocked' ? 'failed' : 'sending';
   // Real last-message time, not the old constant 'now' word (v654). Computed at render (not cached on the
   // thread) so the today/weekday/date bucket stays correct as days roll over between re-renders.
   const lastMessage = thread.messages?.[thread.messages.length - 1] ?? null;
