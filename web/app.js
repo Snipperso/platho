@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v869';
+const PLATHO_APP_RUNTIME_VERSION = 'v870';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -9790,10 +9790,50 @@ function queueInboundPeerIdentityResolution(thread, claimedUsername = null) {
   resolveInboundPeerWalletIdentity(thread, claimedUsername).catch((error) => console.warn('[intro] identity resolve failed', error));
 }
 
+// Dialogs this session has already asked the chain to name. See below for why the attempt is bounded.
+const convThreadIdentityAttempted = new Set();
+
+/**
+ * NAME A DIALOG THAT CAME BACK FROM THE KEY STORE, not from a message.
+ *
+ * Every naming path we had hangs off an INCOMING MESSAGE — the INTRO handler, and the two capsule appends. A
+ * conversation materialised from the persisted conv key store has no message to hang on: after a reload, and on a
+ * device restored from the recovery slot, the CONV scan mints its thread from the record alone. The peer's wallet is
+ * sitting right there in that record (the INTRO publish source, persisted by conv-key-persist), so the dialog can be
+ * named without waiting for the peer to write again — which, for a first contact nobody has replied to yet, could be
+ * never. Until this, such a dialog read "Anonymous <keyId>" permanently.
+ *
+ * ONCE PER SESSION per dialog. The verify is a KeyShard read, and the CONV scan calls this on EVERY pass — a dialog
+ * whose wallet cannot be verified must not turn into a chain read every ~37 seconds for the life of the tab. A dialog
+ * with no wallet on record costs nothing at all: resolveInboundPeerWalletIdentity returns before any read.
+ */
+function queueRestoredConvIdentityResolution(thread) {
+  if (!thread?.id || !thread.convPeerKeyId || !isAnonymousPeerThread(thread)) return;
+  if (convThreadIdentityAttempted.has(thread.id)) return;
+  convThreadIdentityAttempted.add(thread.id);
+  queueInboundPeerIdentityResolution(thread);
+}
+
+/**
+ * The LOCAL identity of a first contact's first message.
+ *
+ * An INTRO carries no CONV capsule, so this message had no id at all — and an id is what both the dedup primitive
+ * (findMessageByCapsuleId) and the history whitelist (serializeMessageForHistory keeps `capsule`) key on. The
+ * handshake nonce is the right value: unique per INTRO, cryptographically bound to it, and already the replay
+ * guard's key. Riding in `capsule.id` reuses the two mechanisms rather than adding a third.
+ *
+ * It is deliberately NOT a whole capsule: every consumer of `message.capsule` beyond the id is a RETRY path, and
+ * those are gated on publishState, which an incoming message never has.
+ */
+function introFirstMessageCapsuleId(introNonce) {
+  if (!introNonce) return null;
+  return `intro:${introKeyIdString(introNonce)}`;   // introKeyIdString is bytes -> base64url
+}
+
 // onFirstContact: the K_root is already adopted by the handler; here we surface the conversation. The second argument
 // is the fetched INTRO capsule — `capsule.source` is the sender's wallet and `capsule.created_at` is the IntroShard's
 // own stamp. Both used to be dropped on the floor by a one-parameter signature.
-function handleIntroFirstContact(opened, capsule = null) {
+async function handleIntroFirstContact(opened, capsule = null) {
   const senderKeyId = introKeyIdString(opened.senderKeyId);
   const created = createInboundPeerThread({ senderKeyId, keyId: senderKeyId, label: null });
   let thread = threads.find((item) => item.id === created.id);
@@ -9813,7 +9853,8 @@ function handleIntroFirstContact(opened, capsule = null) {
     thread.pendingIdentityResolutionAt = new Date().toISOString();
   }
   const bytes = opened.firstMessageBytes;
-  if (bytes && bytes.length > 0) {
+  const capsuleId = introFirstMessageCapsuleId(opened.introNonce);
+  if (bytes && bytes.length > 0 && !(capsuleId && findMessageByCapsuleId(capsuleId))) {
     const blocks = introFirstMessageBlocks(bytes);
     // The IntroShard-stamped created_at (seconds) — the same value the adoption ordering uses. Without it this message
     // reached ensureMessageOrderFields with no time and was stamped Date.now() at persist, i.e. discovery order.
@@ -9826,10 +9867,23 @@ function handleIntroFirstContact(opened, capsule = null) {
         ? { createdAtMs: introCreatedAtSec * 1000, createdAt: new Date(introCreatedAtSec * 1000).toISOString() }
         : {}),
       blocks: blocks ?? undefined,
+      ...(capsuleId ? { capsule: { id: capsuleId } } : {}),
     };
     insertThreadMessage(thread, message);
     refreshThreadAfterMessageChange(thread);
     markIncomingThreadMessage(thread);
+    // THE FIRST MESSAGE OF A FIRST CONTACT WAS NEVER WRITTEN DOWN.
+    //
+    // OBSERVED 2026-08-06 by the owner: a first contact arrived and was readable, the app then asked for a reload to
+    // take an update, and after the reload the dialog was empty. Every OTHER receive path persists on the way in
+    // (appendOpenedCapsuleMessage / appendOpenedPrivatePartsMessage); this one only pushed into the in-memory thread.
+    //
+    // The loss is PERMANENT, not a display glitch, because the INTRO scan is not allowed to hand the same entry over
+    // twice: intro-cursor-store keeps its delivered set (epoch:bucket:entryId) in IndexedDB, so nothing re-delivers it.
+    //
+    // And it cost more than the message: a thread snapshot only reaches local history ALONGSIDE a message, so with no
+    // message persisted, the dialog itself — its name, its convPeerKeyId bridge — was never stored either.
+    await persistMessageToEncryptedHistory(thread, message);
   }
   renderThreads();
   queueInboundPeerIdentityResolution(thread);
@@ -11436,12 +11490,16 @@ function resolveConvReceiveThread(peerKeyIdB64) {
     // went with the Hub, and receiving a message is exactly when a stale label is most visible. Serialized through
     // the shared hygiene queue so N conversations never fan out N concurrent resolves (the v509 iOS freeze).
     queueUsernameHygiene(() => revalidateThreadUsernameVariants(thread));
+    // A dialog restored from local history keeps whatever name it was persisted with — and a thread snapshot is
+    // written at the moment a message is stored, so one whose identity resolved a second later was stored ANONYMOUS.
+    queueRestoredConvIdentityResolution(thread);
     return thread;
   }
   const created = createInboundPeerThread({ senderKeyId: peerKeyIdB64, keyId: peerKeyIdB64, label: null });
   thread = threads.find((item) => item.id === created.id) ?? created;
   if (!threads.includes(thread)) threads.push(thread);
   thread.convPeerKeyId = peerKeyIdB64;
+  queueRestoredConvIdentityResolution(thread);   // AFTER convPeerKeyId — the resolve reads it to find the record
   return thread;
 }
 
