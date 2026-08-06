@@ -25,7 +25,7 @@ Production hosting must keep the security headers from `deploy/Caddyfile` or `de
 
 - `Content-Security-Policy` with `default-src 'self'`, `object-src 'none'`, `base-uri 'none'`, and `frame-ancestors https://web.telegram.org` (relaxed from `'none'` so the app can run as a Telegram Mini App, which embeds it in an iframe on `web.telegram.org`);
 - `script-src 'self' 'wasm-unsafe-eval'` for the bundled WebP encoder; the bundle has no inline scripts and no inline import map (vendor modules use relative imports), so `script-src` carries no content hashes;
-- `connect-src` limited to same-origin plus the approved production TON RPC hosts (`https://toncenter.com` and `https://*.toncenter.com`);
+- `connect-src` limited to same-origin plus the approved production TON RPC hosts (`https://toncenter.com`, `https://*.toncenter.com`, plus the broadcast-only retry doors `https://tonapi.io` and `https://mainnet-v4.tonhubapi.com`);
 - `X-Content-Type-Options: nosniff`;
 - `Referrer-Policy: no-referrer`;
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.

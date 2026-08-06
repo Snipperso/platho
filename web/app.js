@@ -173,8 +173,8 @@ import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
 import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=11';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=11';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=13';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=12';
+import { createConvReadLane } from './conv-lane.mjs?v=14';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=13';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=12';
 import { readAccountStates } from './shard-reader.mjs?v=11';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v862';
+const PLATHO_APP_RUNTIME_VERSION = 'v863';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22549,9 +22549,13 @@ async function attemptConvMessagePublishDirect(context) {
   // send; a fresh shard reads 0. [recovery-wiring review #0]
   let coldFloor = 0;
   if (rec.outgoingSeq?.[route.epoch] === undefined) {
-    try {
-      coldFloor = await createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(route.address);
-    } catch (error) { if (!noteTonRpcRateLimit(error)) console.warn('[conv] last_seq cold-floor read failed, using 0', error); }
+    // FAIL CLOSED, and this used to fail OPEN. The catch here swallowed EVERY failure and carried on with 0 — a 429
+    // on the keyless path, a timeout, an endpoint outage, all read as "nothing has ever been published here". When
+    // the shard actually holds records, starting the outgoing seq at 0 is rejected by its anti-rollback gate (13653)
+    // and the message never lands: a silent loss bought to avoid a visible retry. Only a shard with NO CODE proves
+    // emptiness, and the reader now answers 0 for exactly that case and throws for everything else. A throw here
+    // surfaces as a failed send and re-enters the retry ladder, which is the honest outcome.
+    coldFloor = await createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(route.address);
   }
 
   // Seal each part as a CONV capsule and assign a strictly-increasing outgoing seq (local monotonic counter — the

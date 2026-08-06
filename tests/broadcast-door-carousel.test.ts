@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config.mjs';
 import {
   broadcastDoors,
@@ -64,6 +65,31 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
     await expect(broadcastThroughNextDoor('te6ccgEBAQEAAgAAAA==', { config, fetch: fetchImpl }))
       .resolves.not.toBeNull();
     // Delivery is decided by READING THE SHARD. A door's refusal proves nothing: the earlier copy may still land.
+  });
+
+  it('DOORS-06: every door host is allowed by the served Content-Security-Policy', () => {
+    // SHIPPED BROKEN AND THE OWNER FOUND IT: the doors went live while connect-src still listed only toncenter, so
+    // the browser refused every retry — "Refused to connect because it violates the document's Content Security
+    // Policy". None of the other gates could see it: they stub fetch in Node, where no CSP exists. A door the
+    // browser cannot reach is not a door.
+    const files = [
+      'deploy/Caddyfile',
+      'deploy/nginx-platho.app.conf',
+      'scripts/server/Caddyfile',
+    ];
+    const hosts = broadcastDoors(config).map((door: any) => new URL(door.sendBocEndpoint).origin);
+    for (const file of files) {
+      const text = readFileSync(file, 'utf8');
+      const connectSrc = /connect-src[^;"]*/.exec(text)?.[0] ?? '';
+      expect(connectSrc, `${file} has no connect-src`).toBeTruthy();
+      for (const host of hosts) {
+        const wildcard = host.replace(/^https:\/\/[^.]+\./, 'https://*.');
+        expect(
+          connectSrc.includes(host) || connectSrc.includes(wildcard),
+          `${file}: connect-src does not allow the door ${host} — the browser will block every retry to it`,
+        ).toBe(true);
+      }
+    }
   });
 
   it('DOORS-05: a door may never answer a read, and may never be a host of ours', () => {
