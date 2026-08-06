@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v864';
+const PLATHO_APP_RUNTIME_VERSION = 'v865';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -22212,8 +22212,9 @@ async function attemptIntroFirstContactDirect(context) {
   scheduleRecoveryBackup(conversationId(selfKeyId, sendState.peerKeyId));   // a new K_root — back its slot up (debounced)
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
-  // INTRO writes to IntroShard, which has no delivery confirm — nothing would ever lift this out of 'sending'.
-  markDirectSendBroadcast(thread, message, { awaitsConfirm: false });
+  // Green on arrival, and earned: reaching this line means confirmIntroCreatedAt already READ our entry back out of
+  // the IntroShard (matching r and view_tag), because the K_root adoption above binds to that entry's created_at.
+  markDirectSendBroadcast(thread, message, { verified: true });
   return { peerKeyId: sendState.peerKeyId };
 }
 
@@ -22239,12 +22240,21 @@ const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
 function markDirectSendBroadcast(thread, message, options = {}) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  // 'sending' is a PROMISE that something will resolve it: only the CONV lane has a delivery confirm, and only it
-  // may leave a message in that bucket. The INTRO first contact and self-notes write to different contracts with no
-  // verifier, so they would sit in 'sending' forever — a hang I shipped for twenty minutes by making the green
-  // conditional without checking every caller. They say 'sent', which is the whole truth available for them:
-  // broadcast, never claimed confirmed. Making them lie 'published' again would be the other wrong answer.
-  message.meta = options.awaitsConfirm === false ? 'sent' : 'sending';
+  // THREE HONEST ANSWERS, one per lane, and each says exactly what is known at this point:
+  //
+  //   'sending'   (default, CONV) — signed and handed to the network. A delivery confirm will read the shard and
+  //               upgrade this to green, or redden it. The bucket is a PROMISE that something resolves it.
+  //   'published' (verified, INTRO) — the chain has ALREADY been read. attemptIntroFirstContactDirect cannot finish
+  //               without confirmIntroCreatedAt matching BOTH r and view_tag against the shard's own entry: the
+  //               conversation's K_root binds to that entry's created_at, so an unverified INTRO throws instead of
+  //               adopting. That is STRONGER proof than the CONV confirm, which is asynchronous and may end
+  //               inconclusive. I first shipped this lane as 'sent' after looking for a confirm DRIVER and not
+  //               finding one — without checking whether the send verifies itself inline. It does, and it must.
+  //   'sent'      (awaitsConfirm:false, self-notes) — RecoveryShard slots are never read back. Nothing will ever
+  //               resolve this, so 'sending' would hang forever and 'published' would be a claim we cannot support.
+  message.meta = options.verified === true
+    ? 'published'
+    : (options.awaitsConfirm === false ? 'sent' : 'sending');
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
