@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v867';
+const PLATHO_APP_RUNTIME_VERSION = 'v868';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -8358,6 +8358,34 @@ function followContactPublicChannel(recipientWallet) {
     // Best effort: a follow must never block the contact add itself.
     console.warn('[platho] contact channel follow skipped', error?.message ?? error);
   }
+}
+
+/**
+ * Follow the peer's channel when a conversation starts — ASYMMETRICALLY, and the asymmetry is the whole point.
+ *
+ * INITIATOR: following the person you chose to write to is your own decision restated. Safe, and it is what makes a
+ * fresh account's feed useful at all.
+ *
+ * RECIPIENT: NOT on receipt. An INTRO can be sent to anyone — that is what first contact is for — so following the
+ * sender the moment their message arrives would turn a mass first-contact blast into a way into everybody's feed.
+ * Owner, 2026-08-06, on exactly this risk: he would end up subscribed to everything because of spammers' messages.
+ * So the recipient follows when they REPLY, because replying is the moment they chose to engage.
+ *
+ * "First reply" is DERIVED, never stored: exactly one outgoing message in the thread (the one being sent — the
+ * composer inserts it before publishing) plus at least one incoming means they opened the conversation and this is
+ * my first answer. No new persisted field, and it cannot fire twice — so a deliberate unfollow later is never undone
+ * by simply continuing to talk.
+ */
+function followPeerChannelOnFirstReply(thread, peerWallet) {
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  let outgoing = 0;
+  let incoming = 0;
+  for (const message of messages) {
+    if (message?.type === 'out' || message?.d === 'out') outgoing += 1;
+    else if (message?.type === 'in' || message?.d === 'in') incoming += 1;
+  }
+  if (outgoing !== 1 || incoming === 0) return;
+  followContactPublicChannel(peerWallet);
 }
 
 function followDiscoveredChannel(authorWallet) {
@@ -22247,6 +22275,9 @@ async function attemptIntroFirstContactDirect(context) {
   thread.convPeerKeyId = sendState.peerKeyId;
   dropEmptyAnonymousTwin(thread, sendState.peerKeyId);
   scheduleRecoveryBackup(conversationId(selfKeyId, sendState.peerKeyId));   // a new K_root — back its slot up (debounced)
+  // The INITIATOR side of the asymmetry (see followPeerChannelOnFirstReply): I chose to write to this person, so
+  // following their channel is that same choice restated. Best-effort — a follow must never fail a first contact.
+  followContactPublicChannel(sendState.peerWallet);
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
   // Green on arrival, and earned: reaching this line means confirmIntroCreatedAt already READ our entry back out of
@@ -22705,6 +22736,9 @@ async function attemptConvMessagePublishDirect(context) {
   globalThis.plathoLastConvDirectSend = { peerKeyId, epoch: route.epoch, parts: parts.length, to: result?.parts?.[0]?.to ?? null };
   markDirectSendBroadcast(thread, message);
   armConvDeliveryConfirm(thread, message);   // verify the optimistic green (or correct it to red) in the background
+  // The RECIPIENT side of the asymmetry: replying is the moment they chose to engage, so this is where their follow
+  // is legitimate — never on receipt, which would let a first-contact blast into everyone's feed.
+  followPeerChannelOnFirstReply(thread, rec?.peerWallet);
   return result;
 }
 
