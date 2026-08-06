@@ -723,6 +723,11 @@ html[data-platho-telegram="true"] .install-header-button {
   text-transform: uppercase;
 }
 
+/* Same red the failed message meta uses, so the list and the open dialog agree on what "wrong" looks like. */
+.thread-state[data-tone="failed"] {
+  color: #ff8f8f;
+}
+
 .avatar {
   display: grid;
   place-items: center;
