@@ -92,6 +92,37 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
     }
   });
 
+  it('DOORS-07: EVERY lane that re-sends signed bytes rotates — not just the one I happened to wire first', () => {
+    // Owner, 2026-08-06: "проверь, что это у нас теперь используется везде. И в публичной ленте и при публикации
+    // аватара." Three retry paths were still knocking on the door that had already failed to deliver: the INTRO
+    // idempotent retry, the CONV captured-external retry, and the public lane's retained-external re-broadcast.
+    //
+    // The gate is on the COMPLETENESS of the set, not on the four call sites I know about: any transport.sendBoc of
+    // a PREVIOUSLY CAPTURED external must sit behind a rotation. The wallet's own first broadcast of each chunk is
+    // the one exception and stays direct — the carousel is for retries, and a first send has no failure to route
+    // around yet.
+    const app = readFileSync('web/app.js', 'utf8');
+    const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
+
+    for (const [name, source] of [['app.js', app], ['platho-wallet.mjs', wallet]] as const) {
+      const lines = source.split('\n');
+      lines.forEach((line, index) => {
+        if (!/transport\??\.sendBoc\(\{ boc/.test(line)) return;
+        // `built.boc` is the freshly signed chunk — the FIRST attempt, deliberately straight to the primary.
+        if (line.includes('boc: built.boc')) return;
+        const previous = lines[index - 1] ?? '';
+        expect(
+          previous.includes('broadcastThroughNextDoor('),
+          `${name}:${index + 1} re-sends a captured external without rotating the door:\n${line.trim()}`,
+        ).toBe(true);
+      });
+    }
+
+    // And the rotation is reachable from both files that need it.
+    expect(app).toContain('broadcastThroughNextDoor,');
+    expect(wallet).toContain('broadcastThroughNextDoor,');
+  });
+
   it('DOORS-05: a door may never answer a read, and may never be a host of ours', () => {
     // A door with a read endpoint would become a second source of truth — and cross-verifying reads against a
     // slower provider is what made every critical read wait, the real reason the second provider was removed.
