@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v865';
+const PLATHO_APP_RUNTIME_VERSION = 'v867';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -864,6 +864,43 @@ function copyPrivateThreadDiagnostic() {
       // `seqno`/`chunkWait` are chain waits; `req` on a phase is how many toncenter calls it queued behind.
       sendProfile: globalThis.plathoLastSendProfile ?? null,
       spinner: globalThis.plathoLastSpinnerSpan ?? null,
+      // THE VIEWPORT THE LAYOUT ACTUALLY SEES. Owner, 2026-08-06: the formatting toolbar is cramped in the Telegram
+      // Mini App on desktop and fine in the plain PWA. Every width-keyed rule (the <=380px gap collapse in
+      // styles.css, measured on a 375px iPhone) fires on the CSS width the embed reports, not on the window the
+      // human sees — and inside a Mini App those differ. No console is reachable there, so the number has to travel
+      // in the dump or the diagnosis is guesswork.
+      viewport: {
+        css: Math.round(window.innerWidth ?? 0),
+        visual: Math.round(window.visualViewport?.width ?? 0),
+        dpr: Number(window.devicePixelRatio ?? 0),
+        telegram: isTelegramEnv() ? (telegramPlatform() ?? 'unknown') : null,
+        // HEIGHT is the half that matters here (the complaint is a vertically squashed row, and only while the
+        // composer is maximized), but both axes travel: two harness reproductions of my flex-shrink theory came back
+        // identical with and without the fix, so the mechanism is still unknown and a guess about which number to
+        // carry would be a third wrong turn. `needed` vs `barH` is the clip: overflow is hidden, so content taller
+        // than the box is simply cut.
+        toolbar: (() => {
+          const bar = document.querySelector('.composer-toolbar');
+          const scroll = document.querySelector('.composer-toolbar-scroll');
+          if (!bar || !scroll) return null;
+          const box = bar.getBoundingClientRect();
+          const button = scroll.querySelector('.composer-toolbar-button');
+          const style = getComputedStyle(bar);
+          return {
+            maximized: Boolean(document.querySelector('.composer.is-maximized')),
+            barH: Math.round(box.height),
+            needed: bar.scrollHeight,
+            maxH: style.maxHeight,
+            barW: Math.round(scroll.getBoundingClientRect().width),
+            btn: button
+              ? { w: Math.round(button.getBoundingClientRect().width), h: Math.round(button.getBoundingClientRect().height) }
+              : null,
+            gap: getComputedStyle(scroll).columnGap || getComputedStyle(scroll).gap || null,
+            scrollW: Math.round(scroll.scrollWidth),
+            composerH: Math.round(document.querySelector('.composer')?.getBoundingClientRect().height ?? 0),
+          };
+        })(),
+      },
       // The restore's own numbers. I told the owner twice today to look at a counter that the dump did not carry —
       // first the shard stats, now seededSeqMarks. A diagnostic that exists only in a global nobody prints is not
       // a diagnostic; it is a note to myself. `seeded: 0` with a non-empty history is the exact signature of the
