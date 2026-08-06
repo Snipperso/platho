@@ -15,7 +15,7 @@
 // runs against a stub transport and fixed key-ids, the way the public and intro lanes do.
 
 import { incomingRecordShards } from './conv-discovery.mjs?v=11';
-import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=12';
+import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=13';
 import { changeMarkerOf } from './shard-reader.mjs?v=11';
 import { addrKey } from './shard-discovery.mjs?v=13';
 

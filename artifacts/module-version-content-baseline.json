@@ -40,16 +40,16 @@
     "sha256": "622a1a303881b53c9eb109c547f41eb3ee7d85202877197f891aa302a8b74391"
   },
   "conv-lane-read.mjs": {
-    "version": "12",
-    "sha256": "4b074c9d4ea7c08dc666ccce0fcda8823fd04bfddc3d6bb23dc68310327a9bc7"
+    "version": "13",
+    "sha256": "c718996b6c21cda9a8e22dbf4a7d89f2293a47a3999f8e00314455ab45654317"
   },
   "conv-lane-send.mjs": {
     "version": "11",
     "sha256": "17c69ba090c62ebfe3418d279b21f7fa2a046bed14603f66e70825566696a278"
   },
   "conv-lane.mjs": {
-    "version": "13",
-    "sha256": "27f85ef03e53bb1b70eecb0fa42ccaa3f12c1f0269059837bc37e74a56bc6765"
+    "version": "14",
+    "sha256": "bea3800eb6c07caedf3e7248bb5393755155f36e3b1beb4677e9ddd4b0060e11"
   },
   "conv-publish-browser.mjs": {
     "version": "2",

@@ -296,7 +296,20 @@ export async function confirmConvRecordsLanded({ readView, readRecord, address, 
 export function createRecordShardLastSeqReader(runGetMethod) {
   if (typeof runGetMethod !== 'function') throw new Error('createRecordShardLastSeqReader requires runGetMethod');
   return async (address) => {
-    const raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
+    let raw;
+    try {
+      raw = await runGetMethod({ address: toWireAddress(address), method: 'get_view', stack: [] });
+    } catch (error) {
+      // THE PRODUCTION TRANSPORT THROWS on a non-zero exit code instead of returning it, so the uninit branch below
+      // could only ever fire against a transport that returns one — i.e. in tests. On the live path the -13 arrived
+      // as an exception and the whole reader looked like a failure. `isStructurallyAbsent` reads the code off the
+      // error object, which is where it actually is.
+      if (isStructurallyAbsent(error)) return 0;                         // no code on chain → nothing was published
+      // ABSENCE OF A READ IS NOT ABSENCE OF RECORDS. Anything else — a 429, a timeout, an endpoint outage — proves
+      // nothing about the shard, and answering 0 would restart the outgoing seq below records already committed:
+      // the shard's anti-rollback gate then REJECTS the publish and the message silently never lands.
+      throw error;
+    }
     if (!raw || isUninitExit(raw.exit_code)) return 0;                   // shard not deployed → nothing published (-13 prod / -256 sandbox)
     if (raw.exit_code !== 0) throw new Error(`RecordShard get_view failed with exit_code ${raw.exit_code}`);
     return decodeRecordShardLastSeq(raw.stack);
