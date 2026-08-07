@@ -3662,6 +3662,49 @@ button.feed-item:hover {
   box-shadow: 0 18px 50px var(--shadow);
 }
 
+/* The post-activation briefing. Longer than the other dialogs by design — it is read once and it is the only place
+   the irreversible-and-public facts are stated before a first message — so it scrolls as a WHOLE, capped to the
+   viewport, like .quick-start-dialog. A keyboard-shrunk Telegram viewport must scroll, never clip. */
+.activation-welcome-dialog {
+  display: grid;
+  gap: 12px;
+  width: min(520px, 100%);
+  max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
+  padding: 18px;
+  overflow-y: auto;
+  border: 1px solid var(--modal-outline);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 50px var(--shadow);
+}
+
+.activation-welcome-dialog > p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.activation-welcome-dialog h3 {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.activation-welcome-mission {
+  color: var(--muted);
+}
+
+.activation-welcome-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+.activation-welcome-actions {
+  display: grid;
+  margin-top: 4px;
+}
+
 /* Tall action dialogs (e.g. the image-attach preview: hint + preview + quality select + summary + button) scroll
    as a WHOLE — like .quick-start-dialog — capped to the viewport. The earlier version scrolled ONLY the
    .action-fields region, which TRAPPED the scroll around a tall portrait preview and buried the quality dropdown

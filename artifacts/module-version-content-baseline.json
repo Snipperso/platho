@@ -68,12 +68,12 @@
     "sha256": "1f83a49ba2e76453971374cef1344020af72e96f5045e6dcdf45aa418d297aff"
   },
   "i18n-strings.mjs": {
-    "version": "43",
-    "sha256": "1668579a83ddaa2f004158032c9d8c677186f4270efa26f78f79800a47d9b9a0"
+    "version": "44",
+    "sha256": "56f5d6af5edd835cc17590b6f7864f60ecd0b644e0af267c85864bb379585cec"
   },
   "i18n.mjs": {
-    "version": "41",
-    "sha256": "21293ec9c8a03a2347dfa927bc52a5ed1e262c626eff809b9b74ce1e127ec50b"
+    "version": "42",
+    "sha256": "c4b09b5976fa6686ecbf08e2e2152ea197ad4d8cd8e14739bf6d8350292d282b"
   },
   "intro-bucket.mjs": {
     "version": "12",
@@ -244,8 +244,8 @@
     "sha256": "ea74cd75256df48caadc8b2ed8d79d95306e24ceb9522878caac78d390d07583"
   },
   "styles.css": {
-    "version": "288",
-    "sha256": "4687d4e2fcbe83b5203475b0d1c617f4c5718cc3b2a7ed25f25aa59e9c5f9e13"
+    "version": "289",
+    "sha256": "ad7cc35c9f341f59ada9d8e4e31e2ea11b50370b274c6af440ee79ff9fbaab59"
   },
   "ton-dns-provider.mjs": {
     "version": "51",
