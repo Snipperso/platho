@@ -19,8 +19,8 @@
 // It reuses the shared transport (runGetMethod through the app's pump, readAccountStates for the batched sweep,
 // the /messages reader) rather than inventing a path — one queue per client key is what the rate model rests on.
 
-import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=35';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=13';
+import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=36';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=14';
 
 export class PublicShardTonRpcProviderError extends Error {
   constructor(message) {

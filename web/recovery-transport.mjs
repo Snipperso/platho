@@ -7,9 +7,9 @@
 // h0/h1/bh so the read is self-verifying: bh must equal the body cell's hash. The address-decoding + rate-limited
 // pump are shared with the other lanes (toWireAddress / the injected runGetMethod).
 
-import { toWireAddress } from './shard-reader.mjs?v=12';
+import { toWireAddress } from './shard-reader.mjs?v=13';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
-import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=35';
+import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=36';
 
 /**
  * Decode a RecoveryShardView getter stack (12 items, in declaration order). An arity check guards the same silent

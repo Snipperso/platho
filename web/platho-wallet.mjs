@@ -12,9 +12,9 @@ import {
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-} from './crypto/platho-crypto.mjs?v=13';
-import { tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=73';
+} from './crypto/platho-crypto.mjs?v=14';
+import { tonCell } from './pwa-contract-transactions.mjs?v=36';
+import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=74';
 
 const {
   beginCell,

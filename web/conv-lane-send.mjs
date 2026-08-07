@@ -31,9 +31,9 @@
 // mode-128, so overpaying an already-deployed shard costs nothing — and "pay more only when absent" is forgeable on a
 // public bucket space. tests/conv-lane-send.test.ts pins the message against a REAL sealed capsule and a live RecordShard.
 
-import { buildConvPublishBrowser } from './conv-publish-browser.mjs?v=2';
-import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=35';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=29';
+import { buildConvPublishBrowser } from './conv-publish-browser.mjs?v=3';
+import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=36';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=30';
 
 /**
  * The capsule's three on-chain snake cells, as CLIENT cells buildConvPublishBrowser consumes. createEncryptedConvCapsule
