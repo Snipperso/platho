@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v873';
+const PLATHO_APP_RUNTIME_VERSION = 'v874';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6496,7 +6496,9 @@ function wirePublicImageLightbox(image, src) {
   }, { once: true });
 }
 
-function appendPublicItemContent(container, item) {
+// embedDepth bounds shared-post nesting: a repost OF a repost renders its inner card from the sender's snapshot and
+// stops there, instead of each level fetching the next one's original.
+function appendPublicItemContent(container, item, embedDepth = 0) {
   const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
   if (blocks.length > 0) {
     for (const block of blocks) {
@@ -6522,7 +6524,7 @@ function appendPublicItemContent(container, item) {
         container.append(buildFileBlockChip(block));
       } else if (block?.type === 'share' && block.entryId) {
         // Shared public post (v766): the embed card with the source channel's header.
-        container.append(buildSharedPostEmbed(block));
+        container.append(buildSharedPostEmbed(block, embedDepth));
       }
     }
     return;
@@ -7320,7 +7322,7 @@ async function sharedPostImageUrlWarm(post) {
 // sender-authored/unverified — the tappable header leads to the REAL channel (chain truth) instead. v797: when the
 // referenced post's image is cached locally, the media hint is swapped for the real image (resolved by entryId, no
 // wire copy).
-function buildSharedPostEmbed(block) {
+function buildSharedPostEmbed(block, embedDepth = 0) {
   const embed = document.createElement('div');
   embed.className = 'shared-post-embed';
   const wallet = rawWalletAddress(block.authorWallet);
@@ -7373,12 +7375,16 @@ function buildSharedPostEmbed(block) {
   // The SENDER'S SNAPSHOT paints first, always. It is a 4KB excerpt that already travelled inside the message, so
   // the card is complete the instant it is built — the chain read below is a round trip, and without this every
   // repost would be an empty frame while it runs, and would stay one whenever it cannot run at all.
-  let text = null;
+  // The snapshot lives in its own wrapper so the resolved original can replace the WHOLE body at once. It used to be
+  // patched piecewise — text swapped in place, picture swapped into a hint appended after it — which pinned the image
+  // to the BOTTOM of the card however the author had laid the post out. OBSERVED 2026-08-07 by the owner: the picture
+  // sat under the text instead of where they had placed it.
+  const snapshot = document.createElement('div');
   if (block.snippet) {
     // A DIV, NOT A <p>, and the FULL renderer — the same pair the feed itself uses one function above, for the same
     // reason: block children (heading/list/quote) are invalid inside a paragraph, so a <p> forces inlineOnly and
-    // inlineOnly leaves "#" and "##" standing in the text as literal characters. Owner, 2026-08-07: headings did not
-    // render in a forwarded post while bold did.
+    // inlineOnly leaves "#" and "##" standing in the text as literal characters. OBSERVED 2026-08-07 by the owner:
+    // headings did not render in a forwarded post while bold did.
     //
     // The old justification — "a truncated excerpt should not show a half-cut heading" — expired when the card
     // learned to read the original: a repost whose text is short carries it whole, and a long one is replaced by the
@@ -7387,46 +7393,40 @@ function buildSharedPostEmbed(block) {
     // Links stay safe for the UNVERIFIED sender snapshot: appendInlineFormatted routes every link through
     // buildExternalLinkAnchor (no live href, activateExternalLink interstitial) and only ever appends real nodes —
     // no raw-markup assignment anywhere in this card, which the XSS gate greps for by name.
-    text = document.createElement('div');
+    const text = document.createElement('div');
     text.className = 'feed-block-text shared-post-embed-text';
     appendFormattedMessageText(text, block.snippet);
     if (block.textTruncated) text.append(document.createTextNode('…'));
-    inner.append(text);
+    snapshot.append(text);
   }
-  let mediaHint = null;
   if (block.hasImage) {
-    mediaHint = document.createElement('span');
+    const mediaHint = document.createElement('span');
     mediaHint.className = 'shared-post-embed-media-hint';
     mediaHint.textContent = t('public.sharedPostImageHint');
-    inner.append(mediaHint);
+    snapshot.append(mediaHint);
   }
+  inner.append(snapshot);
   // THEN THE ORIGINAL REPLACES IT — the whole text and the real picture, from the reader's cache if it is there and
   // otherwise from the chain, ONCE (resolveSharedPostOriginal caches into the feed and persists the media).
   //
   // The substitution only ever runs one way, and that is the point: the snippet is what the SENDER typed into the
   // reference and proves nothing, while a post read back through the lane matched its body_commit and its
   // publisher tag. Chain truth displaces the claim; the claim never displaces chain truth.
-  if (block.entryId && (block.hasImage || block.textTruncated)) {
+  //
+  // AND IT REPLACES THE BODY WHOLE, through the SAME renderer the feed and the post detail use — so the post appears
+  // in the order its author wrote it: text, picture where they put it, more text. Rebuilding it out of a snippet plus
+  // a trailing image could only ever produce one layout, and it was the wrong one.
+  if (embedDepth === 0 && block.entryId && (block.hasImage || block.textTruncated)) {
     resolveSharedPostOriginal(block.entryId, block.bodyHash, wallet).then(async (post) => {
-      if (!post || !inner.isConnected) return;
-      const whole = publicPostFullText(post);
-      if (text && whole && whole !== block.snippet) {
-        const replacement = document.createElement('div');
-        replacement.className = 'feed-block-text shared-post-embed-text';
-        appendFormattedMessageText(replacement, whole);
-        text.replaceWith(replacement);
-        text = replacement;
-      }
-      if (!mediaHint) return;
-      const url = await sharedPostImageUrlWarm(post);
-      if (!url || !mediaHint.isConnected) return;
-      const img = document.createElement('img');
-      img.className = 'shared-post-embed-image';
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      img.alt = '';
-      img.src = url;   // a decoded data-url from our OWN store, never user HTML — XSS-safe
-      mediaHint.replaceWith(img);
+      if (!post || !snapshot.isConnected) return;
+      // Warm FIRST: the persisted feed cache holds the post's text without its image (the data-urls are stripped on
+      // write), and this puts the picture back onto the post object the renderer is about to read.
+      await sharedPostImageUrlWarm(post);
+      if (!snapshot.isConnected) return;
+      const real = document.createElement('div');
+      appendPublicItemContent(real, post, embedDepth + 1);
+      if (real.childNodes.length === 0) return;   // nothing renderable — keep the snapshot rather than blank the card
+      snapshot.replaceWith(real);
     }).catch(() => {});
   }
   body.append(inner);

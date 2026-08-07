@@ -2603,6 +2603,13 @@ button.feed-item:hover {
   object-fit: cover;
 }
 
+/* Once the original is read, the card renders the post through the FEED's own body renderer, so its pictures arrive
+   as .feed-image — sized for a full-width feed column (max-height 1400px). Inside a quoted card that would tower over
+   the message it is quoted in, so keep the embed's own ceiling. */
+.shared-post-embed .feed-image {
+  max-height: 260px;
+}
+
 .shared-post-embed.feed-post-collapsible > .feed-post-body {
   max-height: var(--shared-post-embed-max-height);
 }

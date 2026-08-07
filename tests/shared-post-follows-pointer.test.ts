@@ -45,9 +45,11 @@ describe('SHAREREF — a shared post resolves to its original', () => {
     expect(resolve).toContain('while (sharedPostChainReads.size > SHARED_POST_CHAIN_READ_LIMIT)');
 
     // And the card only asks when the snapshot is genuinely short of the original. A complete short repost — the
-    // common case — costs zero requests.
+    // common case — costs zero requests. embedDepth bounds a repost OF a repost: the inner card keeps its snapshot
+    // instead of every level fetching the next one's original.
     const embed = functionBody('function buildSharedPostEmbed(');
-    expect(embed).toContain('if (block.entryId && (block.hasImage || block.textTruncated)) {');
+    expect(embed).toContain('if (embedDepth === 0 && block.entryId && (block.hasImage || block.textTruncated)) {');
+    expect(embed).toContain('appendPublicItemContent(real, post, embedDepth + 1);');
   });
 
   it('SHAREREF-03: only a body-authentic post may answer for the reference, and it replaces the snapshot one way', () => {
@@ -59,8 +61,27 @@ describe('SHAREREF — a shared post resolves to its original', () => {
     // its publisher tag. So the card upgrades snapshot -> chain and never the reverse: nothing writes block.snippet.
     const embed = functionBody('function buildSharedPostEmbed(');
     expect(embed).not.toMatch(/block\.snippet\s*=/);
-    expect(embed).toContain('const whole = publicPostFullText(post);');
-    expect(embed).toContain('text.replaceWith(replacement);');
+    expect(embed).toContain('snapshot.replaceWith(real);');
+    // Replaced WHOLE, and only when there is something to put there — a resolve that renders nothing must leave the
+    // snapshot standing rather than blank the card.
+    expect(embed).toContain('if (real.childNodes.length === 0) return;');
+  });
+
+  it('SHAREREF-08: the original renders through the FEED\'s renderer, so the author\'s layout survives', () => {
+    // The card used to be patched piecewise: the text swapped in place, the picture swapped into a hint appended
+    // AFTER it. That could only ever produce one layout — everything, then the image — so a post with a picture in
+    // the middle came out with it stuck at the bottom (owner, 2026-08-07). appendPublicItemContent walks the post's
+    // blocks in order and is the same function the feed and the post detail use.
+    const embed = functionBody('function buildSharedPostEmbed(');
+    expect(embed).toContain('appendPublicItemContent(real, post, embedDepth + 1);');
+    // The warm runs BEFORE the render, not after: the persisted feed cache holds a post's text without its image
+    // (data-urls are stripped on write), so rendering first would draw the post with no picture at all.
+    expect(embed.indexOf('await sharedPostImageUrlWarm(post);'))
+      .toBeLessThan(embed.indexOf('appendPublicItemContent(real, post, embedDepth + 1);'));
+    // And the renderer threads the depth on, or the bound would stop at the first level.
+    const feedRenderer = functionBody('function appendPublicItemContent(');
+    expect(feedRenderer).toContain('function appendPublicItemContent(container, item, embedDepth = 0)');
+    expect(feedRenderer).toContain('container.append(buildSharedPostEmbed(block, embedDepth));');
   });
 
   it('SHAREREF-04: the fetched post is CACHED — the second render, and every one after a reload, costs nothing', () => {
