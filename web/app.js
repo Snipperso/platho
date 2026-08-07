@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v872';
+const PLATHO_APP_RUNTIME_VERSION = 'v873';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2303,12 +2303,17 @@ function messageTextHasBlockFormatting(text) {
 }
 
 // Render message body text with the safe formatting subset. Appends block/inline children to `container`.
-// options.inlineOnly: skip block parsing (used for the shared-post embed snippet, which is a truncated excerpt
-// and must stay a single inline run inside its <p>). When no block markers are present, the inline fast path
-// keeps the common (unformatted) message structurally identical to the old appendLinkifiedText output.
-function appendFormattedMessageText(container, text, options = {}) {
+// When no block markers are present, the inline fast path keeps the common (unformatted) message structurally
+// identical to the old appendLinkifiedText output.
+//
+// THERE IS NO "INLINE ONLY" MODE ANY MORE, deliberately. It existed for the shared-post embed, whose text sat in a
+// <p> — and a <p> cannot legally hold the block children this emits, so the option made "#" and "##" render as
+// literal characters in a forwarded post while bold worked (owner, 2026-08-07). The embed now uses a DIV like every
+// other body-text container, which leaves nothing that needs the option — and an unused switch on a shared renderer
+// is how the same bug comes back.
+function appendFormattedMessageText(container, text) {
   const str = String(text ?? '');
-  if (options.inlineOnly === true || !messageTextHasBlockFormatting(str)) {
+  if (!messageTextHasBlockFormatting(str)) {
     appendInlineFormatted(container, str);
     return;
   }
@@ -7370,14 +7375,21 @@ function buildSharedPostEmbed(block) {
   // repost would be an empty frame while it runs, and would stay one whenever it cannot run at all.
   let text = null;
   if (block.snippet) {
-    text = document.createElement('p');
+    // A DIV, NOT A <p>, and the FULL renderer — the same pair the feed itself uses one function above, for the same
+    // reason: block children (heading/list/quote) are invalid inside a paragraph, so a <p> forces inlineOnly and
+    // inlineOnly leaves "#" and "##" standing in the text as literal characters. Owner, 2026-08-07: headings did not
+    // render in a forwarded post while bold did.
+    //
+    // The old justification — "a truncated excerpt should not show a half-cut heading" — expired when the card
+    // learned to read the original: a repost whose text is short carries it whole, and a long one is replaced by the
+    // chain copy below. A cut heading renders as a heading with cut text, which is what the feed does anyway.
+    //
+    // Links stay safe for the UNVERIFIED sender snapshot: appendInlineFormatted routes every link through
+    // buildExternalLinkAnchor (no live href, activateExternalLink interstitial) and only ever appends real nodes —
+    // no raw-markup assignment anywhere in this card, which the XSS gate greps for by name.
+    text = document.createElement('div');
     text.className = 'feed-block-text shared-post-embed-text';
-    // Inline formatting + links only (inlineOnly): the snippet is a TRUNCATED excerpt inside a <p>, so block
-    // elements would be invalid and a half-cut heading/list would look odd. Bold/italic/links render; block
-    // markers (heading/list/quote) show as literal text in the preview excerpt. Links are safe for the
-    // UNVERIFIED sender snapshot — appendInlineFormatted routes every link through the activateExternalLink
-    // interstitial (no live href), like the original post.
-    appendFormattedMessageText(text, block.snippet, { inlineOnly: true });
+    appendFormattedMessageText(text, block.snippet);
     if (block.textTruncated) text.append(document.createTextNode('…'));
     inner.append(text);
   }
@@ -7399,9 +7411,9 @@ function buildSharedPostEmbed(block) {
       if (!post || !inner.isConnected) return;
       const whole = publicPostFullText(post);
       if (text && whole && whole !== block.snippet) {
-        const replacement = document.createElement('p');
+        const replacement = document.createElement('div');
         replacement.className = 'feed-block-text shared-post-embed-text';
-        appendFormattedMessageText(replacement, whole, { inlineOnly: true });
+        appendFormattedMessageText(replacement, whole);
         text.replaceWith(replacement);
         text = replacement;
       }

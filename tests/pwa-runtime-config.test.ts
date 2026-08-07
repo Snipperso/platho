@@ -4589,12 +4589,17 @@ describe('PWA runtime config guard', () => {
     // Embed: source-channel header resolved by the RECIPIENT (their own resolver; the sender's snapshot label is
     // a fallback only), collapsed with the shared toggle machinery keyed by the shared post's entry id.
     // v767 (owner ask): the snippet LINKIFIES like the original post; v769 renders it through the safe formatting
-    // renderer (inlineOnly — a truncated excerpt stays a single inline run in its <p>). Safe for an unverified
-    // sender-authored snapshot: appendInlineFormatted routes every link through buildExternalLinkAnchor (no live
-    // href, activateExternalLink interstitial) and never uses innerHTML.
+    // renderer. It rendered INLINE-ONLY inside a <p> until 2026-08-07, when the owner found that a forwarded post
+    // showed its headings as literal "#" and "##" while bold worked — a <p> cannot hold the block children the
+    // renderer emits, so the container forced the crippled mode. It is a DIV now, exactly like the feed's own body
+    // text one function above. Safe for an unverified sender-authored snapshot either way: appendInlineFormatted
+    // routes every link through buildExternalLinkAnchor (no live href, activateExternalLink interstitial) and
+    // never uses innerHTML.
     const embedFn = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildPublicFeedArticle('));
     expect(embedFn).toMatch(/resolveWalletChannelDisplay\(wallet\)\?\.name/);
-    expect(embedFn).toMatch(/appendFormattedMessageText\(text, block\.snippet, \{ inlineOnly: true \}\);/);
+    expect(embedFn).toMatch(/text = document\.createElement\('div'\);/);
+    expect(embedFn).toMatch(/appendFormattedMessageText\(text, block\.snippet\);/);
+    expect(embedFn, 'the chain-read replacement renders the same way').toMatch(/appendFormattedMessageText\(replacement, whole\);/);
     expect(embedFn).toMatch(/if \(block\.textTruncated\) text\.append\(document\.createTextNode\('…'\)\);/);
     expect(embedFn).toMatch(/wireClampToggleButton\(embed, body, inner, expandedSharedEmbeds, String\(block\.entryId\)\);/);
     // Both display surfaces render the embed (private bubbles + public posts/comments).
@@ -4871,7 +4876,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const INLINE_FORMAT_RE = \/\\\*\\\*\\\*\(\[\^\*\\n\]\+\)\\\*\\\*\\\*\|/); // *** alternative is FIRST
     expect(inlineFn).not.toMatch(/innerHTML/);
     const blockFn = app.slice(app.indexOf('function appendFormattedMessageText('), app.indexOf('function appendFormattedMessageText(') + 3200);
-    expect(blockFn).toMatch(/options\.inlineOnly === true \|\| !messageTextHasBlockFormatting\(str\)/); // inline fast path
+    expect(blockFn).toMatch(/if \(!messageTextHasBlockFormatting\(str\)\)/); // inline fast path
+    // NO "inline only" ESCAPE HATCH. It existed for the shared-post embed, whose text lived in a <p> that cannot
+    // legally hold these block children — and it made "#"/"##" render as literal characters in a forwarded post
+    // while bold worked (owner, 2026-08-07). Every body-text container is a DIV now, so nothing needs it, and an
+    // unused switch on a shared renderer is how that bug returns.
+    expect(app, 'the inline-only mode must stay gone').not.toMatch(/inlineOnly: true/);
     expect(blockFn).toMatch(/msg-heading/);
     expect(blockFn).toMatch(/document\.createElement\('blockquote'\)/);
     expect(blockFn).toMatch(/document\.createElement\(ordered \? 'ol' : 'ul'\)/);
