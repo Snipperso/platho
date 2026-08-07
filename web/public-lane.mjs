@@ -44,6 +44,11 @@ import {
 const PS_KIND_CHANNEL = 0;
 const PS_KIND_THREAD = 1;
 
+// Rows per shard read. PublicShard caps get_page at PS_PAGE_CAP = 96 to keep the getter under its gas ceiling, and
+// the provider's readPosts defaults to the same — so this is the contract's number, not a tuning knob. It is also
+// the size of one "show earlier comments" step.
+const PAGE_ROWS = 96;
+
 /**
  * How far back a CHANNEL is read — the CONTRACT'S retention, not a guess.
  *
@@ -212,8 +217,11 @@ export function createPublicLane({
         const key = addrKey(coord.address);
         const marker = changeMarkerOf(state);
         const snapshot = readShardSnapshot(key, marker);
-        const shardPosts = snapshot ?? (await readShardPosts(state.address)).posts;
-        if (!snapshot) writeShardSnapshot(key, marker, shardPosts);
+        const shardPosts = snapshot ? snapshot.posts : (await readShardPosts(state.address)).posts;
+        // ONE VALUE SHAPE for the shared snapshot cache. The thread read stores where its window starts alongside the
+        // rows (it can page backwards); a channel read never pages, but it must write the same record or the two
+        // would read each other's entries as the wrong type the first time their shard addresses ever met.
+        if (!snapshot) writeShardSnapshot(key, marker, { posts: shardPosts, from: null, entryCount: null });
         for (const p of shardPosts) posts.push({ ...p, channelWallet, channelEpochTag: coord.epochTag, channelShardSeq: coord.seq });
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
@@ -269,8 +277,20 @@ export function createPublicLane({
      *
      * LIVENESS FIRST: a post with no comments never deployed its thread shard, so a bare get_page would hit an
      * uninitialised account and throw exit -13. Check accountStates and return [] for the ordinary no-comments case.
+     *
+     * RETURNS { posts, cursors, hasMore, shardsSeen } — not a bare array, and both extra fields answer a question the
+     * caller could not otherwise answer honestly:
+     *
+     *  * `cursors` / `hasMore` — HOW FAR BACK THIS READ GOT. get_page is capped at PS_PAGE_CAP = 96 rows by the
+     *    contract and the window is anchored at the tail, so a busy post read back its newest 96 comments and the
+     *    rest were on chain, paid for, and unreachable — MEASURED at 120 comments in tests/public-comment-window.
+     *    Pass the returned cursors back as `olderThan` to read the page before them ("show earlier comments").
+     *
+     *  * `shardsSeen` — WHETHER THE THREAD EXISTS AT ALL. The caller used to infer "nobody has commented" from an
+     *    empty result, which cannot tell an empty thread from a live one whose entries failed to decode. A shard
+     *    that is live is proof somebody commented, whatever came back.
      */
-    async readThreadComments(channelWallet, channelEpochTag, entryId, { channelShardSeq = 0, threadShardSeq = 0 } = {}) {
+    async readThreadComments(channelWallet, channelEpochTag, entryId, { channelShardSeq = 0, threadShardSeq = 0, olderThan = null } = {}) {
       const nowUnix = now();
       const channelPk = await publicChannelPartitionKey(publicWalletHash(channelWallet), channelShardSeq);
       const postUid = await publicPostUid(channelPk, channelEpochTag, entryId);
@@ -289,22 +309,50 @@ export function createPublicLane({
       }
       const live = await readStates(coords);
       const posts = [];
+      const cursors = {};
+      let shardsSeen = 0;
       for (const address of coords) {
         const state = live.get(addrKey(address));
         // ACTIVE, not merely present: readAccountStates reports touched-but-uninit accounts too (525 B, status
         // 'uninit'), and get_page on an uninit account throws exit -13 — a publicly-derivable touched address would
         // otherwise defeat a bare size check and break the read.
         if (!state || state.status !== 'active') continue;
+        shardsSeen += 1;
         const key = addrKey(address);
         const marker = changeMarkerOf(state);
-        // Nothing has been written to this shard since we last read it, so its comments are exactly what we hold.
-        const snapshot = readShardSnapshot(key, marker);
-        if (snapshot) { posts.push(...snapshot); continue; }
-        const { posts: shardPosts } = await readShardPosts(address);
-        writeShardSnapshot(key, marker, shardPosts);
+        // WHERE THIS SHARD'S WINDOW STARTS. Absent cursor = the newest page (readPosts anchors at the tail itself);
+        // a cursor from a previous call = the page immediately BEFORE what has already been read. `from` reaching 0
+        // means this shard is exhausted and asking again would re-read the same rows.
+        const previous = olderThan?.[key];
+        const paged = Number.isFinite(Number(previous?.from)) && Number(previous.from) > 0;
+        if (previous && !paged) { cursors[key] = { from: 0, entryCount: Number(previous.entryCount ?? 0) }; continue; }
+        // The count is clamped as well as the start. Asking for a full page from a clamped start would re-read rows
+        // the caller already holds — 72 of them in the 120-comment case, every time the button is pressed — and the
+        // merge would hide it, so the waste would never show up as a bug.
+        const pageStart = paged ? Math.max(0, Number(previous.from) - PAGE_ROWS) : 0;
+        const pageRows = paged ? Number(previous.from) - pageStart : PAGE_ROWS;
+        const fromId = paged ? BigInt(pageStart) : null;
+        // The snapshot cache holds a shard's NEWEST window, so it may only answer the unpaged read. Serving it for a
+        // paged one would hand back the newest rows under the guise of older ones.
+        const snapshot = paged ? null : readShardSnapshot(key, marker);
+        if (snapshot) {
+          posts.push(...snapshot.posts);
+          cursors[key] = { from: snapshot.from, entryCount: snapshot.entryCount };
+          continue;
+        }
+        const { posts: shardPosts, entry_count: entryCount } = await readShardPosts(address, {
+          ...(fromId === null ? {} : { fromId, maxCount: BigInt(pageRows) }),
+        });
+        const count = Number(entryCount ?? 0);
+        const from = fromId === null ? Math.max(0, count - PAGE_ROWS) : Number(fromId);
+        if (!paged) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count });
         posts.push(...shardPosts);
+        cursors[key] = { from, entryCount: count };
       }
-      return posts;
+      // hasMore asks the only question the button needs: is there a row BEFORE what we have read, anywhere in the
+      // thread. A shard whose window already starts at 0 is exhausted and contributes nothing.
+      const hasMore = Object.values(cursors).some((cursor) => Number(cursor.from) > 0);
+      return { posts, cursors, hasMore, shardsSeen };
     },
 
     /**

@@ -145,7 +145,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     expect((await threadShard.getGetView()).entry_count, 'the comment is stored in the thread shard').toBe(1n);
 
     const lane = laneOverShards(bc, new Map([[addrKey(threadDest.toString()), { shard: threadShard, messages: [{ body: builtComment.body, source: commenter.address.toString() }] }]]));
-    const comments = await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
+    const { posts: comments } = await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
 
     expect(comments.length, 'the comment came back via the thread derivation').toBe(1);
     expect(addrKey(comments[0].publisher), 'attributed to the commenter, not the channel').toBe(addrKey(commenter.address.toString()));
@@ -186,7 +186,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     // only and this returns 0.
     const laterClock = CLOCK + THREAD_ERA_SECONDS;
     const lane = laneOverShards(bc, new Map([[addrKey(threadDest.toString()), { shard: threadShard, messages: [{ body: builtComment.body, source: commenter.address.toString() }] }]]), laterClock);
-    const comments = await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
+    const { posts: comments } = await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
 
     expect(comments.length, 'the prior-era comment is still found via the era window').toBe(1);
     expect(readPublicPostPayloadV2({ header: comments[0].header, body: comments[0].body }).text).toBe('written last era');
