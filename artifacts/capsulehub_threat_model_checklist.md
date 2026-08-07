@@ -1,8 +1,21 @@
 # CapsuleHub Threat Model Checklist
 
+> **HISTORICAL ONLY — SUPERSEDED.** `CapsuleHub` and `Vault` were deleted in clean-17. Everything below describes the
+> clean-15 monolithic hub and the Vault-funded publish path: a single hub contract holding every user's entries, publishes
+> funded from an internal Vault balance, `PH0B` 140-byte headers, ACK forward reserves, and a publish surcharge retained
+> as hub reserve. None of that exists.
+>
+> clean-17 replaced the hub with per-lane shard accounts (`RecordShard`, `IntroShard`, `RecoveryShard`, `PublicShard`,
+> `KeyShard`), each addressed by derivation and paid directly from the user's own wallet. The current protocol is
+> specified in `web/CRYPTO_PROTOCOL.md`; the clean-17 contract review is recorded in the release evidence, not here.
+>
+> This file is kept because it records a real hardening pass and the reasoning behind decisions that carried forward
+> (fee flush bounce accounting, forged-callback rejection, retrievable payload cells as the delivery record). It must not
+> be cited as current behaviour.
+
 Status: local engineering hardening pass, not an independent audit or formal proof.
 
-Date: 2026-05-22
+Date: 2026-05-22 (clean-15 generation)
 
 ## Covered Locally
 

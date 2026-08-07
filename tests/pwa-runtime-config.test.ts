@@ -2294,9 +2294,18 @@ describe('PWA runtime config guard', () => {
     expect(matrix).not.toMatch(/get_refund_flush_id/);
     expect(matrix).not.toMatch(/get_pending_refund_flush_for/);
     expect(matrix).not.toMatch(/\|\s*Flush username refund\s*\|[\s\S]*\|\s*Implemented\s*\|/);
-    expect(matrix).toContain('Direct user-wallet username mint, profile avatar payment, and username refund-flush product actions are intentionally unsupported');
-    expect(matrix).toMatch(/\|\s*Mint username from Vault balance\s*\|\s*`Vault` external\s*\|[\s\S]*Vault auth key \/ owner signing key/);
-    expect(matrix).toMatch(/\|\s*Set wallet avatar from Vault balance\s*\|\s*`Vault` external\s*\|[\s\S]*Vault auth key \/ owner signing key/);
+    // REBASELINED 2026-08-07. The three pins here demanded the OPPOSITE of what clean-17 does. They required the
+    // matrix to state that "direct user-wallet username mint [and] profile avatar payment ... are intentionally
+    // unsupported" and that both flows are signed with a "Vault auth key" — the design where an intermediary contract
+    // held the user's balance and signed on their behalf. `Vault` was deleted; direct user-wallet payment IS the
+    // supported path now, through a dedicated registry notify op on the user's own ATHWallet.
+    //
+    // What the negatives above protect is unchanged and still worth protecting: the refund-flush ABI was removed, and
+    // a matrix that lists it as `Implemented` would send an operator looking for an entrypoint that is not there.
+    expect(matrix).toMatch(/\|\s*Mint username\s*\|\s*user `ATHWallet`\s*\|[\s\S]{0,200}ATHTransferRequestRegistryMintUsername/);
+    expect(matrix).toMatch(/\|\s*Set wallet avatar\s*\|\s*user `ATHWallet`\s*\|[\s\S]{0,200}ATHTransferRequestRegistryProfileAvatar/);
+    expect(matrix).not.toMatch(/Vault auth key/);
+    expect(matrix).not.toMatch(/from Vault balance/);
   });
 
   it('PWA-ACTIVATION-01: transient Vault provider errors do not clear an active composer binding', () => {

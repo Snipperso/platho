@@ -186,7 +186,10 @@ Stop if:
    - current code hashes;
    - StateInit hashes;
    - `ath_total_supply_atomic = 100000000000000000`;
-   - `vault_activity_airdrop_total_atomic = 15000000000000000`;
+   - `vault_activity_airdrop_total_atomic = 15000000000000000` — a legacy KEY NAME kept deliberately. `Vault` no
+     longer exists; the custodian is `AirdropPool`. The key is not renamed because the live manifest, the genesis
+     verifier, and the deployed evidence all read it by this exact name, and renaming a field the verifier matches by
+     string is a silent-failure change, not a cleanup;
    - `ath_long_term_vesting_allocation_atomic = 10000000000000000`;
    - `ath_long_term_vesting_period_count = 100`;
    - `ath_long_term_vesting_period_seconds = 31536000`;
