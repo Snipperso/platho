@@ -4,12 +4,12 @@
   "command": "npm.cmd test",
   "config": "vitest.all.config.ts",
   "generated_after_local_run": "2026-07-31T00:00:00.000Z",
-  "discovered_test_files": 238,
-  "executed_test_files": 238,
-  "passed_test_files": 238,
+  "discovered_test_files": 240,
+  "executed_test_files": 240,
+  "passed_test_files": 240,
   "failed_test_files": 0,
-  "total_tests": 1696,
-  "passed_tests": 1696,
+  "total_tests": 1706,
+  "passed_tests": 1706,
   "failed_tests": 0,
   "supersedes_historical_artifacts": [
     "artifacts/M21A_CHUNKED_FULL_MATRIX_SUMMARY.txt"

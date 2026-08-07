@@ -221,6 +221,46 @@ export function createPublicLane({
     },
 
     /**
+     * ONE post, addressed directly by the coordinates a SHARE block carries.
+     *
+     * WHY THIS EXISTS. A reposted public post travels as a REFERENCE: entry id, body hash and author wallet, plus a
+     * 4KB text snapshot and a "has image" flag. The reader had no way to follow that reference — the only resolver
+     * looked in the LOCAL feed cache, and the recipient of a repost is by definition someone who probably does not
+     * follow that channel. So the image never appeared and the text stayed a fragment, on a pointer that was
+     * complete all along.
+     *
+     * ADDRESSED, NOT SCANNED. readChannelPosts would also find it, but it costs the whole channel — 14 eras x 4
+     * overflow shards of accountStates plus a history read per live shard — and it reads each shard's NEWEST window,
+     * so an OLD post (a book channel's early chapter) is not in it at any price. The feed id is
+     * `epochTag.shardSeq.entryId`, which names the exact shard account and the exact row, so this reads that one
+     * shard from that one entry forward. Cost does not grow with the channel.
+     *
+     * The window is forward on purpose: a multipart post (any post with an image) occupies consecutive entries and
+     * the SHARE block points at its FIRST part, so its remaining parts are the entries just after it.
+     *
+     * KNOWN CEILING, stated rather than hidden: bodies come from /messages (newest-first, 8 pages x 128), so in a
+     * shard carrying more than ~1024 publishes the oldest entries have no reachable body and this returns nothing
+     * for them. The caller keeps the sender's snapshot in that case, which is exactly what it is for.
+     */
+    async readPostAt(channelWallet, channelEpochTag, channelShardSeq, shardEntryId, { window = 16 } = {}) {
+      const seq = Number(channelShardSeq) || 0;
+      const epochTag = BigInt(channelEpochTag);
+      const pk = await publicChannelPartitionKey(publicWalletHash(channelWallet), seq);
+      const address = rawAddress(await publicShardAddressBytes(pk, epochTag));
+      const live = await readStates([address]);
+      const state = live.get(addrKey(address));
+      // ACTIVE, not merely present: a publicly-derivable address can be touched into existence uninitialised, and
+      // get_page on an uninit account throws exit -13 (the same trap the thread read documents).
+      if (!state || state.status !== 'active') return [];
+      const { posts } = await readShardPosts(state.address, {
+        fromId: BigInt(shardEntryId), maxCount: BigInt(window),
+      });
+      return posts.map((post) => ({
+        ...post, channelWallet, channelEpochTag: String(epochTag), channelShardSeq: seq,
+      }));
+    },
+
+    /**
      * The comment thread of one post. The caller holds the post's coordinates from having rendered it:
      * (channelWallet, channelEpochTag, entryId) plus the parent's channel overflow seq. post_uid folds the parent's
      * channel_pk (which uses channelShardSeq — NOT 0, or an overflow-shard post's thread would never be found),

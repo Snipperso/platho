@@ -3206,8 +3206,12 @@ describe('PWA runtime config guard', () => {
     // Per-ENTRY tolerance survived the move: one unreadable payload must never abort the pass. In the shard
     // readers that is a per-entry try/catch around the PPH2 decode — posts and comments alike.
     // (The Hub entry funnel is gone; the shard readers each carry the per-entry try/catch pinned below.)
-    const shardSync = app.slice(app.indexOf('async function syncPublicChannelFromShards'), app.indexOf('async function syncPublicChannelFromChain'));
+    // The decode moved out of the sync loop into publicPostPartsFromShardPosts so the ADDRESSED single-post read (a
+    // repost whose original the reader does not hold) decodes through the same code — the tolerance moved with it,
+    // which is the point of having one decoder rather than two.
+    const shardSync = app.slice(app.indexOf('async function publicPostPartsFromShardPosts'), app.indexOf('async function syncPublicChannelFromChain'));
     expect(shardSync).toMatch(/try \{ payload = readPublicPostPayloadV2\(\{ header: sp\.header, body: sp\.body \}\); \} catch \{ continue; \}/);
+    expect(shardSync, 'and the sync still routes through it').toMatch(/await publicPostPartsFromShardPosts\(shardPosts, channel\)/);
     const shardComments = app.slice(app.indexOf('async function loadPublicPostCommentsFromShards'), app.indexOf('async function loadPublicPostComments('));
     expect(shardComments).toMatch(/try \{ payload = readPublicPostPayloadV2\(\{ header: tp\.header, body: tp\.body \}\); \} catch \{ continue; \}/);
     // The avatar readers dropped out of this guard with the Hub: the AVATAR shard reader parses its own parts
@@ -5351,26 +5355,30 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain("publicMessageInput?.addEventListener('compositionstart', () => composerEditorEscapeFmtForComposition(publicMessageInput));");
   });
 
-  it('PWA-SHARED-POST-IMAGE-01: a shared post shows the ORIGINAL image resolved by entryId from the local cache — no wire copy (v797)', () => {
+  it('PWA-SHARED-POST-IMAGE-01: a shared post shows the ORIGINAL image — resolved by reference, never copied on the wire', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
     const policy = readFileSync('web/capsule-part-policy.mjs', 'utf8');
-    // A SHARE is an internal REFERENCE (entryId): the image is resolved from LOCAL caches, never re-uploaded. The
-    // resolver finds the post in the feed cache by entryId and warms its stripped image from the durable media store.
+    // A SHARE is an internal REFERENCE (entryId): the image is RESOLVED, never re-uploaded — a copy would republish
+    // the picture on chain at full price. v797 resolved it from the local feed cache only, which is why a repost
+    // reached a reader who does not follow that channel with no picture at all; the resolution now falls through to
+    // an addressed chain read (SHAREREF-*, and measured against real shards in tests/public-lane-post-at).
     expect(app).toContain('function findCachedPublicPostByEntryId(entryId)');
-    expect(app).toContain('async function resolveSharedPostImageUrl(entryId, expectedBodyHash)');
-    expect(app).toContain('const post = findCachedPublicPostByEntryId(entryId);');
+    expect(app).toContain('function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet)');
+    expect(app).toContain('async function sharedPostImageUrlWarm(post)');
     expect(app).toContain('const store = await publicPostMediaStore();'); // warm the stripped image from the durable store
     expect(app).toContain('applyPublicPostMediaRecord(post, media);');
     // REFERENCE INTEGRITY: the SHARE block is sender-authored, so the resolved post's bodyHash must match the block's
-    // (content-addressed) — else a crafted entryId could show an unrelated cached post's image under a spoofed label.
+    // (content-addressed) — else a crafted entryId could show an unrelated post's image under a spoofed label. Both
+    // resolution paths carry the check: the cache hit compares, and the chain read PICKS BY it.
     expect(app).toContain('function normalizeBodyHashHex(value)');
-    expect(app).toContain('if (!want || want !== normalizeBodyHashHex(post.bodyHash)) return null;');
+    expect(app).toContain('if (cached && want && want === normalizeBodyHashHex(cached.bodyHash)) return Promise.resolve(cached);');
+    expect(app).toContain('.find((item) => normalizeBodyHashHex(item.bodyHash) === want) ?? null');
     // buildSharedPostEmbed swaps the media hint for the real <img> (data-url .src, never innerHTML = XSS-safe).
-    expect(app).toContain('resolveSharedPostImageUrl(block.entryId, block.bodyHash).then((url) => {');
+    expect(app).toContain('const url = await sharedPostImageUrlWarm(post);');
     expect(app).toContain('mediaHint.replaceWith(img);');
     expect(app).toContain('img.src = url;');
-    const embed = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildSharedPostEmbed(') + 2600);
+    const embed = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildPublicFeedArticle('));
     expect(embed).not.toMatch(/innerHTML/);
     // The reference the image lookup needs — entryId + bodyHash — rides the SHARE block. It went to version 2 on
     // 2026-08-04 because v1 packed the entry id as a uint64 and clean-17's public feed id is `epochTag.shardSeq.
