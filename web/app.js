@@ -160,7 +160,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=55';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=19';
+import { createPublicLane } from './public-lane.mjs?v=20';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=12';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v871';
+const PLATHO_APP_RUNTIME_VERSION = 'v872';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6747,10 +6747,7 @@ function sharePayloadFromPublicItem(item) {
   const authorWallet = rawWalletAddress(item.authorWallet);
   if (!authorWallet) return null;
   const blocks = Array.isArray(item.blocks) ? item.blocks : [];
-  const fullText = (blocks
-    .filter((block) => block?.type === 'text' && String(block.text ?? '').trim())
-    .map((block) => String(block.text).trim())
-    .join('\n\n') || String(item.text ?? '')).trim();
+  const fullText = publicPostFullText(item);
   // Truncate at DRAFT time (not just at encode) so the optimistic echo shows exactly what the wire carries.
   const snippet = truncateUtf8ToShareSnippet(fullText);
   return {
@@ -7190,16 +7187,114 @@ function normalizeBodyHashHex(value) {
 // block's expectedBodyHash (content-addressed) — else a crafted entryId could show an UNRELATED cached post's image
 // under the sender's claimed channel/label. No match -> null (keep the hint). Only the recipient's OWN decoded media
 // is ever shown; sender bytes never cross.
-async function resolveSharedPostImageUrl(entryId, expectedBodyHash) {
+/**
+ * A REPOST CARRIES A POINTER. THIS IS WHAT FOLLOWS IT.
+ *
+ * OBSERVED 2026-08-07 by the owner: a reposted public post arrives incomplete and with no picture.
+ *
+ * The SHARE block is a reference by design — entry id, body hash, author wallet, a 4KB text snapshot and a
+ * "has image" flag — because copying the picture would republish it on chain at full price. What was missing is the
+ * other half: NOTHING EVER FOLLOWED THE REFERENCE. The only resolver looked in this device's own feed cache, and the
+ * recipient of a repost is by definition someone who probably does not follow that channel. So the picture never
+ * appeared and the text stayed a fragment, on a pointer that was complete the whole time.
+ *
+ * ONE READ, THEN NEVER AGAIN. The result is merged into the SAME feed cache the sync writes, so the second render —
+ * and every render after a reload, since commitPublicChannelFeedCache persists text to localStorage and image media
+ * to IndexedDB — costs nothing. A cache hit never touches the network at all.
+ *
+ * ADDRESSED, NOT SCANNED: the feed id IS the coordinates (epochTag.shardSeq.entryId), so this reads one shard from
+ * one row. Cost does not grow with the channel, and an old post in a large channel is reachable — readChannelPosts
+ * would find neither.
+ */
+const sharedPostChainReads = new Map();   // feed entryId -> Promise<post|null>
+const SHARED_POST_CHAIN_READ_LIMIT = 256;
+
+/** epochTag.shardSeq.entryId -> the three coordinates, or null for a v1 share (a bare uint64, pre-shard). */
+function sharedPostShardCoordinates(entryId) {
+  const parts = String(entryId ?? '').split('.');
+  if (parts.length !== 3 || !parts.every((part) => /^\d+$/.test(part))) return null;
+  return { epochTag: parts[0], shardSeq: Number(parts[1]), shardEntryId: parts[2] };
+}
+
+async function fetchSharedPostFromChain(entryId, expectedBodyHash, authorWallet) {
+  const lane = directPublicLaneReader();
+  const wallet = rawWalletAddress(authorWallet);
+  const coords = sharedPostShardCoordinates(entryId);
+  const want = normalizeBodyHashHex(expectedBodyHash);
+  if (!lane || !wallet || !coords || !want) return null;
+  // Registers the channel UNSUBSCRIBED — the same semantics discovery uses, so following a reference never turns
+  // into a follow. The id is only needed to key the post in the feed cache.
+  const channelId = ensurePublicChannelForAuthorWallet(wallet, { activate: false });
+  if (!channelId) return null;
+  const shardPosts = await lane.readPostAt(wallet, coords.epochTag, coords.shardSeq, coords.shardEntryId);
+  if (shardPosts.length === 0) return null;
+  const parts = await publicPostPartsFromShardPosts(shardPosts, { id: channelId, authorWallet: wallet });
+  // CONTENT-AUTHENTIC OR NOTHING: the window holds the neighbouring entries too, and the sender chose these
+  // coordinates. Only the post whose body hashes to what the reference claims may answer for it.
+  const post = assemblePublicParts(parts).find((item) => normalizeBodyHashHex(item.bodyHash) === want) ?? null;
+  if (!post) return null;
+  const updatedAt = new Date().toISOString();
+  const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
+  const existing = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
+  const merged = mergeLocalPendingPublicFeed(channelId, upsertPublicChainPosts(existing, [post]));
+  publicChannelFeedCache = {
+    ...publicChannelFeedCache,
+    [channelId]: { feed: { version: 1, channelId, updatedAt, posts: merged }, syncedAt: updatedAt },
+  };
+  commitPublicChannelFeedCache();   // text -> localStorage, image media -> IndexedDB. Survives the reload.
+  return post;
+}
+
+/**
+ * The original of a shared post: cache first, chain once.
+ *
+ * ONE ATTEMPT PER POST PER SESSION, including a failed one — this runs from a RENDER, and a post that cannot be
+ * resolved (older than the shard's reachable history, retired, or a fabricated reference) must not re-read on every
+ * scroll. The bound is the promise itself, kept in the map. Eviction is the only retry, and that is deliberate.
+ */
+function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet) {
+  const cached = findCachedPublicPostByEntryId(entryId);
+  const want = normalizeBodyHashHex(expectedBodyHash);
+  if (cached && want && want === normalizeBodyHashHex(cached.bodyHash)) return Promise.resolve(cached);
+  const key = String(entryId ?? '');
+  if (!key) return Promise.resolve(null);
+  const inFlight = sharedPostChainReads.get(key);
+  if (inFlight) return inFlight;
+  const job = fetchSharedPostFromChain(key, expectedBodyHash, authorWallet)
+    .catch((error) => {
+      if (!noteTonRpcRateLimit(error)) console.warn('[public] shared post read failed', key, error);
+      return null;
+    });
+  sharedPostChainReads.set(key, job);
+  while (sharedPostChainReads.size > SHARED_POST_CHAIN_READ_LIMIT) {
+    const oldest = sharedPostChainReads.keys().next();
+    if (oldest.done) break;
+    sharedPostChainReads.delete(oldest.value);
+  }
+  return job;
+}
+
+/** A public post's whole text, the way the share payload builder reads it — one definition, two callers. */
+function publicPostFullText(post) {
+  const blocks = Array.isArray(post?.blocks) ? post.blocks : [];
+  return (blocks
+    .filter((block) => block?.type === 'text' && String(block.text ?? '').trim())
+    .map((block) => String(block.text).trim())
+    .join('\n\n') || String(post?.text ?? '')).trim();
+}
+
+/**
+ * A resolved post's image, warmed if the cache is holding only its text.
+ *
+ * The localStorage feed cache STRIPS image data-urls on persist (omitHeavyFeedMediaForPersist — the iOS freeze), so
+ * a post that came back from a reload has its picture in the durable per-post media store instead. This is the same
+ * warm the feed does at load time, for one post on demand.
+ */
+async function sharedPostImageUrlWarm(post) {
   try {
-    const post = findCachedPublicPostByEntryId(entryId);
     if (!post) return null;
-    const want = normalizeBodyHashHex(expectedBodyHash);
-    if (!want || want !== normalizeBodyHashHex(post.bodyHash)) return null; // reference must be content-authentic
     const direct = sharedPostImageUrlFromPost(post);
     if (direct) return direct;
-    // The localStorage feed cache STRIPS image data-urls on persist — warm the image back from the durable
-    // per-post media store (keyed by post.id) exactly like the feed's own load-time image warm.
     const key = publicPostCacheKey(post);
     if (!key) return null;
     const store = await publicPostMediaStore();
@@ -7252,6 +7347,12 @@ function buildSharedPostEmbed(block) {
     // Works from the PRIVATE surface too: the channel view lives on the Public pane.
     setView('public');
     openPublicChannelView({ authorWallet: wallet });
+    // AND THEN THE POST ITSELF. "The embed's channel link leads to the original" was only ever true down to the
+    // CHANNEL: the reader landed in a feed and had to hunt. In a channel serialising a book that is a dead end.
+    // The post detail stacks on top of the channel view, so a failed resolve simply leaves the channel open.
+    resolveSharedPostOriginal(block.entryId, block.bodyHash, wallet).then((post) => {
+      if (post) openPublicPostDetail(post);
+    }).catch(() => {});
   });
   embed.append(header);
   const body = document.createElement('div');
@@ -7264,8 +7365,12 @@ function buildSharedPostEmbed(block) {
     title.textContent = block.title;
     inner.append(title);
   }
+  // The SENDER'S SNAPSHOT paints first, always. It is a 4KB excerpt that already travelled inside the message, so
+  // the card is complete the instant it is built — the chain read below is a round trip, and without this every
+  // repost would be an empty frame while it runs, and would stay one whenever it cannot run at all.
+  let text = null;
   if (block.snippet) {
-    const text = document.createElement('p');
+    text = document.createElement('p');
     text.className = 'feed-block-text shared-post-embed-text';
     // Inline formatting + links only (inlineOnly): the snippet is a TRUNCATED excerpt inside a <p>, so block
     // elements would be invalid and a half-cut heading/list would look odd. Bold/italic/links render; block
@@ -7276,26 +7381,41 @@ function buildSharedPostEmbed(block) {
     if (block.textTruncated) text.append(document.createTextNode('…'));
     inner.append(text);
   }
+  let mediaHint = null;
   if (block.hasImage) {
-    const mediaHint = document.createElement('span');
+    mediaHint = document.createElement('span');
     mediaHint.className = 'shared-post-embed-media-hint';
     mediaHint.textContent = t('public.sharedPostImageHint');
     inner.append(mediaHint);
-    // v797: resolve the ORIGINAL post's image by entryId from the local cache (no re-upload, no wire copy) and
-    // swap the hint for the real image. A cold recipient (channel not cached) keeps the hint; the header still
-    // taps through to the live original. .src is a decoded data-url from our own store (never user HTML) — XSS-safe.
-    if (block.entryId) {
-      resolveSharedPostImageUrl(block.entryId, block.bodyHash).then((url) => {
-        if (!url || !mediaHint.isConnected) return;
-        const img = document.createElement('img');
-        img.className = 'shared-post-embed-image';
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        img.alt = '';
-        img.src = url;
-        mediaHint.replaceWith(img);
-      }).catch(() => {});
-    }
+  }
+  // THEN THE ORIGINAL REPLACES IT — the whole text and the real picture, from the reader's cache if it is there and
+  // otherwise from the chain, ONCE (resolveSharedPostOriginal caches into the feed and persists the media).
+  //
+  // The substitution only ever runs one way, and that is the point: the snippet is what the SENDER typed into the
+  // reference and proves nothing, while a post read back through the lane matched its body_commit and its
+  // publisher tag. Chain truth displaces the claim; the claim never displaces chain truth.
+  if (block.entryId && (block.hasImage || block.textTruncated)) {
+    resolveSharedPostOriginal(block.entryId, block.bodyHash, wallet).then(async (post) => {
+      if (!post || !inner.isConnected) return;
+      const whole = publicPostFullText(post);
+      if (text && whole && whole !== block.snippet) {
+        const replacement = document.createElement('p');
+        replacement.className = 'feed-block-text shared-post-embed-text';
+        appendFormattedMessageText(replacement, whole, { inlineOnly: true });
+        text.replaceWith(replacement);
+        text = replacement;
+      }
+      if (!mediaHint) return;
+      const url = await sharedPostImageUrlWarm(post);
+      if (!url || !mediaHint.isConnected) return;
+      const img = document.createElement('img');
+      img.className = 'shared-post-embed-image';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = '';
+      img.src = url;   // a decoded data-url from our OWN store, never user HTML — XSS-safe
+      mediaHint.replaceWith(img);
+    }).catch(() => {});
   }
   body.append(inner);
   embed.append(body);
@@ -9934,6 +10054,65 @@ async function publicShardBodyHashHex(cell) {
   return `0x${tonCell.bytesToHex(hash)}`;
 }
 
+/**
+ * Raw CHANNEL shard posts -> feed post PARTS, ready for assemblePublicParts.
+ *
+ * Extracted from the sync walk so the on-demand single-post read (a repost whose original the reader does not hold)
+ * decodes through the SAME code instead of growing a second, subtly different copy. `channel` needs only `id` and
+ * `authorWallet`.
+ */
+async function publicPostPartsFromShardPosts(shardPosts, channel) {
+  const authorWallet = channel.authorWallet;
+  const postParts = [];
+  for (const sp of shardPosts ?? []) {
+    let payload;
+    try { payload = readPublicPostPayloadV2({ header: sp.header, body: sp.body }); } catch { continue; }
+    const createdAtSec = Number(sp.created_at ?? 0n);
+    // Channel PROFILE divert: a single-part document carrying only a profile block is channel metadata, not a
+    // visible post — capture it and drop it, exactly like the CapsuleHub walk.
+    if (payload.type === 'document' && Number(payload.partCount ?? 1) <= 1) {
+      const profileDoc = readProfileDocument(payload.documentBytes ?? payload.document_bytes);
+      if (profileDoc?.isProfileOnly) {
+        setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, sp.entry_id, createdAtSec);
+        continue;
+      }
+    }
+    const bodyHashHex = await publicShardBodyHashHex(sp.body);
+    // entry_id is 0-based PER shard account, so a channel's posts across its era/overflow shards COLLIDE on it
+    // (both shards have entry 0, 1, …). assemblePublicParts groups single-part posts by `single:channelId:entryId`
+    // and upsertPublicChainPosts dedups by entryId — a raw entry_id would merge two distinct posts into one
+    // corrupted record. So the FEED identity (entryId) is made globally unique with the shard's coordinates, while
+    // the RAW per-shard entry_id is kept as shardEntryId for the comment thread derivation (post_uid needs it).
+    const shardEntryId = sp.entry_id.toString();
+    const globalEntryId = `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`;
+    postParts.push({
+      id: `pshard-${channel.id}-${globalEntryId}`,
+      entryId: globalEntryId,
+      shardEntryId,
+      channelId: channel.id,
+      type: payload.type,
+      text: payload.text ?? '',
+      imageBytes: payload.imageBytes ?? payload.image_bytes,
+      documentBytes: payload.documentBytes ?? payload.document_bytes,
+      createdAt: createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString(),
+      author: publicAuthorLabel(authorWallet),
+      authorWallet,
+      bodyHash: bodyHashHex,
+      entryUid: bodyHashHex.slice(2),   // synthesized: unique per body, satisfies the chain anchor
+      streamId: payload.stream_id,
+      partIndex: payload.partIndex ?? 0,
+      partCount: payload.partCount ?? 1,
+      commentsAllowed: payload.commentsAllowed !== false,
+      chainVerified: true,
+      // The shard's channel epoch_tag + overflow seq — the comment reader/writer folds these into post_uid to
+      // find the THREAD shard for this post's comments.
+      channelEpochTag: sp.channelEpochTag != null ? String(sp.channelEpochTag) : undefined,
+      channelShardSeq: sp.channelShardSeq ?? 0,
+    });
+  }
+  return postParts;
+}
+
 // clean-17 feed sync (gated): for each feed-source channel, read its posts from the author's CHANNEL PublicShard and
 // merge into publicChannelFeedCache through the SAME assemble/upsert/local-pending seam the CapsuleHub sync uses.
 // Comments are NOT walked here — they load on demand (loadPublicPostComments), same as the CapsuleHub path since the
@@ -9959,54 +10138,7 @@ async function syncPublicChannelFromShards() {
       console.warn('[public] shard channel read failed', channel.id, error);
       continue;
     }
-    const postParts = [];
-    for (const sp of shardPosts) {
-      let payload;
-      try { payload = readPublicPostPayloadV2({ header: sp.header, body: sp.body }); } catch { continue; }
-      const authorWallet = channel.authorWallet;
-      const createdAtSec = Number(sp.created_at ?? 0n);
-      // Channel PROFILE divert: a single-part document carrying only a profile block is channel metadata, not a
-      // visible post — capture it and drop it, exactly like the CapsuleHub walk.
-      if (payload.type === 'document' && Number(payload.partCount ?? 1) <= 1) {
-        const profileDoc = readProfileDocument(payload.documentBytes ?? payload.document_bytes);
-        if (profileDoc?.isProfileOnly) {
-          setChannelProfileFromWalk(authorWallet, profileDoc.profileBlock, sp.entry_id, createdAtSec);
-          continue;
-        }
-      }
-      const bodyHashHex = await publicShardBodyHashHex(sp.body);
-      // entry_id is 0-based PER shard account, so a channel's posts across its era/overflow shards COLLIDE on it
-      // (both shards have entry 0, 1, …). assemblePublicParts groups single-part posts by `single:channelId:entryId`
-      // and upsertPublicChainPosts dedups by entryId — a raw entry_id would merge two distinct posts into one
-      // corrupted record. So the FEED identity (entryId) is made globally unique with the shard's coordinates, while
-      // the RAW per-shard entry_id is kept as shardEntryId for the comment thread derivation (post_uid needs it).
-      const shardEntryId = sp.entry_id.toString();
-      const globalEntryId = `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`;
-      postParts.push({
-        id: `pshard-${channel.id}-${globalEntryId}`,
-        entryId: globalEntryId,
-        shardEntryId,
-        channelId: channel.id,
-        type: payload.type,
-        text: payload.text ?? '',
-        imageBytes: payload.imageBytes ?? payload.image_bytes,
-        documentBytes: payload.documentBytes ?? payload.document_bytes,
-        createdAt: createdAtSec > 0 ? new Date(createdAtSec * 1000).toISOString() : new Date().toISOString(),
-        author: publicAuthorLabel(authorWallet),
-        authorWallet,
-        bodyHash: bodyHashHex,
-        entryUid: bodyHashHex.slice(2),   // synthesized: unique per body, satisfies the chain anchor
-        streamId: payload.stream_id,
-        partIndex: payload.partIndex ?? 0,
-        partCount: payload.partCount ?? 1,
-        commentsAllowed: payload.commentsAllowed !== false,
-        chainVerified: true,
-        // The shard's channel epoch_tag + overflow seq — the comment reader/writer folds these into post_uid to
-        // find the THREAD shard for this post's comments.
-        channelEpochTag: sp.channelEpochTag != null ? String(sp.channelEpochTag) : undefined,
-        channelShardSeq: sp.channelShardSeq ?? 0,
-      });
-    }
+    const postParts = await publicPostPartsFromShardPosts(shardPosts, channel);
     const posts = assemblePublicParts(postParts);
     posts.reverse();
     const cachedFeed = publicChannelFeedCache?.[channel.id]?.feed ?? publicChannelFeedCache?.[channel.id];
