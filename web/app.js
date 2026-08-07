@@ -160,7 +160,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=55';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=20';
+import { createPublicLane } from './public-lane.mjs?v=21';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=12';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=40';
+} from './i18n.mjs?v=41';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v874';
+const PLATHO_APP_RUNTIME_VERSION = 'v875';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1073,6 +1073,12 @@ function publicPostCommentsCacheKey(item) {
 }
 let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
+// How far back the open post's comment read has got, per thread shard, and whether anything older remains. A post
+// past the contract's 96-row page cap reads its NEWEST comments only; these drive the "show earlier" affordance.
+// Session state, not cached: they describe a READ, not the post.
+let publicPostDetailCommentCursors = null;
+let publicPostDetailHasMoreComments = false;
+let publicPostDetailLoadingEarlier = false;
 let privateImageAttachments = [];
 // Swipe-to-reply drafts (v646): {refEntryId, author, snippet} | null — the quoted target for the NEXT send.
 // Composer block builders read these (default params) so the size plan, the optimistic echo and the wire agree.
@@ -7946,6 +7952,18 @@ function renderPublicPostDetail() {
   heading.className = 'public-detail-comments-heading';
   heading.textContent = comments.length > 0 ? t('public.commentsWithCount', { count: comments.length }) : t('public.comments');
   section.append(heading);
+  // OLDER COMMENTS ARE A PAGE AWAY, NOT GONE. get_page is capped at 96 rows by the contract and the read anchors at
+  // the tail, so a busy post shows its newest 96 and the rest sat on chain, paid for and unreachable — MEASURED at
+  // 120 comments in tests/public-comment-window. Above the list, because that is where the older ones will appear.
+  if (publicPostDetailHasMoreComments) {
+    const earlier = document.createElement('button');
+    earlier.type = 'button';
+    earlier.className = 'public-detail-earlier-comments';
+    earlier.disabled = publicPostDetailLoadingEarlier;
+    earlier.textContent = publicPostDetailLoadingEarlier ? t('public.loadingComments') : t('public.showEarlierComments');
+    earlier.addEventListener('click', () => { loadEarlierPublicPostComments(); });
+    section.append(earlier);
+  }
   if (comments.length > 0) appendPublicItemComments(section, { comments });
   if (publicPostDetailLoadState === 'loading') {
     section.append(publicDetailStatusNode(comments.length > 0 ? t('public.loadingMoreComments') : t('public.loadingComments')));
@@ -8012,6 +8030,11 @@ function openPublicPostDetail(item) {
   const cached = publicPostCommentsCache.get(cacheKey);
   publicPostDetailChainComments = Array.isArray(cached?.comments) ? cached.comments : [];
   publicPostDetailParentExists = cached ? cached.parentExists === true : null;
+  // Cursors describe a READ, not a post, so they never come from the cache: opening a post starts at the newest
+  // page again. Carrying a stale cursor over would ask the chain for a page the screen is not showing.
+  publicPostDetailCommentCursors = null;
+  publicPostDetailHasMoreComments = false;
+  publicPostDetailLoadingEarlier = false;
   publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
   if (publicPane) publicPane.dataset.postOpen = 'true';
   // Shared composer -> comment mode for this post; no auto-focus (the user opens to read first) and no inline
@@ -8600,22 +8623,23 @@ function buildDiscoveryCtaCard() {
 // accountStates call — reading only the current era silently dropped every earlier comment. Shards whose change
 // marker has not moved since the last open are served from the lane's snapshot cache, so reopening an untouched
 // thread reads no bodies at all.
-async function loadPublicPostCommentsFromShards(item) {
+async function loadPublicPostCommentsFromShards(item, { olderThan = null } = {}) {
   const lane = directPublicLaneReader();
   if (!lane) return { comments: [], degraded: true };
   if (item?.channelEpochTag == null || item?.entryId == null || !item?.authorWallet) {
-    return { comments: [], degraded: false, parentExists: false, latestLink: '0' };
+    return { comments: [], degraded: false, parentExists: false, latestLink: '0', cursors: null, hasMore: false };
   }
-  let threadPosts;
+  let read;
   try {
     // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
-    threadPosts = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.shardEntryId ?? item.entryId), { channelShardSeq: item.channelShardSeq ?? 0 });
+    read = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.shardEntryId ?? item.entryId), { channelShardSeq: item.channelShardSeq ?? 0, olderThan });
   } catch (error) {
     // Feed a 429 into the shared rate-limit tracker before degrading, or the app keeps hammering at the same
     // cadence while every read fails (the Hub loader did this; the shard loader silently did not).
     if (!noteTonRpcRateLimit(error)) console.warn('[public] thread comments read failed', item.entryId, error);
     return { comments: [], degraded: true };
   }
+  const threadPosts = read.posts;
   const commentParts = [];
   for (const tp of threadPosts) {
     let payload;
@@ -8651,19 +8675,62 @@ async function loadPublicPostCommentsFromShards(item) {
   }
   const comments = assemblePublicParts(commentParts);
   comments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false };
-  return { comments, degraded: false, parentExists: comments.length > 0, latestLink: String(comments.length) };
+  globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false, hasMore: read.hasMore === true };
+  // parentExists = "somebody has commented on this post", and it is asked so the empty screen can tell the ordinary
+  // case from a failed one. It used to be DERIVED FROM THE COUNT (comments.length > 0), which cannot tell those
+  // apart at all: a thread whose entries were all unreadable came back empty and was announced as "no comments yet",
+  // and the retry branch beside it — with a comment explaining exactly this distinction — could never run.
+  // A LIVE THREAD SHARD is the honest signal: the shard is only ever deployed by a comment landing in it.
+  return {
+    comments,
+    degraded: false,
+    parentExists: Number(read.shardsSeen ?? 0) > 0,
+    latestLink: String(comments.length),
+    cursors: read.cursors ?? null,
+    hasMore: read.hasMore === true,
+  };
 }
 
 async function loadPublicPostComments(item, options = {}) {
   // clean-17 direct-pay: a post's comments live in its THREAD shard, derived from the parent's coordinates
   // (loadPublicPostCommentsFromShards). The removed CapsuleHub walk read a shared entry log with a snapshot
   // boundary and an incremental cursor; a thread shard is per-post, so there is no shared log to walk.
-  return loadPublicPostCommentsFromShards(item);
+  return loadPublicPostCommentsFromShards(item, { olderThan: options.olderThan ?? null });
 }
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
 // retries on a degraded (rate-limited) walk — keeping the partial result OUT of the authoritative list.
+/**
+ * READ ONE PAGE FURTHER BACK in this post's comment thread.
+ *
+ * Only ever runs from the button, so the cost lands on the reader who asked for it: opening a post stays exactly as
+ * expensive as it was. The result is MERGED (mergePublicComments dedups by entry id and re-sorts by time) rather
+ * than replacing the list, because a page of older comments is an addition to what is on screen, not a new answer.
+ *
+ * Deliberately NOT cached: the durable snapshot is the post's newest window, and writing a back-page into it would
+ * make the next open serve a partial middle of the thread as if it were the head.
+ */
+async function loadEarlierPublicPostComments() {
+  const item = publicPostDetailItem;
+  if (!item || publicPostDetailLoadingEarlier || !publicPostDetailHasMoreComments) return;
+  publicPostDetailLoadingEarlier = true;
+  renderPublicPostDetail();
+  const token = publicPostDetailLoadToken;
+  try {
+    const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors });
+    if (token !== publicPostDetailLoadToken || !publicPostDetailOpen) return;   // closed or reopened mid-read
+    if (result.degraded) return;                                                // keep the button, let them retry
+    publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);
+    publicPostDetailCommentCursors = result.cursors ?? publicPostDetailCommentCursors;
+    publicPostDetailHasMoreComments = result.hasMore === true;
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] earlier comments read failed', error);
+  } finally {
+    publicPostDetailLoadingEarlier = false;
+    renderPublicPostDetail();
+  }
+}
+
 async function refreshPublicPostDetailComments() {
   const item = publicPostDetailItem;
   if (!item) return;
@@ -8692,6 +8759,8 @@ async function refreshPublicPostDetailComments() {
     if (!result.degraded) {
       publicPostDetailChainComments = result.comments;
       publicPostDetailParentExists = result.parentExists === true;
+      publicPostDetailCommentCursors = result.cursors ?? null;
+      publicPostDetailHasMoreComments = result.hasMore === true;
       publicPostDetailLoadState = 'ready';
       // Cache the fresh authoritative result so the next open of this post is instant (SWR). Bounded LRU (data
       // URLs can be large): drop the oldest once past the cap.
@@ -23779,7 +23848,11 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   }
   if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment published, confirming' });
   schedulePublicPublishVisibilityChecks();   // same clock as a post — a comment is the twin that gets forgotten
-  setPublicStatus('comment published');
+  // MATCH THE RECORD, which says "confirming" one line above. A broadcast is not a confirmation: toncenter's 200
+  // means QUEUED, and an external whose seqno the chain has not reached is dropped outright. The post path was
+  // corrected for exactly this and its twin here was not — the status line kept announcing a flat "published" the
+  // moment sendBoc returned.
+  setPublicStatus('comment published, confirming');
   return result;
 }
 

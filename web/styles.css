@@ -2593,6 +2593,27 @@ button.feed-item:hover {
   font-size: 12px;
 }
 
+/* "Show earlier comments" — one page (96 rows, the contract's get_page cap) further back in the thread. Sits above
+   the list because that is where the older comments appear. */
+.public-detail-earlier-comments {
+  display: block;
+  width: 100%;
+  margin: 4px 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.public-detail-earlier-comments:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
 /* v797: the referenced post's real image, resolved by entryId from the local cache (no wire copy). */
 .shared-post-embed-image {
   display: block;

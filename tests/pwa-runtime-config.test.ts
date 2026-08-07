@@ -3640,10 +3640,20 @@ describe('PWA runtime config guard', () => {
     // The THREAD read has exactly ONE entry point (the on-demand loader) — the shard twin of the old
     // parent-index rule, and the actual scalability requirement: no background walker may read comments.
     expect(app.match(/lane\.readThreadComments\(/g)?.length ?? 0).toBe(1);
-    // ...and the loader itself is invoked from exactly ONE place: refreshPublicPostDetailComments.
-    expect(app.match(/await loadPublicPostComments\(/g)?.length ?? 0).toBe(1);
+    // ...and the loader is invoked ONLY from functions a user action starts. Named rather than counted: the count
+    // grew to two when "show earlier comments" landed (2026-08-07), and a bare number would have had to be nudged
+    // up without anyone asking the question the rule is actually about — WHO reads comments.
+    const callers = [...app.matchAll(/await loadPublicPostComments\(/g)].map((match) => {
+      const before = app.slice(0, match.index);
+      const start = Math.max(before.lastIndexOf('\nfunction '), before.lastIndexOf('\nasync function '));
+      return /function\s+([A-Za-z0-9_$]+)/.exec(app.slice(start, match.index))?.[1] ?? '<anonymous>';
+    });
+    expect(callers.sort()).toEqual(['loadEarlierPublicPostComments', 'refreshPublicPostDetailComments']);
     // refreshPublicPostDetailComments fires only on user actions: opening the post detail + the retry button.
     expect(app.match(/refreshPublicPostDetailComments\(\);/g)?.length ?? 0).toBe(2);
+    // ...and the earlier-page read fires only from its button, never a timer or a sync pass.
+    expect(app.match(/loadEarlierPublicPostComments\(\);/g)?.length ?? 0).toBe(1);
+    expect(app).toContain("earlier.addEventListener('click', () => { loadEarlierPublicPostComments(); });");
     // The pre-warm on the "Comments" button render is LOCAL-ONLY (IndexedDB) — zero chain reads.
     const warm = app.slice(app.indexOf('async function warmPublicPostCommentsCache'), app.indexOf('function openPublicPostDetail'));
     expect(warm.length).toBeGreaterThan(0);
@@ -3837,7 +3847,7 @@ describe('PWA runtime config guard', () => {
     );
     // Missing parent coordinates -> genuinely zero comments (clean, not degraded).
     expect(loaderSource).toMatch(/if \(item\?\.channelEpochTag == null \|\| item\?\.entryId == null \|\| !item\?\.authorWallet\) \{/);
-    expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false, parentExists: false, latestLink: '0' \};/);
+    expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false, parentExists: false, latestLink: '0', cursors: null, hasMore: false \};/);
     // The post-detail empties honestly: genuinely-empty (clean read, no index) vs not-loaded (failed read).
     expect(app).toMatch(/publicPostDetailParentExists === false/);
     // A rate-limited read returns degraded:true (the caller keeps "Loading" and retries; never caches a partial).

@@ -110,7 +110,7 @@ describe('PUBLIC-LANE — the thread snapshot cache', () => {
 
     const marker = { lt: '100' };
     const { lane, counts } = countingLane(shard, rows, postUid, marker);
-    const read = () => lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
+    const read = async () => (await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 })).posts;
 
     const first = await read();
     expect(first.length, 'both comments come back on the first open').toBe(2);
@@ -137,7 +137,7 @@ describe('PUBLIC-LANE — the thread snapshot cache', () => {
 
     const marker = { lt: '100' };
     const { lane, counts } = countingLane(shard, rows, postUid, marker);
-    const read = () => lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 });
+    const read = async () => (await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0 })).posts;
 
     expect((await read()).length).toBe(1);
     const afterFirst = { ...counts };
