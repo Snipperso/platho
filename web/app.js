@@ -20,7 +20,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=13';
+} from './crypto/platho-crypto.mjs?v=14';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -30,14 +30,14 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=29';
+} from './platho-wallet.mjs?v=30';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=117';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=118';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -46,7 +46,7 @@ import {
   tonRpcRequestCounters,
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
-} from './ton-rpc-transport.mjs?v=73';
+} from './ton-rpc-transport.mjs?v=74';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -152,45 +152,45 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
-} from './pwa-contract-transactions.mjs?v=35';
+} from './pwa-contract-transactions.mjs?v=36';
 import {
   MAX_BATCH_PARTS,
-} from './publish-batch-orchestration.mjs?v=8';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=52';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=55';
-import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=2';
+} from './publish-batch-orchestration.mjs?v=9';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=53';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=56';
+import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=3';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=21';
-import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=2';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=12';
+import { createPublicLane } from './public-lane.mjs?v=22';
+import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=3';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=13';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=12';
-import { createIntroLane } from './intro-lane.mjs?v=18';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=2';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=13';
+import { createIntroLane } from './intro-lane.mjs?v=19';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=3';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=2';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=3';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=12';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=12';
-import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=2';
-import { createConvReadLane } from './conv-lane.mjs?v=15';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=14';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=13';
-import { readAccountStates } from './shard-reader.mjs?v=12';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=13';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=13';
+import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=3';
+import { createConvReadLane } from './conv-lane.mjs?v=16';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=15';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=14';
+import { readAccountStates } from './shard-reader.mjs?v=13';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=12';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=13';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=12';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=13';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=12';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=13';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=14';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=13';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=12';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=12';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=13';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=13';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=13';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=14';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -202,14 +202,14 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=14';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=51';
+} from './shard-discovery.mjs?v=15';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=52';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=57';
+} from './username-ton-rpc-provider.mjs?v=58';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v880';
+const PLATHO_APP_RUNTIME_VERSION = 'v881';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late

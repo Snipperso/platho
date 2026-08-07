@@ -15,9 +15,9 @@
 // tests/public-publish-browser.test.ts pins the message against the @ton/core reference (by representation hash)
 // and against a live PublicShard in a sandbox.
 
-import { beginCell } from './pwa-contract-transactions.mjs?v=35';
-import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=5';
-import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=2';
+import { beginCell } from './pwa-contract-transactions.mjs?v=36';
+import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=6';
+import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=3';
 
 // "PSP1" — message(0x50535031) PublicPublish. MUST equal the opcode PublicShard.tact declares; mirrored here (not
 // imported from the reader) because a builder that derives its own opcode is the independent check, and drift shows

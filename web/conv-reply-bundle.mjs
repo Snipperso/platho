@@ -16,8 +16,8 @@
 // view straight in would silently build a wrong bundle (the mirrored-declarations trap). readSnakeCellBytes accepts
 // the getter's base64 BoC string or a parsed cell. [clean17-private-lane-plan: Y reply-bundle resolution]
 
-import { publicKeyBundleFromVaultKeyRecord, CRYPTO_SUITES } from './crypto/platho-crypto.mjs?v=13';
-import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=35';
+import { publicKeyBundleFromVaultKeyRecord, CRYPTO_SUITES } from './crypto/platho-crypto.mjs?v=14';
+import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=36';
 
 const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 

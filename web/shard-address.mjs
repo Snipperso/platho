@@ -20,7 +20,7 @@
 // to the one @ton/core derives from the compiled wrapper. Two independent implementations agreeing is the only
 // evidence worth having, given the failure mode above.
 
-import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=35';
+import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=36';
 import {
   RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC, PUBLICSHARD_CODE_BOC,
   AIRDROPTICKET_CODE_BOC,

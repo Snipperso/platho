@@ -1,5 +1,9 @@
 import { ed25519, x25519 } from '../vendor/@noble/curves/ed25519.js';
 import { ml_kem768 } from '../vendor/@noble/post-quantum/ml-kem.js';
+// Only the stealth view_tag uses these, and only because it runs once per FOREIGN intro — see deriveStealthViewTag.
+// Every other HKDF in this file stays on WebCrypto, where the per-call cost is irrelevant.
+import { hkdf as nobleHkdf } from '../vendor/@noble/hashes/hkdf.js';
+import { sha256 as nobleSha256 } from '../vendor/@noble/hashes/sha2.js';
 import { buildIntroHandshake, openIntroHandshake } from './intro-handshake.mjs';
 
 export const CRYPTO_SUITES = Object.freeze({
@@ -229,10 +233,137 @@ function deriveX25519SharedSecret(secretKey, publicKey) {
   );
 }
 
+// ═══ NATIVE X25519 FAST PATH — THE SCAN LOOP ONLY ════════════════════════════════════════════════════════════
+//
+// WHY THIS EXISTS AT ALL. A recipient cannot know which IntroShard bucket a sender chose, so it recomputes this tag
+// once per FOREIGN intro in its whole window. That makes it the cost of BEING REACHABLE BY STRANGERS, and it scales
+// with the entire network's first-contact volume rather than with the user's own traffic. It is the one place in
+// the client where per-user work grows with everyone else's activity, which makes it the product ceiling.
+//
+// MEASURED 2026-08-07 (node 22, desktop), per scanned entry:
+//   vendored noble X25519 (JS)          1.2044 ms   <- what shipped
+//   HKDF-SHA256                         0.0089 ms   <- noise; the first hypothesis, that WebCrypto call overhead
+//                                                      dominated, was WRONG
+//   WebCrypto X25519 + raw peer import  0.0487 ms   <- 24x, and no contract is touched
+//
+// At 100,000 network-wide first contacts a day that is the difference between 125 s and 5 s of CPU per user per
+// day. It buys one order of magnitude; it does not change the shape, which stays linear per user.
+//
+// WHY A LIVE PROBE AND NOT A FEATURE TEST. A runtime can expose importKey for X25519 and still fail deriveBits, and
+// discovering that inside a scan pass would stop first contact for that device silently. So the probe DERIVES a
+// real secret and compares it byte-for-byte against noble on the same inputs. The fast path is used only after it
+// has proven it agrees with the implementation it replaces — on that device, at runtime.
+//
+// WHY PKCS8. WebCrypto accepts a raw X25519 PUBLIC key but not a raw private one, so the 32-byte scan secret is
+// wrapped in the fixed PKCS8 envelope for OID 1.3.101.110. The prefix is constant; only the key bytes vary.
+const X25519_PKCS8_PREFIX = new Uint8Array([
+  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20,
+]);
+
+/** The imported scan key, cached against the CALLER'S array so a pass imports once instead of once per entry. */
+const importedScanKeys = new WeakMap();
+let nativeX25519Probe = null;
+
+function x25519Pkcs8(secretKey) {
+  const out = new Uint8Array(X25519_PKCS8_PREFIX.length + X25519_SECRET_KEY_BYTES);
+  out.set(X25519_PKCS8_PREFIX, 0);
+  out.set(secretKey, X25519_PKCS8_PREFIX.length);
+  return out;
+}
+
+async function nativeSharedSecret(subtle, privateKey, publicKeyBytes) {
+  const peer = await subtle.importKey('raw', publicKeyBytes, { name: 'X25519' }, false, []);
+  return new Uint8Array(await subtle.deriveBits({ name: 'X25519', public: peer }, privateKey, 256));
+}
+
+async function nativeX25519Usable() {
+  if (nativeX25519Probe === null) {
+    nativeX25519Probe = (async () => {
+      const subtle = globalThis.crypto?.subtle;
+      if (typeof subtle?.importKey !== 'function' || typeof subtle?.deriveBits !== 'function') return false;
+      try {
+        const secret = x25519.utils.randomSecretKey();
+        const peerPublic = x25519.getPublicKey(x25519.utils.randomSecretKey());
+        const key = await subtle.importKey('pkcs8', x25519Pkcs8(secret), { name: 'X25519' }, false, ['deriveBits']);
+        const native = await nativeSharedSecret(subtle, key, peerPublic);
+        return bytesEqual(native, x25519.getSharedSecret(secret, peerPublic));
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return nativeX25519Probe;
+}
+
+/**
+ * The scan-path shared secret. Identical output to `deriveX25519SharedSecret`, which is what the probe above
+ * asserts; the only difference is which implementation computes it.
+ *
+ * `secretRef` is the caller's original array, used as the cache key. `scanIntros` hands the same reference to every
+ * entry of a pass, so the key is imported once and the per-entry cost is one raw import plus one derivation.
+ *
+ * A degenerate `publicKey` (r = 0 is enough, and IntroShard cannot reject it) makes BOTH implementations throw:
+ * noble inside its ladder, WebCrypto as OperationError on the all-zero result. Callers that scan strangers' entries
+ * rely on that throw to skip the record, so the behaviour must stay identical — `tests/intro-scan-native-ecdh`
+ * pins it.
+ */
+async function scanSharedSecret(secretKey, publicKey, secretRef) {
+  if (await nativeX25519Usable()) {
+    const subtle = globalThis.crypto.subtle;
+    const cacheKey = secretRef && typeof secretRef === 'object' ? secretRef : null;
+    let imported = cacheKey ? importedScanKeys.get(cacheKey) : null;
+    if (!imported) {
+      imported = subtle.importKey('pkcs8', x25519Pkcs8(secretKey), { name: 'X25519' }, false, ['deriveBits']);
+      if (cacheKey) importedScanKeys.set(cacheKey, imported);
+    }
+    const shared = await nativeSharedSecret(subtle, await imported, publicKey);
+    return assertNonZeroSharedSecret('x25519SharedSecret', assertBytes('x25519SharedSecret', shared, X25519_PUBLIC_KEY_BYTES));
+  }
+  return deriveX25519SharedSecret(secretKey, publicKey);
+}
+
+/** Test seam: forget the probe and the imported keys so a suite can exercise both paths in one process. */
+export function __resetX25519FastPathForTests() {
+  nativeX25519Probe = null;
+}
+
+/**
+ * Test seam: is the fast path actually in use here?
+ *
+ * Without this a differential test compares the fallback against the fallback and passes while the fast path is
+ * dead — the shape of gated-body defect this repo has been bitten by before. The suite asserts this is true on a
+ * runtime that has X25519, so a change that silently disables the probe turns the suite red instead of just slow.
+ */
+export async function __x25519FastPathActiveForTests() {
+  return nativeX25519Usable();
+}
+
 // clean-16 stealth: derive the per-message view_tag (u16, big-endian) from the ephemeral<->scan ECDH secret.
 // salt = STEALTH_VIEWTAG_SALT_DOMAIN, info = STEALTH_VIEWTAG_INFO_DOMAIN || ephemeralPublicKey (domain separation).
 // The recipient recomputes scan_shared = X25519(scan_secret, E) and matches this tag cheaply before decrypting.
+//
+// The HKDF here is noble's rather than WebCrypto's, and ONLY here. Measured 2026-08-07: WebCrypto costs 0.0371 ms
+// per tag against noble's 0.0089, because it is two async calls (importKey + deriveBits) around eight bytes of
+// work. That gap is invisible anywhere else in this file and is a third of the remaining per-entry cost in the one
+// place that runs once per foreign intro. HKDF-SHA256 is deterministic, so both produce identical bytes —
+// tests/intro-scan-native-ecdh pins each tag against a WebCrypto-derived reference, which is exactly that claim.
 async function deriveStealthViewTag(scanSharedSecret, ephemeralPublicKey) {
+  const ikm = assertBytes('stealth.scanSharedSecret', scanSharedSecret, X25519_PUBLIC_KEY_BYTES);
+  const salt = utf8(STEALTH_VIEWTAG_SALT_DOMAIN);
+  const info = concatBytes(
+    utf8(STEALTH_VIEWTAG_INFO_DOMAIN),
+    assertBytes('stealth.ephemeralPublicKey', ephemeralPublicKey, X25519_PUBLIC_KEY_BYTES),
+  );
+  const tagBytes = nobleHkdf(nobleSha256, ikm, salt, info, STEALTH_VIEW_TAG_BYTES);
+  return ((tagBytes[0] << 8) | tagBytes[1]) & 0xffff;
+}
+
+/**
+ * The pre-2026-08-07 WebCrypto derivation, kept and exported ONLY so the suite can diff the fast path against the
+ * code it replaced rather than against a re-implementation of it in the test. A test that rebuilds the old
+ * algorithm proves the new one matches the test author's memory; this proves it matches what actually shipped.
+ */
+export async function __deriveStealthViewTagViaWebCryptoForTests(scanSharedSecret, ephemeralPublicKey) {
   const ikm = assertBytes('stealth.scanSharedSecret', scanSharedSecret, X25519_PUBLIC_KEY_BYTES);
   const salt = utf8(STEALTH_VIEWTAG_SALT_DOMAIN);
   const info = concatBytes(
@@ -250,9 +381,12 @@ async function deriveStealthViewTag(scanSharedSecret, ephemeralPublicKey) {
 
 // Sender side: fresh random ephemeral e (E = e·G) against the recipient's advertised scan pubkey S.
 async function deriveStealthViewTagForRecipient(ephemeralSecretKey, ephemeralPublicKey, recipientScanPublicKey) {
-  const scanShared = deriveX25519SharedSecret(
+  // The sender's ephemeral secret is fresh per message, so nothing is cached here — but it must go through the
+  // SAME implementation as the recipient's side or the two would have to agree by luck rather than by construction.
+  const scanShared = await scanSharedSecret(
     assertBytes('stealth.ephemeralSecretKey', ephemeralSecretKey, X25519_SECRET_KEY_BYTES),
     assertBytes('recipient.scanPublicKey', recipientScanPublicKey, X25519_PUBLIC_KEY_BYTES),
+    null,
   );
   return deriveStealthViewTag(scanShared, ephemeralPublicKey);
 }
@@ -264,7 +398,7 @@ export async function computePrivateScanViewTag(scanSecretKey, ephemeralScanPubl
   const ephemeralPub = typeof ephemeralScanPublicKey === 'bigint'
     ? writeBigUintBytes(ephemeralScanPublicKey, 32, 'ephemeralScanPublicKey')
     : assertBytes('ephemeralScanPublicKey', toUint8Array(ephemeralScanPublicKey), 32);
-  const scanShared = deriveX25519SharedSecret(scanSecret, ephemeralPub);
+  const scanShared = await scanSharedSecret(scanSecret, ephemeralPub, scanSecretKey);
   return deriveStealthViewTag(scanShared, ephemeralPub);
 }
 
@@ -281,9 +415,14 @@ export async function computePrivateScanViewTag(scanSecretKey, ephemeralScanPubl
 // degenerate point, so a skipped entry was never addressed to anyone.
 //
 // Only the ECDH is guarded. Lengths are validated ABOVE the try, so once they hold, the sole remaining failure inside
-// deriveX25519SharedSecret is the degenerate point; the HKDF stays OUTSIDE it deliberately, because a WebCrypto fault
+// scanSharedSecret is the degenerate point; the HKDF stays OUTSIDE it deliberately, because a WebCrypto fault
 // is an environment failure, not attacker data, and swallowing it would turn a broken client into one that silently
 // reports "no first contacts ever arrived".
+//
+// The narrowness of that try matters more since the fast path landed: WebCrypto reports the degenerate point as a
+// generic OperationError, indistinguishable from an environment fault by its type. It stays inside the try because
+// the ONLY thing it can be reached by is attacker data whose lengths already checked out — the same reasoning that
+// justified swallowing noble's throw, applied to the implementation that replaced it.
 export async function privateScanViewTagOrNull(scanSecretKey, ephemeralScanPublicKey) {
   const scanSecret = assertBytes('scanSecretKey', toUint8Array(scanSecretKey), X25519_SECRET_KEY_BYTES);
   const ephemeralPub = typeof ephemeralScanPublicKey === 'bigint'
@@ -291,7 +430,7 @@ export async function privateScanViewTagOrNull(scanSecretKey, ephemeralScanPubli
     : assertBytes('ephemeralScanPublicKey', toUint8Array(ephemeralScanPublicKey), 32);
   let scanShared;
   try {
-    scanShared = deriveX25519SharedSecret(scanSecret, ephemeralPub);
+    scanShared = await scanSharedSecret(scanSecret, ephemeralPub, scanSecretKey);
   } catch {
     return null;
   }
