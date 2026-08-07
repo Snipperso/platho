@@ -2,13 +2,13 @@
 
 ## Le jeton du protocole Platho
 
-ATH est le jeton utilitaire de Platho. Il sert aux récompenses d'activité, aux réductions sur les frais de protocole après l'airdrop, aux noms d'utilisateur `.ath`, aux mises à jour de l'avatar de profil, aux ventes de stabilisation du marché, au rachat et à la destruction.
+ATH est le jeton utilitaire de Platho. Il sert aux récompenses d'activité, aux remises sur les frais de protocole après l'airdrop, aux noms `.ath`, aux mises à jour d'avatar, aux ventes de stabilité de marché, au rachat et à la destruction.
 
-ATH n'est pas un jeton administratif. Il ne confère pas la capacité de réécrire les soldes, de suspendre les opérations, d'émettre de nouvelles unités ou de modifier les règles de propriété des utilisateurs. Son rôle est d'alimenter l'économie de l'application et de relier l'usage de Platho à la comptabilité on-chain.
+ATH n'est pas un jeton administratif. Il ne confère aucun pouvoir de réécrire des soldes, de suspendre des opérations, d'émettre de nouveaux jetons ou de modifier ce que possèdent les personnes qui l'utilisent. Son rôle est d'alimenter l'économie de l'application et de relier l'usage de Platho à la comptabilité on-chain.
 
 Ce document décrit le modèle ATH dans Platho.
 
-## Paramètres fondamentaux
+## Paramètres principaux
 
 ATH a une offre totale fixe :
 
@@ -16,61 +16,61 @@ ATH a une offre totale fixe :
 100,000,000 ATH
 ```
 
-Le prix de référence au lancement est :
+Prix de référence au lancement :
 
 ```text
 1 ATH = 0.001 GRAM
 ```
 
-La valorisation entièrement diluée au lancement est :
+Valorisation entièrement diluée au lancement :
 
 ```text
 100,000,000 ATH * 0.001 GRAM = 100,000 GRAM
 ```
 
-ATH part d'une capitalisation de référence de `100,000 GRAM`.
+ATH démarre sur une capitalisation de référence de `100,000 GRAM`.
 
 ## Offre fixe
 
-ATH est émis par `ATHMaster`. À l'initialisation, `ATHMaster` fixe l'offre totale à `100,000,000 ATH`.
+ATH est émis par le contrat `ATHMaster`. À l'initialisation, `ATHMaster` fixe l'offre totale à `100,000,000 ATH`.
 
-Il n'existe aucune fonction d'émission après la genèse. `ATHMaster` n'implémente ni émission administrative, ni suspension, ni liste noire, ni taxe de transfert, ni transfert forcé, ni vidange de sauvetage.
+Il n'existe aucune fonction d'émission après le genèse. `ATHMaster` n'implémente ni frappe administrative, ni pause, ni liste noire, ni taxe de transfert, ni transfert forcé, ni retrait d'urgence.
 
-Le déploiement initial de l'offre est effectué une seule fois via `DeployTreasurySupply`. Il envoie la totalité de l'offre au portefeuille ATH de la trésorerie. Le déploiement de l'offre de genèse ne peut pas être répété.
+L'émission primaire n'a lieu qu'une fois, via `DeployTreasurySupply`, qui envoie l'intégralité de l'offre au portefeuille ATH de trésorerie. L'émission de genèse ne peut pas être répétée.
 
-L'offre totale ne diminue que par la destruction. `ATHMaster` n'accepte une destruction qu'après une notification de destruction authentifiée provenant du portefeuille ATH déterministe de l'adresse propriétaire. Après vérification, `ATHMaster` diminue `total_supply` et envoie `ATHBurnFinalized`.
+L'offre totale ne diminue que par destruction. `ATHMaster` n'accepte une destruction qu'après une notification authentifiée provenant du portefeuille ATH déterministe de l'adresse propriétaire. Une fois vérifiée, `ATHMaster` réduit `total_supply` et envoie `ATHBurnFinalized`.
 
-La destruction d'ATH est une réduction réelle de l'offre totale, et non un transfert vers une adresse inutilisée.
+Détruire de l'ATH est une réduction réelle de l'offre totale, et non un transfert vers une adresse inutilisée.
 
 ## Répartition de l'offre
 
-L'offre d'ATH est répartie entre quatre catégories :
+L'offre d'ATH se répartit en quatre catégories :
 
-| Catégorie | Part | Montant |
+| Catégorie | Part | Quantité |
 | --- | ---: | ---: |
 | Airdrop d'activité | 15% | 15,000,000 ATH |
 | Liquidité initiale | 15% | 15,000,000 ATH |
-| Vesting à long terme du protocole | 10% | 10,000,000 ATH |
-| Réserve de stabilité du marché | 60% | 60,000,000 ATH |
+| Vesting de protocole à long terme | 10% | 10,000,000 ATH |
+| Réserve de stabilité de marché | 60% | 60,000,000 ATH |
 
 Cette répartition définit la structure économique de Platho :
 
-- 15 % de l'offre sont distribués aux utilisateurs via l'activité applicative avant le lancement du pool.
-- 15 % de l'offre servent à la liquidité initiale.
-- 10 % de l'offre sont verrouillés dans un vesting immuable à long terme.
-- 60 % de l'offre sont approvisionnés dans MarketStabilitySeller et verrouillés à la genèse, puis vendus par tranches au-dessus du prix de lancement après le gel de la tarification post-pool.
+- 15% de l'offre est distribuée aux personnes qui utilisent l'application, par l'activité, avant le lancement du pool.
+- 15% de l'offre sert de liquidité initiale.
+- 10% de l'offre est verrouillée dans un vesting immuable à long terme.
+- 60% de l'offre est versée à MarketStabilitySeller et verrouillée au genèse, puis vendue par tranches au-dessus du prix de lancement, une fois le gel des prix effectué après le pool.
 
-L'airdrop d'activité et la réserve de vesting à long terme sont garantis, à la genèse finale, par les portefeuilles ATH officiels de Vault et d'ATHVesting, et le vérificateur de version contrôle ces soldes avant la mise en production. La réserve de stabilité du marché de `60,000,000 ATH` est approvisionnée dans MarketStabilitySeller et verrouillée à la genèse finale, garantie par son portefeuille ATH de vendeur officiel, et le vérificateur de version contrôle cette garantie avant la mise en production. La réserve est capitalisée dès le départ, mais elle n'est pas vendue avant le lancement du pool, moment où le gel de tarification unique, lié aux preuves, fixe le prix de la tranche de base.
+Au genèse final, l'airdrop d'activité et la réserve de vesting à long terme sont couverts par les portefeuilles ATH officiels d'AirdropPool et d'ATHVesting, et le vérificateur de publication contrôle ces soldes avant une mise en production. La réserve de stabilité de `60,000,000 ATH` est versée à MarketStabilitySeller et verrouillée au genèse final, couverte par son portefeuille ATH officiel de vente, et le vérificateur contrôle cette couverture avant une mise en production. La réserve est capitalisée dès le départ, mais elle n'est pas vendue avant le lancement du pool, moment où un gel des prix unique et lié aux preuves fixe le prix de base de la tranche.
 
-## Vesting à long terme du protocole
+## Vesting de protocole à long terme
 
-La réserve de vesting à long terme est :
+La réserve de vesting à long terme est de :
 
 ```text
 10,000,000 ATH
 ```
 
-Elle est détenue par `ATHVesting`, et non par un compartiment de trésorerie mutable. Le calendrier de vesting est fixé dans le contrat :
+Elle est conservée dans `ATHVesting`, et non dans un compartiment de trésorerie modifiable. Le calendrier est inscrit dans le contrat :
 
 ```text
 100,000 ATH per 365-day period
@@ -78,15 +78,15 @@ Elle est détenue par `ATHVesting`, et non par un compartiment de trésorerie mu
 10,000,000 ATH total
 ```
 
-Quiconque peut déclencher une réclamation une fois qu'ATH est acquis, mais le bénéficiaire est immuable. Le contrat n'a aucune fonction d'accélération, de changement de bénéficiaire, de suspension, de balayage administratif, de vidange de sauvetage ou de libération discrétionnaire.
+N'importe qui peut déclencher une demande de versement une fois l'ATH acquis, mais la personne bénéficiaire est immuable. Le contrat n'a ni accélération, ni changement de bénéficiaire, ni pause, ni retrait administratif, ni sortie d'urgence, ni libération discrétionnaire.
 
-À la genèse finale, le portefeuille officiel `ATHWallet(owner = ATHVesting, master = ATHMaster)` doit contenir exactement `10,000,000 ATH`. Le vérificateur exige également zéro ATH réclamé, une phase inactive et aucun transfert en attente avant le lancement.
+Au genèse final, le portefeuille officiel `ATHWallet(owner = ATHVesting, master = ATHMaster)` doit contenir exactement `10,000,000 ATH`. Le vérificateur exige en outre zéro ATH réclamé, une phase inactive et aucun transfert en attente avant le lancement.
 
-Cette réserve est intentionnellement lente. Elle crée un horizon long pour le développement du protocole sans placer un compartiment liquide de 10M ATH au-dessus du marché au lancement.
+Cette réserve est délibérément lente. Elle ouvre un long horizon pour le développement du protocole sans placer, au lancement, un bloc liquide de 10M ATH au-dessus du marché.
 
 ## Airdrop d'activité
 
-L'airdrop d'activité est :
+L'airdrop d'activité est de :
 
 ```text
 15,000,000 ATH
@@ -98,73 +98,62 @@ Récompense par publication réussie :
 10 ATH
 ```
 
-La récompense est créditée sur le solde ATH interne de l'utilisateur dans Vault après une publication réussie. Une publication réussie signifie que Vault a envoyé la charge utile à CapsuleHub, que CapsuleHub a accepté l'entrée et que Vault a reçu l'accusé de réception.
+La récompense s'accumule pour la personne qui publie sous forme de crédit : une capsule acceptée vaut un crédit, et un crédit vaut `10 ATH`, à l'identique sur toutes les voies. Les crédits s'accumulent sur son propre compte (`AirdropTicket`, un par portefeuille) et sont réglés par lots depuis `AirdropPool` ; l'ATH arrive dans son propre portefeuille ATH.
 
-Les tentatives de publication échouées ne créent pas de récompenses d'activité.
+Les tentatives de publication échouées ne créent aucune récompense d'activité.
 
-Comptabilité des récompenses :
+Comptabilisation de la récompense :
 
 ```text
-user.ath_balance += 10 ATH
+credits += 1                 // un crédit = 10 ATH
 airdrop_remaining -= 10 ATH
 ```
 
-Si le compartiment d'airdrop restant est inférieur à 10 ATH, le montant restant est crédité. Une fois le compartiment épuisé, les nouvelles récompenses d'activité s'arrêtent.
+Le budget est un multiple exact de la récompense : `15,000,000 ATH` font `1,500,000` crédits. Une fois épuisés, les nouvelles récompenses d'activité cessent.
 
-L'airdrop d'activité est comptabilisé dans Vault et garanti par le portefeuille ATH officiel de Vault préfinancé.
+L'airdrop d'activité est couvert par le portefeuille ATH officiel d'`AirdropPool`, où se trouvent ces `15,000,000 ATH`.
 
-Les dépôts d'ATH dans Vault ne sont pris en charge que via le flux de transfert-avec-notification depuis le portefeuille ATHWallet de l'utilisateur
-(`ATHTransferRequestWithNotify`) vers Vault. Un transfert ATH ordinaire manuel vers le portefeuille ATHWallet officiel de Vault n'est
-pas pris en charge : il peut augmenter le solde brut du portefeuille officiel, mais il ne crée pas `Vault.user.ath_balance` et ne doit
-pas être présenté par la PWA comme une voie de dépôt.
-
-Les retraits d'ATH de Vault sont des commandes Vault externes signées. La réserve d'exécution en aval — déploiement, transfert, stockage et
-ACK de l'ATHWallet — est payée depuis le solde GRAM interne de l'utilisateur dans Vault. Vault ne recrédite que la valeur d'ACK/échec/rebond
-authentifiée qu'il reçoit, moins la réserve de remboursement locale et plafonnée par la valeur interne réservée.
+Le versement se fait par lots, et non capsule par capsule. Chaque livraison porte un coût fixe non récupérable d'environ `0.0166 GRAM`, et ce coût ne dépend pas du nombre de crédits qu'elle transporte. Payer capsule par capsule sur 1,500,000 capsules brûlerait davantage que ce que ces capsules collectent en frais de protocole ; les crédits s'accumulent donc et sont réglés par lots.
 
 ## Prix de l'activité
 
-Les messages partent du prix de base public actuel :
+Les messages partent du prix de base actuel :
 
 ```text
-from 0.0337 GRAM
+0.0191 GRAM
 ```
 
-Les exemples canoniques exacts actuels avant la réduction ATH sont :
+Chiffres exacts actuels avant la remise ATH :
 
 ```text
-public post: 0.0337 GRAM
-hybrid private 1 KiB capsule: 0.0347 GRAM
+message privé :    0.0191 GRAM
+premier contact :  0.0178 GRAM
+publication :      0.0203 GRAM
 ```
 
-Pour une publication réussie, l'utilisateur reçoit :
+Pour chaque publication réussie, on reçoit :
 
 ```text
 10 ATH
 ```
 
-Au prix de référence au lancement :
+Au prix de référence du lancement :
 
 ```text
 10 ATH * 0.001 GRAM = 0.01 GRAM
 ```
 
-Cela lie la distribution précoce d'ATH à l'usage réel de l'application. La récompense est un bonus d'activité, et non un remboursement, un cashback,
-une remise ou une promesse qu'ATH compensera le coût en GRAM d'une publication. La valeur de référence au lancement de `10 ATH` peut être
-inférieure au coût en GRAM de la capsule, et c'est intentionnel : les utilisateurs reçoivent une propriété précoce du réseau pour un usage réel,
-et non un remboursement garanti.
+Cela relie la distribution initiale d'ATH à l'usage réel de l'application. La récompense est une prime d'activité, non un remboursement, un cashback, une remise, ni la promesse qu'ATH compense le coût en GRAM d'une publication. La valeur de référence de `10 ATH` peut être inférieure au coût en GRAM d'une capsule, et c'est délibéré : on reçoit une propriété précoce du réseau pour un usage réel, pas une compensation garantie.
 
-Tarification des capsules : les publications publiques de 1 KiB partent de `0.0337 GRAM` et les capsules privées hybrides de 1 KiB de `0.0347 GRAM`. Les blocs de capsules publiques ou privées plus grands coûtent davantage, car le corps sélectionné de 1, 2, 4, 8, 16 ou 32 KiB
-modifie la réserve d'exécution et de stockage de Vault/CapsuleHub. La récompense reste de `10 ATH` par capsule finalisée
-avec succès, quelle que soit la taille de la capsule.
+Tarification des capsules : une publication publique à partir de `0.0203 GRAM`, une capsule privée à partir de `0.0191 GRAM`. Les blocs de capsule publics ou privés plus grands coûtent davantage, car le corps choisi de 1, 2, 4, 8, 16 ou 32 Kio modifie la réserve d'exécution et de stockage dans le fragment. La récompense reste de `10 ATH` par capsule finalisée avec succès, quelle que soit sa taille.
 
-La publication privée utilise par défaut le profil de sécurité hybride : X25519 + ML-KEM-768 + AES-GCM. Il n'existe pas de mode de message privé classique moins cher.
+Une publication privée utilise par défaut le profil de sécurité hybride : X25519 + ML-KEM-768 + AES-GCM. Il n'existe pas de mode classique moins cher pour les messages privés.
 
-ATH peut s'échanger au-dessus ou en dessous du prix de référence au lancement une fois que le pool officiel existe. La récompense d'activité n'est ni un rendement d'investissement, ni une attente de profit, ni une garantie de prix.
+ATH peut s'échanger au-dessus ou en dessous du prix de référence une fois le pool officiel en place. La récompense d'activité n'est ni un rendement d'investissement, ni une attente de profit, ni une garantie de prix.
 
-## Frais de protocole et prix utilisateur
+## Frais de protocole et prix pour l'utilisateur
 
-À l'intérieur de Vault, les frais de protocole sont distincts du coût total facturé à l'utilisateur.
+Les frais de protocole sont distincts du coût total supporté par la personne qui publie.
 
 Frais de protocole :
 
@@ -173,59 +162,61 @@ Frais de protocole :
 | Publication publique | 0.010 GRAM |
 | Message privé hybride | 0.010 GRAM |
 
-Le prix facturé à l'utilisateur inclut les frais de protocole, la dotation de stockage compacte pour l'index/en-tête, la réserve d'exécution locale de Vault et le remboursement ACK attendu :
+Le prix final couvre les frais de protocole, le gaz et la dotation de stockage de l'entrée dans son fragment :
 
-| Type de publication | Prix facturé à l'utilisateur |
+| Publication | Montant joint |
 | --- | ---: |
-| Public (à partir de) | from 0.0337 GRAM |
-| Exemple exact actuel de publication publique | 0.0337 GRAM |
-| Exemple exact actuel de capsule privée hybride 1 KiB | 0.0347 GRAM |
+| Message privé | 0.0191 GRAM |
+| Premier contact | 0.0178 GRAM |
+| Publication ou commentaire public | 0.0203 GRAM |
+| Mise à jour d'avatar | 0.0395 GRAM |
+| Activation du compte | 0.0600 GRAM |
 
-Si la PWA reçoit une estimation réseau conservatrice plus élevée, elle ajoute le dépassement estimé à la charge maximale canonique, arrondie au palier propre de `0.001 GRAM`. Les réductions ATH s'appliquent aux frais de protocole, et non aux coûts réseau ou aux réserves de stockage. Cette surcharge est une marge de sécurité signée : si CapsuleHub accepte la publication, l'ACK de succès ne renvoie que la réserve d'ACK de publication fixe de `30,000,000` nanotons (`0.030 GRAM`). Après que Vault a traité cet ACK, l'utilisateur est crédité d'environ `25,800,000` nanotons sur son solde GRAM interne dans Vault. La partie au-dessus de la valeur requise canonique reste dans CapsuleHub en tant que dépassement de réserve réseau/stockage. Elle n'est pas renvoyée à Vault et n'est pas comptabilisée comme `accrued_plato_fee_ton` au moment de la publication. Seul le surplus brut au-dessus de la réserve protégée de CapsuleHub peut ensuite être balayé sans permission vers FeeAccumulator, où il suit la comptabilité normale de trésorerie/rachat. CapsuleHub stocke des métadonnées d'entrée compactes et authentifiées ainsi que le hachage du corps ; le corps lourd est récupéré depuis l'historique des transactions de publication acceptées et vérifié localement.
+Le client joint toujours le plus élevé des deux montants — celui qu'exige la création du fragment. L'excédent n'est pas perdu : le fragment ne garde que ce dont il a besoin et renvoie le reste à l'expéditeur. Si l'estimation réseau revient plus élevée que prévu, le client ajoute une marge par-dessus ; c'est une marge et non un paiement, et elle est également restituée. Les remises ATH s'appliquent aux frais de protocole, pas aux coûts réseau ni aux réserves de stockage.
 
-## Réductions ATH
+## Remises ATH
 
-ATH réduit les frais de protocole des messages une fois que l'airdrop d'activité a été entièrement distribué.
+ATH réduit les frais de protocole sur les messages une fois l'airdrop d'activité entièrement distribué.
 
-Les réductions ne se débloquent que lorsque l'airdrop d'activité restant est :
+Les remises ne se débloquent que lorsque l'airdrop restant vaut :
 
 ```text
 airdrop_remaining_ath == 0 ATH
 ```
 
-Avant ce point, les frais de protocole sont payés en totalité.
+Jusque-là, les frais de protocole sont payés en totalité.
 
-Seuil de réduction maximale :
+Seuil de remise complète :
 
 ```text
 10,000 ATH
 ```
 
-Si le solde ATH interne de l'utilisateur dans Vault est d'au moins `10,000 ATH`, l'utilisateur atteint le palier de réduction maximale des frais de protocole pour la composante de frais Platho. Les coûts réseau et les réserves de stockage restent payés.
+Si le solde ATH du portefeuille personnel atteint au moins `10,000 ATH`, on atteint le palier de remise complète sur la composante de frais Platho. Les coûts réseau et les réserves de stockage restent dus.
 
-Si le solde est inférieur à `10,000 ATH`, les frais diminuent linéairement :
+En dessous de `10,000 ATH`, les frais décroissent linéairement :
 
 ```text
 raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 ATH)) / 10,000 ATH)
 discounted_fee = raw_discounted_fee
 ```
 
-Le calcul arrondit à l'entier supérieur. Avec les constantes actuelles, les frais de protocole complets sont de `0.010 GRAM` (`10,000,000 nanotons`) pour les capsules publiques et privées, et la réduction maximale est de `0.010 GRAM` par capsule.
+Le calcul arrondit vers le haut. Avec les constantes actuelles, les frais de protocole complets sont de `0.010 GRAM` (`10,000,000 nanotons`) pour les capsules publiques comme privées, et la réduction maximale est de `0.010 GRAM` par capsule.
 
 ## Lancement du pool
 
-Le pool ATH/GRAM est lancé une fois que la totalité de l'airdrop d'activité de `15,000,000 ATH` a été distribuée.
+Le pool ATH/GRAM est lancé après la distribution intégrale de l'airdrop d'activité de `15,000,000 ATH`.
 
-La séquence de lancement est :
+Séquence de lancement :
 
-1. Les utilisateurs reçoivent de l'ATH via un usage réel de Platho.
-2. La totalité de l'airdrop d'activité est distribuée.
-3. Les réductions ATH se débloquent.
+1. Les personnes reçoivent de l'ATH par un usage réel de Platho.
+2. L'airdrop d'activité complet est distribué.
+3. Les remises ATH se débloquent.
 4. Le pool ATH/GRAM est lancé.
-5. Les preuves de route post-pool et les preuves de tarification sont gelées.
+5. Les preuves de route et de prix postérieures au pool sont gelées.
 6. Le partage de rachat est activé.
 
-Le pool part du prix de référence :
+Le pool démarre au prix de référence :
 
 ```text
 1 ATH = 0.001 GRAM
@@ -237,59 +228,51 @@ Allocation de liquidité initiale :
 15,000,000 ATH
 ```
 
-Côté GRAM au prix de lancement :
+Le côté GRAM au prix de lancement :
 
 ```text
 15,000,000 ATH * 0.001 GRAM = 15,000 GRAM
 ```
 
-Les frais de protocole collectés avant le lancement du pool financent l'intégralité du côté GRAM de la liquidité initiale. Cela fait partie de
-l'amorçage du lancement et ne transforme pas les récompenses d'activité en une créance libellée en GRAM.
+Les frais de protocole collectés avant le lancement financent intégralement le côté GRAM de la liquidité initiale. Cela relève de l'amorçage et ne transforme pas les récompenses d'activité en créance libellée en GRAM.
 
-Le pool est lancé autour d'un jeton déjà distribué via l'usage de l'application. Cela distingue ATH d'un listing vide sans base d'utilisateurs.
+Le pool est lancé autour d'un jeton déjà distribué par l'usage de l'application. C'est ce qui distingue ATH d'une cotation vide sans base d'utilisateurs.
 
 ## FeeAccumulator
 
 Les frais de protocole en GRAM sont collectés dans `FeeAccumulator`.
 
-Avant l'activation du partage de rachat, tout le GRAM accumulé va vers le compartiment de trésorerie :
+Avant l'activation du partage de rachat, tout le GRAM accumulé va au compartiment de trésorerie :
 
 ```text
 accumulated_ton -> treasury_due_ton
 ```
 
-`buyback_due_ton` ne croît pas avant l'activation du partage.
+`buyback_due_ton` ne croît pas tant que le partage n'est pas activé.
 
-Après `EnableBuybackSplit`, le GRAM accumulé est partagé :
+Après `EnableBuybackSplit`, le GRAM accumulé est divisé :
 
 ```text
 50% -> treasury_due_ton
 50% -> buyback_due_ton
 ```
 
-Si le montant est impair en nanotons, le reste demeure du côté rachat :
+Si le montant en nanotons est impair, le reste demeure du côté rachat :
 
 ```text
 treasury_amount = floor(amount * 50%)
 buyback_amount = amount - treasury_amount
 ```
 
-`EnableBuybackSplit` est une action à sens unique exécutée par le récepteur de trésorerie immuable après le lancement du pool et le gel de la route
-de rachat. Il s'agit d'une véritable autorité ponctuelle : elle ne peut pas voler de fonds, suspendre, sauver ou changer d'adresses, mais elle modifie
-définitivement l'économie de FeeAccumulator, passant de l'accumulation d'amorçage exclusivement en trésorerie au partage 50/50 trésorerie/rachat. Elle n'est
-activée qu'après la réussite du contrôle préalable à la version.
+`EnableBuybackSplit` est une action sans retour, exécutée par la personne destinataire immuable de la trésorerie après le lancement du pool et le gel de la route de rachat. C'est un pouvoir réel à usage unique : il ne peut ni voler des fonds, ni suspendre, ni vider en urgence, ni changer d'adresses, mais il modifie définitivement l'économie de FeeAccumulator, d'une accumulation d'amorçage réservée à la trésorerie vers un partage 50/50 trésorerie/rachat. Il n'est activé qu'après le contrôle préalable à la publication.
 
-Les autorités de version de Platho sont délibérément étroites et pour la plupart à usage unique. Elles existent néanmoins et doivent être nommées honnêtement :
-le propriétaire de la trésorerie déploie l'offre initiale d'ATH une seule fois ; le contrôleur de genèse effectue la liaison et le scellement préalables au scellement ;
-le contrôleur de lancement de BuybackBurn gèle la route post-pool une seule fois ; le gel de tarification de MarketStabilitySeller est effectué
-une seule fois par son contrôleur de lancement ; et le récepteur de trésorerie de FeeAccumulator active le partage de rachat à sens unique après le contrôle préalable. Aucun de ces
-rôles n'est un mécanisme de sauvetage, de suspension, de mise à niveau, de vidange administrative ou de contrôle arbitraire des soldes.
+Les pouvoirs de publication de Platho sont volontairement étroits et presque tous à usage unique. Ils existent, et il faut les nommer honnêtement : la propriété de la trésorerie déploie une fois l'offre primaire d'ATH ; le contrôleur de genèse effectue la liaison pré-scellement puis le scellement ; le contrôleur de lancement de BuybackBurn gèle une fois la route postérieure au pool ; le gel des prix de MarketStabilitySeller est effectué une fois par son contrôleur de lancement ; et la personne destinataire de la trésorerie chez FeeAccumulator active le partage de rachat sans retour après le contrôle préalable. Aucun de ces rôles n'est une sortie d'urgence, une pause, une mise à jour, un retrait administratif ou un contrôle arbitraire sur les soldes.
 
 ## Rachat et destruction
 
-Le rachat est exécuté via `FeeAccumulator` et `BuybackBurn`.
+Le rachat passe par `FeeAccumulator` et `BuybackBurn`.
 
-BuybackBurn n'accepte qu'une enveloppe d'exécution complète :
+BuybackBurn n'accepte qu'une enveloppe exécutable complète :
 
 ```text
 51.05 GRAM
@@ -298,36 +281,33 @@ BuybackBurn n'accepte qu'une enveloppe d'exécution complète :
 Structure de l'enveloppe :
 
 ```text
-50.00 GRAM  - STON.fi offer amount
-1.00 GRAM   - route forward gas
-0.05 GRAM   - pTON transfer gas
+50.00 GRAM  - montant de l'offre STON.fi
+1.00 GRAM   - gaz de transfert de route
+0.05 GRAM   - gaz de transfert pTON
 ```
 
-Un montant brut de `50 GRAM` n'est pas un fragment de rachat valide. Le rachat n'est accepté qu'en tant qu'enveloppe de route complète.
+`50 GRAM` seuls ne constituent pas un bloc de rachat valide. Le rachat n'est accepté que sous forme d'enveloppe de route complète.
 
-Après le gel de la route, BuybackBurn exécute un rachat comme suit :
+Une fois la route gelée, BuybackBurn effectue le rachat ainsi :
 
-1. N'accepte `51.05 GRAM` que du FeeAccumulator lié.
-2. Enregistre le montant dans `reserve_due_ton`.
+1. Accepte `51.05 GRAM` uniquement du FeeAccumulator lié.
+2. Inscrit le montant dans `reserve_due_ton`.
 3. Sur `ExecuteBuybackChunk`, consomme une enveloppe.
 4. Utilise la cotation gelée et le minOut gelé.
-5. Fixe le délai STON.fi en interne.
+5. Fixe en interne l'échéance STON.fi.
 6. Envoie la route via le portefeuille pTON gelé.
-7. N'accepte de l'ATH que via le portefeuille ATH officiel de BuybackBurn.
+7. N'accepte l'ATH que par le portefeuille ATH officiel de BuybackBurn.
 8. Vérifie que le portefeuille source correspond au pool STON.fi gelé.
 9. Envoie l'ATH reçu à la destruction via le portefeuille ATH officiel.
-10. Ne termine le cycle qu'après `ATHBurnFinalized` de la part d'`ATHMaster`.
+10. Ne clôt le cycle qu'après `ATHBurnFinalized` d'`ATHMaster`.
 
-Le succès du rachat n'est pas défini par un message du routeur, une requête de destruction sortante ou une notification de destruction de l'ATHWallet. Il est défini
-uniquement lorsque BuybackBurn reçoit un `ATHBurnFinalized` authentifié de la part d'ATHMaster. Jusqu'à l'arrivée de cette finalisation,
-BuybackBurn doit toujours être traité comme étant en état de destruction en attente ou de nouvelle tentative ; les tableaux de bord et les indexeurs ne doivent pas compter l'ATH comme
-détruit simplement parce qu'une tentative de destruction a été envoyée.
+Le succès d'un rachat n'est défini ni par un message du routeur, ni par une demande de destruction sortante, ni par une notification de destruction d'ATHWallet. Il n'est défini que lorsque BuybackBurn reçoit un `ATHBurnFinalized` authentifié d'ATHMaster. Tant que cette finalisation n'est pas arrivée, BuybackBurn reste en état de destruction en attente ou de nouvelle tentative ; tableaux de bord et indexeurs ne doivent pas compter l'ATH comme détruit au seul motif qu'une tentative a été envoyée.
 
-Si la destruction n'est pas finalisée, l'ATH reçu passe en dû de nouvelle tentative. `RetryAthBurnDue` détruit la totalité du montant dû de nouvelle tentative.
+Si la destruction n'aboutit pas, l'ATH reçu passe en dette de nouvelle tentative. `RetryAthBurnDue` détruit l'intégralité de ce montant.
 
-## Frais de nom d'utilisateur
+## Frais de nom
 
-L'enregistrement d'un nom d'utilisateur `.ath` est payé en ATH via le portefeuille ATH officiel d'UsernameRegistry.
+Enregistrer un nom `.ath` se paie en ATH via le portefeuille ATH officiel d'UsernameRegistry.
 
 Prix :
 
@@ -335,54 +315,41 @@ Prix :
 | ---: | ---: |
 | 4 caractères | 10,000 ATH |
 | 5 caractères | 1,000 ATH |
-| 6+ caractères | 100 ATH |
+| 6 et plus | 100 ATH |
 
-UsernameRegistry n'accepte que le prix exact. Un sous-paiement ou un sur-paiement ne crée pas de nom.
+UsernameRegistry n'accepte que le prix exact. Un paiement insuffisant comme un paiement excédentaire ne crée pas de nom.
 
-Un mint accepté passe par un état en attente et déploie `UsernameNFTItem`. Avant l'accusé de réception de l'item, le paiement n'est pas reconnu comme un revenu. Après l'accusé de réception de l'item, le montant est partagé :
+Une frappe acceptée passe par un état en attente et déploie un `UsernameNFTItem`. Le paiement n'est comptabilisé en produit qu'une fois l'item confirmé. L'item confirmé, le montant est partagé :
 
 ```text
 50% -> treasury_due_ath
 50% -> burn_due_ath
 ```
 
-Le mint de nom d'utilisateur est financé par Vault. Les rejets pour nom d'utilisateur invalide, prix erroné ou nom en doublon rebondissent via la
-voie de notification du portefeuille ATH officiel afin que Vault puisse restaurer l'ATH interne de l'utilisateur. UsernameRegistry ne maintient pas de
-compartiment de remboursement de nom d'utilisateur externe direct dans le flux actuel financé par Vault.
+La frappe d'un nom se paie en ATH depuis le portefeuille personnel. Les refus pour nom invalide, prix erroné ou nom déjà pris sont restitués à la personne propriétaire par la voie de remboursement des notifications ATHWallet. UsernameRegistry ne tient aucun compartiment de remboursement externe pour les noms.
 
-L'ATH issu du mint de nom d'utilisateur ne devient un revenu de protocole qu'après confirmation du déploiement de l'item correspondant.
+L'ATH issu d'une frappe de nom ne devient un produit du protocole qu'après confirmation du déploiement de l'item correspondant.
 
-L'autorité sur les noms d'utilisateur est répartie délibérément : `UsernameRegistry` ancre le nom à un `UsernameNFTItem` unique et exact, et
-l'état de l'item porte le propriétaire actuel. Les transferts de l'item transfèrent le nom d'utilisateur. L'item expose les données NFT standard
-et les métadonnées on-chain TEP-64, y compris `name = <username>.ath` ; il ne dépend pas d'un serveur Platho pour ses métadonnées.
-Les octets du nom d'utilisateur sont littéraux et ne sont pas normalisés pour l'affichage : les noms comportant des séparateurs en tête, en fin, consécutifs ou uniquement composés de séparateurs sont
-valides tant que chaque octet appartient à l'ensemble autorisé `a-z`, `0-9`, `_`, `-` et que la longueur est comprise entre 4 et 16.
-Si le déploiement de l'item a été tenté mais que l'ACK de l'item n'a jamais atteint le registre, `PrunePendingUsernameMint` est intentionnellement
-non destructif : il ne devine pas l'échec, ne supprime pas l'état en attente et ne crée pas de dû de remboursement. La voie de récupération est un `UsernameItemDeployedAck`
-tardif ou `UsernameNFTItem.ResendDeployedAck`, de sorte qu'un item initialisé peut toujours devenir faisant autorité.
-Si le déploiement de l'item rebondit réellement, le registre demande au portefeuille ATH officiel de rembourser la notification en attente.
-Un `UsernameNFTItem` déployé sans que `UsernameRegistry.name_records[name_hash]` pointe vers cet item exact est
-non faisant autorité : les clients, les indexeurs et l'interface utilisateur ne doivent pas traiter l'item seul comme la propriété du nom `.ath`, et ne doivent pas
-utiliser le propriétaire de l'enregistrement du registre comme propriétaire actuel après des transferts.
+L'autorité sur les noms est volontairement scindée : `UsernameRegistry` ancre le nom à un `UsernameNFTItem` précis, et l'état de l'item porte la propriété actuelle. Transférer l'item transfère le nom. L'item fournit des données NFT standard et des métadonnées TEP-64 on-chain, dont `name = <username>.ath` ; il ne dépend d'aucun serveur Platho pour ses métadonnées. Les octets du nom sont littéraux et ne sont pas normalisés à l'affichage : les noms comportant des séparateurs en tête, en fin, consécutifs ou exclusivement composés de séparateurs sont valides dès lors que chaque octet appartient à l'ensemble autorisé `a-z`, `0-9`, `_`, `-` et que la longueur est comprise entre 4 et 16. Si un déploiement d'item a été tenté mais que son ACK n'est jamais parvenu au registre, `PrunePendingUsernameMint` est délibérément non destructif : il ne présume pas l'échec, ne supprime pas l'état en attente et ne crée pas de dette de remboursement. La voie de rattrapage est un `UsernameItemDeployedAck` tardif ou `UsernameNFTItem.ResendDeployedAck`, de sorte qu'un item déjà initialisé peut encore devenir faisant autorité. Si le déploiement rebondit réellement, le registre demande au portefeuille ATH officiel de restituer la notification en attente. Un `UsernameNFTItem` déployé sans que `UsernameRegistry.name_records[name_hash]` pointe vers cet item précis ne fait pas autorité : clients, indexeurs et interfaces ne doivent pas traiter l'item seul comme la propriété du nom `.ath`, ni retenir la personne propriétaire inscrite au registre comme propriétaire actuel après des transferts.
 
-## Frais d'avatar de profil
+## Frais d'avatar
 
-Coûts de mise à jour de l'avatar de profil :
+Coût d'une mise à jour d'avatar :
 
 ```text
 100 ATH
 ```
 
-Les mises à jour de l'avatar de profil sont financées par Vault. La PWA envoie `SetProfileAvatarFromVaultBalance` à Vault ; Vault paie via la voie de notification de son portefeuille ATH officiel vers le portefeuille ATH officiel de ProfileRegistry. Le paiement d'avatar directement depuis le portefeuille de l'utilisateur n'est pas pris en charge.
+La mise à jour d'avatar se paie en ATH depuis le portefeuille personnel : un transfert avec notification depuis son portefeuille ATH vers le portefeuille ATH officiel de ProfileRegistry.
 
-ProfileRegistry n'accepte la mise à jour que lorsque toutes les conditions sont réunies :
+ProfileRegistry n'accepte la mise à jour que si toutes les conditions sont réunies :
 
-- le montant est exactement `100 ATH` ;
+- le montant vaut exactement `100 ATH` ;
 - l'expéditeur est le portefeuille ATH officiel de ProfileRegistry ;
-- le portefeuille payeur est le Vault lié ;
+- le portefeuille payeur est le portefeuille ATH de la personne propriétaire ;
 - le portefeuille propriétaire est dans la basechain ;
-- le hachage de l'avatar n'est pas nul ;
-- l'identifiant de flux n'est pas nul ;
+- l'empreinte de l'avatar est non nulle ;
+- l'identifiant de flux est non nul ;
 - le nombre de parties est compris entre 1 et 16 ;
 - le format média est WebP.
 
@@ -393,66 +360,59 @@ Une mise à jour acceptée crée une nouvelle version d'avatar et partage les fr
 50 ATH -> burn_due_ath
 ```
 
-Une notification d'avatar rejetée est remboursée via la voie de rebond de notification de l'ATHWallet. ProfileRegistry ne crée pas de compartiment de remboursement distinct pour les mises à jour d'avatar mal formées.
+Une notification d'avatar refusée est restituée par la voie de remboursement des notifications ATHWallet. ProfileRegistry ne crée pas de compartiment de remboursement distinct pour les mises à jour malformées.
 
-ProfileRegistry stocke le pointeur d'avatar authentifié, et non les octets d'image permanents. La PWA doit reconstruire les données WebP de l'avatar à partir des entrées CapsuleHub publiques ou du cache local et vérifier les octets par rapport à l'`avatar_hash` stocké ; un historique manquant ou élagué est présenté comme indisponible.
+ProfileRegistry fixe le prix et règle le paiement, mais ne conserve aucun état de profil : le pointeur authentifié vers l'avatar réside dans le KeyShard de la personne propriétaire elle-même. Les octets de l'image résident dans PublicShard, domaine AVATAR ; le client reconstitue le WebP à partir de là ou d'un cache local et compare les octets à l'`avatar_hash` enregistré. Un historique absent ou tronqué est présenté comme indisponible.
 
-## Vendeur de stabilité du marché
+## Market Stability Seller
 
-MarketStabilitySeller est une réserve de contrat publique qui distribue de l'ATH après le lancement du pool officiel :
+MarketStabilitySeller est une réserve publique en contrat qui distribue l'ATH après le lancement du pool officiel :
 
 ```text
 60,000,000 ATH
 ```
 
-Son objectif est de réduire la distorsion du marché précoce causée par une liquidité faible. Au lancement, un petit pool peut être fortement déplacé par un petit groupe d'acheteurs précoces. Si cela se produit, les utilisateurs qui ont besoin d'ATH pour des actions réelles dans Platho peuvent être contraints d'acheter au sein d'un pic de prix artificiel.
+Son objet est de réduire la distorsion du marché précoce due à une liquidité mince. Au lancement, un petit pool peut être fortement déplacé par un groupe restreint d'acheteurs. Si cela survient, celles et ceux qui ont besoin d'ATH pour des actions réelles dans Platho peuvent être contraints d'acheter sur un pic de prix artificiel.
 
-MarketStabilitySeller crée un escalier d'offre transparent au-dessus du prix de lancement. Il vend de l'ATH par tranches de taille fixe. Chaque tranche suivante est plus chère que la précédente, et chaque tranche a une limite de taille stricte. Après le gel de tarification unique, lié aux preuves, le calendrier des tranches est déterministe et ne peut pas être modifié manuellement par l'équipe.
+MarketStabilitySeller crée une échelle d'offre transparente au-dessus du prix de lancement. Il vend l'ATH par tranches de taille fixe. Chaque tranche suivante est plus chère que la précédente, et chacune comporte une limite stricte de taille. Après le gel des prix unique et lié aux preuves, le calendrier des tranches est déterministe et l'équipe ne peut pas le modifier à la main.
 
-Si des spéculateurs précoces tentent d'absorber une grande quantité d'ATH, ils achètent depuis la réserve publique à des prix de tranche croissants au lieu d'extraire toute la liquidité bon marché d'un pool faible et de la revendre aux utilisateurs. Si des utilisateurs ordinaires ont besoin d'ATH pour Platho, ils peuvent l'acheter à un prix de tranche public connu sans pousser un petit pool à la verticale avec une seule vague de demande.
+Si des spéculateurs précoces tentent d'absorber une grande quantité d'ATH, ils achètent à la réserve publique à des prix de tranche croissants, plutôt que de vider toute la liquidité bon marché d'un pool mince pour la revendre. Qui a besoin d'ATH pour Platho peut l'acheter à un prix de tranche public et connu, sans propulser un petit pool à la verticale d'une seule vague de demande.
 
-La réserve ne déverse pas de jetons sur le marché. Elle ne vend pas d'elle-même et ne crée pas de pression vendeuse en l'absence de demande. Une vente ne se produit que lorsqu'un acheteur achète volontairement depuis la tranche actuelle. S'il n'y a pas de demande, la réserve reste inactive.
+La réserve ne déverse pas de jetons sur le marché. Elle ne vend pas d'elle-même et ne crée aucune pression vendeuse sans demande. Une vente n'a lieu que lorsque quelqu'un achète volontairement dans la tranche courante. Sans demande, la réserve reste inactive.
 
-L'utilité on-chain d'ATH est spécifique :
+L'utilité on-chain d'ATH est concrète :
 
-- l'enregistrement d'un nom d'utilisateur `.ath` est payé en ATH via UsernameRegistry ;
-- les mises à jour du pointeur d'avatar de profil sont payées en ATH via ProfileRegistry ;
-- l'ATH détenu sur le solde interne de l'utilisateur dans Vault réduit les frais de protocole pour les publications Vault après le seuil de distribution d'activité ;
-- les frais acceptés de nom d'utilisateur et d'avatar créent un dû de trésorerie et un dû de destruction ;
+- enregistrer un nom `.ath` se paie en ATH via UsernameRegistry ;
+- les mises à jour du pointeur d'avatar se paient en ATH via ProfileRegistry ;
+- l'ATH détenu dans son propre portefeuille réduit les frais de protocole des publications une fois passée la porte de distribution d'activité ;
+- les frais acceptés de noms et d'avatars créent une dette de trésorerie et une dette de destruction ;
 - BuybackBurn achète de l'ATH avec les frais de protocole en GRAM et détruit l'ATH reçu via ATHMaster.
 
-Les publications Vault sont payées en GRAM. ATH ne paie pas la totalité de la transaction de publication. Il réduit la composante de frais de protocole une fois le seuil de réduction ouvert.
+Les publications se paient en GRAM directement depuis le portefeuille. ATH ne paie pas la transaction de publication entière. Il réduit la composante de frais de protocole une fois la porte des remises ouverte.
 
-Cela lie la demande d'ATH à des actions de protocole concrètes : noms `.ath`, mises à jour d'avatar, réductions de frais de protocole Vault après l'airdrop, et pression de rachat/destruction. MarketStabilitySeller n'élargit l'offre disponible qu'à mesure que les acheteurs prennent la tranche suivante, de sorte que l'accès précoce est public et déterministe plutôt que dominé par un pool faible.
+Cela relie la demande d'ATH à des actions précises du protocole : noms `.ath`, mises à jour d'avatar, remises de frais après l'airdrop, et pression de rachat et de destruction. MarketStabilitySeller n'élargit l'offre disponible qu'à mesure que la tranche suivante est prise, de sorte que l'accès précoce est public et déterministe plutôt que dominé par un pool mince.
 
-La réserve n'est vendue qu'après le gel de tarification post-pool.
+La réserve n'est vendue qu'après le gel des prix postérieur au pool.
 
-Le gel de tarification est une véritable autorité de lancement ponctuelle. Il fixe le prix de la tranche de base une seule fois à partir des preuves du lancement du pool, puis le hachage du contrôleur de lancement est effacé. Après cela, MarketStabilitySeller ne peut pas voler de fonds, suspendre les ventes, sauver des soldes, passer outre les acheteurs ou muter le calendrier des prix.
+Le gel des prix est un véritable pouvoir de lancement, à usage unique. Il fixe une fois le prix de base de la tranche à partir des preuves du lancement du pool, après quoi l'empreinte du contrôleur de lancement est effacée. Dès lors, MarketStabilitySeller ne peut ni voler des fonds, ni suspendre les ventes, ni vider les soldes en urgence, ni passer outre les acheteurs, ni modifier la grille de prix.
 
-MarketStabilitySeller est capitalisé à la genèse finale avec la réserve complète de `60,000,000 ATH`, approvisionnée via le
-flux authentifié de financeur de réserve vers le portefeuille ATH de vendeur officiel, jusqu'au plafond strict de `60,000,000 ATH`.
-`mainnet:genesis:verify` vérifie que le vendeur porte la réserve complète et que la garantie de son portefeuille ATH de vendeur officiel
-est d'au moins `60,000,000 ATH` avant la mise en production. Un transfert ATH ordinaire non sollicité vers le portefeuille ATH de vendeur
-officiel n'augmente pas la réserve comptabilisée, n'élargit pas l'offre vendable et peut rester bloqué ; un solde de portefeuille
-supérieur à `60,000,000 ATH` est traité comme un avertissement, et non comme une réserve supplémentaire.
+MarketStabilitySeller est capitalisé au genèse final avec la réserve complète de `60,000,000 ATH`, financée par le flux authentifié de dotation vers le portefeuille ATH officiel de vente, dans la limite stricte de `60,000,000 ATH`. `mainnet:genesis:verify` contrôle que le vendeur porte la réserve complète et que la couverture de son portefeuille ATH officiel atteint au moins `60,000,000 ATH` avant une mise en production. Un transfert ordinaire et non sollicité d'ATH vers ce portefeuille officiel n'augmente pas la réserve comptabilisée, n'élargit pas l'offre vendable et peut rester bloqué ; un solde supérieur à `60,000,000 ATH` est traité comme un avertissement, non comme une réserve supplémentaire.
 
-La vente est une étape post-pool distincte. La réserve n'est pas vendue avant le lancement du pool, moment où le gel de tarification unique
-lié aux preuves fixe le prix de la tranche de base ; à partir de là, le calendrier des tranches est déterministe et ne peut pas être modifié manuellement
-par l'équipe.
+La vente est une étape distincte, postérieure au pool. La réserve n'est pas vendue avant le lancement ; à ce moment, le gel des prix unique et lié aux preuves fixe le prix de base de la tranche, et le calendrier devient déterministe, non modifiable à la main par l'équipe.
 
-La réserve est divisée en 20 tranches :
+La réserve est découpée en 20 tranches :
 
 ```text
 20 * 3,000,000 ATH = 60,000,000 ATH
 ```
 
-Chaque tranche a un multiplicateur :
+Chaque tranche porte un multiplicateur :
 
 ```text
 x2, x3, x4, ..., x21
 ```
 
-Cela crée un escalier de prix régulier. À mesure que la popularité du projet croît, le marché reçoit une offre d'ATH supplémentaire, mais chaque tranche suivante est plus chère que la précédente. La demande précoce ne heurte pas immédiatement un pool faible, et la croissance des prix ne devient pas un mur vertical qui rend le jeton utilitaire peu pratique à utiliser.
+Cela crée une échelle de prix régulière. À mesure que le projet gagne en popularité, le marché reçoit une offre supplémentaire d'ATH, mais chaque tranche suivante est plus chère que la précédente. La demande précoce ne frappe pas d'un coup un pool mince, et la hausse ne se transforme pas en mur vertical qui rendrait un jeton utilitaire inconfortable à utiliser.
 
 Formule d'achat :
 
@@ -460,7 +420,7 @@ Formule d'achat :
 price = ceil(base_tranche_price * current_multiplier * amount / 3,000,000 ATH)
 ```
 
-`base_tranche_price` est gelé après le lancement du pool et correspond exactement à la preuve de tarification x1.
+`base_tranche_price` est gelé après le lancement du pool et correspond exactement à la preuve de prix x1.
 
 Au prix de lancement `1 ATH = 0.001 GRAM`, le prix x1 d'une tranche est :
 
@@ -468,7 +428,7 @@ Au prix de lancement `1 ATH = 0.001 GRAM`, le prix x1 d'une tranche est :
 3,000,000 ATH * 0.001 GRAM = 3,000 GRAM
 ```
 
-Par conséquent :
+D'où :
 
 | Tranche | Multiplicateur | Prix pour 3M ATH | Prix pour 1 ATH |
 | ---: | ---: | ---: | ---: |
@@ -480,82 +440,82 @@ Par conséquent :
 | ... | ... | ... | ... |
 | 20 | x21 | 63,000 GRAM | 0.021 GRAM |
 
-Un achat unique ne peut pas franchir une limite de tranche. Cela empêche d'acheter de l'ATH de la tranche suivante au prix de la tranche précédente.
+Un achat unique ne peut pas franchir une limite de tranche. Cela empêche d'acquérir l'ATH de la tranche suivante au prix de la précédente.
 
-Le revenu en GRAM n'est reconnu qu'après la livraison de l'ATH à l'acheteur. Si le transfert d'ATH échoue ou rebondit, la réserve est restaurée, l'acheteur récupère le principal en GRAM payé, et le dû de trésorerie n'augmente pas.
+Le produit en GRAM n'est comptabilisé qu'après livraison de l'ATH à l'acheteur. Si le transfert d'ATH échoue ou rebondit, la réserve est rétablie, l'acheteur récupère le principal en GRAM versé, et la dette de trésorerie n'augmente pas.
 
-Une fois la dernière tranche x21 vendue, MarketStabilitySeller ne régule plus le prix de l'ATH. À partir de ce point, le prix est entièrement déterminé par le marché : liquidité, offre disponible, demande de noms `.ath`, mises à jour d'avatar, réductions de frais de protocole Vault après l'airdrop, et pression de rachat/destruction.
+Une fois la tranche finale x21 vendue, MarketStabilitySeller ne régule plus le prix d'ATH. À partir de là, le prix est entièrement fixé par le marché : liquidité, offre disponible, demande de noms `.ath`, mises à jour d'avatar, remises de frais après l'airdrop, et pression de rachat et de destruction.
 
-Même au palier x21, la valorisation de référence demeure modérée par rapport au modèle d'utilité :
+Même au palier x21, la valorisation de référence reste modérée au regard du modèle d'utilité :
 
 ```text
 1 ATH = 0.021 GRAM
 100,000,000 ATH = 2,100,000 GRAM
 ```
 
-Au palier x21, MarketStabilitySeller a terminé sa libération de réserve programmée. Après cela, le prix de l'ATH est entièrement déterminé par le marché : liquidité, demande d'usage, offre disponible, et pression de rachat/destruction. La seule allocation de protocole restante est le calendrier de vesting lent à long terme, plafonné à `100,000 ATH` par an.
+Au palier x21, MarketStabilitySeller a achevé la libération programmée de sa réserve. Ensuite, le prix d'ATH est entièrement fixé par le marché, via la liquidité, la demande d'usage, l'offre disponible et la pression de rachat et de destruction. La seule distribution de protocole restante est le calendrier lent du vesting à long terme, plafonné à `100,000 ATH` par an.
 
 ## Compartiments de trésorerie et de destruction
 
-UsernameRegistry et ProfileRegistry utilisent le même modèle de partage des frais ATH :
+UsernameRegistry et ProfileRegistry utilisent le même modèle de partage des frais en ATH :
 
 ```text
 accepted ATH fee -> 50% treasury_due_ath + 50% burn_due_ath
 ```
 
-Le vidage du dû de trésorerie envoie l'ATH au récepteur de trésorerie via le portefeuille ATH officiel.
+Vider la dette de trésorerie envoie l'ATH à la personne destinataire de la trésorerie via le portefeuille ATH officiel.
 
-Le vidage du dû de destruction envoie une requête de destruction d'ATH via le portefeuille ATH officiel. L'offre ne diminue qu'après la finalisation de la destruction dans ATHMaster.
+Vider la dette de destruction envoie une demande de destruction d'ATH par le portefeuille ATH officiel. L'offre ne diminue qu'après finalisation de la destruction dans ATHMaster.
 
-Les voies d'échec et de rebond restaurent les compartiments de dû. La comptabilité est préservée jusqu'à ce que le transfert ou la destruction en aval soit achevé.
+Les voies d'échec et de rebond rétablissent les compartiments de dette. La comptabilité est conservée jusqu'à l'achèvement du transfert ou de la destruction en aval.
 
-## Comptabilité de l'ATHWallet
+## Comptabilité ATHWallet
 
-Les soldes ATH résident dans des contrats ATHWallet déterministes.
+Les soldes d'ATH résident dans des contrats ATHWallet déterministes.
 
-ATHWallet gère :
+ATHWallet prend en charge :
 
-- le crédit de l'offre de genèse ;
+- le crédit de l'émission de genèse ;
 - le transfert ordinaire ;
 - le transfert avec notification ;
-- la notification de mint de nom d'utilisateur ;
-- la notification d'avatar de profil ;
-- la requête de destruction ;
-- l'accusé de réception de notification ;
-- l'élagage des notifications périmées ;
-- la récupération sur rebond/échec.
+- la notification de frappe de nom ;
+- la notification d'avatar ;
+- la demande de destruction ;
+- l'accusé de réception d'une notification ;
+- l'élagage d'une notification périmée ;
+- la reprise après rebond ou échec.
 
-Les contrats qui acceptent l'ATH comme paiement n'acceptent pas de messages directs provenant d'adresses arbitraires. Ils n'acceptent des notifications que de leur ATHWallet officiel. L'authentification du portefeuille source est effectuée à l'intérieur de l'ATHWallet via une dérivation de portefeuille déterministe.
+Les contrats qui acceptent l'ATH en paiement n'acceptent pas de messages directs d'adresses arbitraires. Ils n'acceptent des notifications que de leur propre ATHWallet officiel. L'authentification du portefeuille source a lieu à l'intérieur d'ATHWallet, par dérivation déterministe.
 
-ATH expose des points d'entrée de transfert de type TEP-74 pour les outils jetton génériques, mais les actions du protocole Platho utilisent des messages de notification ATH authentifiés. Les intégrations externes ne doivent pas supposer que les flux de notification Platho émettent une `JettonTransferNotification` générique.
+ATH expose des points d'entrée de transfert de type TEP-74 pour l'outillage jetton générique, mais les actions de protocole de Platho utilisent des messages de notification ATH authentifiés. Les intégrations externes ne doivent pas supposer que les flux de notification de Platho émettent un `JettonTransferNotification` générique.
 
-Les transferts internes sortants dans ATHWallet sont protégés par une comptabilité en attente côté source et un accusé de réception côté source. Le solde n'est pas restauré à partir d'un corps de rebond sans preuve d'attente.
+Les transferts internes sortants dans ATHWallet sont protégés par une comptabilité des opérations en attente côté source et par un accusé côté source. Un solde n'est pas rétabli à partir du corps d'un rebond sans preuve d'une opération en attente.
 
-## Cycle de vie de l'ATH
+## Cycle de vie d'ATH
 
-1. `ATHMaster` crée une offre fixe de `100,000,000 ATH`.
-2. Le déploiement de trésorerie à usage unique reçoit l'offre dans le portefeuille ATH de la trésorerie.
-3. L'offre est répartie entre activité, liquidité, vesting à long terme et stabilité du marché.
-4. Les utilisateurs publient des messages via Vault.
-5. Une publication réussie crédite une récompense d'activité de `10 ATH`.
-6. Une fois la totalité de l'airdrop d'activité de `15,000,000 ATH` distribuée et `airdrop_remaining_ath == 0`, les réductions de frais de protocole ATH se débloquent.
+1. `ATHMaster` crée l'offre fixe de `100,000,000 ATH`.
+2. Un déploiement de trésorerie unique reçoit l'offre dans le portefeuille ATH de trésorerie.
+3. L'offre est répartie entre activité, liquidité, vesting à long terme et stabilité de marché.
+4. Les personnes publient des messages en payant directement depuis leur propre portefeuille.
+5. Une publication réussie crédite `10 ATH` de récompense d'activité.
+6. Une fois l'airdrop d'activité de `15,000,000 ATH` entièrement distribué et `airdrop_remaining_ath == 0`, les remises de frais se débloquent.
 7. Le pool ATH/GRAM est lancé au prix de référence `1 ATH = 0.001 GRAM`.
-8. Les preuves de route post-pool et les preuves de tarification sont gelées.
-9. MarketStabilitySeller vend la réserve via les tranches x2..x21.
-10. Une fois le partage activé, FeeAccumulator divise les frais de protocole en GRAM entre trésorerie et rachat.
-11. BuybackBurn achète de l'ATH avec les frais de protocole en GRAM et détruit l'ATH via ATHMaster.
-12. Les frais de nom d'utilisateur et de profil créent un dû de trésorerie ATH et un dû de destruction ATH.
-13. L'offre totale diminue progressivement via des destructions authentifiées.
+8. Les preuves de route et de prix postérieures au pool sont gelées.
+9. MarketStabilitySeller vend la réserve par les tranches x2..x21.
+10. Le partage activé, FeeAccumulator répartit les frais en GRAM entre trésorerie et rachat.
+11. BuybackBurn achète de l'ATH avec les frais en GRAM et le détruit via ATHMaster.
+12. Les frais de nom et de profil créent une dette de trésorerie en ATH et une dette de destruction en ATH.
+13. L'offre totale diminue progressivement par destructions authentifiées.
 
 ## Modèle final
 
 ATH relie quatre couches de Platho :
 
-1. **Usage de l'application** - les messages créent des récompenses d'activité.
-2. **Fonctionnalités payantes** - les noms d'utilisateur et les avatars requièrent de l'ATH.
-3. **Réductions** - le solde ATH réduit les frais de protocole après le seuil de distribution.
-4. **Réduction de l'offre** - une partie des frais ATH et de la sortie de rachat est détruite via ATHMaster.
+1. **Usage de l'application** — les messages créent des récompenses d'activité.
+2. **Fonctions payantes** — noms et avatars exigent de l'ATH.
+3. **Remises** — un solde d'ATH réduit les frais de protocole après la porte de distribution.
+4. **Réduction de l'offre** — une partie des frais en ATH et du produit du rachat est détruite via ATHMaster.
 
-Le modèle commence avec une offre fixe et une valorisation de référence de `100,000 GRAM`. La distribution principale aux utilisateurs est liée à un usage payant réel : les messages partent de `0.0337 GRAM` — actuellement `0.0337 GRAM` pour une publication publique de 1 KiB et `0.0347 GRAM` pour une capsule privée hybride de 1 KiB, plus un bonus d'activité de `10 ATH` par capsule finalisée. Les classes de taille publiques ou privées plus grandes coûtent davantage. Ce bonus n'est ni un remboursement, ni un dédommagement, ni une promesse de profit. Une fois les premiers 15 % de l'offre distribués, le pool est lancé, les réductions de frais de protocole se débloquent, et la voie de rachat s'ouvre.
+Le modèle part d'une offre fixe et d'une valorisation de référence de `100,000 GRAM`. La distribution primaire est liée à un usage réel et payant : les messages partent de `0.0191 GRAM` — aujourd'hui `0.0191 GRAM` pour un message privé et `0.0203 GRAM` pour une publication publique — plus une prime d'activité de `10 ATH` par capsule finalisée. Les classes de taille publiques ou privées supérieures coûtent davantage. Cette prime n'est ni un remboursement, ni une indemnisation, ni une promesse de profit. Une fois les premiers 15% de l'offre distribués, le pool est lancé, les remises de frais se débloquent et la voie du rachat s'ouvre.
 
-ATH existe en tant que jeton opérationnel à l'intérieur de Platho : il est distribué via l'activité, utilisé dans des actions payantes, réduit les frais de protocole, est vendu depuis la réserve via un escalier défini, et est détruit via une destruction on-chain. Après l'escalier de stabilité du marché, le prix futur de l'ATH est déterminé par le marché et l'usage du protocole.
+ATH existe comme jeton de travail au sein de Platho : il est distribué par l'activité, utilisé dans des actions payantes, réduit les frais de protocole, est vendu depuis la réserve selon une échelle définie, et est détruit on-chain. Passée l'échelle de stabilité de marché, le prix futur d'ATH est déterminé par le marché et par l'usage du protocole.
