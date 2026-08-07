@@ -57,6 +57,13 @@ const ROOT_RUNTIME_FILES = new Set([
   'profile-avatar-media-store.mjs',
   'webp-encoder.mjs',
   'qr-code.mjs',
+  // Standalone diagnostic page at /bench-scan.html, not linked from the app and not precached by the service
+  // worker. It times the SHIPPED first-contact scan on the device it is opened on, which is the one number no
+  // desktop measurement can produce and the one that decides how many users the design carries. It exists because
+  // the fast path added in v881 may or may not engage on an older phone, and "may or may not" is not an answer.
+  'bench-scan.html',
+  'bench-scan.js',
+  'bench-scan.css',
   // clean-17 direct-pay lanes. These modules are imported (transitively) by app.js and MUST ship in the bundle —
   // WEB-GRAPH-01 walks the import graph from app.js and a module missing here 404s in production and bricks boot.
   // The private conversation lane (CONV), first-contact INTRO, RECOVERY, the public/avatar lane (PUBLIC), and the
