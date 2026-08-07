@@ -98,22 +98,11 @@ Imbalan per penerbitan yang berhasil:
 10 ATH
 ```
 
-Imbalan bertambah bagi pihak yang menerbitkan dalam bentuk kredit: satu kapsul yang diterima adalah satu kredit, dan satu kredit adalah `10 ATH`, sama di semua jalur. Kredit menumpuk di akun milik pihak penerbit sendiri (`AirdropTicket`, satu per dompet) dan ditebus secara berkelompok dari `AirdropPool`; ATH-nya masuk ke dompet ATH miliknya sendiri.
+Setiap kapsul yang diterima memberi pengirimnya `10 ATH`, sama di semua jalur. Upaya penerbitan yang gagal tidak memberi apa pun.
 
-Upaya penerbitan yang gagal tidak menghasilkan imbalan aktivitas.
+Pembayaran dilakukan berkelompok, bukan per kapsul. Setiap pengiriman menanggung biaya tetap yang tidak dapat ditarik kembali sekitar `0.0166 GRAM`, dan biaya itu tidak bergantung pada berapa banyak ATH yang dibawanya. Membayar setelah setiap kapsul akan menelan lebih banyak daripada yang dikumpulkan kapsul-kapsul itu sebagai biaya protokol, karena itu imbalan menumpuk dan datang dalam satu pembayaran.
 
-Pembukuan imbalan:
-
-```text
-credits += 1                 // satu kredit = 10 ATH
-airdrop_remaining -= 10 ATH
-```
-
-Anggarannya kelipatan pas dari imbalan: `15,000,000 ATH` sama dengan `1,500,000` kredit. Begitu habis, imbalan aktivitas baru berhenti.
-
-Airdrop aktivitas dijamin oleh dompet ATH resmi `AirdropPool`, dan di sanalah `15,000,000 ATH` itu berada.
-
-Pembayaran dilakukan berkelompok, bukan per kapsul. Setiap pengiriman menanggung biaya tetap yang tidak dapat ditarik kembali sekitar `0.0166 GRAM`, dan biaya itu tidak bergantung pada berapa banyak kredit yang dibawanya. Membayar per kapsul untuk 1,500,000 kapsul akan membakar lebih banyak daripada yang dikumpulkan kapsul-kapsul itu sebagai biaya protokol, karena itu kredit menumpuk dan ditebus dalam kelompok.
+Airdrop dijamin oleh dompet ATH resmi `AirdropPool`, dan di sanalah `15,000,000 ATH` itu berada. Begitu habis, imbalan aktivitas berhenti.
 
 ## Harga aktivitas
 

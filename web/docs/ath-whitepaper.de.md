@@ -98,22 +98,11 @@ Belohnung je erfolgreicher Veröffentlichung:
 10 ATH
 ```
 
-Die Belohnung fällt der veröffentlichenden Person als Guthabenposten zu: eine angenommene Kapsel ist ein Posten und ein Posten sind `10 ATH` — auf jeder Spur gleich. Die Posten sammeln sich im eigenen Konto der veröffentlichenden Person (`AirdropTicket`, eines je Wallet) und werden gebündelt aus `AirdropPool` eingelöst; das ATH landet in ihrer eigenen ATH-Wallet.
+Jede angenommene Kapsel bringt der sendenden Person `10 ATH` — auf jeder Spur gleich. Ein fehlgeschlagener Veröffentlichungsversuch bringt nichts.
 
-Fehlgeschlagene Veröffentlichungsversuche erzeugen keine Aktivitätsbelohnung.
+Ausgezahlt wird in Bündeln, nicht je Kapsel. Jede Zustellung trägt feste, nicht rückholbare Kosten von rund `0.0166 GRAM`, und diese Kosten hängen nicht davon ab, wie viel ATH die Zustellung transportiert. Nach jeder Kapsel auszuzahlen würde mehr kosten, als diese Kapseln an Protokollgebühren einbringen; deshalb sammelt sich die Belohnung an und kommt in einer Zahlung.
 
-Verbuchung der Belohnung:
-
-```text
-credits += 1                 // ein Posten = 10 ATH
-airdrop_remaining -= 10 ATH
-```
-
-Das Budget ist ein exaktes Vielfaches der Belohnung: `15,000,000 ATH` sind `1,500,000` Posten. Sind sie aufgebraucht, enden neue Aktivitätsbelohnungen.
-
-Der Aktivitäts-Airdrop ist durch die offizielle ATH-Wallet von `AirdropPool` gedeckt — dort liegen diese `15,000,000 ATH`.
-
-Ausgezahlt wird in Bündeln, nicht je Kapsel. Jede Zustellung trägt feste, nicht rückholbare Kosten von rund `0.0166 GRAM`, und diese Kosten hängen nicht davon ab, wie viele Posten die Zustellung transportiert. Eine Auszahlung je Kapsel über 1,500,000 Kapseln würde mehr verbrennen, als diese Kapseln an Protokollgebühren einbringen; deshalb sammeln sich die Posten und werden gebündelt eingelöst.
+Der Airdrop ist durch die offizielle ATH-Wallet von `AirdropPool` gedeckt — dort liegen diese `15,000,000 ATH`. Sind sie aufgebraucht, enden die Aktivitätsbelohnungen.
 
 ## Preis der Aktivität
 

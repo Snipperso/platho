@@ -98,22 +98,14 @@ Reward per successful publish:
 10 ATH
 ```
 
-The reward accrues to the publisher as a credit: one accepted capsule is one credit is `10 ATH`, the same on every lane. Credits accumulate in the publisher's own account (`AirdropTicket`, one per wallet) and are redeemed in batches from `AirdropPool`; the ATH arrives in the user's own ATH wallet.
+Every accepted capsule earns the sender `10 ATH`, the same on every lane. A failed publish attempt earns nothing.
 
-Failed publish attempts create no activity rewards.
+Payout runs in batches rather than per capsule. Every delivery carries a fixed unrecoverable cost of roughly
+`0.0166 GRAM`, and that cost does not depend on how much ATH the delivery carries. Paying out after every capsule would
+cost more than those capsules collect in protocol fees, so the reward accumulates and arrives in one payment.
 
-Reward accounting:
-
-```text
-credits += 1                 // one credit = 10 ATH
-airdrop_remaining -= 10 ATH
-```
-
-The budget is an exact multiple of the reward: `15,000,000 ATH` is `1,500,000` credits. Once they are exhausted, new activity rewards stop.
-
-The activity airdrop is backed by the official ATH wallet of `AirdropPool`, which is where those `15,000,000 ATH` sit.
-
-Payout runs in batches rather than per capsule. Every delivery carries a fixed unrecoverable cost of roughly `0.0166 GRAM`, and that cost does not depend on how many credits the delivery carries. Paying out per capsule across 1,500,000 capsules would burn more than those capsules collect in protocol fees, so credits accumulate and are redeemed in batches.
+The airdrop is backed by the official ATH wallet of `AirdropPool`, which is where those `15,000,000 ATH` sit. When they
+run out, activity rewards stop.
 
 ## Activity Price
 

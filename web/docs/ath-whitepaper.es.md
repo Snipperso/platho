@@ -98,22 +98,11 @@ Recompensa por publicación exitosa:
 10 ATH
 ```
 
-La recompensa se acumula para quien publica en forma de crédito: una cápsula aceptada es un crédito, y un crédito son `10 ATH`, igual en todos los carriles. Los créditos se acumulan en la cuenta propia de quien publica (`AirdropTicket`, una por wallet) y se canjean por lotes desde `AirdropPool`; el ATH llega a la wallet ATH de la propia persona usuaria.
+Cada cápsula aceptada aporta `10 ATH` a quien la envía, igual en todos los carriles. Un intento fallido de publicación no aporta nada.
 
-Los intentos fallidos de publicación no generan recompensas por actividad.
+El pago se realiza por lotes, no cápsula a cápsula. Cada entrega arrastra un coste fijo no recuperable de unos `0.0166 GRAM`, y ese coste no depende de cuánto ATH lleve la entrega. Pagar después de cada cápsula costaría más de lo que esas cápsulas recaudan en comisiones de protocolo, así que la recompensa se acumula y llega en un solo pago.
 
-Contabilidad de la recompensa:
-
-```text
-credits += 1                 // un crédito = 10 ATH
-airdrop_remaining -= 10 ATH
-```
-
-El presupuesto es un múltiplo exacto de la recompensa: `15,000,000 ATH` son `1,500,000` créditos. Cuando se agotan, cesan las nuevas recompensas por actividad.
-
-El airdrop por actividad está respaldado por la wallet ATH oficial de `AirdropPool`, que es donde residen esos `15,000,000 ATH`.
-
-El pago se realiza por lotes, no cápsula a cápsula. Cada entrega arrastra un coste fijo no recuperable de unos `0.0166 GRAM`, y ese coste no depende de cuántos créditos lleve la entrega. Pagar cápsula a cápsula a lo largo de 1,500,000 cápsulas quemaría más de lo que esas cápsulas recaudan en comisiones de protocolo, así que los créditos se acumulan y se canjean en lotes.
+El airdrop está respaldado por la wallet ATH oficial de `AirdropPool`, que es donde residen esos `15,000,000 ATH`. Cuando se agoten, cesan las recompensas por actividad.
 
 ## Precio de la actividad
 
