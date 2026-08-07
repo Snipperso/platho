@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=41';
+} from './i18n.mjs?v=42';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v875';
+const PLATHO_APP_RUNTIME_VERSION = 'v876';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -23927,6 +23927,9 @@ async function refreshVaultActivationStatus(options = {}) {
     };
     globalThis.plathoVaultBinding = { walletAddress: forWallet, user, keyRecord: null };
     setText(vaultRecordStatus, t('vault.activated'));
+    // The chain has just confirmed this wallet's keys are registered. Once per wallet, this is where the welcome
+    // comes from — see maybeShowActivationWelcome for why the trigger is here and not at the activation send.
+    maybeShowActivationWelcome(forWallet);
     refreshMessageActionStatuses();
     refreshMessagingControls();
     refreshComposerPublishPolicy();
@@ -24757,6 +24760,9 @@ let quickStartBackupMode = false;
 
 function closeQuickStart() {
   if (quickStartDialog) quickStartDialog.hidden = true;
+  // Every exit runs through here — finish, ✕ and skip-out alike — so the deferred welcome is released once, from
+  // one place, whichever way the overlay was left.
+  flushPendingActivationWelcome();
   if (!quickStartBackupMode) {
     // Explicit dismissal (X / Skip-out): stop onboarding for good AND drop the in-progress resume marker.
     try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
@@ -24771,6 +24777,73 @@ function finishQuickStart() {
   closeQuickStart();
   flashWalletIdentityStatus(t('quickstart.setupComplete'));
 }
+
+// ── ACTIVATION WELCOME ────────────────────────────────────────────────────────────────────────────────────────
+//
+// Activation used to complete in silence: the button vanished and nothing said what had changed (owner,
+// 2026-08-07). It is also the single moment a user is certain to read something, so the two facts they cannot
+// undo afterwards — nothing is deletable, public is public — are stated here rather than in a document nobody opens.
+//
+// THE TRIGGER IS THE CHAIN, NOT THE BROADCAST. It fires where refreshVaultActivationStatus has just read the
+// user's OWN KeyShard and found their current keys registered. An activation external can be accepted by an RPC
+// and never land; congratulating someone on an activation that did not happen is the same optimistic lie the send
+// lanes were cured of this week.
+const activationWelcomeDialog = document.querySelector('#activationWelcomeDialog');
+const activationWelcomeCloseButton = document.querySelector('#activationWelcomeCloseButton');
+const activationWelcomeStartButton = document.querySelector('#activationWelcomeStartButton');
+const ACTIVATION_WELCOME_SHOWN_KEY_PREFIX = 'platho.activationWelcome.v1.';
+// Shown once per WALLET: a second wallet on the same device is a different account and deserves its own briefing.
+const activationWelcomeShownThisSession = new Set();
+// Set when the account went active while the quick-start overlay owned the screen. Stacking a second backdrop over
+// it is the v473 Telegram trap — both are .modal-backdrop, the later one paints on top and swallows the pointer, and
+// in a Mini App that wedged the flow outright. So the welcome waits and becomes the LAST thing quick-start shows.
+let pendingActivationWelcomeWallet = null;
+
+function activationWelcomeStorageKey(walletAddress) {
+  const raw = rawWalletAddress(walletAddress);
+  return raw ? `${ACTIVATION_WELCOME_SHOWN_KEY_PREFIX}${raw}` : null;
+}
+
+function activationWelcomeAlreadyShown(walletAddress) {
+  const key = activationWelcomeStorageKey(walletAddress);
+  if (!key) return true;                                       // nothing to key it to — never pop it blind
+  if (activationWelcomeShownThisSession.has(key)) return true; // covers a browser with no usable localStorage
+  try { return globalThis.localStorage?.getItem(key) === '1'; } catch { return false; }
+}
+
+function markActivationWelcomeShown(walletAddress) {
+  const key = activationWelcomeStorageKey(walletAddress);
+  if (!key) return;
+  activationWelcomeShownThisSession.add(key);
+  try { globalThis.localStorage?.setItem(key, '1'); } catch { /* private mode / quota: the session set still holds */ }
+}
+
+function openActivationWelcomeDialog() {
+  if (activationWelcomeDialog) activationWelcomeDialog.hidden = false;
+}
+
+function closeActivationWelcomeDialog() {
+  if (activationWelcomeDialog) activationWelcomeDialog.hidden = true;
+}
+
+function maybeShowActivationWelcome(walletAddress) {
+  if (!walletAddress || activationWelcomeAlreadyShown(walletAddress)) return;
+  if (quickStartDialog && !quickStartDialog.hidden) { pendingActivationWelcomeWallet = walletAddress; return; }
+  markActivationWelcomeShown(walletAddress);
+  openActivationWelcomeDialog();
+}
+
+/** Quick-start has released the screen — show the welcome it deferred, if the account went active during it. */
+function flushPendingActivationWelcome() {
+  const wallet = pendingActivationWelcomeWallet;
+  pendingActivationWelcomeWallet = null;
+  if (!wallet || activationWelcomeAlreadyShown(wallet)) return;
+  markActivationWelcomeShown(wallet);
+  openActivationWelcomeDialog();
+}
+
+activationWelcomeCloseButton?.addEventListener('click', () => closeActivationWelcomeDialog());
+activationWelcomeStartButton?.addEventListener('click', () => closeActivationWelcomeDialog());
 
 // Resume the stepper at a specific step (reload / after a background auto-lock + unlock). Unlike openQuickStart,
 // it skips the welcome view and jumps straight to where the user left off.
