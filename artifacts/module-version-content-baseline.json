@@ -68,12 +68,12 @@
     "sha256": "1f83a49ba2e76453971374cef1344020af72e96f5045e6dcdf45aa418d297aff"
   },
   "i18n-strings.mjs": {
-    "version": "44",
-    "sha256": "56f5d6af5edd835cc17590b6f7864f60ecd0b644e0af267c85864bb379585cec"
+    "version": "45",
+    "sha256": "018fbad457c4102a33ed85c62908511f8b344af59cecf1fe4d16ee6fa15091c0"
   },
   "i18n.mjs": {
-    "version": "42",
-    "sha256": "c4b09b5976fa6686ecbf08e2e2152ea197ad4d8cd8e14739bf6d8350292d282b"
+    "version": "43",
+    "sha256": "076de6915a16bdd71fc90d9abc4947755c373bfba4815c63766a381261ebfd2d"
   },
   "intro-bucket.mjs": {
     "version": "12",

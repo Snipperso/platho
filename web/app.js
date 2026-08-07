@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=42';
+} from './i18n.mjs?v=43';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -235,7 +235,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v877';
+const PLATHO_APP_RUNTIME_VERSION = 'v878';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -14298,7 +14298,7 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
   // No Vault hold under direct-pay (see composerKnownVaultTonShortfall) — do not show the "need hold … vault 0" warning.
   if (!privateLaneDirectPayEnabled() && user?.exists === true && vaultTonBalanceNanotons(user) < hold) {
     return {
-      text: t('composer.needHoldStatus', { hold: formatTonNanotons(hold), vault: formatTonNanotons(vaultTonBalanceNanotons(user)) }),
+      text: t('composer.needHoldStatus', { hold: formatTonNanotons(hold), available: formatTonNanotons(vaultTonBalanceNanotons(user)) }),
       state: 'short',
       parts,
     };
