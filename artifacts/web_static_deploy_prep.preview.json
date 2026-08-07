@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-07T18:34:24.238Z",
+  "generatedAt": "2026-08-07T19:11:08.120Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,9 +8,9 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 223,
-    "totalBytes": 5529689,
-    "bundleSha256": "ea7f33dc753f2455449cc15dfff9e56f47a567e56d0c017477d22d5be73fb95e",
+    "fileCount": 226,
+    "totalBytes": 5538549,
+    "bundleSha256": "ab58c86118a1321970eeed1def7707befead35042b48e29f557f08f8f93c6844",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -25,7 +25,7 @@
       {
         "path": "app.js",
         "bytes": 1292766,
-        "sha256": "14cba497fe5e9ff22f7a620b2049a7f57abcac739930134f0916c6ed29bf6f27"
+        "sha256": "5f0e1a92f7dc774b9b9e161f24c766cec9246bf3e6863016368dab4612724745"
       },
       {
         "path": "assets/icons/about.svg",
@@ -256,6 +256,21 @@
         "path": "ath-ton-rpc-provider.mjs",
         "bytes": 6593,
         "sha256": "569096fcbd844c4a6ab89f00425945d1ce57c6cc8295e4684d8e92cdb70f0981"
+      },
+      {
+        "path": "bench-scan.css",
+        "bytes": 1734,
+        "sha256": "bb505b8b73a02c110def6abad4312f77bbe644a33ebdcf463f55a4bf146123a6"
+      },
+      {
+        "path": "bench-scan.html",
+        "bytes": 1770,
+        "sha256": "3f272a3d2c3b469177d0042ae2ade2ae2331e256a526c0df4a643d5d392dc989"
+      },
+      {
+        "path": "bench-scan.js",
+        "bytes": 5356,
+        "sha256": "8ba62b619b2462e3422fe3286466d51287e5f3af25c5b15b29b96ebc0af6a07c"
       },
       {
         "path": "boot-guard.js",
@@ -505,7 +520,7 @@
       {
         "path": "index.html",
         "bytes": 63216,
-        "sha256": "360e767f3116dd306042c356af9b35133630cd7d4c8422cfcd17400ec6ba5569"
+        "sha256": "419bdc0c8c86458ee4fdd75a9a81ad264315d804e7feafc2b3dde1f619977371"
       },
       {
         "path": "intro-bucket.mjs",
@@ -735,7 +750,7 @@
       {
         "path": "sw.js",
         "bytes": 8227,
-        "sha256": "0854bdbeb69b9dc5967654f671680e454e21f5f6e86e2e0bd30104435a923713"
+        "sha256": "c05e6620ce3de9a98e8ed8581d07a04fafb2887ab765ae5572d010e0f48bc73e"
       },
       {
         "path": "ton-dns-provider.mjs",

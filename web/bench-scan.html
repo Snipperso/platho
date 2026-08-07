@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0d0f">
+    <meta name="color-scheme" content="dark">
+    <title>Platho scan benchmark</title>
+    <link rel="stylesheet" href="./bench-scan.css">
+  </head>
+  <body>
+    <main>
+      <h1>First-contact scan benchmark</h1>
+
+      <p>
+        This measures one number: how long this device takes to check a single incoming first-contact record.
+        It is the only work in Platho that grows with how busy the whole network is, so it decides how many
+        users the design can carry. Nothing is sent anywhere — the page generates its own random keys, measures
+        locally, and shows the result.
+      </p>
+
+      <button id="run" type="button">Run the measurement</button>
+      <p id="status" role="status">Takes a few seconds. Keep the screen on and this tab in front.</p>
+
+      <section id="result" hidden>
+        <h2>Result</h2>
+        <dl id="summary"></dl>
+
+        <h2>What that means at scale</h2>
+        <p class="note">
+          Seconds of CPU this device would spend per day, if it stayed reachable while the whole network
+          exchanged this many first contacts daily. Established conversations cost nothing here.
+        </p>
+        <table id="curve">
+          <thead>
+            <tr><th>network first contacts per day</th><th>seconds per day on this device</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <button id="copy" type="button">Copy result as text</button>
+        <pre id="raw"></pre>
+      </section>
+    </main>
+    <script type="module" src="./bench-scan.js"></script>
+  </body>
+</html>

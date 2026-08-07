@@ -1,0 +1,60 @@
+/* Standalone diagnostic page. It deliberately does NOT reuse styles.css: that sheet lays out the app shell, and a
+   bare page borrowing it would render inside a layout that has no place to put this. A strict CSP (style-src 'self')
+   also rules out inline styles, so this file exists rather than a style attribute. */
+
+:root { color-scheme: dark; }
+
+body {
+  margin: 0;
+  padding: 24px 18px 64px;
+  background: #0b0d0f;
+  color: #e8ecef;
+  font: 16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+main { max-width: 680px; margin: 0 auto; }
+
+h1 { font-size: 22px; margin: 0 0 16px; }
+h2 { font-size: 17px; margin: 28px 0 10px; }
+p { margin: 0 0 16px; }
+
+.note { color: #9aa4ad; font-size: 14px; }
+
+button {
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  background: #2f6df6;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 13px 20px;
+  min-height: 46px;
+  cursor: pointer;
+}
+
+button:disabled { background: #33404d; color: #8b98a5; cursor: default; }
+
+#status { color: #9aa4ad; font-size: 14px; margin-top: 12px; }
+
+dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0 0 8px; }
+dt { color: #9aa4ad; }
+dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #1e262e; }
+th { color: #9aa4ad; font-weight: 500; font-size: 14px; }
+td:last-child, th:last-child { text-align: right; }
+
+pre {
+  margin: 16px 0 0;
+  padding: 12px;
+  background: #11161b;
+  border-radius: 10px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.verdict-good { color: #4ec98a; }
+.verdict-slow { color: #f0b429; }
