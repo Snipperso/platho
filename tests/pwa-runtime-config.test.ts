@@ -594,7 +594,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/createWalletReceiveQrNode/);
     expect(app).toMatch(/createQrSvgDataUrl/);
     expect(app).toMatch(/submitWalletTonTransfer/);
-    expect(enCopy).toMatch(/local Platho wallet, not Vault/);
+    // The "Source" row still names where the GRAM comes from. It used to add "not Vault" — copy from an architecture
+    // that was deleted, which VAULTWORD-01 now forbids outright (owner, 2026-08-07).
+    expect(enCopy).toMatch(/local Platho wallet/);
     expect(app).toMatch(/GRAM transfer submitted/);
     expect(app).toMatch(/confirmWalletPasswordForExport/);
     expect(app).toMatch(/lockPlathoWallet/);
