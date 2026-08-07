@@ -330,7 +330,7 @@ UsernameRegistry 只接受恰好等于价格的金额。少付与多付都不会
 
 来自用户名铸造的 ATH，只有在对应 item 的部署得到确认之后，才成为协议收入。
 
-用户名的权威被刻意拆分：`UsernameRegistry` 把名称锚定到唯一确切的 `UsernameNFTItem`，而 item 的状态承载当前所有者。转移 item 即转移名称。item 提供标准 NFT 数据与链上 TEP-64 元数据，其中包含 `name = <username>.ath`；它的元数据不依赖任何 Platho 服务器。名称字节按字面处理，不做显示层归一化：只要每个字节都属于允许集合 `a-z`、`0-9`、`_`、`-`，且长度在 4..16 之间，带前导、尾随、连续或全部为分隔符的名称都是有效的。若 item 部署已经发起、但其 ACK 始终未抵达注册表，`PrunePendingUsernameMint` 刻意保持非破坏性：它不猜测失败，不删除待定状态，也不创建退款应付项。恢复路径是迟到的 `UsernameItemDeployedAck` 或 `UsernameNFTItem.ResendDeployedAck`，因此一个已初始化的 item 仍可成为权威。若 item 部署确实回弹，注册表会请求官方 ATH 钱包退回待定通知。一个已部署的 `UsernameNFTItem`，若 `UsernameRegistry.name_records[name_hash]` 并未指向这个确切的 item，则不具权威：客户端、索引器与界面不得仅凭该 item 就认定 `.ath` 名称的归属，也不得在发生转移之后仍以注册表记录中的所有者为当前所有者。
+用户名的权威被刻意拆分：`UsernameRegistry` 把名称锚定到唯一确切的 `UsernameNFTItem`，而 item 的状态承载当前所有者。转移 item 即转移名称。item 提供标准 NFT 数据与链上 TEP-64 元数据，其中包含 `name = <username>.ath`；它的元数据不依赖任何 Platho 服务器。名称字节按字面处理，不做显示层归一化：只要每个字节都属于允许集合 `a-z`、`0-9`、`_`、`-`，且长度在 4..16 之间，带前导、尾随、连续或全部为分隔符的名称都是有效的。若 item 部署已经发起、但其 ACK 始终未抵达注册表，`PrunePendingUsernameMint` 刻意保持非破坏性：它不猜测失败，不删除待定状态，也不创建退款应付项。恢复路径是迟到的 `UsernameItemDeployedAck` 或 `UsernameNFTItem.ResendDeployedAck`，因此一个已初始化的 item 仍可成为权威。若 item 部署确实回弹，注册表会请求官方 ATH 钱包退回待定通知。名称与 item 之间的锚点就是地址推导本身：`UsernameRegistry.get_username_item_address(name_hash)` 给出该名称唯一可能所在的地址。部署在其他任何地址上的 `UsernameNFTItem` 都不具权威：客户端、索引器与界面不得仅凭该 item 就认定 `.ath` 名称的归属，也不得在发生转移之后仍以注册表记录中的所有者为当前所有者。
 
 ## 头像费用
 

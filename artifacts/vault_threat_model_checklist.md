@@ -1,8 +1,17 @@
 # Vault Threat Model Checklist
 
+> **HISTORICAL ONLY — SUPERSEDED.** The `Vault` contract was deleted in clean-17. It held a per-user internal GRAM and
+> ATH balance, a separate auth key, and the authority to fund publishes and discounts. clean-17 has no internal balance
+> and no auth key: every publish is an external message signed by the user's own wallet key and paid directly to the
+> target shard, and messaging keys live in the wallet's own `KeyShard`, addressed by derivation from that wallet.
+>
+> The current protocol is specified in `web/CRYPTO_PROTOCOL.md`. This file is kept for the reasoning it records about
+> ATH notify-flow accounting and bounce recovery, which carried forward into the shard generation. It must not be cited
+> as current behaviour.
+
 Status: local engineering hardening pass, not an independent audit or formal proof.
 
-Date: 2026-05-17
+Date: 2026-05-17 (clean-15 generation)
 
 ## Covered Locally
 

@@ -39,7 +39,11 @@ describe('operator documents describe the contracts that exist', () => {
       const lines = readFileSync(doc, 'utf8').split(/\r?\n/);
       lines.forEach((line, i) => {
         if (!REMOVED.test(line)) return;
-        const window = lines.slice(Math.max(0, i - 1), i + 2).join(' ');
+        // Collapse whitespace before matching. The window is built by joining lines with a space, so a wrapped
+        // sentence produces runs like "`Vault` no      longer exists" — indentation from the next line lands in the
+        // middle of the phrase and `no longer exists` stops matching. The gate then flags a line that is already
+        // saying exactly what it demands. Same defect as the prose pins in spec-onchain-message-source.
+        const window = lines.slice(Math.max(0, i - 1), i + 2).join(' ').replace(/\s+/g, ' ');
         if (MARKS_IT_GONE.test(window)) return;
         live.push(`${doc}:${i + 1}: ${line.trim().slice(0, 150)}`);
       });

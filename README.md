@@ -4,17 +4,17 @@
 
 Platho is a no-backend encrypted messenger PWA and TON smart-contract suite.
 
-The project is designed around a hard constraint: the messenger must remain usable as a static application without a proprietary server. The PWA uses a normal 24-word TON recovery phrase as the single user secret; wallet keys and messaging keys are derived from that phrase. Identity, key publication, and protocol mechanics are anchored in TON contracts; private messages are encrypted client-side and published as CapsuleHub payload cells.
+The project is designed around a hard constraint: the messenger must remain usable as a static application without a proprietary server. External infrastructure of any kind — backend, issuer, relay, indexer — is forbidden by design, not merely unused. The PWA uses a normal 24-word recovery phrase as the single user secret; wallet keys and messaging keys are derived from that phrase. Identity, key publication, and protocol mechanics are anchored in TON contracts; private messages are encrypted client-side and published directly into per-lane shard accounts whose addresses are derived, not looked up.
 
 ## Status
 
-Platho is experimental and pre-mainnet. Several contracts have gone through local engineering review and extended negative tests, but this repository is not a production release and has not completed independent external security review.
+The clean-17 contract generation is deployed and sealed on mainnet, and the PWA runs against it. Contracts are immutable after seal; migration hooks are built in for the next generation.
 
-Do not deploy mainnet production artifacts until the gates in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) pass.
+Platho is still experimental. Every contract has gone through local engineering review and extended negative tests, but the project has not completed independent external security review, and ceremony steps remain open — the activity-airdrop backing in particular. Treat the gates in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) as the authority on what is and is not live.
 
 ## Repository layout
 
-- `contracts/` - Tact smart contracts for Vault, Username Registry, CapsuleHub, ATH, FeeAccumulator, and BuybackBurn.
+- `contracts/` - Tact smart contracts: the message lanes (RecordShard, IntroShard, RecoveryShard, PublicShard, KeyShard), identity (UsernameRegistry, UsernameNFTItem, ProfileRegistry), and the ATH economy (ATHMaster, ATHWallet, AirdropPool, AirdropTicket, ATHVesting, MarketStabilitySeller, FeeAccumulator, BuybackBurn).
 - `web/` - static PWA messenger runtime, crypto protocol docs, service worker, and vendored browser dependencies needed for standalone operation.
 - `tests/` - contract, runtime, crypto, deployment, and pre-production test suites.
 - `scripts/` - build, artifact, route-freeze, readiness, crypto self-test, and static deploy helpers.
@@ -42,7 +42,7 @@ npm run preprod:check
 
 ## Static PWA
 
-The app in `web/` is intentionally serverless. A production bundle must use mainnet configuration, a real Vault chain provider, and no testnet fixtures.
+The app in `web/` is intentionally serverless. A production bundle must use mainnet configuration, real contract addresses, and no testnet fixtures.
 
 Preview bundle:
 

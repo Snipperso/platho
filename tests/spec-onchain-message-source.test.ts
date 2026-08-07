@@ -13,17 +13,37 @@ function EN(...keys: string[]): string {
   return keys.map((k) => (I18N_STRINGS.en as Record<string, string>)[k] ?? '').join('\n');
 }
 
+// SPEC files, not the SHIPPED doc. `web/docs/crypto-protocol.md` used to sit in this list and was pinned to the
+// Vault/CapsuleHub-era wording — "retrievable publish bodies", "PH0B", "surcharge", "accepted transaction body".
+// That made the gate the reason the user-facing text could not be corrected: rewriting it for clean-17 turned this
+// file red (2026-08-07), exactly as PWA-CONFIG-01C did for "local Platho wallet, not Vault".
+//
+// A document a person reads in the app and an internal specification are not the same artefact and must not be held
+// to the same pins. The spec files below still carry that vocabulary and still keep this gate meaningful; the shipped
+// doc now describes what the product actually does.
 const SPEC_FILES = [
   'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
-  'artifacts/M27_INTERFACE_DECISIONS.md',
-  'artifacts/capsulehub_threat_model_checklist.md',
   'web/CRYPTO_PROTOCOL.md',
-  'web/docs/crypto-protocol.md',
   'web/NO_BACKEND_ARCHITECTURE.md',
 ];
 
+// Specs of a generation that no longer exists. `M27_INTERFACE_DECISIONS.md` and `capsulehub_threat_model_checklist.md`
+// document `Vault` and `CapsuleHub`, both DELETED in clean-17, so holding them to current-truth pins would mean either
+// rewriting a historical record into fiction or freezing the current docs to match it. They are quarantined instead —
+// the same treatment SPEC-MSG-SOURCE-00 gives the superseded message-budget specs — and the banner is what this gate
+// enforces. The same applies to `vault_threat_model_checklist.md`, which was never in the active list.
+const QUARANTINED_SPECS = [
+  'artifacts/M27_INTERFACE_DECISIONS.md',
+  'artifacts/capsulehub_threat_model_checklist.md',
+  'artifacts/vault_threat_model_checklist.md',
+];
+
+// The shipped doc is listed HERE and not in SPEC_FILES: it must still be free of the retired message-budget
+// vocabulary — dropping it from the spec list must not quietly drop it from that sweep too — while being free to
+// describe the current protocol in its own words.
 const ACTIVE_INTERFACE_DOCS = [
   ...SPEC_FILES,
+  'web/docs/crypto-protocol.md',
   'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
   'PRODUCTION_READINESS.md',
   'DEPLOYMENT_RUNBOOK.md',
@@ -34,7 +54,27 @@ function read(path: string): string {
   return readFileSync(path, 'utf8');
 }
 
+// Prose pins must not depend on where a paragraph happens to wrap. `web/CRYPTO_PROTOCOL.md` is hard-wrapped at 120
+// columns, so a sentence the gate quotes can be split by a newline in the middle of the phrase and the pin fails
+// against a document that says exactly the right thing. readFlat collapses every run of whitespace to one space; use it
+// for anything that pins a SENTENCE rather than a code block or a table row.
+function readFlat(path: string): string {
+  return readFileSync(path, 'utf8').replace(/\s+/g, ' ');
+}
+
 describe('v1 on-chain message source of truth', () => {
+  it('SPEC-MSG-SOURCE-00A: deleted-generation specs carry a quarantine banner and are not active docs', () => {
+    for (const path of QUARANTINED_SPECS) {
+      const text = read(path);
+      expect(text, path).toMatch(/HISTORICAL ONLY/);
+      expect(text, path).toMatch(/SUPERSEDED/i);
+      expect(text, path).toMatch(/deleted in clean-17/i);
+      // A quarantined spec must POINT somewhere current, or a reader who lands on it has no way out.
+      expect(text, path).toMatch(/web\/CRYPTO_PROTOCOL\.md/);
+      expect(ACTIVE_INTERFACE_DOCS, `${path} must not also be listed as an active doc`).not.toContain(path);
+    }
+  });
+
   it('SPEC-MSG-SOURCE-00: historical message-budget specs are quarantined from active source-of-truth docs', () => {
     const historicalFiles = [
       'artifacts/platho_v1_spec_v0_3_2_vault_m6_aligned.md',
@@ -85,7 +125,9 @@ describe('v1 on-chain message source of truth', () => {
       // phrase cannot hide in the dictionary either.
       const text = path === 'web/app.js' ? `${read(path)}\n${EN_COPY}` : read(path);
       expect(text, path).toMatch(/accepted[\s\S]{0,80}transaction bod/i);
-      expect(text, path).toMatch(/body_hash|CapsuleHub hashes/i);
+      // The hash lives under different spellings per doc (`body_hash`, `body.hash`, "the stored hashes"). What the
+      // gate protects is that SOMETHING on chain commits to the body — not which identifier a given file happens to use.
+      expect(text, path).toMatch(/body_hash|body\.hash|stored hashes|stored commitment|shard's stored hashes/i);
       expect(text, path).toMatch(/provider history|message history|local (encrypted )?cache/i);
       for (const pattern of forbidden) {
         expect(text, `${path} must not match stale body-storage wording ${pattern}`).not.toMatch(pattern);
@@ -94,57 +136,82 @@ describe('v1 on-chain message source of truth', () => {
   });
 
   it('SPEC-MSG-SOURCE-02: v1 pins the binary capsule byte layout and useful capacity', () => {
+    // REBASELINED onto clean-17 2026-08-07. This demanded `PH0B` and "140 bytes" — the clean-15 header that carried the
+    // recipient key id, the sender signing key, and the profile pointer in CLEARTEXT. clean-16 split header0 into a
+    // 40-byte CONV form (opaque bucket key only) and a 42-byte INTRO form (ephemeral point + view tag), and moved the
+    // sender identity INSIDE the AEAD. Pinning the old bytes would have required undoing the privacy work to go green.
     for (const path of SPEC_FILES) {
       const text = read(path);
-      expect(text, path).toMatch(/PH0B/);
+      expect(text, path).toMatch(/PH0C/);
       expect(text, path).toMatch(/PH1B/);
-      expect(text, path).toMatch(/140 bytes|140-byte/);
+      expect(text, path).toMatch(/40 bytes|40-byte/);
+      expect(text, path).toMatch(/42 bytes|42-byte/);
       expect(text, path).toMatch(/30 bytes|30-byte/);
+      // The cleartext header must NOT be described as carrying a recipient label or the sender's identity again.
+      expect(text, path).not.toMatch(/header0[\s\S]{0,120}recipient_key_id|recipient_key_id[\s\S]{0,60}in (the )?header0/i);
       expect(text, path).toMatch(/1024[- ]byte|1024 useful (text )?bytes|1024-byte user payload slot|1, 2, 4, 8, 16, or 32 KiB/i);
       expect(text, path).toMatch(/one encrypted (1024-byte|user payload slot)|exactly one (encrypted )?(1024-byte|user payload slot)|selected[\s\S]{0,80}1, 2, 4, 8, 16, or 32 KiB/i);
       expect(text, path).not.toMatch(/14,336|14336|14 blocks|14 content blocks/i);
     }
   });
 
-  it('SPEC-MSG-SOURCE-03: Vault publish surcharge is documented as retained CapsuleHub reserve, not refundable excess', () => {
-    const surchargeDocs = [
+  it('SPEC-MSG-SOURCE-03: publishing is direct-paid from the user wallet, with no intermediary balance', () => {
+    // REPLACES the clean-15 surcharge guard. That mechanism — a signed `maxCharge`, a fixed 0.030 TON ACK reserve, a
+    // ~25,800,000 nanoton credit back into an internal Vault balance, and the excess retained inside CapsuleHub — went
+    // away with both contracts. What replaced it is worth guarding for the opposite reason: there is now NOTHING between
+    // the user's wallet and the shard, and a doc that reintroduces an intermediary balance would be describing a design
+    // the project has forbidden.
+    const payDocs = [
       'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
       'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
-      'web/docs/ath-whitepaper.md',
+      'web/NO_BACKEND_ARCHITECTURE.md',
+      'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
     ];
 
-    for (const path of surchargeDocs) {
+    for (const path of payDocs) {
       const text = read(path);
-      expect(text, path).toMatch(/surcharge/i);
-      expect(text, path).toMatch(/remain(s)?[\s\S]{0,80}CapsuleHub|retained[\s\S]{0,80}CapsuleHub/i);
-      expect(text, path).toMatch(/30,000,000`? nanotons|0\.030 TON/i);
-      expect(text, path).toMatch(/25,800,000`? nanotons|credited roughly/i);
-      expect(text, path).toMatch(/fixed[\s\S]{0,60}ACK reserve|fixed ACK forward reserve|success(?:ful)? (publish )?ACK returns only/i);
-      expect(text, path).toMatch(/not (a )?Vault refund|not returned to Vault|not counted as (`)?accrued_plato_fee_ton(`)?(?: at publish time)?|not `?accrued_plato_fee_ton`?/i);
-      expect(text, path).toMatch(/SweepExcessReserve|surplus above .*protected|raw surplus above .*protected/i);
-      expect(text, path).toMatch(/FeeAccumulator|DepositProtocolFee/i);
-      expect(text, path).not.toMatch(/not counted as protocol fee revenue(?![\s\S]{0,220}(SweepExcessReserve|surplus|FeeAccumulator|DepositProtocolFee))/i);
-      expect(text, path).not.toMatch(/ACK\/excess value to Vault|returns ACK\/excess|return(s)? ACK\/excess|plus true excess/i);
+      expect(text, path).toMatch(/direct[- ]pa(y|id)|paid (straight|directly)/i);
+      expect(text, path).toMatch(/signed by the user's own wallet key|external message signed by the user's own wallet/i);
+      expect(text, path).toMatch(/no internal balance|there is no internal balance/i);
+      // No relayer, no issuer, no discount authority — the founding constraint, stated rather than implied.
+      expect(text, path).not.toMatch(/relayer can submit|funded from an internal|Vault balance/i);
+      expect(text, path).not.toMatch(/surcharge/i);
+      expect(text, path).not.toMatch(/max_?[Cc]harge/);
+    }
+
+    // The protocol fee passes THROUGH a shard; a shard that accrued fees would need a protected reserve, a sweep, and a
+    // flush — the exact machinery clean-17 removed.
+    for (const path of ['artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md', 'web/CRYPTO_PROTOCOL.md']) {
+      const text = read(path);
+      expect(text, path).toMatch(/flows [*_]?through[*_]? the shard|through the shard to `?FeeAccumulator`?/i);
+      expect(text, path).toMatch(/never accumulated inside the shard|is never accumulated/i);
+      expect(text, path).toMatch(/FeeAccumulator/);
+      expect(text, path).not.toMatch(/SweepExcessReserve|accrued_plato_fee_ton/);
     }
   });
 
-  it('SPEC-MSG-SOURCE-03A: public pricing copy uses current exact public/private canonical examples', () => {
-    const publicPriceDocs = [
-      'DEPLOYMENT_RUNBOOK.md',
-      'artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md',
-      'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
-      'web/docs/ath-whitepaper.md',
-    ];
+  it('SPEC-MSG-SOURCE-03A: pricing copy matches the canonical direct-pay values', () => {
+    // REBASELINED 2026-08-07. The clean-15 examples (`from 0.0337 TON` public, `0.0347 TON` private) were the
+    // Vault-funded prices and no longer exist. The canonical source is web/publish-price.mjs, so the gate reads the
+    // constants and requires the prose to agree with THEM rather than with a number typed into a doc.
+    const priceModule = read('web/publish-price.mjs');
+    const constant = (name: string): bigint => {
+      const match = priceModule.match(new RegExp(`export const ${name} = ([0-9_]+)n`));
+      expect(match, `${name} must exist in web/publish-price.mjs`).toBeTruthy();
+      return BigInt((match as RegExpMatchArray)[1].replaceAll('_', ''));
+    };
+    const conv = constant('CONV_PUBLISH_VALUE');
+    const publicPost = constant('PUBLIC_CHANNEL_PUBLISH_VALUE');
+    expect(conv, 'a private capsule must still be the cheapest lane').toBeLessThan(publicPost);
 
-    for (const path of publicPriceDocs) {
+    const convGram = (Number(conv) / 1e9).toFixed(4);
+    const publicGram = (Number(publicPost) / 1e9).toFixed(4);
+
+    for (const path of ['artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md', 'web/docs/ath-whitepaper.md']) {
       const text = read(path);
-      const coin = path.startsWith('web/') ? 'GRAM' : 'TON';
-      expect(text, path).toMatch(new RegExp(`from \`?0\\.0337 ${coin}\`?`));
-      expect(text, path).toMatch(new RegExp(`0\\.0337 ${coin}`));
-      expect(text, path).toMatch(new RegExp(`0\\.0347 ${coin}`));
-      expect(text, path).not.toMatch(/from `?0\.030 TON`?/i);
+      expect(text, `${path} must quote the canonical private price ${convGram}`).toContain(convGram);
+      expect(text, `${path} must quote the canonical public price ${publicGram}`).toContain(publicGram);
+      expect(text, path).not.toMatch(/0\.0337|0\.0347/);
     }
 
     const html = read('web/index.html');
@@ -168,7 +235,7 @@ describe('v1 on-chain message source of truth', () => {
 
     for (const path of pricingDocs) {
       const text = read(path);
-      expect(text, path).toMatch(/0.010 GRAM|10,000,000 nanotons|full protocol-fee discount|discounted_fee = raw_discounted_fee/i);
+      expect(text, path).toMatch(/0\.010? GRAM|10,000,000 nanotons|full protocol-fee discount|discounted_fee = raw_discounted_fee/i);
       expect(text, path).not.toMatch(forbiddenOldFeeCopy);
       if (path !== 'artifacts/platho_v1_open_values_v0_6.md') {
         expect(text, path).toMatch(/airdrop_remaining_ath == 0|fully distributed|full `?15,000,000 ATH`? activity airdrop/i);
@@ -206,7 +273,7 @@ describe('v1 on-chain message source of truth', () => {
     expect(noBackend).toMatch(/User-selectable RPC requires an explicit settings UI/i);
     expect(noBackend).toMatch(/provider history coverage affects availability/i);
     expect(noBackend).toMatch(/owner-signed pointer trust model/i);
-    expect(noBackend).toMatch(/refuse to sign avatar registration until `CapsuleHub` entries/i);
+    expect(noBackend).toMatch(/refuse to sign avatar registration until[\s\S]{0,60}public entries are visible/i);
     expect(noBackend).toMatch(/Reusing an already-published identical avatar is an explicit recovery path/i);
     expect(noBackend).not.toMatch(/chosen or replaceable by the user/i);
   });
@@ -257,54 +324,63 @@ describe('v1 on-chain message source of truth', () => {
       whitepaper.indexOf('## Profile Avatar Fees'),
     );
 
-    expect(usernameSection).toMatch(/Username mint is Vault-funded/);
-    expect(usernameSection).toMatch(/Vault can restore the user's internal ATH/);
-    expect(usernameSection).not.toMatch(/direct username payments/i);
-    expect(usernameSection).not.toMatch(/refund due for direct username/i);
+    // REBASELINED 2026-08-07: the mint is no longer Vault-funded — it is paid in ATH from the user's own wallet
+    // through the dedicated registry notify op. The rule the gate protects is unchanged: the registry has no separate
+    // external refund bucket, so rejections must come back through the ATHWallet notification-refund path.
+    expect(usernameSection).toMatch(/paid in ATH from the user's own wallet/i);
+    expect(usernameSection).toMatch(/notification-refund path|ATHWallet notification/i);
+    expect(usernameSection).toMatch(/no separate external refund bucket/i);
+    expect(usernameSection).not.toMatch(/Vault/i);
     expect(usernameSection).not.toMatch(/FlushAthRefundDue|get_refund_due/i);
   });
 
-  it('SPEC-MSG-SOURCE-03C3B: public profile avatar docs describe the supported Vault-funded flow', () => {
+  it('SPEC-MSG-SOURCE-03C3B: public profile avatar docs describe the direct-pay notify flow', () => {
     const whitepaper = read('web/docs/ath-whitepaper.md');
     const avatarSection = whitepaper.slice(
       whitepaper.indexOf('## Profile Avatar Fees'),
       whitepaper.indexOf('## Market Stability Seller'),
     );
 
-    expect(avatarSection).toMatch(/Profile avatar updates are Vault-funded/);
-    expect(avatarSection).toMatch(/SetProfileAvatarFromVaultBalance/);
-    expect(avatarSection).toMatch(/payer wallet is the bound Vault/);
-    expect(avatarSection).toMatch(/Direct user-wallet avatar payment is not supported/);
+    expect(avatarSection).toMatch(/paid in ATH from the user's own wallet/i);
+    expect(avatarSection).toMatch(/transfer-with-notification/i);
+    expect(avatarSection).toMatch(/ProfileRegistry's official ATH wallet/i);
+    expect(avatarSection).not.toMatch(/Vault/i);
   });
 
-  it('SPEC-MSG-SOURCE-03C3C: final current spec does not resurrect stale Vault session publish wording', () => {
+  it('SPEC-MSG-SOURCE-03C3C: final current spec does not resurrect stale intermediary publish wording', () => {
     const spec = read('artifacts/PLATHO_CAPSULE_V1_FINAL_SPEC.md');
 
-    expect(spec).toMatch(/Vault auth-signed publishes/);
-    expect(spec).not.toMatch(/Vault session publishes/i);
+    expect(spec).toMatch(/signed by the user's own wallet key/i);
+    expect(spec).not.toMatch(/Vault auth-signed publishes|Vault session publishes/i);
     expect(spec).not.toMatch(/session budget/i);
     expect(spec).not.toMatch(/message_budget_ton/i);
   });
 
-  it('SPEC-MSG-SOURCE-03C4: PWA interface matrix labels Vault-auth service flows and payment-check ordering correctly', () => {
+  it('SPEC-MSG-SOURCE-03C4: PWA interface matrix labels every user flow as signed by the user wallet', () => {
+    // REBASELINED 2026-08-07. This used to require five rows to be labelled "Vault auth key / owner signing key" —
+    // the exact opposite of what clean-17 does. Payment checks were retired outright; the remaining flows are all
+    // signed by the user's own wallet, and the matrix must not describe an intermediary signer for any of them.
     const matrix = read('artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md');
 
     for (const flow of [
-      'Mint username from Vault balance',
-      'Set wallet avatar from Vault balance',
-      'Create payment check',
-      'Claim payment check',
-      'Cancel payment check',
+      'Register messaging keys',
+      'Publish first-contact capsule',
+      'Publish conversation capsule',
+      'Publish public post/comment',
+      'Publish avatar media',
+      'Mint username',
+      'Set wallet avatar',
     ]) {
       const row = matrix.split('\n').find((line) => line.startsWith(`| ${flow} |`));
       expect(row, `${flow} row must exist`).toBeTruthy();
-      expect(row, `${flow} must be a Vault external auth flow`).toContain('Vault auth key / owner signing key');
-      expect(row, `${flow} must not be documented as a wallet-sender flow`).not.toMatch(/\|\s*(sender|recipient|user) wallet\s*\|/i);
+      expect(row, `${flow} must be signed by the user wallet`).toMatch(/user wallet/i);
+      expect(row, `${flow} must not name an intermediary signer`).not.toMatch(/Vault auth key|auth key \/ owner signing key/i);
     }
 
-    expect(matrix).toMatch(/persists encrypted local recovery first/i);
-    expect(matrix).toMatch(/creates and confirms the locked intent, then publishes the encrypted check capsule/i);
-    expect(matrix).not.toMatch(/publishes the encrypted check capsule before creating the locked intent/i);
+    // Payment checks are retired: neither the flows nor the getters may come back as current product surface.
+    expect(matrix).toMatch(/[Pp]ayment checks were retired/);
+    expect(matrix).not.toMatch(/\| (Create|Claim|Cancel) payment check \|/);
+    expect(matrix).not.toMatch(/get_receive_intent|CreateReceiveIntent\(/);
   });
 
   it('SPEC-MSG-SOURCE-03D: public comments warning is immutable-but-not-forever retention copy', () => {
@@ -348,15 +424,18 @@ describe('v1 on-chain message source of truth', () => {
     expect(source).not.toMatch(/visible forever|deleted or hidden by the protocol/);
   });
 
-  it('SPEC-MSG-SOURCE-03F: crypto docs distinguish live expiry from chain-history import', () => {
-    for (const path of ['web/CRYPTO_PROTOCOL.md', 'web/docs/crypto-protocol.md']) {
-      const text = read(path);
-      expect(text, path).toMatch(/Live\/off-chain capsule package verification rejects/);
-      expect(text, path).toMatch(/expired capsules/);
-      expect(text, path).toMatch(/Chain-history import is different/);
-      expect(text, path).toMatch(/accepted TON transaction history/);
-      expect(text, path).toMatch(/does not reject solely because the header expiry is in the past/);
-    }
+  it('SPEC-MSG-SOURCE-03F: the internal spec distinguishes live expiry from chain-history import', () => {
+    // The SHIPPED doc (web/docs/crypto-protocol.md) was rewritten for readers and no longer carries this
+    // implementation detail — it is not something a person needs in order to use the messenger. The rule itself still
+    // has to be written down somewhere, because getting it wrong makes retained history unreadable BY DESIGN, so the
+    // pin moved to the internal spec rather than being dropped.
+    const text = readFlat('web/CRYPTO_PROTOCOL.md');
+    expect(text).toMatch(/Live package verification rejects/);
+    expect(text).toMatch(/expired capsules/);
+    expect(text).toMatch(/Chain-history import is different/);
+    expect(text).toMatch(/transaction history/);
+    expect(text).toMatch(/does not reject solely because the header expiry has passed/);
+    expect(text).toMatch(/retained history would become unreadable by design/i);
   });
 
   it('SPEC-MSG-SOURCE-03E: deployment runbook funds the airdrop backing before the seals', () => {
@@ -387,22 +466,30 @@ describe('v1 on-chain message source of truth', () => {
   });
 
   it('SPEC-MSG-SOURCE-04: username authority is registry name-to-item plus current item owner, not item-only', () => {
+    // `web/docs/crypto-protocol.md` DROPPED from this list 2026-08-07: the shipped crypto doc was rewritten to describe
+    // encryption and no longer covers usernames at all. Forcing username authority into it would be padding a reader's
+    // document to satisfy a gate. The three docs that DO own the subject still carry the full rule.
     const usernameTruthDocs = [
       'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
       'web/docs/ath-whitepaper.md',
       'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
     ];
 
     for (const path of usernameTruthDocs) {
-      const text = read(path);
-      expect(text, path).toMatch(/UsernameRegistry|get_name_record|name record/i);
+      const text = readFlat(path);
+      expect(text, path).toMatch(/UsernameRegistry/);
       expect(text, path).toMatch(/UsernameNFTItem|item/i);
-      expect(text, path).toMatch(/points?[\s\S]{0,80}exact[\s\S]{0,80}item|name_records\[name_hash\]/i);
-      expect(text, path).toMatch(/current owner[\s\S]{0,80}item|item state[\s\S]{0,80}current owner|item owner is the current username owner/i);
-      expect(text, path).toMatch(/non-authoritative|not (be )?treated as (a )?(username )?ownership|ignore\s+item-only\s+ownership/i);
-      expect(text, path).toMatch(/registry record owner|registry record remains|name-to-item anchor|name-bound|authoritative item address/i);
-      expect(text, path).not.toMatch(/UsernameNFTItem.*alone.*ownership/i);
+      // The anchor is now the DERIVATION, not a stored map: `name_records` was deleted 2026-07-20 because holding it
+      // capped the registry at roughly 21,503 names. A doc still claiming the map is the anchor describes dead state.
+      expect(text, path).toMatch(/get_username_item_address/);
+      expect(text, path).toMatch(/current owner[\s\S]{0,80}item|item state[\s\S]{0,80}current owner|item's `?get_state|item owner is the current username owner/i);
+      expect(text, path).toMatch(/non-authoritative|not authoritative|must not treat the item alone as ownership|not (be )?treated as (a )?(username )?ownership|ignore\s+item-only\s+ownership/i);
+      expect(text, path).toMatch(/name-to-item anchor|authoritative item address|the derivation/i);
+      // The forbidden claim is that an item ALONE proves ownership. `.*` across a flattened document also matched the
+      // sentence that FORBIDS exactly that ("must not treat the item alone as ownership"), so the negative is anchored
+      // to the affirmative verb instead of to mere co-occurrence.
+      expect(text, path).not.toMatch(/UsernameNFTItem[^.]{0,120}alone (is|proves|establishes|means)[^.]{0,60}ownership/i);
+      expect(text, path).not.toMatch(/`?name_records\[name_hash\]`? (pointing|points)/i);
     }
 
     // 2026-07-20: the registry's `name_records` map was deleted, so the name-to-item anchor is no longer a STORED
@@ -472,45 +559,38 @@ describe('v1 on-chain message source of truth', () => {
   });
 
   it('SPEC-MSG-SOURCE-04B: username stale pending mint docs match non-destructive recovery', () => {
+    // See SPEC-MSG-SOURCE-04 for why the shipped crypto doc is not in this list.
     const usernameRecoveryDocs = [
       'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
       'web/docs/ath-whitepaper.md',
     ];
 
     for (const path of usernameRecoveryDocs) {
-      const text = read(path);
+      const text = readFlat(path);
       expect(text, path).toMatch(/PrunePendingUsernameMint/);
       expect(text, path).toMatch(/non-destructive/i);
-      expect(text, path).toMatch(/does not(?: guess failure,)?\s*delete\s+pending state|keeps\s+pending mint state/i);
+      expect(text, path).toMatch(/does not[\s\S]{0,30}delete\s+(the\s+)?pending state|keeps\s+pending mint state/i);
       expect(text, path).toMatch(/ResendDeployedAck|late ACK/i);
       expect(text, path).not.toMatch(/pending mint is pruned|pending mint.*pruned after a missing item ACK/i);
     }
   });
 
-  it('SPEC-MSG-SOURCE-05: Vault ATH deposit and withdrawal wording matches notify-flow accounting', () => {
-    const vaultAthDocs = [
-      'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
-      'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
-      'web/docs/ath-whitepaper.md',
-    ];
+  it('SPEC-MSG-SOURCE-05: ATH payment wording matches notify-flow accounting, with no intermediary ledger', () => {
+    // REBASELINED 2026-08-07. Vault held an internal ATH ledger, so this pinned deposit/withdrawal wording. There is no
+    // ledger now: ATH-priced actions are paid from the user's own ATHWallet through a dedicated registry notify op.
+    // What survives unchanged is the accounting rule that mattered — a contract credits only value it actually
+    // received and authenticated, never a balance it inferred from a raw wallet read.
+    const text = read('artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md');
 
-    for (const path of vaultAthDocs) {
-      const text = read(path);
-      const coin = path.startsWith('web/') ? 'GRAM' : 'TON';
-      expect(text, path).toMatch(/manual\s+ordinary\s+ATH\s+transfer/i);
-      expect(text, path).toMatch(/official Vault ATHWallet/i);
-      expect(text, path).toMatch(/unsupported/i);
-      expect(text, path).toMatch(/ATHTransferRequestWithNotify|transfer-with-notify|notify-flow/i);
-      expect(text, path).toMatch(/signed external Vault command|Vault auth key \/ owner signing key/i);
-      expect(text, path).toMatch(new RegExp(`internal Vault ${coin}`, 'i'));
-      expect(text, path).toMatch(/authenticated\s+ACK\/fail\/bounce/i);
-      expect(text, path).toMatch(/capped\s+by\s+the\s+reserved\s+internal|reserved internal value/i);
-      expect(text, path).not.toMatch(/withdraw returns all excess/i);
-      expect(text, path).not.toMatch(/returns all excess/i);
-      expect(text, path).not.toMatch(/full excess refund/i);
-    }
+    expect(text).toMatch(/manual\s+ordinary\s+ATH\s+transfer/i);
+    expect(text).toMatch(/official protocol ATH wallet/i);
+    expect(text).toMatch(/unsupported/i);
+    expect(text).toMatch(/ATHTransferRequestRegistry(MintUsername|ProfileAvatar)|notify op/i);
+    expect(text).toMatch(/authenticated\s+ACK\/fail\/bounce/i);
+    expect(text).toMatch(/capped\s+by\s+the\s+reserved/i);
+    expect(text).toMatch(/never from an intermediary balance/i);
+    expect(text).not.toMatch(/internal Vault (TON|GRAM|ATH)/i);
+    expect(text).not.toMatch(/returns all excess|full excess refund/i);
   });
 
   it('SPEC-MSG-SOURCE-06: buyback split authority is documented as one-time treasury preflight authority', () => {
@@ -527,10 +607,12 @@ describe('v1 on-chain message source of truth', () => {
     for (const path of buybackSplitDocs) {
       const text = read(path);
       expect(text, path).toMatch(/EnableBuybackSplit|buyback split/i);
-      expect(text, path).toMatch(/treasury receiver/i);
+      // "receiver" vs "recipient" and "preflight" vs "pre-release check" are the same authority under different
+      // English. The gate pins WHO holds it and that it is one-way, not the noun a given document happened to use.
+      expect(text, path).toMatch(/treasury receiver|treasury recipient/i);
       expect(text, path).toMatch(/one-time|one-way/i);
-      expect(text, path).toMatch(/preflight/i);
-      expect(text, path).toMatch(/not admin\/rescue\/pause|cannot steal funds, pause, rescue/i);
+      expect(text, path).toMatch(/preflight|pre-release check/i);
+      expect(text, path).toMatch(/not admin\/rescue\/pause|cannot steal funds, pause/i);
       expect(text, path).toMatch(/permanently changes FeeAccumulator economics|50\/50 treasury\/buyback/i);
       expect(text, path).not.toMatch(/trust us bro/i);
       expect(text, path).not.toMatch(/no authority exists anywhere/i);
@@ -615,42 +697,43 @@ describe('v1 on-chain message source of truth', () => {
     // Seller funding happens only after pool launch") was INACCURATE. clean-15 funds and locks the full 60M reserve
     // into MarketStabilitySeller at genesis, and mainnet:genesis:verify checks the official seller ATH wallet
     // backing. Selling is the separate post-pool step (after the one-time pricing freeze). Pin the corrected framing.
-    const text = read('web/docs/ath-whitepaper.md');
+    const text = readFlat('web/docs/ath-whitepaper.md');
 
-    // Activity airdrop + vesting backing statement stays.
-    expect(text).toMatch(/activity airdrop and long-term vesting reserve are backed at final genesis/i);
+    // Activity airdrop + vesting backing statement stays. The whitepaper was rewritten in the owner's words
+    // (2026-08-06), so the pins express the CLAIM rather than the previous sentence.
+    expect(text).toMatch(/final genesis the activity airdrop and the long-term vesting reserve are backed/i);
     // The 60M reserve is FUNDED + LOCKED at genesis, backed by its official seller ATH wallet.
     expect(text).toMatch(/market-stability reserve is funded into MarketStabilitySeller and locked at final genesis, backed by its official seller ATH wallet/i);
-    expect(text).toMatch(/MarketStabilitySeller is capitalized at final genesis with the full .60,000,000 ATH. reserve/i);
-    expect(text).toMatch(/mainnet:genesis:verify. checks that the seller carries the full reserve/i);
+    expect(text).toMatch(/MarketStabilitySeller is capitali[sz]ed at final genesis with the full .60,000,000 ATH. reserve/i);
+    expect(text).toMatch(/mainnet:genesis:verify.{0,3} checks that the seller carries the full reserve/i);
     // Selling is post-pool, after the one-time evidence-bound pricing freeze; the tranche schedule is deterministic.
-    expect(text).toMatch(/not sold until after pool launch[\s\S]{0,120}pricing freeze[\s\S]{0,180}tranche schedule is deterministic/i);
+    expect(text).toMatch(/not sold (until|before) the pool launch[\s\S]{0,140}pricing freeze[\s\S]{0,200}tranche schedule is deterministic/i);
     // The corrected doc must NOT resurrect the old "not funded at genesis / funded only after pool launch" wording.
     expect(text).not.toMatch(/not funded into the seller at final genesis/i);
     expect(text).not.toMatch(/Seller funding happens only after pool launch/i);
   });
 
   it('SPEC-MSG-SOURCE-09B: docs pin .ath item-owner authority and permissive separator policy', () => {
+    // See SPEC-MSG-SOURCE-04: the shipped crypto doc no longer covers usernames.
     const usernameDocs = [
       'web/CRYPTO_PROTOCOL.md',
-      'web/docs/crypto-protocol.md',
       'web/docs/ath-whitepaper.md',
       'artifacts/PWA_CONTRACT_INTERFACE_MATRIX.md',
       'MAINNET_RELEASE_CHECKLIST.md',
     ];
 
     for (const path of usernameDocs) {
-      const text = read(path);
-      expect(text, path).toMatch(/UsernameRegistry|get_name_record|name-to-item anchor/i);
+      const text = readFlat(path);
+      expect(text, path).toMatch(/UsernameRegistry|name-to-item anchor/i);
       expect(text, path).toMatch(/UsernameNFTItem|get_state|item state/i);
       expect(text, path).toMatch(/current owner|current owner is then read|owner_wallet/i);
-      expect(text, path).toMatch(/must not\s+use the registry record owner|not the current owner after transfer|historical/i);
+      expect(text, path).toMatch(/must not\s+use (the|a) registry record'?s? owner|not the current owner after transfer|historical/i);
     }
 
-    for (const path of ['web/CRYPTO_PROTOCOL.md', 'web/docs/crypto-protocol.md', 'web/docs/ath-whitepaper.md']) {
-      const text = read(path);
-      expect(text, path).toMatch(/leading, trailing, consecutive, and all-separator names are\s+valid/i);
-      expect(text, path).toMatch(/allowed `a-z`,\s+`0-9`, `_`, `-` set/i);
+    for (const path of ['web/CRYPTO_PROTOCOL.md', 'web/docs/ath-whitepaper.md']) {
+      const text = readFlat(path);
+      expect(text, path).toMatch(/leading, trailing, consecutive,? (and|or) all-separator (names|characters) are valid/i);
+      expect(text, path).toMatch(/allowed (set )?`a-z`, `0-9`, `_`, `-`( set)?/i);
     }
   });
 
@@ -664,16 +747,19 @@ describe('v1 on-chain message source of truth', () => {
 
     for (const path of authorityDocs) {
       const text = read(path);
-      expect(text, path).toMatch(/authority|authorities/i);
+      // Each pin below names an authority and requires the doc to say who holds it. The alternatives cover the
+      // rewritten whitepaper's English ("release powers", "treasury recipient", "freezes the post-pool route") —
+      // the same authorities, named honestly, in a document written for readers rather than for this gate.
+      expect(text, path).toMatch(/authority|authorities|release powers/i);
       expect(text, path).toMatch(/treasury owner|ath_treasury_owner/i);
-      expect(text, path).toMatch(/DeployTreasurySupply|initial ATH supply/i);
+      expect(text, path).toMatch(/DeployTreasurySupply|initial ATH supply|primary ATH supply/i);
       expect(text, path).toMatch(/genesis controller|genesis_controller_one_shot/i);
-      expect(text, path).toMatch(/pre-seal bind|pre-seal binding|seal actions/i);
-      expect(text, path).toMatch(/BuybackBurn[\s\S]{0,120}route freeze|route freeze[\s\S]{0,120}BuybackBurn/i);
-      expect(text, path).toMatch(/MarketStabilitySeller[\s\S]{0,140}pricing freeze|pricing freeze[\s\S]{0,140}MarketStabilitySeller/i);
-      expect(text, path).toMatch(/treasury receiver[\s\S]{0,160}EnableBuybackSplit|EnableBuybackSplit[\s\S]{0,160}treasury receiver/i);
-      expect(text, path).toMatch(/no rescue|not (a )?rescue|rescue, pause|pause, rescue/i);
-      expect(text, path).toMatch(/admin drain|admin\/rescue\/pause|arbitrary balance-control|cannot steal funds/i);
+      expect(text, path).toMatch(/pre-seal bind|pre-seal binding|seal actions|the seal/i);
+      expect(text, path).toMatch(/BuybackBurn[\s\S]{0,140}(route freeze|freezes the post-pool route)|route freeze[\s\S]{0,140}BuybackBurn/i);
+      expect(text, path).toMatch(/MarketStabilitySeller[\s\S]{0,160}pricing freeze|pricing freeze[\s\S]{0,160}MarketStabilitySeller/i);
+      expect(text, path).toMatch(/treasury (receiver|recipient)[\s\S]{0,160}(EnableBuybackSplit|buyback split)|(EnableBuybackSplit|buyback split)[\s\S]{0,160}treasury (receiver|recipient)/i);
+      expect(text, path).toMatch(/no rescue|not (a )?rescue|rescue, pause|pause, rescue|emergency exit/i);
+      expect(text, path).toMatch(/admin drain|admin\/rescue\/pause|arbitrary balance-control|arbitrary control over balances|cannot steal funds/i);
       expect(text, path).not.toMatch(/no authority exists anywhere|no authorities exist|no authority at all/i);
     }
 

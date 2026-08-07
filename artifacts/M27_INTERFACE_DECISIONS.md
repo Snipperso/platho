@@ -2,12 +2,20 @@
 
 Date: 2026-05-20
 
-Status: historical / superseded. This is not a mainnet production approval.
+> **HISTORICAL ONLY — SUPERSEDED.** This records interface decisions of the clean-15 generation, whose `Vault` and
+> `CapsuleHub` contracts were deleted in clean-17. Everything below about a single hub, Vault-only publishes, `PH0B`
+> 140-byte headers, `maxCharge`, and TON-denominated pricing describes a design that no longer exists.
+>
+> Current source of truth: `web/CRYPTO_PROTOCOL.md` for the wire protocol and `web/publish-price.mjs` for prices. In
+> clean-17 each lane has its own shard account addressed by derivation, a publish is an external message signed by the
+> user's own wallet and paid directly to that shard, header0 is 40 bytes on CONV and 42 on INTRO, and the currency is
+> labelled GRAM.
+>
+> Kept because the reasoning survives the rewrite: bodies must be verifiable without a backend, on-chain state stays
+> compact while authenticating a body recovered from transaction history, and the storage top-up ABI below still
+> describes how no-authority top-ups work.
 
-Current source of truth: `PLATHO_CAPSULE_V1_FINAL_SPEC.md`. Final v1 stores compact
-authenticated headers/indexes and `body_hash` in CapsuleHub state; the heavy body is
-recovered from accepted publish transaction history. Pricing in this historical note is
-superseded by the final `0.030 TON` starting net price and hybrid-only private messaging.
+Status: historical / superseded. This is not a mainnet production approval.
 
 ## CapsuleHub v1
 
@@ -63,8 +71,8 @@ Decision: v1 exposes explicit no-authority storage top-up handlers for contracts
 
 | Contract | Message | Opcode |
 |---|---|---:|
-| Vault | `TopUpStorageReserve` | `0x3215B5FD` |
-| CapsuleHub | `TopUpStorageReserve` | `0x5331B880` |
+| ~~Vault~~ (deleted in clean-17) | `TopUpStorageReserve` | `0x3215B5FD` |
+| ~~CapsuleHub~~ (deleted in clean-17) | `TopUpStorageReserve` | `0x5331B880` |
 | FeeAccumulator | `TopUpStorageReserve` | `0x87A2D2C7` |
 | BuybackBurn | `TopUpStorageReserve` | `0x906182D2` |
 | UsernameRegistry | `UsernameRegistryTopUpStorageReserve` | `0x0ABA5F1D` |
