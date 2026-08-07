@@ -4599,12 +4599,15 @@ describe('PWA runtime config guard', () => {
     expect(embedFn).toMatch(/resolveWalletChannelDisplay\(wallet\)\?\.name/);
     expect(embedFn).toMatch(/text = document\.createElement\('div'\);/);
     expect(embedFn).toMatch(/appendFormattedMessageText\(text, block\.snippet\);/);
-    expect(embedFn, 'the chain-read replacement renders the same way').toMatch(/appendFormattedMessageText\(replacement, whole\);/);
+    // Once the original is read the whole body is re-rendered through the feed's own renderer (SHAREREF-08), which
+    // keeps the author's block order — so there is no second formatting path here to keep in step.
+    expect(embedFn, 'the resolved original renders through the feed renderer').toMatch(/appendPublicItemContent\(real, post, embedDepth \+ 1\);/);
     expect(embedFn).toMatch(/if \(block\.textTruncated\) text\.append\(document\.createTextNode\('…'\)\);/);
     expect(embedFn).toMatch(/wireClampToggleButton\(embed, body, inner, expandedSharedEmbeds, String\(block\.entryId\)\);/);
     // Both display surfaces render the embed (private bubbles + public posts/comments).
     expect(app).toMatch(/bubble\.append\(buildSharedPostEmbed\(block\)\);/);
-    expect(app).toMatch(/container\.append\(buildSharedPostEmbed\(block\)\);/);
+    // The public renderer threads its nesting depth through, so a repost OF a repost stops fetching after one level.
+    expect(app).toMatch(/container\.append\(buildSharedPostEmbed\(block, embedDepth\)\);/);
     // The feed cache round-trip keeps share blocks (normalizeFeedBlocks whitelists them like reply quotes).
     expect(subs).toMatch(/if \(block\.type === 'share'\) \{/);
     expect(subs).toMatch(/textTruncated: block\.textTruncated === true,/);
@@ -5384,10 +5387,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain('function normalizeBodyHashHex(value)');
     expect(app).toContain('if (cached && want && want === normalizeBodyHashHex(cached.bodyHash)) return Promise.resolve(cached);');
     expect(app).toContain('.find((item) => normalizeBodyHashHex(item.bodyHash) === want) ?? null');
-    // buildSharedPostEmbed swaps the media hint for the real <img> (data-url .src, never innerHTML = XSS-safe).
-    expect(app).toContain('const url = await sharedPostImageUrlWarm(post);');
-    expect(app).toContain('mediaHint.replaceWith(img);');
-    expect(app).toContain('img.src = url;');
+    // buildSharedPostEmbed warms the picture onto the post object and then re-renders the body through the feed's
+    // renderer, so the image lands where its author put it rather than at the end of the card.
+    expect(app).toContain('await sharedPostImageUrlWarm(post);');
+    expect(app).toContain('appendPublicItemContent(real, post, embedDepth + 1);');
     const embed = app.slice(app.indexOf('function buildSharedPostEmbed('), app.indexOf('function buildPublicFeedArticle('));
     expect(embed).not.toMatch(/innerHTML/);
     // The reference the image lookup needs — entryId + bodyHash — rides the SHARE block. It went to version 2 on
