@@ -52,21 +52,47 @@ describe('operator documents describe the contracts that exist', () => {
       + `followed literally:\n${live.join('\n')}`).toEqual([]);
   });
 
-  it('OPDOC-02: no ceremony step is described as already complete', () => {
-    // The sharper half. A stale "is complete" does not merely confuse — it removes a step. Both offenders named an
-    // irreversible one, and the checklist exists precisely so that no irreversible step is decided from memory.
-    const claims: string[] = [];
-    const CEREMONY_STEP = /(DeployTreasurySupply|airdrop backing|activity airdrop|SealGenesis|reserve funding)/i;
-    const ALREADY_DONE = /\bis complete\b|\bwas completed\b|\bhas been (?:funded|deployed|sealed|performed)\b/i;
+  it('OPDOC-02: ceremony-step status in the docs matches the verifier, in BOTH directions', () => {
+    // REWRITTEN 2026-08-07, after this gate missed the same defect pointing the other way.
+    //
+    // The original version hardcoded its premise — "for clean-17 none of them has been performed" — and forbade any
+    // line saying a ceremony step was done. That was correct on 2026-07-31 and wrong from 2026-08-02, when the
+    // ceremony ran. The docs then drifted the OTHER way and nothing caught it: PRODUCTION_READINESS.md went on
+    // saying DeployTreasurySupply "has NOT been performed", the airdrop backing "has NOT been performed", and
+    // MAINNET_GENESIS_VERIFIED.txt "returns false" — for five days, while the flag said true, the verifier reported
+    // zero issues, and the pool had already paid out 2,180 ATH.
+    //
+    // A stale "is complete" removes a step. A stale "has NOT been performed" invites an operator to run an
+    // IRREVERSIBLE one-shot a second time. Both are the same defect: the sheet disagreeing with the chain. So the
+    // premise is no longer written into the gate — it is READ from the evidence, and the gate flips with it.
+    const verified = readFileSync('artifacts/MAINNET_GENESIS_VERIFIED.txt', 'utf8').trim() === 'true';
+    const report = JSON.parse(readFileSync('artifacts/mainnet_genesis_verify_report.json', 'utf8'));
+    expect(report.mainnet_genesis_verified, 'the flag file and the verifier report must agree').toBe(verified);
+
+    const CEREMONY_STEP = /(DeployTreasurySupply|airdrop backing|activity airdrop|SealGenesis|reserve funding|MAINNET_GENESIS_VERIFIED)/i;
+    const CLAIMS_DONE = /\bis complete\b|\bwas completed\b|\bhas been (?:funded|deployed|sealed|performed)\b|returns `?true`?/i;
+    const CLAIMS_PENDING = /\bhas NOT been (?:funded|deployed|sealed|performed)\b|\bhas not been (?:funded|deployed|sealed|performed)\b|\bis not complete\b|returns `?false`?/i;
+
+    const offending = verified ? CLAIMS_PENDING : CLAIMS_DONE;
+    const wrong: string[] = [];
     for (const doc of OPERATOR_DOCS) {
       readFileSync(doc, 'utf8').split(/\r?\n/).forEach((line, i) => {
-        if (!CEREMONY_STEP.test(line) || !ALREADY_DONE.test(line)) return;
-        if (MARKS_IT_GONE.test(line)) return;              // a note about a PAST generation is allowed to say so
-        claims.push(`${doc}:${i + 1}: ${line.trim().slice(0, 150)}`);
+        if (!CEREMONY_STEP.test(line)) return;
+        // A dated [CORRECTED ...] note is allowed to quote what the line USED to claim — that is how this repo
+        // records its own drift, and forbidding it would delete the audit trail. The rule applies to the assertion
+        // the line makes NOW, so only the text before the bracket is judged.
+        const assertion = line.split('[CORRECTED')[0];
+        if (!offending.test(assertion)) return;
+        if (MARKS_IT_GONE.test(assertion)) return;        // a note about a PAST generation may say so
+        wrong.push(`${doc}:${i + 1}: ${assertion.trim().slice(0, 150)}`);
       });
     }
-    expect(claims, 'a ceremony step is documented as already done. For clean-17 none of them has been performed, and '
-      + `an operator reading this would skip it:\n${claims.join('\n')}`).toEqual([]);
+
+    expect(wrong, verified
+      ? 'the genesis is VERIFIED, but these lines still tell the operator a ceremony step is pending. One of them is '
+        + `an irreversible one-shot, and following this sheet means running it twice:\n${wrong.join('\n')}`
+      : 'the genesis is NOT verified, but these lines describe a ceremony step as already done. An operator reading '
+        + `this would skip it:\n${wrong.join('\n')}`).toEqual([]);
   });
 
   it('OPDOC-03: the release checklist still names every contract the ceremony deploys', () => {

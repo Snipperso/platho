@@ -287,9 +287,11 @@ describe('v1 on-chain message source of truth', () => {
       expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
       expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
     } else {
-      // VPB2 redeploy left web/platho-config.mjs in PRODUCTION / 'pwa-production'
-      // even though MAINNET_GENESIS_VERIFIED.txt is "false" again pending the
-      // Session 7 re-verification; assert the current committed config state.
+      // The config stays PRODUCTION / 'pwa-production' even while the flag is false: a redeploy leaves it pinned and
+      // the flag is what gates the release, not the config mode. This branch has been dead since 2026-08-02, when the
+      // clean-17 genesis was sealed and the flag went true; it is kept so the gate still holds if a future generation
+      // retires the flag again. (It previously carried a note claiming the flag was "false again pending Session 7
+      // re-verification" — stale from 2026-07-28 and left behind by the ceremony.)
       expect(config).toMatch(/mode:\s*PLATHO_APP_MODES\.PRODUCTION/);
       expect(config).toMatch(/signedBundlePurpose:\s*'pwa-production'/);
     }

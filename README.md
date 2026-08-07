@@ -10,7 +10,9 @@ The project is designed around a hard constraint: the messenger must remain usab
 
 The clean-17 contract generation is deployed and sealed on mainnet, and the PWA runs against it. Contracts are immutable after seal; migration hooks are built in for the next generation.
 
-Platho is still experimental. Every contract has gone through local engineering review and extended negative tests, but the project has not completed independent external security review, and ceremony steps remain open — the activity-airdrop backing in particular. Treat the gates in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) as the authority on what is and is not live.
+The genesis ceremony is complete: the supply is minted, the activity airdrop is funded and paying, and the live verifier passes against the sealed manifest. What has not happened yet is the ATH/GRAM pool launch, so protocol-fee discounts stay locked until the activity airdrop is fully distributed, and the post-pool route and pricing freezes remain outstanding by design.
+
+Platho is still experimental. Every contract has gone through local engineering review and extended negative tests, but the project has not completed independent external security review. Treat the gates in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) as the authority on what is and is not live.
 
 ## Repository layout
 
