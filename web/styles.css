@@ -27,6 +27,14 @@
   --shadow: rgba(0, 0, 0, 0.32);
   /* Accent-tinted outline for modal panels so a dark dialog separates from the dark app background (owner). */
   --modal-outline: rgba(48, 213, 176, 0.5);
+  /* SINGLE SOURCE OF TRUTH for how wide a dialog card is. There used to be four numbers across eight dialogs —
+     440 for the forms, 460 for the quick start, 520 for the install sheet, and whatever the newest one copied —
+     and the owner read that straight off the screen as "this one is wider than the rest" (2026-08-07). Widths that
+     agree only by someone remembering to type the same digits do not stay in agreement.
+     ONE EXCEPTION, and it is a different kind of surface rather than a different taste: the docs reader is a
+     document viewer, so it has its own token below. The image lightbox is full-viewport and not a card at all. */
+  --modal-card-width: 460px;
+  --modal-reader-width: 980px;
   --header-actions-width: 216px;
   /* SINGLE SOURCE OF TRUTH for every header (pane headers, the public absolute action cluster, the
      conversation/post-detail headers): one top offset, one bar height, one control size, one derived
@@ -3654,7 +3662,7 @@ button.feed-item:hover {
 .install-dialog {
   display: grid;
   gap: 14px;
-  width: min(440px, 100%);
+  width: min(var(--modal-card-width), 100%);
   padding: 18px;
   border: 1px solid var(--modal-outline);
   border-radius: 8px;
@@ -3668,7 +3676,10 @@ button.feed-item:hover {
 .activation-welcome-dialog {
   display: grid;
   gap: 12px;
-  width: min(520px, 100%);
+  /* Matched to .quick-start-dialog, not to .install-dialog: the dialogs sit in a 440-460 band and 520 is the install
+     outlier. This one is the tail of onboarding — often the screen right after the quick-start — so it should read
+     as the same card, not a wider one. (Owner spotted it as "wider than the rest"; measured across all eight.) */
+  width: min(var(--modal-card-width), 100%);
   max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
   padding: 18px;
   overflow-y: auto;
@@ -3720,10 +3731,10 @@ button.feed-item:hover {
 .quick-start-dialog {
   display: grid;
   gap: 16px;
-  width: min(460px, 100%);
+  width: min(var(--modal-card-width), 100%);
   /* The dialog is a grid item of the .modal-backdrop (place-items:center). Without min-width:0 its
      automatic minimum is min-content, so a wide descendant (a long localized paragraph's max-content,
-     the footer's action button) inflates the box PAST width:min(460px,100%) and it spills off a narrow
+     the footer's action button) inflates the box PAST its declared width and it spills off a narrow
      screen (iPhone / TG Mini App). min-width:0 makes the width authoritative so inner text wraps instead. */
   min-width: 0;
   max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
@@ -3932,14 +3943,15 @@ button.feed-item:hover {
 
 .docs-dialog {
   grid-template-rows: auto minmax(0, 1fr);
-  width: min(980px, 100%);
+  width: min(var(--modal-reader-width), 100%);
   height: min(760px, 86dvh);
 }
 
 .recipient-dialog header,
 .action-dialog header,
 .docs-dialog header,
-.install-dialog header {
+.install-dialog header,
+.activation-welcome-dialog header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -3953,7 +3965,9 @@ button.feed-item:hover {
 .docs-dialog h2,
 .docs-dialog p,
 .install-dialog h2,
-.install-dialog p {
+.install-dialog p,
+.activation-welcome-dialog h2,
+.activation-welcome-dialog p {
   margin: 0;
 }
 
@@ -4300,10 +4314,6 @@ button.feed-item:hover {
   background: var(--accent);
   font-weight: 800;
   cursor: pointer;
-}
-
-.install-dialog {
-  width: min(520px, 100%);
 }
 
 .install-dialog > p {
