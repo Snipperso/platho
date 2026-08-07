@@ -98,22 +98,11 @@ Récompense par publication réussie :
 10 ATH
 ```
 
-La récompense s'accumule pour la personne qui publie sous forme de crédit : une capsule acceptée vaut un crédit, et un crédit vaut `10 ATH`, à l'identique sur toutes les voies. Les crédits s'accumulent sur son propre compte (`AirdropTicket`, un par portefeuille) et sont réglés par lots depuis `AirdropPool` ; l'ATH arrive dans son propre portefeuille ATH.
+Chaque capsule acceptée rapporte `10 ATH` à la personne qui l'envoie, à l'identique sur toutes les voies. Une tentative de publication échouée ne rapporte rien.
 
-Les tentatives de publication échouées ne créent aucune récompense d'activité.
+Le versement se fait par lots, et non capsule par capsule. Chaque livraison porte un coût fixe non récupérable d'environ `0.0166 GRAM`, et ce coût ne dépend pas de la quantité d'ATH qu'elle transporte. Payer après chaque capsule coûterait davantage que ce que ces capsules collectent en frais de protocole ; la récompense s'accumule donc et arrive en un seul versement.
 
-Comptabilisation de la récompense :
-
-```text
-credits += 1                 // un crédit = 10 ATH
-airdrop_remaining -= 10 ATH
-```
-
-Le budget est un multiple exact de la récompense : `15,000,000 ATH` font `1,500,000` crédits. Une fois épuisés, les nouvelles récompenses d'activité cessent.
-
-L'airdrop d'activité est couvert par le portefeuille ATH officiel d'`AirdropPool`, où se trouvent ces `15,000,000 ATH`.
-
-Le versement se fait par lots, et non capsule par capsule. Chaque livraison porte un coût fixe non récupérable d'environ `0.0166 GRAM`, et ce coût ne dépend pas du nombre de crédits qu'elle transporte. Payer capsule par capsule sur 1,500,000 capsules brûlerait davantage que ce que ces capsules collectent en frais de protocole ; les crédits s'accumulent donc et sont réglés par lots.
+L'airdrop est couvert par le portefeuille ATH officiel d'`AirdropPool`, où se trouvent ces `15,000,000 ATH`. Une fois épuisés, les récompenses d'activité cessent.
 
 ## Prix de l'activité
 
