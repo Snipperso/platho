@@ -53,6 +53,9 @@ const ROOT_RUNTIME_FILES = new Set([
   'shard-address.mjs',
   'airdrop-ticket-read.mjs',
   'airdrop-pool-read.mjs',
+  // The reserve seller: its live state (price step + what is left on it) and the buy message.
+  'market-stability-read.mjs',
+  'market-stability-buy-send.mjs',
   'shard-code.mjs',
   'username-ton-rpc-provider.mjs',
   'sw.js',

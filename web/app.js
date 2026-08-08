@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=20';
+} from './public-channel-subscriptions.mjs?v=21';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -191,6 +191,12 @@ import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mj
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=15';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=14';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
+import {
+  ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
+  athForNanotons, buyValueNanotons, createMarketStabilityReader,
+  marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
+} from './market-stability-read.mjs?v=1';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
 import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=14';
 import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=14';
@@ -227,7 +233,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=47';
+} from './i18n.mjs?v=48';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -656,6 +662,8 @@ rpcKeyRow?.addEventListener('click', (event) => {
 
 refreshToncenterKeyUi();
 const flushAthButton = document.querySelector('#flushAthButton');
+const buyAthButton = document.querySelector('#buyAthButton');
+const buyAthStatus = document.querySelector('#buyAthStatus');
 const flushAthStatus = document.querySelector('#flushAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
@@ -1515,7 +1523,11 @@ let athTicketState = { credits: null, minClaimCredits: null, inFlight: 0n, claim
 // The pool's own numbers: how much of the activity airdrop has gone out, and how much ATH one credit is worth.
 // `athPerCredit` is what turns an internal credit count into the figure a user can act on — 10 credits is not
 // "10 of something", it is 100 ATH.
-let athPoolState = { distributedTotal: null, totalPool: null, athPerCredit: null };
+let athPoolState = { distributedTotal: null, totalPool: null, athPerCredit: null, remainingBudget: null };
+// The reserve seller. `null` state means "not read yet / unreadable", which the buy dialog treats as UNKNOWN rather
+// than as sold out — a confident "no" from a failed read is the worse of the two errors here.
+let marketStabilityState = null;
+let marketStabilityBuyInFlight = false;
 // pendingSince: a claim was broadcast and the chain has not shown it yet. Distinct from `busy` (which covers only the
 // signing/broadcast itself) — the gap between those two is where the button used to re-enable on a live claim.
 let athClaimState = { busy: false, error: null, errorCode: null, pendingSince: null };
@@ -18061,6 +18073,8 @@ claimAirdropButton?.addEventListener('click', async () => {
   }
 });
 
+buyAthButton?.addEventListener('click', () => { openBuyAthDialog().catch((error) => console.error(error)); });
+
 flushAthButton?.addEventListener('click', async () => {
   try {
     flushAthButton.disabled = true;
@@ -21078,6 +21092,10 @@ async function refreshAthPoolState() {
         distributedTotal: pool.distributedTotal,
         totalPool: pool.totalPool,
         athPerCredit: pool.athPerCredit,
+        // Read for the BUY dialog, which must stop saying "ATH is earned by writing" once nothing is left to earn.
+        // The owner called that out before a line of copy was written: prose about a phase of the project goes stale
+        // silently, so the phase has to be a value the client reads rather than a sentence someone remembers to edit.
+        remainingBudget: pool.remainingBudget,
       };
       // The claim row shows ATH, and ATH is credits x ath-per-credit — a figure that only exists once this read
       // lands. Without a render here the row keeps showing the raw credit count until the next ticket refresh
@@ -21086,6 +21104,246 @@ async function refreshAthPoolState() {
     }
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] pool read failed', error);
+  }
+}
+
+/**
+ * The reserve seller's live state: the price step, what is left on it, and whether it can take a sale at all.
+ *
+ * A failed read leaves `marketStabilityState` as it was (or null on the first pass) rather than writing zeros. The
+ * distinction matters at the point of sale: "sold out" and "I could not ask" look identical in a zeroed struct, and
+ * only one of them should stop a buyer.
+ */
+async function refreshMarketStabilityState() {
+  const address = PLATHO_APP_CONFIG.marketStabilitySeller?.address ?? null;
+  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  if (!address || !transport?.runGetMethod) return;
+  try {
+    const state = await createMarketStabilityReader((call) => transport.runGetMethod(call))(address);
+    if (state.exists) marketStabilityState = state;
+    renderBuyAthStatus();
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[market] reserve seller read failed', error);
+  }
+}
+
+/** A nanoton figure as a grouped GRAM string, the same shape every other money row on this screen uses. */
+function formatGramNanotons(value) {
+  return groupDecimalText(formatTonNanotons(value));
+}
+
+/** The seller's current price for ONE ATH, as a GRAM string. */
+function marketStabilityUnitPriceLabel(state = marketStabilityState) {
+  if (!state?.currentMultiplier) return null;
+  return formatGramNanotons(quoteNanotonsForAth(ATH_ATOMIC_PER_UNIT, state.currentMultiplier));
+}
+
+/**
+ * The row's trailing status. It carries the PRICE rather than a word, for the same reason the claim and flush rows
+ * carry theirs: a control that spends money should say how much before it is pressed, not after.
+ */
+function renderBuyAthStatus() {
+  if (!buyAthStatus) return;
+  if (!marketStabilityState) {
+    setText(buyAthStatus, t('profile.statusChecking'));
+    return;
+  }
+  if (maxBuyableAtomic(marketStabilityState) <= 0n) {
+    setText(buyAthStatus, t('profile.buyAthSoldOut'));
+    return;
+  }
+  const price = marketStabilityUnitPriceLabel();
+  setText(buyAthStatus, price ? t('profile.buyAthFromPrice', { price }) : t('profile.statusChecking'));
+}
+
+// WHY THE COPY IS ASSEMBLED FROM STATE INSTEAD OF WRITTEN OUT.
+//
+// The owner, reading the draft: "after the airdrop is handed out, part of this text stops being true". He is right,
+// and about the two most load-bearing lines — "ATH is earned by writing" and "take a short name before they are
+// gone". Both describe a PHASE of the project, and prose about a phase goes stale in silence, in ten languages at
+// once. So the phase is a value the client reads: while the airdrop pool still has budget the earning line is true
+// and shown; when it is exhausted both lines go away on their own.
+//
+// An UNREADABLE pool shows the shorter text, not the longer one. That is the whole discipline in one line: the
+// shorter version asserts strictly less, so it cannot be the wrong thing to say when we do not know.
+function buyAthDialogNotes(state) {
+  const remaining = athPoolState.remainingBudget;
+  const airdropStillRunning = remaining !== null && remaining !== undefined && nonNegativeBigInt(remaining) > 0n;
+  const notes = [];
+  if (airdropStillRunning) {
+    notes.push({ type: 'note', text: t('profile.buyAthEarned') });
+    notes.push({ type: 'note', text: t('profile.buyAthNow') });
+  } else {
+    notes.push({ type: 'note', text: t('profile.buyAthNowAfter') });
+  }
+  notes.push({
+    type: 'note',
+    text: t('profile.buyAthPriceLine', {
+      price: marketStabilityUnitPriceLabel(state) ?? '-',
+      amount: formatAthAtomicGrouped(maxBuyableAtomic(state)),
+    }),
+  });
+  if (airdropStillRunning) notes.push({ type: 'note', text: t('profile.buyAthPoolLine', { price: POOL_LAUNCH_PRICE_LABEL }) });
+  return notes;
+}
+
+/** The price the liquidity pool will open at — 15,000,000 ATH against 15,000 GRAM. Stated, never computed from it. */
+const POOL_LAUNCH_PRICE_LABEL = '0.001';
+
+/**
+ * Wait for the seller to be free, then buy.
+ *
+ * The reserve serves ONE sale at a time (gate 23211 refuses a buy while another is in flight), so a busy seller is a
+ * QUEUE, not a failure — and sending into it would bounce the buyer's money back with a red row and no explanation.
+ * A dust buy can hold the slot for one round trip, which is seconds. So this waits, and only gives up after the wait
+ * stops being plausibly a queue.
+ */
+async function awaitMarketStabilityIdle(attempts = 6, delayMs = 2500) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await refreshMarketStabilityState();
+    if (marketStabilityCanSell(marketStabilityState)) return marketStabilityState;
+    if (marketStabilityState && maxBuyableAtomic(marketStabilityState) <= 0n) return null;  // sold out, not busy
+    await delay(delayMs);
+  }
+  return null;
+}
+
+async function openBuyAthDialog() {
+  if (!plathoWallet?.address) {
+    setText(buyAthStatus, t('profile.buyAthWalletRequired'));
+    return;
+  }
+  await refreshMarketStabilityState();
+  const state = marketStabilityState;
+  if (!state) {
+    setText(buyAthStatus, t('profile.buyAthUnavailable'));
+    return;
+  }
+  const maxAtomic = maxBuyableAtomic(state);
+  if (maxAtomic <= 0n) {
+    setText(buyAthStatus, t('profile.buyAthSoldOut'));
+    return;
+  }
+
+  // TWO INPUTS, ONE NUMBER. Editing either recomputes the other, and the ATH side is authoritative: the message
+  // carries an amount, not a payment, so a GRAM figure is only ever a way of ARRIVING at an amount.
+  let amountAtomic = 0n;
+  const athInput = document.createElement('input');
+  const gramInput = document.createElement('input');
+  const setAmount = (atomic, { skip } = {}) => {
+    amountAtomic = atomic < 0n ? 0n : (atomic > maxAtomic ? maxAtomic : atomic);
+    if (skip !== 'ath') athInput.value = amountAtomic === 0n ? '' : formatAthAtomic(amountAtomic);
+    if (skip !== 'gram') {
+      const cost = quoteNanotonsForAth(amountAtomic, state.currentMultiplier);
+      gramInput.value = amountAtomic === 0n ? '' : formatTonNanotons(cost);
+    }
+    updateActiveActionSummary();
+  };
+  const parseDecimal = (text, decimals) => {
+    const clean = String(text ?? '').replace(/\s| /g, '').replace(',', '.');
+    if (!/^\d*(\.\d*)?$/.test(clean) || clean === '' || clean === '.') return null;
+    const [whole, fraction = ''] = clean.split('.');
+    const padded = fraction.slice(0, decimals).padEnd(decimals, '0');
+    return BigInt(whole || '0') * (10n ** BigInt(decimals)) + BigInt(padded || '0');
+  };
+
+  const buildField = (input, id, label, onInput) => {
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.autocomplete = 'off';
+    input.id = id;
+    input.className = 'action-input';
+    input.placeholder = '0';
+    input.addEventListener('input', onInput);
+    const wrap = document.createElement('label');
+    wrap.className = 'action-field';
+    const span = document.createElement('span');
+    span.textContent = label;
+    wrap.append(span, input);
+    return wrap;
+  };
+
+  const fields = [
+    ...buyAthDialogNotes(state),
+    {
+      type: 'custom',
+      className: 'action-custom-field buy-ath-inputs',
+      render: () => {
+        const box = document.createElement('div');
+        box.className = 'buy-ath-pair';
+        box.append(
+          buildField(athInput, 'buyAthAmountInput', t('profile.buyAthAmountLabel'), () => {
+            const parsed = parseDecimal(athInput.value, 9);
+            setAmount(parsed ?? 0n, { skip: 'ath' });
+          }),
+          buildField(gramInput, 'buyAthCostInput', t('profile.buyAthCostLabel'), () => {
+            const parsed = parseDecimal(gramInput.value, 9);
+            setAmount(parsed === null ? 0n : athForNanotons(parsed, state.currentMultiplier), { skip: 'gram' });
+          }),
+        );
+        return box;
+      },
+    },
+    // The overhead is real money leaving the wallet for one hop, so it is named — and so is the fact that whatever
+    // is not needed comes back, which is the contract's own behaviour and the reason over-providing is safe.
+    { type: 'note', text: t('profile.buyAthFeeNote') },
+  ];
+
+  const proceed = await openActionDialog({
+    title: t('profile.buyAthTitle'),
+    hint: t('profile.buyAthHint'),
+    submitLabel: t('profile.buyAthSubmit'),
+    fields,
+    summary: () => [
+      { label: t('profile.buyAthSummaryAmount'), value: formatAthProfileAmount(amountAtomic) },
+      { label: t('profile.buyAthSummaryPrice'), value: `${formatGramNanotons(quoteNanotonsForAth(amountAtomic, state.currentMultiplier))} GRAM` },
+      { label: t('profile.buyAthSummaryFee'), value: `${formatGramNanotons(MARKET_STABILITY_BUY_OVERHEAD)} GRAM` },
+    ],
+    validateSubmit: async () => {
+      if (amountAtomic <= 0n) return { ok: false, error: t('profile.buyAthEnterAmount') };
+      const total = buyValueNanotons(amountAtomic, state.currentMultiplier);
+      try {
+        await assertWalletGramAtLeast(total + WALLET_FEE_HEADROOM_NANOTONS, 'buy');
+      } catch {
+        return { ok: false, error: t('profile.buyAthLowBalance', { amount: formatGramNanotons(total) }) };
+      }
+      return { ok: true };
+    },
+  });
+  if (!proceed || amountAtomic <= 0n) return;
+  await submitBuyAth(amountAtomic);
+}
+
+async function submitBuyAth(amountAtomic) {
+  if (marketStabilityBuyInFlight) return;
+  marketStabilityBuyInFlight = true;
+  if (buyAthButton) buyAthButton.disabled = true;
+  setText(buyAthStatus, t('profile.buyAthSending'));
+  try {
+    const ready = await awaitMarketStabilityIdle();
+    if (!ready) {
+      setText(buyAthStatus, t('profile.buyAthBusy'));
+      return;
+    }
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    await publishMarketStabilityBuy({
+      wallet: plathoWallet,
+      transport,
+      sellerAddress: PLATHO_APP_CONFIG.marketStabilitySeller.address,
+      recipient: plathoWallet.address,
+      amountAtomic,
+      multiplier: ready.currentMultiplier,
+      lastTerminalQueryId: ready.lastTerminalQueryId,
+    });
+    setText(buyAthStatus, t('profile.buyAthSent'));
+    // The ATH lands when the seller forwards it, a hop later — re-read both sides rather than claim a balance.
+    window.setTimeout(() => { refreshAthProtocolStats().catch(() => {}); }, 8000);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[market] buy failed', error);
+    setText(buyAthStatus, t('profile.buyAthFailed'));
+  } finally {
+    marketStabilityBuyInFlight = false;
+    if (buyAthButton) buyAthButton.disabled = false;
   }
 }
 
@@ -21108,6 +21366,7 @@ async function refreshAthProtocolStatsRun() {
     await refreshAthFlushState();
     await refreshAthTicketState();
     await refreshAthPoolState();
+    await refreshMarketStabilityState();
     renderAthProfileStats();
     return athProtocolState;
   } catch (error) {

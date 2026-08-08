@@ -12,7 +12,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=293">
+    <link rel="stylesheet" href="./styles.css?v=294">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
@@ -388,6 +388,9 @@
                    The button carries the progress ("0 ATH / 100 ATH") and stays disabled until the threshold. -->
               <div class="settings-list">
                 <button id="claimAirdropButton" type="button"><span data-i18n="profile.claimAirdrop">Claim ATH</span><strong class="profile-action-status" id="claimAirdropStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <!-- [OWNER 2026-08-08] The other way to get ATH: buy it from the sealed reserve instead of earning it.
+                     The status carries the PRICE, like every other row here that spends money. -->
+                <button id="buyAthButton" type="button"><span data-i18n="profile.buyAth">Buy ATH</span><strong class="profile-action-status" id="buyAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
               </div>
               <div class="profile-stat-list">
                 <div class="profile-stat-row">

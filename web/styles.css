@@ -5240,3 +5240,14 @@ button.feed-item:hover {
     transition: none;
   }
 }
+
+/* Buy-ATH: the two conversion inputs sit side by side on a wide screen and stack on a narrow one. They are ONE
+   number shown two ways, so they must read as a pair rather than as two independent questions. */
+.buy-ath-pair {
+  display: grid;
+  gap: var(--space-3, 12px);
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 480px) {
+  .buy-ath-pair { grid-template-columns: 1fr; }
+}
