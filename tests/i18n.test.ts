@@ -160,15 +160,22 @@ describe('i18n app integration', () => {
     expect(app).toMatch(/\/g, '\\u202F'\)/);
   });
 
-  it('PWA-I18N-10: messageSyncStatus state is decoupled from its translated display text', () => {
-    // The node is read as state elsewhere; with i18n the text is translated, so state lives in a marker.
-    expect(app).toMatch(/function setMessageSyncStatus\(text, state = ''\)/);
-    expect(app).toMatch(/function messageSyncStatusState\(\)/);
-    expect(app).toMatch(/messageSyncStatus\.dataset\.syncState/);
-    // No call site reads the translated textContent as state anymore.
-    expect(app).not.toMatch(/messageSyncStatus\?\.textContent === 'syncing'/);
-    expect(app).not.toMatch(/messageSyncStatus\?\.textContent !== 'sync delayed'/);
-    expect(app).toMatch(/messageSyncStatusState\(\) === 'syncing'/);
-    expect(app).toMatch(/messageSyncStatusState\(\) !== 'delayed'/);
+  it('PWA-I18N-10: sync state is never read back out of translated display text', () => {
+    // REBASELINED 2026-08-07. This used to pin one mechanism — setMessageSyncStatus / messageSyncStatusState /
+    // messageSyncStatus.dataset.syncState — which existed because the profile "Sync messages" row doubled as a
+    // state store. The owner removed that row (the header carries the indicator on every tab), and pinning a
+    // deleted function would have meant keeping dead code alive to satisfy a test.
+    //
+    // The RULE outlives the mechanism and is what is pinned now: under i18n the rendered text is translated, so
+    // branching on it silently changes behaviour with the interface language. That defect class is why the
+    // marker existed in the first place, and it can return anywhere — not just in the row that is gone.
+    expect(app, 'no branch may compare rendered text against a translated string')
+      .not.toMatch(/textContent\s*[=!]==\s*t\(/);
+    // The surviving sync state — the header indicator's — is a locale-independent flag, not a phrase.
+    expect(app).toMatch(/dataset\.syncing = active \? 'true' : 'false'/);
+    // And the removed row does not come back half-wired: a node whose absence makes an accessor return '' turns
+    // three guards into no-ops without raising anything, which is exactly how this row was removed safely.
+    expect(app).not.toMatch(/messageSyncStatus\s*=\s*document\.querySelector/);
+    expect(app).not.toMatch(/function setMessageSyncStatus\(/);
   });
 });

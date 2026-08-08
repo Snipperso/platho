@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=43';
+} from './i18n.mjs?v=44';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -231,11 +231,15 @@ const appConfig = PLATHO_APP_CONFIG;
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
+// refreshProfileFeeLabels() canNOT be called here: it reads the `mintUsernameStatus` / `setAvatarStatus` element
+// consts, which are declared a few hundred lines below, and a `const` read before its declaration throws
+// ReferenceError — at module top level that aborts the whole script and the app never boots. It runs with the
+// other boot-time UI initialisers instead, after every element const exists.
 // MUST equal the #appVersionLabel in index.html (PWA-CONFIG-01B pins the equality): the update-detect
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v883';
+const PLATHO_APP_RUNTIME_VERSION = 'v884';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -445,29 +449,16 @@ const vaultRecordStatus = document.querySelector('#vaultRecordStatus');
 const registerVaultKeysButton = document.querySelector('#registerVaultKeysButton');
 const replaceVaultKeysButton = document.querySelector('#replaceVaultKeysButton');
 const vaultRotateStatus = document.querySelector('#vaultRotateStatus');
-const syncMessagesButton = document.querySelector('#syncMessagesButton');
-const messageSyncStatus = document.querySelector('#messageSyncStatus');
-// messageSyncStatus doubles as a display node AND a state store: several call sites read its current text
-// to decide whether to overwrite it (keep a rate-limit note over a generic failure, replace a placeholder,
-// stop clobbering a mid-sync label). With i18n the display text is translated, so the machine-readable state
-// must live in a stable, locale-independent marker instead of the rendered text.
-function setMessageSyncStatus(text, state = '') {
-  if (!messageSyncStatus) return;
-  messageSyncStatus.textContent = text ?? '';
-  if (state) messageSyncStatus.dataset.syncState = state;
-  else delete messageSyncStatus.dataset.syncState;
-}
-function messageSyncStatusState() {
-  return messageSyncStatus?.dataset.syncState ?? '';
-}
-// Companion to privateSyncStatusText: the ONE state distinction downstream cares about is 'delayed'
-// (rate-limit / RPC-delayed) versus a normal settled result.
-function privateSyncStatusState(result) {
-  if (result && typeof result === 'object'
-    && (result.rateLimited || result.rpcDelayed || result.reason === 'private_index_read_failed')) return 'delayed';
-  return 'result';
-}
-const publicSyncWindowSelect = document.querySelector('#publicSyncWindowSelect');
+// The profile "Sync messages" row was REMOVED (owner, 2026-08-07): every tab already carries the sync
+// indicator in its header, and a second control that says the same thing in a different place is noise.
+//
+// It took its state store with it. That row was not only a label — several call sites read
+// `messageSyncStatus.dataset.syncState` to decide whether to overwrite it (keep a rate-limit note over a
+// generic failure, replace a placeholder, stop clobbering a mid-sync label). Deleting the node alone would
+// have left `messageSyncStatusState()` returning '' forever through its optional chain, silently flipping
+// three branches with nothing to raise. The guards existed only to protect that one label, so they went with
+// it rather than being left to guard nothing. The header indicator has its own machinery —
+// beginMessageSyncUi / completeMessageSyncUi / failMessageSyncUi — and is untouched.
 const publicCommentsDefaultSelect = document.querySelector('#publicCommentsDefaultSelect');
 const setAvatarButton = document.querySelector('#setAvatarButton');
 const setAvatarStatus = document.querySelector('#setAvatarStatus');
@@ -662,6 +653,7 @@ rpcKeyRow?.addEventListener('click', (event) => {
 refreshToncenterKeyUi();
 const flushAthButton = document.querySelector('#flushAthButton');
 const flushAthStatus = document.querySelector('#flushAthStatus');
+const flushAthNote = document.querySelector('#flushAthNote');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
 const claimAirdropButton = document.querySelector('#claimAirdropButton');
@@ -1382,7 +1374,6 @@ const PUBLIC_FEED_RENDER_PAGE = 150;
 // public state; initializing it up there would forward-reference this const in its TDZ and crash boot).
 publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
-const PUBLIC_SYNC_WINDOW_STORAGE_KEY = 'platho.publicSyncWindow.v1';
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v2';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
 const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
@@ -4147,7 +4138,6 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   setText(keyAuthStatus, t('common.locked'));
   setText(vaultDraftStatus, t('common.locked'));
   setText(vaultRecordStatus, t('common.locked'));
-  setMessageSyncStatus(t('common.locked'), 'locked');
   setText(vaultRotateStatus, t('common.locked'));
   refreshMessagingControls();
   refreshComposerPublishPolicy();
@@ -5266,7 +5256,6 @@ function beginMessageSyncUi() {
   messageAutoSyncAt = 0;
   messageAutoSyncLastErrorLabel = null;
   messageAutoSyncLoadingFrame = 0;
-  setMessageSyncStatus(t('sync.statusSyncing'), 'syncing');
   scheduleMessageAutoSyncCountdownUi();
 }
 
@@ -6366,29 +6355,16 @@ function markVisiblePublicFeedRead(items = publicFeedItemsChronological()) {
   return changed;
 }
 
-function publicFeedCacheForCurrentWindow() {
-  const cutoffMs = publicSyncCutoffMs();
-  if (cutoffMs === null) return publicChannelFeedCache;
-  const out = {};
-  for (const [channelId, record] of Object.entries(publicChannelFeedCache ?? {})) {
-    const feed = record?.feed ?? record;
-    if (!feed?.posts) {
-      out[channelId] = record;
-      continue;
-    }
-    const filteredFeed = {
-      ...feed,
-      posts: feed.posts
-        .filter((post) => isFreshPublicTimestamp(post.createdAt, cutoffMs))
-        .map((post) => ({
-          ...post,
-          comments: (post.comments ?? []).filter((comment) => isFreshPublicTimestamp(comment.createdAt, cutoffMs)),
-        })),
-    };
-    out[channelId] = record?.feed ? { ...record, feed: filteredFeed } : filteredFeed;
-  }
-  return out;
-}
+// The "History sync — short / long" setting was REMOVED (owner, 2026-08-07). It had been inert for some time:
+// publicSyncCutoffMs() normalised the stored value and then returned null unconditionally, so this function
+// short-circuited to the whole cache and the date filter below it was unreachable. Both options rendered the
+// same feed, which is worse than no control — a user picking "retained history, up to 1 year" was told they had
+// widened their history and got nothing. Its vocabulary was pre-shard too ("newest 128 entries" counted the old
+// monolithic hub; PublicShard pages 96 rows from the tail).
+//
+// Nothing replaces it: the feed shows whatever the shard still retains, which is what a channel carrying a long
+// work needs. A saved `platho.publicSyncWindow.v1` is left in localStorage on existing devices — orphan data
+// nobody reads, not worth a migration.
 
 function isPendingPublicFeedItem(item) {
   return Boolean(item?.publishStatus && (item.entryId === undefined || item.entryId === null || item.entryId === ''));
@@ -8855,7 +8831,7 @@ function rebuildThreadsFromPublicSubscriptions(options = {}) {
   // without auto-subscribing). The channels LIST stays subscription-driven (see the channels render).
   publicChannelThreads = publicChannelsToThreads(
     feedSourcePublicChannels(),
-    publicFeedCacheForCurrentWindow(),
+    publicChannelFeedCache,
   );
 
   if (!preserveActive) {
@@ -12192,16 +12168,10 @@ function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
         messageAutoSyncStallStreak = 0;
         nextSyncDelayMs = MESSAGE_AUTO_SYNC_IDLE_MS;
       }
-      if (privateSyncImported(result)) {
-        setMessageSyncStatus(t('sync.newMessages'), 'result');
-      } else if (messageSyncStatusState() === 'syncing') {
-        setMessageSyncStatus(privateSyncStatusText(result), privateSyncStatusState(result));
-      }
     } catch (error) {
       const rateLimited = noteTonRpcRateLimit(error);
       const label = rateLimited ? t('sync.syncDelayed') : t('sync.syncFailed');
       failMessageSyncUi(label);
-      setMessageSyncStatus(rateLimited ? t('sync.delayedShort') : t('sync.failedShort'), rateLimited ? 'delayed' : 'failed');
       if (!rateLimited) console.error(error);
       if (rateLimited) nextSyncDelayMs = tonRpcLimitBackoffMs(error);
     } finally {
@@ -13453,17 +13423,13 @@ function markNavVaultBalanceRetryNeeded(reason = 'retrying') {
   markNavVaultBalancePending(reason, { retry: true });
 }
 
-function refreshMessageActionStatuses(options = {}) {
+// Only the key-rotation status is left here. The `keepSyncStatus` option went with the sync row: it existed
+// solely so one caller could refresh this panel WITHOUT stomping a live sync label, and there is no longer a
+// label to stomp.
+function refreshMessageActionStatuses() {
   if (!plathoWallet) {
-    if (!options.keepSyncStatus) setMessageSyncStatus(t('common.walletRequiredStatus'), 'wallet-required');
     setText(vaultRotateStatus, t('common.walletRequiredStatus'));
     return;
-  }
-  if (!options.keepSyncStatus) {
-    const state = messageSyncStatusState();
-    if (!state || state === 'wallet-required' || state === 'chain') {
-      setMessageSyncStatus(t('sync.statusTapToSync'), 'idle');
-    }
   }
   setText(vaultRotateStatus, hasActivePlathoAccount() ? t('vault.rotateReady') : t('vault.rotateActivateFirst'));
 }
@@ -14241,6 +14207,71 @@ function estimatedProfileAvatarTonFeeNanotons(attachment) {
     + PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS;
 }
 
+/**
+ * The CHEAPEST an avatar can be: one public AVATAR capsule plus the ProfileRegistry leg. Larger images split into
+ * more capsules, which is why the profile row quotes a floor rather than a price.
+ *
+ * (That sentence used to end with the word from in double quotes, and WEB-GRAPH-01 read it as an import: its
+ * regex is `\bfrom\s*['"]...['"]`, so prose putting a quote right after that word looks exactly like a module
+ * specifier. The walker can only OVER-report — it cannot miss a real import that way — so the prose gives way,
+ * not the gate.)
+ *
+ * Read from the same constants the send attaches — `publicPublishValueForKind(3)` and
+ * PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS — rather than typed into a translation. This exact figure has been
+ * wrong on screen three times (see the notes on estimatedUsernameMintTonFeeNanotons and
+ * composerEstimatedMaxChargeNanotons): each time a hand-maintained number outlived the value the wallet was asked
+ * to sign, on the screen where the user decides whether to trust the app. A label derived from the constant cannot
+ * drift from it.
+ */
+function profileAvatarFloorNanotons() {
+  return publicPublishValueForKind(3) + PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS;
+}
+
+/**
+ * Mirrors of the AirdropTicket constants the claim note quotes. Pinned against contracts/AirdropTicket.tact by
+ * PWA-AIRDROP-CLAIM-NOTE-01, because a note that drifts from the chain is worse than no note: it would advise a
+ * batch the contract refuses, or quote a cost the wallet does not actually ask for.
+ *
+ * The cost is not a deposit that comes back. AirdropTicket's own comment records it: a claim's whole inbound value
+ * leaves again with the redeem hop, so 0.063 GRAM is spent per claim no matter how much ATH the claim carries —
+ * which is exactly why claiming in large batches is worth advising.
+ */
+const AIRDROP_CLAIM_MIN_VALUE_NANOTONS = 63_000_000n;   // AT_CLAIM_MIN_VALUE
+const AIRDROP_MAX_CREDITS_PER_CLAIM = 1000n;            // AT_MAX_CREDITS_PER_CLAIM
+
+/**
+ * The profile rows that quote a figure. They carry no `data-i18n`: the static pass calls `t(key)` without
+ * params and would render the `{amount}` placeholder literally, so this is their only writer.
+ *
+ * No guard against overwriting a live status. It would need one if it could run mid-action, and it cannot: the
+ * two callers are the boot pass — before anything has been clicked — and the quick-start language switch, which
+ * only exists pre-wallet, where minting a name and setting an avatar are not reachable. A guard here would be
+ * protecting against a state this function cannot observe.
+ */
+function refreshProfileFeeLabels() {
+  if (mintUsernameStatus) {
+    mintUsernameStatus.textContent = t('username.mintFee', {
+      amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()),
+    });
+  }
+  if (setAvatarStatus) {
+    setAvatarStatus.textContent = t('avatar.setFee', { amount: formatTonNanotons(profileAvatarFloorNanotons()) });
+  }
+  if (flushAthNote) {
+    // The live figure when the ticket has reported one, the mirrored constant before that — the note is shown on
+    // a profile that may not have a deployed ticket yet, and "checking" where a number belongs helps nobody.
+    const cost = nonNegativeBigInt(athTicketState.claimMinValue ?? AIRDROP_CLAIM_MIN_VALUE_NANOTONS);
+    const perCredit = nonNegativeBigInt(athPoolState.athPerCredit ?? 0n);
+    const maxAth = perCredit > 0n ? AIRDROP_MAX_CREDITS_PER_CLAIM * perCredit : null;
+    flushAthNote.textContent = maxAth === null
+      ? t('profile.claimCostNote', { cost: t('common.gramAmount', { amount: formatTonNanotons(cost) }) })
+      : t('profile.claimCostBatchNote', {
+        cost: t('common.gramAmount', { amount: formatTonNanotons(cost) }),
+        max: formatAthAtomicGrouped(maxAth),
+      });
+  }
+}
+
 function profileAvatarTonFeeLabel(attachment) {
   if (!attachment) return t('avatar.estimatedAfterCompression');
   const parts = Math.max(1, imageAttachmentPartCount(attachment));
@@ -14364,30 +14395,6 @@ function refreshComposerCostStatus() {
   refreshPublicSendButtonState();
 }
 
-function normalizePublicSyncWindow(value) {
-  const text = String(value ?? 'short').toLowerCase();
-  if (text === 'all' || text === 'long') return 'long';
-  return 'short';
-}
-
-function readPublicSyncWindow() {
-  try {
-    return normalizePublicSyncWindow(localStorageOrNull()?.getItem(PUBLIC_SYNC_WINDOW_STORAGE_KEY));
-  } catch {
-    return 'short';
-  }
-}
-
-function writePublicSyncWindow(value) {
-  const normalized = normalizePublicSyncWindow(value);
-  try {
-    localStorageOrNull()?.setItem(PUBLIC_SYNC_WINDOW_STORAGE_KEY, normalized);
-  } catch {
-    // Non-persistent mode still applies the visible selection for this tab.
-  }
-  return normalized;
-}
-
 function normalizePublicCommentsDefault(value) {
   const text = String(value ?? 'disabled').toLowerCase();
   return ['enabled', 'disabled'].includes(text) ? text : 'disabled';
@@ -14432,28 +14439,6 @@ function updatePublicCommentsToggleUi() {
   publicPostCommentsToggle.title = label;
 }
 
-function publicSyncWindowLabel(value = readPublicSyncWindow()) {
-  const normalized = normalizePublicSyncWindow(value);
-  return normalized === 'long' ? t('public.longHistory') : t('public.shortHistory');
-}
-
-function publicSyncCutoffMs(value = readPublicSyncWindow()) {
-  normalizePublicSyncWindow(value);
-  return null;
-}
-
-function updatePublicSyncWindowUi() {
-  const windowValue = readPublicSyncWindow();
-  if (publicSyncWindowSelect) publicSyncWindowSelect.value = windowValue;
-}
-
-function isFreshPublicTimestamp(value, cutoffMs = publicSyncCutoffMs()) {
-  if (cutoffMs === null) return true;
-  if (!value) return true;
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return true;
-  return timestamp >= cutoffMs;
-}
 
 // --- WYSIWYG composer editor (v771) --------------------------------------------------------------------------
 // Each composer is a contenteditable .composer-input div. It SERIALIZES to the exact same markdown+marker string
@@ -16514,7 +16499,11 @@ function refreshMessagingControls() {
       ? t('vault.statusActive')
       : activationPending
       ? t('vault.statusActivating')
-      : t('vault.activationFeeGram', { fee: plathoAccountActivationFeeLabel() }));
+      // NOT wrapped in a second template. `plathoAccountActivationFeeLabel()` already returns a complete
+      // "N GRAM" through common.gramAmount, and this line used to feed that into vault.activationFeeGram —
+      // "{fee} GRAM" — so the row read "0.06 GRAM GRAM". One place owns how a GRAM amount is written; a second
+      // one appending the unit again is how it doubled, and dropping the wrapper is what stops it recurring.
+      : plathoAccountActivationFeeLabel());
   if (replaceVaultKeysButton) {
     // clean-17: "Replace message keys" is VESTIGIAL under direct-pay — the messaging keys are wallet-frozen (no real
     // rotation is possible), and register/activate is now repair-aware (re-writes stale keys), so a separate replace
@@ -16522,7 +16511,6 @@ function refreshMessagingControls() {
     replaceVaultKeysButton.hidden = privateLaneDirectPayEnabled();
     replaceVaultKeysButton.disabled = privateLaneDirectPayEnabled() || !plathoWallet || !signedActionsReady;
   }
-  if (syncMessagesButton) syncMessagesButton.disabled = !plathoWallet || !signedActionsReady || messageSyncManualInFlight;
   if (mintUsernameButton) mintUsernameButton.disabled = false;
   if (linkUsernameButton) linkUsernameButton.disabled = false;
   if (setAvatarButton) setAvatarButton.disabled = plathoProfileAvatarPending;
@@ -16549,7 +16537,7 @@ function refreshMessagingControls() {
   refreshVaultMoveWidget();
   refreshComposerCostStatus();
   refreshConversationSubtitle();
-  refreshMessageActionStatuses({ keepSyncStatus: true });
+  refreshMessageActionStatuses();
 }
 
 function setView(view) {
@@ -17741,20 +17729,6 @@ document.addEventListener('keydown', (event) => {
   closePublicDiscovery();
 });
 
-publicSyncWindowSelect?.addEventListener('change', async () => {
-  const value = writePublicSyncWindow(publicSyncWindowSelect.value);
-  updatePublicSyncWindowUi();
-  setPublicStatus(`syncing ${publicSyncWindowLabel(value)}`);
-  rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
-  renderPublicSurface({ anchorUnread: true });
-  try {
-    await syncPublicChannels();
-  } catch (error) {
-    setPublicStatus('sync blocked');
-    console.error(error);
-  }
-});
-
 publicCommentsDefaultSelect?.addEventListener('change', () => {
   const value = writePublicCommentsDefault(publicCommentsDefaultSelect.value);
   updatePublicCommentsDefaultUi();
@@ -17910,13 +17884,12 @@ replaceVaultKeysButton?.addEventListener('click', async () => {
   }
 });
 
-// The full manual private message sync (forced history retry + index rescan) — shared by the settings
-// "Sync messages" button and the header sync indicator's tap-to-sync on the Private tab.
+// The full manual private message sync (forced history retry + index rescan). Its only entry point is now the
+// header sync indicator's tap-to-sync; the profile row that used to share it was removed.
 async function runManualPrivateMessageSync() {
   if (messageSyncManualInFlight) return;
   try {
     messageSyncManualInFlight = true;
-    if (syncMessagesButton) syncMessagesButton.disabled = true;
     clearMessageAutoSyncTimer();
     beginMessageSyncUi();
     const result = await syncPrivateCapsulesFromChainOnce({
@@ -17926,20 +17899,15 @@ async function runManualPrivateMessageSync() {
       forceIndexRescan: true,
     });
     completeMessageSyncUi(result);
-    setMessageSyncStatus(privateSyncStatusText(result), privateSyncStatusState(result));
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     failMessageSyncUi(rateLimited ? t('sync.delayed') : t('sync.failed'));
-    setMessageSyncStatus(rateLimited ? t('sync.delayedShort') : t('sync.failedShort'), rateLimited ? 'delayed' : 'failed');
     if (!rateLimited) console.error(error);
   } finally {
     messageSyncManualInFlight = false;
-    if (syncMessagesButton) syncMessagesButton.disabled = false;
     scheduleMessageAutoSync();
   }
 }
-
-syncMessagesButton?.addEventListener('click', () => { runManualPrivateMessageSync(); });
 
 publicChannelSearch?.addEventListener('input', () => {
   publicChannelSearchQuery = publicChannelSearch.value;
@@ -18122,7 +18090,10 @@ privateAnonymousButton?.addEventListener('click', () => {
   const value = writePrivateSenderMode(next);
   updatePrivateSenderModeUi();
   refreshComposerCostStatus();
-  flashWalletIdentityStatus(`Private sender: ${privateSenderModeLabel(value)}`);
+  // Same confirmation as the profile select's handler, and it must go through the dictionary for the same reason:
+  // this path (the composer eye) is the one people actually use, and it was the one shipping raw English into
+  // every non-English UI. The two entry points now render one string.
+  flashWalletIdentityStatus(t('wallet.privateSenderFlash', { mode: privateSenderModeLabel(value) }));
 });
 
 registerVaultKeysButton?.addEventListener('click', async () => {
@@ -20886,6 +20857,10 @@ async function refreshAthPoolState() {
         totalPool: pool.totalPool,
         athPerCredit: pool.athPerCredit,
       };
+      // The claim note's per-claim maximum is credits-per-claim x ath-per-credit, and the second half only exists
+      // once this read lands. Without a refresh here the note would keep the cost-only wording for the whole
+      // session — the advice to batch would be missing exactly where it is worth reading.
+      refreshProfileFeeLabels();
     }
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] pool read failed', error);
@@ -24135,7 +24110,6 @@ async function bootCrypto() {
       setText(keyAuthStatus, requiredStatus);
       vaultDraftStatus.textContent = requiredStatus;
       setText(vaultRecordStatus, requiredStatus);
-      setMessageSyncStatus(requiredStatus, hasStoredWallet ? 'unlock-required' : 'wallet-required');
       setText(vaultRotateStatus, requiredStatus);
       localProfileAvatarPointer = null;
       refreshComposerPublishPolicy();
@@ -24198,19 +24172,13 @@ async function bootCrypto() {
       refreshMessagingControls();
       if (noteTonRpcRateLimit(error)) {
         failMessageSyncUi(t('sync.delayedLabel'));
-        setMessageSyncStatus(t('sync.delayedShort'), 'delayed');
       } else {
         failMessageSyncUi(t('sync.failedLabel'));
         console.error(error);
       }
       return null;
     });
-    if (syncResult) {
-      completeMessageSyncUi(syncResult);
-      setMessageSyncStatus(privateSyncStatusText(syncResult), privateSyncStatusState(syncResult));
-    } else if (messageSyncStatusState() !== 'delayed') {
-      setMessageSyncStatus(t('sync.failedShort'), 'failed');
-    }
+    if (syncResult) completeMessageSyncUi(syncResult);
     // Refresh the OWN profile avatar here — the single canonical post-unlock spot — serialized AFTER the
     // activation + private-sync reads above and BEFORE the background loop / vault auto-refresh timers are
     // armed below, so no avatar read overlaps another chain read on iOS (v509 class). Cached avatars resolve
@@ -24448,6 +24416,7 @@ appLanguageSelect?.addEventListener('change', () => {
 quickStartLanguageSelect?.addEventListener('change', () => {
   setLocale(quickStartLanguageSelect.value);
   applyStaticTranslations();
+  refreshProfileFeeLabels();
   if (appLanguageSelect) appLanguageSelect.value = currentLocale();
   // Re-render the stepper ONLY if it is actually open: renderQuickStartStep persists progress (resume-on-boot)
   // and may auto-advance — neither is welcome while the user is still on the welcome view.
@@ -25059,7 +25028,7 @@ function setupEmojiPicker() {
 setupEmojiPicker();
 
 renderAthProfileStats();
-updatePublicSyncWindowUi();
+refreshProfileFeeLabels();
 updatePublicCommentsDefaultUi();
 updatePrivateSenderModeUi();
 setPublicCommentTarget(null);
