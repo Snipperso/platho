@@ -148,8 +148,8 @@
     "sha256": "0b8abb52d2234cd672f9ea062188a42680cab1fb4e582d690aa4f8e5a7b535f6"
   },
   "platho-config.mjs": {
-    "version": "119",
-    "sha256": "e8bcb1616ccbe769ea03adc8e951aa69370260c324e527272f48302ddc8bf185"
+    "version": "120",
+    "sha256": "6418918eb2e5e91cac9ad7ab10f63ddca22b69e481fa82680044f46fbf413173"
   },
   "platho-crypto.mjs": {
     "version": "15",
