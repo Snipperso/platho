@@ -17,8 +17,8 @@
 // user's toncenter budget, and the whole per-client-key rate model (8 rps under one key, one queue inside one
 // client) depends on there being exactly one queue.
 
-import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=74';
-import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=36';
+import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=75';
+import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=37';
 
 /**
  * A scan is background work: it must yield to anything the user is waiting on.

@@ -14,7 +14,7 @@
 // claim about WHERE the time goes, which a single total cannot confirm. The stages below split it, and the
 // concurrent variant tests the specific suspicion: if per-call overhead dominates, overlapping calls hides it.
 
-import { privateScanViewTagOrNull, __x25519FastPathActiveForTests } from './crypto/platho-crypto.mjs?v=14';
+import { privateScanViewTagOrNull, __x25519FastPathActiveForTests } from './crypto/platho-crypto.mjs?v=15';
 import { x25519 } from './vendor/@noble/curves/ed25519.js';
 import { hkdf } from './vendor/@noble/hashes/hkdf.js';
 import { sha256 } from './vendor/@noble/hashes/sha2.js';

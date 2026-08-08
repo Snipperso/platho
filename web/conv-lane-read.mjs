@@ -15,8 +15,8 @@
 // forged/replayed bodies BEFORE spending a decrypt attempt on them. The write key is public knowledge to both parties
 // (derived from the shared K_root), so this authenticates the transport, not the message content.
 
-import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=36';
-import { toWireAddress } from './shard-reader.mjs?v=13';
+import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=37';
+import { toWireAddress } from './shard-reader.mjs?v=14';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 

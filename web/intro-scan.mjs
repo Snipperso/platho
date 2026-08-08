@@ -20,7 +20,7 @@
 // aborts the caller's whole pass before its cursors are saved — so one 0.0153-GRAM publish would stop first contact
 // for the entire network, permanently, since the next pass re-reads the same page. Skipping loses nothing: a real
 // sender never publishes a point that cannot produce a shared secret, so such a record was addressed to no one.
-import { privateScanViewTagOrNull } from './crypto/platho-crypto.mjs?v=14';
+import { privateScanViewTagOrNull } from './crypto/platho-crypto.mjs?v=15';
 
 /**
  * Stage-1 filter over a batch of intro entries.

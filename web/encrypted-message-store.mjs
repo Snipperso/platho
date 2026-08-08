@@ -8,7 +8,11 @@ const MESSAGE_HISTORY_VERSION = 1;
 const MESSAGE_HISTORY_DB_VERSION = 2;
 const MESSAGE_HISTORY_DOMAIN = 'PLATHO.LOCAL.MESSAGE_HISTORY.V1';
 const AES_GCM_NONCE_BYTES = 12;
-export const DEFAULT_MESSAGE_HISTORY_MAX_RECORDS = 500;
+// Per CONVERSATION, not per app. ~1 KB per stored record was MEASURED, so 2000 is about 2 MB of disk for a
+// conversation that actually reaches it — and a conversation is what a person thinks in, so that is the unit the
+// budget belongs to. The number is a disk choice, not a display one: the app loads a WINDOW of the newest
+// messages and pages back through the rest on demand.
+export const DEFAULT_MESSAGE_HISTORY_MAX_PER_THREAD = 2000;
 
 function assertObject(value, name) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -260,31 +264,42 @@ async function getOrCreateStoredKey(db) {
   return key;
 }
 
-async function pruneIndexedDbMessages(db, maxRecords) {
+/**
+ * Keep the newest `maxPerThread` records OF THIS THREAD.
+ *
+ * [WAS GLOBAL, FIXED 2026-08-08] The cap used to be 500 records across the whole app, pruned by createdAt over
+ * every conversation at once. Two consequences, both silent: a person messaging for years simply did not have
+ * their history on the device, and a burst in one chat EVICTED another chat's past — the busiest conversation ate
+ * the quietest one. Per thread, neither can happen: a conversation's depth is its own, and nothing another
+ * contact does can shorten it.
+ *
+ * Pruning one thread rather than the whole store also makes the work proportional to the write: a message lands in
+ * exactly one conversation, so only that conversation's tail is examined.
+ */
+async function pruneIndexedDbThread(db, threadId, maxPerThread) {
+  if (!threadId || !Number.isFinite(maxPerThread) || maxPerThread <= 0) return;
   const tx = db.transaction(MESSAGE_STORE_NAME, 'readwrite');
   const store = tx.objectStore(MESSAGE_STORE_NAME);
-  const count = await requestToPromise(store.count());
-  if (count <= maxRecords) {
+  const index = store.index('threadId');
+  const count = await requestToPromise(index.count(threadId));
+  if (count <= maxPerThread) {
     await transactionDone(tx);
     return;
   }
-  const toDelete = count - maxRecords;
-  let deleted = 0;
-  const cursorRequest = store.index('createdAt').openCursor();
-  cursorRequest.onsuccess = () => {
-    const cursor = cursorRequest.result;
-    if (!cursor || deleted >= toDelete) return;
-    cursor.delete();
-    deleted += 1;
-    cursor.continue();
-  };
+  // Oldest first: the threadId index is not ordered by time, so the ids are collected and sorted by the CLEAR
+  // createdAt header. Reading headers costs no decryption — that is the whole reason this stays cheap.
+  const records = await requestToPromise(index.getAll(threadId));
+  records.sort((a, b) => Number(a?.createdAt ?? 0) - Number(b?.createdAt ?? 0));
+  for (const record of records.slice(0, count - maxPerThread)) {
+    if (record?.id) store.delete(record.id);
+  }
   await transactionDone(tx);
 }
 
 export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) {
   const db = await openHistoryDb(options.dbName ?? DEFAULT_DB_NAME);
   const key = await getOrCreateStoredKey(db);
-  const maxRecords = options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_RECORDS;
+  const maxPerThread = options.maxPerThread ?? options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_PER_THREAD;
 
   return {
     async putMessage(input) {
@@ -292,20 +307,57 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
       const tx = db.transaction(MESSAGE_STORE_NAME, 'readwrite');
       tx.objectStore(MESSAGE_STORE_NAME).put(record);
       await transactionDone(tx);
-      await pruneIndexedDbMessages(db, maxRecords);
+      await pruneIndexedDbThread(db, record.threadId, maxPerThread);
       return { id: record.id, threadId: record.threadId, createdAt: record.createdAt };
+    },
+    /**
+     * Every record's CLEAR header — id, threadId, createdAt, type, capsuleId — and not one decryption.
+     *
+     * This is what lets history load lazily without losing a belt. Deduplication of an arriving capsule used to
+     * scan the threads held in memory, so a partially-loaded thread would have re-inserted an old message the
+     * chain re-delivered (a manual sync asks for exactly that with forceIndexRescan). Headers give the caller
+     * every capsule id it has ever stored, at no crypto cost, so the check stops depending on what happens to be
+     * in memory.
+     */
+    async listMessageHeaders() {
+      const tx = db.transaction(MESSAGE_STORE_NAME, 'readonly');
+      const records = await requestToPromise(tx.objectStore(MESSAGE_STORE_NAME).getAll());
+      await transactionDone(tx);
+      return records
+        .map((record) => ({
+          id: record?.id ?? null,
+          threadId: record?.threadId ?? null,
+          createdAt: Number(record?.createdAt ?? 0),
+          type: record?.type ?? null,
+          capsuleId: record?.capsuleId ?? null,
+        }))
+        .sort((a, b) => a.createdAt - b.createdAt || String(a.id).localeCompare(String(b.id)));
     },
     async listMessages(filter = {}) {
       return (await this.listMessagesDetailed(filter)).messages;
     },
+    /**
+     * `threadId` narrows to one conversation; `limit` takes the NEWEST that many; `before` (a createdAt) pages
+     * further back. Only the selected window is decrypted — the cost of opening a dialog is its window, not its
+     * history.
+     */
     async listMessagesDetailed(filter = {}) {
       const tx = db.transaction(MESSAGE_STORE_NAME, 'readonly');
       const store = tx.objectStore(MESSAGE_STORE_NAME);
       const source = filter.threadId
         ? store.index('threadId').getAll(filter.threadId)
         : store.getAll();
-      const records = await requestToPromise(source);
+      let records = await requestToPromise(source);
       await transactionDone(tx);
+      if (Number.isFinite(filter.before)) {
+        records = records.filter((record) => Number(record?.createdAt ?? 0) < Number(filter.before));
+      }
+      if (Number.isFinite(filter.limit) && filter.limit >= 0 && records.length > filter.limit) {
+        // Sort BEFORE slicing: the threadId index is keyed by thread, not by time, so "the newest N" is only
+        // meaningful after ordering. Slicing first would decrypt an arbitrary N and call them the latest.
+        records.sort((a, b) => Number(a?.createdAt ?? 0) - Number(b?.createdAt ?? 0));
+        records = records.slice(records.length - filter.limit);
+      }
       return openMessageHistoryRecords(key, records);
     },
     // Deleting a message means deleting it HERE too. Removing it only from the in-memory thread leaves the record in
@@ -320,8 +372,8 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
     get type() {
       return 'indexeddb';
     },
-    get maxRecords() {
-      return maxRecords;
+    get maxPerThread() {
+      return maxPerThread;
     },
     get persistent() {
       return true;
@@ -332,12 +384,23 @@ export async function createIndexedDbEncryptedMessageHistoryStore(options = {}) 
 export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
   const key = options.key ?? await createHistoryKey();
   const records = new Map();
-  const maxRecords = options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_RECORDS;
+  const maxPerThread = options.maxPerThread ?? options.maxRecords ?? DEFAULT_MESSAGE_HISTORY_MAX_PER_THREAD;
 
+  // Per thread, mirroring the IndexedDB store. The fallback must not have DIFFERENT retention from the real one:
+  // a device that fell back to memory would otherwise lose a different set of messages than the same device with
+  // IndexedDB working, and the difference would only show up as "my history is shorter here".
   function prune() {
-    const ordered = [...records.values()].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-    for (const record of ordered.slice(0, Math.max(0, ordered.length - maxRecords))) {
-      records.delete(record.id);
+    const byThread = new Map();
+    for (const record of records.values()) {
+      const bucket = byThread.get(record.threadId) ?? [];
+      bucket.push(record);
+      byThread.set(record.threadId, bucket);
+    }
+    for (const bucket of byThread.values()) {
+      bucket.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+      for (const record of bucket.slice(0, Math.max(0, bucket.length - maxPerThread))) {
+        records.delete(record.id);
+      }
     }
   }
 
@@ -348,13 +411,32 @@ export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
       prune();
       return { id: record.id, threadId: record.threadId, createdAt: record.createdAt };
     },
+    // The SAME shape as the IndexedDB store, deliberately. A fallback that answered a narrower API would fail only
+    // on devices where IndexedDB is unavailable — the ones nobody tests on.
+    async listMessageHeaders() {
+      return [...records.values()]
+        .map((record) => ({
+          id: record?.id ?? null,
+          threadId: record?.threadId ?? null,
+          createdAt: Number(record?.createdAt ?? 0),
+          type: record?.type ?? null,
+          capsuleId: record?.capsuleId ?? null,
+        }))
+        .sort((a, b) => a.createdAt - b.createdAt || String(a.id).localeCompare(String(b.id)));
+    },
     async listMessages(filter = {}) {
       return (await this.listMessagesDetailed(filter)).messages;
     },
     async listMessagesDetailed(filter = {}) {
-      const selected = [...records.values()]
+      let selected = [...records.values()]
         .filter((record) => !filter.threadId || record.threadId === filter.threadId)
         .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+      if (Number.isFinite(filter.before)) {
+        selected = selected.filter((record) => Number(record.createdAt) < Number(filter.before));
+      }
+      if (Number.isFinite(filter.limit) && filter.limit >= 0 && selected.length > filter.limit) {
+        selected = selected.slice(selected.length - filter.limit);
+      }
       return openMessageHistoryRecords(key, selected);
     },
     async deleteMessage(id) {
@@ -375,8 +457,8 @@ export async function createMemoryEncryptedMessageHistoryStore(options = {}) {
     get type() {
       return 'memory';
     },
-    get maxRecords() {
-      return maxRecords;
+    get maxPerThread() {
+      return maxPerThread;
     },
     get persistent() {
       return false;

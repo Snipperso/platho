@@ -296,18 +296,28 @@ async function nativeX25519Usable() {
 }
 
 /**
- * The scan-path shared secret. Identical output to `deriveX25519SharedSecret`, which is what the probe above
- * asserts; the only difference is which implementation computes it.
+ * THE X25519 shared secret for every hot path — the intro scan AND the per-message key derivation. Identical
+ * output to `deriveX25519SharedSecret`, which is what the probe above asserts; the only difference is which
+ * implementation computes it.
  *
- * `secretRef` is the caller's original array, used as the cache key. `scanIntros` hands the same reference to every
- * entry of a pass, so the key is imported once and the per-entry cost is one raw import plus one derivation.
+ * [WIDENED 2026-08-08] v881 gave this to the scan loop only. That was scoped for blast radius — the capsule open
+ * is the most safety-critical code here — and the scoping was too tight: MEASURED, opening one received message
+ * costs 1.527 ms of which the JS scalar multiplication is 1.169 (77%). Native takes the whole receive path to
+ * 0.395 ms, 3.9x, and leaves ML-KEM decapsulation (0.335 ms, no native implementation exists in any browser) as
+ * the floor. On a sync of a thousand messages that is 1.5 s against 0.4 s, and roughly seven times both on an
+ * iPhone.
+ *
+ * `secretRef` is the caller's original array, used as the cache key so a pass imports the key once:
+ *   - the scan hands the same scan secret to every entry;
+ *   - the receive path hands the same recipient secret to every message of a sync batch;
+ *   - the SEND path draws a fresh ephemeral per message and passes null, since a one-shot key cannot be reused.
  *
  * A degenerate `publicKey` (r = 0 is enough, and IntroShard cannot reject it) makes BOTH implementations throw:
  * noble inside its ladder, WebCrypto as OperationError on the all-zero result. Callers that scan strangers' entries
  * rely on that throw to skip the record, so the behaviour must stay identical — `tests/intro-scan-native-ecdh`
  * pins it.
  */
-async function scanSharedSecret(secretKey, publicKey, secretRef) {
+async function sharedSecretX25519(secretKey, publicKey, secretRef) {
   if (await nativeX25519Usable()) {
     const subtle = globalThis.crypto.subtle;
     const cacheKey = secretRef && typeof secretRef === 'object' ? secretRef : null;
@@ -383,7 +393,7 @@ export async function __deriveStealthViewTagViaWebCryptoForTests(scanSharedSecre
 async function deriveStealthViewTagForRecipient(ephemeralSecretKey, ephemeralPublicKey, recipientScanPublicKey) {
   // The sender's ephemeral secret is fresh per message, so nothing is cached here — but it must go through the
   // SAME implementation as the recipient's side or the two would have to agree by luck rather than by construction.
-  const scanShared = await scanSharedSecret(
+  const scanShared = await sharedSecretX25519(
     assertBytes('stealth.ephemeralSecretKey', ephemeralSecretKey, X25519_SECRET_KEY_BYTES),
     assertBytes('recipient.scanPublicKey', recipientScanPublicKey, X25519_PUBLIC_KEY_BYTES),
     null,
@@ -398,7 +408,7 @@ export async function computePrivateScanViewTag(scanSecretKey, ephemeralScanPubl
   const ephemeralPub = typeof ephemeralScanPublicKey === 'bigint'
     ? writeBigUintBytes(ephemeralScanPublicKey, 32, 'ephemeralScanPublicKey')
     : assertBytes('ephemeralScanPublicKey', toUint8Array(ephemeralScanPublicKey), 32);
-  const scanShared = await scanSharedSecret(scanSecret, ephemeralPub, scanSecretKey);
+  const scanShared = await sharedSecretX25519(scanSecret, ephemeralPub, scanSecretKey);
   return deriveStealthViewTag(scanShared, ephemeralPub);
 }
 
@@ -415,7 +425,7 @@ export async function computePrivateScanViewTag(scanSecretKey, ephemeralScanPubl
 // degenerate point, so a skipped entry was never addressed to anyone.
 //
 // Only the ECDH is guarded. Lengths are validated ABOVE the try, so once they hold, the sole remaining failure inside
-// scanSharedSecret is the degenerate point; the HKDF stays OUTSIDE it deliberately, because a WebCrypto fault
+// sharedSecretX25519 is the degenerate point; the HKDF stays OUTSIDE it deliberately, because a WebCrypto fault
 // is an environment failure, not attacker data, and swallowing it would turn a broken client into one that silently
 // reports "no first contacts ever arrived".
 //
@@ -430,7 +440,7 @@ export async function privateScanViewTagOrNull(scanSecretKey, ephemeralScanPubli
     : assertBytes('ephemeralScanPublicKey', toUint8Array(ephemeralScanPublicKey), 32);
   let scanShared;
   try {
-    scanShared = await scanSharedSecret(scanSecret, ephemeralPub, scanSecretKey);
+    scanShared = await sharedSecretX25519(scanSecret, ephemeralPub, scanSecretKey);
   } catch {
     return null;
   }
@@ -1675,7 +1685,8 @@ export async function encryptCompactPayloadBytes(payloadBytes, recipientPublicBu
   const ephemeralPublicKey = options.ephemeralPublicKey
     ? assertBytes('ephemeralPublicKey', toUint8Array(options.ephemeralPublicKey), X25519_PUBLIC_KEY_BYTES)
     : x25519.getPublicKey(ephemeralSecretKey);
-  const x25519SharedSecret = deriveX25519SharedSecret(ephemeralSecretKey, recipient.x25519PublicKey);
+  // null ref: a fresh ephemeral secret per message, so there is nothing to cache across calls.
+  const x25519SharedSecret = await sharedSecretX25519(ephemeralSecretKey, recipient.x25519PublicKey, null);
   // The sender identity section (68 bytes) is prepended to the plaintext and sealed under AES-GCM together with the payload.
   const identityBytes = (options.identityBytes === undefined || options.identityBytes === null)
     ? null
@@ -1774,7 +1785,10 @@ async function decryptCompactBodyBytes(bodyBytesLike, recipientKeyPair, hashes, 
   if (openedAsSender) {
     key = await importAesGcmKeyBytes(await decryptSenderRecoveryPayloadKey(info, recipientKeyPair, hashes));
   } else {
-    const sharedParts = [deriveX25519SharedSecret(recipientKeyPair.x25519SecretKey, info.ephemeralPublicKey)];
+    // The recipient secret is the SAME object across a sync batch, so the imported key is reused per pass.
+    const sharedParts = [await sharedSecretX25519(
+      recipientKeyPair.x25519SecretKey, info.ephemeralPublicKey, recipientKeyPair.x25519SecretKey,
+    )];
     if (info.suite === CRYPTO_SUITES.HYBRID_V1) {
       sharedParts.push(ml_kem768.decapsulate(
         assertBytes('mlKem768Ciphertext', info.mlKem768Ciphertext, MLKEM768_CIPHERTEXT_BYTES),
@@ -3490,7 +3504,8 @@ export async function encryptText(plaintext, recipientPublicBundle, options = {}
   const nonce = randomBytes(AES_GCM_NONCE_BYTES);
   const ephemeralSecretKey = randomBytes(X25519_SECRET_KEY_BYTES);
   const ephemeralPublicKey = x25519.getPublicKey(ephemeralSecretKey);
-  const x25519SharedSecret = deriveX25519SharedSecret(ephemeralSecretKey, recipient.x25519PublicKey);
+  // null ref: a fresh ephemeral secret per message, so there is nothing to cache across calls.
+  const x25519SharedSecret = await sharedSecretX25519(ephemeralSecretKey, recipient.x25519PublicKey, null);
 
   const baseEnvelope = {
     version: PROTOCOL_VERSION,
@@ -3537,7 +3552,9 @@ export async function decryptText(envelope, recipientKeyPair) {
     base64urlDecode(envelope.kem?.x25519EphemeralPublicKey),
     32,
   );
-  const x25519SharedSecret = deriveX25519SharedSecret(recipientKeyPair.x25519SecretKey, ephemeralPublicKey);
+  const x25519SharedSecret = await sharedSecretX25519(
+    recipientKeyPair.x25519SecretKey, ephemeralPublicKey, recipientKeyPair.x25519SecretKey,
+  );
 
   if (envelope.suite === CRYPTO_SUITES.CLASSICAL_V1) {
     const plaintext = await decryptBytes(envelope, [x25519SharedSecret]);

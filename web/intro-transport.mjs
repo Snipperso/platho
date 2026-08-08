@@ -13,10 +13,10 @@
 // No @ton/core and no build/*.ts here on purpose: this module runs in the browser, where neither loads. Cells are
 // the client's own records, parsed by its own reader — see web/intro-codec.mjs and web/shard-address.mjs, each
 // pinned against the reference implementation because a divergence here fails silently.
-import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=13';
+import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=14';
 import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=2';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
-import { parseBocBase64, computeCellHashAndDepth, beginCell, bytesToBigUint } from './pwa-contract-transactions.mjs?v=36';
+import { parseBocBase64, computeCellHashAndDepth, beginCell, bytesToBigUint } from './pwa-contract-transactions.mjs?v=37';
 
 /**
  * Bind the batched state read to a request function.

@@ -2622,6 +2622,27 @@ button.feed-item:hover {
   cursor: default;
 }
 
+/* The private twin of the control above: same affordance, so paging back through a dialog and paging back through
+   a comment thread do not look like two different features. It sits inside the scroller above the first row. */
+.conversation-earlier-button {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 6px auto 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.conversation-earlier-button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
 /* v797: the referenced post's real image, resolved by entryId from the local cache (no wire copy). */
 .shared-post-embed-image {
   display: block;

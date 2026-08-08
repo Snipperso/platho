@@ -20,7 +20,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=14';
+} from './crypto/platho-crypto.mjs?v=15';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -30,14 +30,14 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=30';
+} from './platho-wallet.mjs?v=31';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
-} from './encrypted-message-store.mjs?v=5';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=118';
+} from './encrypted-message-store.mjs?v=6';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=119';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -46,7 +46,7 @@ import {
   tonRpcRequestCounters,
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
-} from './ton-rpc-transport.mjs?v=74';
+} from './ton-rpc-transport.mjs?v=75';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -152,45 +152,45 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
   VAULT_RESERVES_NANOTONS,
-} from './pwa-contract-transactions.mjs?v=36';
+} from './pwa-contract-transactions.mjs?v=37';
 import {
   MAX_BATCH_PARTS,
-} from './publish-batch-orchestration.mjs?v=9';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=53';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=56';
-import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=3';
+} from './publish-batch-orchestration.mjs?v=10';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=54';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=57';
+import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=22';
-import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=3';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=13';
+import { createPublicLane } from './public-lane.mjs?v=23';
+import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=14';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=13';
-import { createIntroLane } from './intro-lane.mjs?v=19';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=3';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=14';
+import { createIntroLane } from './intro-lane.mjs?v=20';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=4';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=3';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=13';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=13';
-import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=3';
-import { createConvReadLane } from './conv-lane.mjs?v=16';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=15';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=14';
-import { readAccountStates } from './shard-reader.mjs?v=13';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=14';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=14';
+import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=4';
+import { createConvReadLane } from './conv-lane.mjs?v=17';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=16';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=15';
+import { readAccountStates } from './shard-reader.mjs?v=14';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=13';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=14';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=13';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=14';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=13';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=14';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=15';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=14';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=13';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=13';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=14';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=14';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=14';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=15';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -202,14 +202,14 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=15';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=52';
+} from './shard-discovery.mjs?v=16';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=53';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=58';
+} from './username-ton-rpc-provider.mjs?v=59';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=45';
+} from './i18n.mjs?v=46';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -239,7 +239,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v885';
+const PLATHO_APP_RUNTIME_VERSION = 'v886';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -10508,6 +10508,18 @@ function findMessageByCapsuleId(capsuleId) {
   return null;
 }
 
+/**
+ * Has this capsule ever been stored on this device? Answers for history OUTSIDE the loaded window, which
+ * `findMessageByCapsuleId` cannot see.
+ *
+ * The two are not interchangeable. A caller that wants to UPDATE an existing message needs the object, and only
+ * the in-memory search can hand it over; a caller that only wants to know whether to INSERT must ask this, or a
+ * manual sync (which re-delivers on purpose) will duplicate everything older than the window.
+ */
+function capsuleAlreadyStored(capsuleId) {
+  return Boolean(capsuleId) && storedCapsuleIds.has(capsuleId);
+}
+
 function messageBlocksForHistory(message) {
   if (!Array.isArray(message?.blocks) || message.blocks.length <= 0) return null;
   return safeJsonClone(message.blocks) ?? null;
@@ -11544,6 +11556,9 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
   const message = messageFromOpenedCapsule(opened, meta, entry);
   const existing = findMessageByCapsuleId(opened.capsule?.id);
   if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
+  // Loaded threads did not have it, but the STORE might: this capsule can be older than the loaded window, and a
+  // manual sync re-delivers on purpose. Inserting here would duplicate it on screen and then persist the duplicate.
+  if (capsuleAlreadyStored(opened.capsule?.id)) return true;
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
@@ -11570,6 +11585,9 @@ async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   const message = messageFromOpenedPrivateParts(parts, meta);
   const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean);
   if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
+  // Same reasoning as the single-part path: ANY part already on disk means this message was stored before the
+  // window that is currently loaded.
+  if (parts.some((part) => capsuleAlreadyStored(part.opened?.capsule?.id))) return true;
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
@@ -12196,7 +12214,11 @@ async function bootReplayStore() {
 
 function historyStatusLabel() {
   if (!encryptedMessageStore) return t('vault.historyOff');
-  const limit = encryptedMessageStore.maxRecords ? t('vault.historyLimitLast', { count: encryptedMessageStore.maxRecords }) : t('vault.historyLimitLocal');
+  // "per chat" is the load-bearing half. The cap used to be global, and reading "last 500" next to a history label
+  // gave no hint that one busy conversation was eating another's past.
+  const limit = encryptedMessageStore.maxPerThread
+    ? t('vault.historyLimitPerChat', { count: encryptedMessageStore.maxPerThread })
+    : t('vault.historyLimitLocal');
   return encryptedMessageStore.persistent === false
     ? t('vault.historyMemoryCache', { limit })
     : t('vault.historyLocalCache', { limit });
@@ -12392,6 +12414,11 @@ async function writeMessageToEncryptedHistory(thread, message) {
     });
     message.localHistoryId = stored.id;
     message.localHistoryCreatedAt = stored.createdAt;
+    // Keep the dedup set current: it is built from headers at boot, and without this a capsule stored during THIS
+    // session would look unknown to the next re-delivery of the same sync.
+    rememberStoredCapsuleIds(message);
+    const state = historyWindowState.get(thread.id);
+    if (state) historyWindowState.set(thread.id, { ...state, stored: state.stored + 1, loaded: state.loaded + 1 });
     setText(localStateLabel, historyStatusLabel());
     return stored;
   } catch (error) {
@@ -12491,12 +12518,148 @@ function healCrossWalletIdentityBleed({ requeueAnonymous = false, clearOwnContac
   return healed;
 }
 
+/**
+ * How many messages of a conversation are held in memory and painted when it opens. The rest stay on disk and
+ * come back a page at a time through "show earlier".
+ *
+ * MEASURED 2026-08-08: 0.035 ms to decrypt one record, so a window costs ~3.4 ms per conversation — invisible.
+ * Loading everything instead is what made the old design need a tiny global cap: a 2000-deep conversation across
+ * twenty contacts is 40,000 records, 1.4 s on a desktop and roughly ten seconds on a phone, on the path between
+ * unlocking the wallet and a usable app.
+ */
+const PRIVATE_HISTORY_WINDOW = 96;
+
+/**
+ * Every capsule id the STORE holds, read from clear headers without decrypting anything.
+ *
+ * Deduplication used to ask the threads in memory whether a capsule was already known. With the whole history in
+ * memory that was the same question; with a window it is not. A manual sync asks the chain to re-deliver
+ * (forceIndexRescan), and an older message outside the window would have been re-inserted and re-persisted —
+ * a duplicate that appears only for people with history deeper than the window, which is to say the people whose
+ * history matters most.
+ */
+let storedCapsuleIds = new Set();
+
+/**
+ * Per thread: how much the store holds, how much is loaded, and the timestamp to page back from.
+ *
+ * Keyed by thread id rather than hung on the thread object because a thread is rebuilt from several sources
+ * (history, chain sync, a fresh dialog) and the window state must survive that rebuild.
+ */
+const historyWindowState = new Map();
+
+function threadHistoryHasMore(threadId) {
+  const state = historyWindowState.get(threadId);
+  return Boolean(state && state.loaded < state.stored);
+}
+
+/** The thread whose earlier page is being decrypted, so the control can say so and cannot be pressed twice. */
+let privateHistoryLoadingThreadId = null;
+
+/**
+ * Pull the page BEFORE what is loaded and prepend it.
+ *
+ * Reads by `before: oldestLoadedAt` rather than by an offset: messages arrive out of order (a chain sync backfills
+ * older ones), so an offset into a growing list would skip or repeat a page. A timestamp names the boundary
+ * itself, which is stable no matter what lands in between.
+ */
+async function loadEarlierThreadHistory(thread) {
+  if (!thread || !encryptedMessageStore || privateHistoryLoadingThreadId) return;
+  const state = historyWindowState.get(thread.id);
+  if (!state || state.loaded >= state.stored) return;
+  privateHistoryLoadingThreadId = thread.id;
+  renderConversation();
+  try {
+    const page = await encryptedMessageStore.listMessagesDetailed({
+      threadId: thread.id,
+      limit: PRIVATE_HISTORY_WINDOW,
+      before: state.oldestLoadedAt ?? undefined,
+    });
+    const older = page.messages ?? [];
+    for (const item of older) {
+      if (thread.messages.some((message) => message.localHistoryId === item.id)) continue;
+      const message = { ...item.message, localHistoryId: item.id, localHistoryCreatedAt: item.createdAt };
+      if (message.introDirectSend) message.introDirectSend = reviveIntroDirectSend(message.introDirectSend);
+      ensureMessageOrderFields(message, item.createdAt);
+      insertThreadMessage(thread, message);
+      rememberStoredCapsuleIds(message);
+    }
+    historyWindowState.set(thread.id, {
+      ...state,
+      loaded: state.loaded + older.length,
+      oldestLoadedAt: older[0]?.createdAt ?? state.oldestLoadedAt,
+      // An empty page means the store has nothing older, whatever the header count said. Without this the control
+      // would stay forever on a device whose records were pruned between the count and the read.
+      stored: older.length === 0 ? state.loaded : state.stored,
+    });
+  } finally {
+    privateHistoryLoadingThreadId = null;
+    renderConversation();
+  }
+}
+
+function rememberStoredCapsuleIds(message) {
+  if (!message) return;
+  if (message.capsule?.id) storedCapsuleIds.add(message.capsule.id);
+  for (const capsule of message.capsules ?? []) {
+    if (capsule?.id) storedCapsuleIds.add(capsule.id);
+  }
+}
+
+/** How many records the store holds for each thread, counted from headers — no decryption. */
+function storedCountsByThread(headers) {
+  const counts = new Map();
+  for (const header of headers) {
+    if (!header?.threadId) continue;
+    counts.set(header.threadId, (counts.get(header.threadId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Load the NEWEST window of every conversation the store knows about, and remember how much is left behind.
+ *
+ * Sequential on purpose. These are decryptions, and firing every conversation at once on a phone is the
+ * run-loop-stall shape this client has been bitten by before; the whole point of the window is that the total is
+ * small enough that order does not matter.
+ */
+async function restoreHistoryWindows(headers) {
+  storedCapsuleIds = new Set(headers.map((header) => header?.capsuleId).filter(Boolean));
+  const counts = storedCountsByThread(headers);
+  const messages = [];
+  const failed = [];
+  for (const [threadId, count] of counts) {
+    const page = await encryptedMessageStore.listMessagesDetailed({
+      threadId,
+      limit: PRIVATE_HISTORY_WINDOW,
+    });
+    messages.push(...(page.messages ?? []));
+    failed.push(...(page.failed ?? []));
+    // Recorded per thread rather than derived later: `count` comes from the headers, and after this the store may
+    // already have grown. A stale "there is more" only costs a button that finds nothing; a stale "there is none"
+    // hides history, so the pessimistic direction is the one kept.
+    historyWindowState.set(threadId, {
+      stored: count,
+      loaded: page.messages?.length ?? 0,
+      oldestLoadedAt: page.messages?.[0]?.createdAt ?? null,
+    });
+  }
+  return { messages, failed };
+}
+
 async function restoreEncryptedMessageHistory() {
   if (!encryptedMessageStore) return;
   try {
-    const result = encryptedMessageStore.listMessagesDetailed
-      ? await encryptedMessageStore.listMessagesDetailed()
-      : { messages: await encryptedMessageStore.listMessages(), failed: [] };
+    // Headers first: they cost no decryption and answer both questions the window cannot — which conversations
+    // exist at all, and which capsules have ever been stored.
+    const headers = encryptedMessageStore.listMessageHeaders
+      ? await encryptedMessageStore.listMessageHeaders()
+      : null;
+    const result = headers
+      ? await restoreHistoryWindows(headers)
+      : (encryptedMessageStore.listMessagesDetailed
+        ? await encryptedMessageStore.listMessagesDetailed()
+        : { messages: await encryptedMessageStore.listMessages(), failed: [] });
     const restored = result.messages ?? [];
     const failed = result.failed ?? [];
     let changed = false;
@@ -17035,6 +17198,20 @@ function renderConversation() {
   if (!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch(thread)) return;
   const conversationRenderSnapshotRows = [];
   messageStrip.innerHTML = '';
+  // Older messages live on disk outside the loaded window. The control goes ABOVE the first row, where the reader
+  // is already looking when they scroll up, and appears only when the store really has more — a button that
+  // finds nothing teaches people to stop pressing it.
+  if (threadHistoryHasMore(thread.id)) {
+    const earlier = document.createElement('button');
+    earlier.type = 'button';
+    earlier.className = 'conversation-earlier-button';
+    earlier.textContent = privateHistoryLoadingThreadId === thread.id
+      ? t('chat.loadingEarlier')
+      : t('chat.showEarlierMessages');
+    earlier.disabled = privateHistoryLoadingThreadId === thread.id;
+    earlier.addEventListener('click', () => { loadEarlierThreadHistory(thread).catch((error) => console.error(error)); });
+    messageStrip.append(earlier);
+  }
   thread.messages.forEach((message) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
