@@ -30,6 +30,10 @@ const ROOT_RUNTIME_FILES = new Set([
   'platho-config.mjs',
   'capsule-part-policy.mjs',
   'message-pricing-policy.mjs',
+  // The message formatting grammar + its plain-text projection. app.js imports it at the TOP, so leaving it out of
+  // this list does not degrade a feature — the first import 404s and the entire module graph dies on the boot
+  // watchdog. Caught here by WEB-GRAPH-01, which now also runs in the targeted gate for exactly this reason.
+  'message-plain-text.mjs',
   'public-channel-subscriptions.mjs',
   'recipient-identities.mjs',
   'encrypted-message-store.mjs',
