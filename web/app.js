@@ -223,7 +223,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=44';
+} from './i18n.mjs?v=45';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -239,7 +239,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v884';
+const PLATHO_APP_RUNTIME_VERSION = 'v885';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -653,7 +653,6 @@ rpcKeyRow?.addEventListener('click', (event) => {
 refreshToncenterKeyUi();
 const flushAthButton = document.querySelector('#flushAthButton');
 const flushAthStatus = document.querySelector('#flushAthStatus');
-const flushAthNote = document.querySelector('#flushAthNote');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
 const claimAirdropButton = document.querySelector('#claimAirdropButton');
@@ -14257,19 +14256,29 @@ function refreshProfileFeeLabels() {
   if (setAvatarStatus) {
     setAvatarStatus.textContent = t('avatar.setFee', { amount: formatTonNanotons(profileAvatarFloorNanotons()) });
   }
-  if (flushAthNote) {
-    // The live figure when the ticket has reported one, the mirrored constant before that — the note is shown on
-    // a profile that may not have a deployed ticket yet, and "checking" where a number belongs helps nobody.
-    const cost = nonNegativeBigInt(athTicketState.claimMinValue ?? AIRDROP_CLAIM_MIN_VALUE_NANOTONS);
-    const perCredit = nonNegativeBigInt(athPoolState.athPerCredit ?? 0n);
-    const maxAth = perCredit > 0n ? AIRDROP_MAX_CREDITS_PER_CLAIM * perCredit : null;
-    flushAthNote.textContent = maxAth === null
-      ? t('profile.claimCostNote', { cost: t('common.gramAmount', { amount: formatTonNanotons(cost) }) })
-      : t('profile.claimCostBatchNote', {
-        cost: t('common.gramAmount', { amount: formatTonNanotons(cost) }),
-        max: formatAthAtomicGrouped(maxAth),
-      });
-  }
+}
+
+/**
+ * What a claim will cost the wallet: the live figure once the ticket has reported one, the mirrored constant
+ * before that. It belongs on the row rather than in a paragraph beneath it (owner, 2026-08-08) — the row is where
+ * the decision is made, and an explanation underneath is something to read instead of a number to see.
+ */
+function airdropClaimCostLabel() {
+  const cost = nonNegativeBigInt(athTicketState.claimMinValue ?? AIRDROP_CLAIM_MIN_VALUE_NANOTONS);
+  return t('common.gramAmount', { amount: formatTonNanotons(cost) });
+}
+
+/**
+ * What a flush will cost: one message per bucket that actually has something to send. The condition mirrors
+ * submitAthDueFlush exactly — due > 0 and nothing already pending — so the row quotes the value the wallet will be
+ * asked to sign, not a nominal per-message figure.
+ */
+function athFlushCostNanotons(state = athFlushState) {
+  const buckets = [
+    [state.username_burn_due_ath, state.username_pending_burn_flush_count],
+    [state.profile_burn_due_ath, state.profile_pending_burn_flush_count],
+  ].filter(([due, pending]) => nonNegativeBigInt(due) > 0n && nonNegativeBigInt(pending) === 0n).length;
+  return BigInt(buckets) * REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS;
 }
 
 function profileAvatarTonFeeLabel(attachment) {
@@ -19290,8 +19299,16 @@ function athFlushStatusText(state = athFlushState) {
   if (!athFlushStateKnown(state)) return t('common.checking');
   const ready = athFlushReadyAmount(state);
   const pending = athFlushPendingCount(state);
-  if (ready > 0n && pending > 0n) return t('profile.readyPlusPending', { amount: formatAthProfileAmount(ready) });
-  if (ready > 0n) return t('profile.readyAmount', { amount: formatAthProfileAmount(ready) });
+  // The cost rides along only when this press would actually send something. With every bucket already pending
+  // there is nothing to pay for, and quoting a price for a button that will refuse would be its own small lie.
+  const cost = athFlushCostNanotons(state);
+  const withCost = (text) => (cost > 0n
+    ? t('profile.amountWithCost', { amount: text, cost: t('common.gramAmount', { amount: formatTonNanotons(cost) }) })
+    : text);
+  if (ready > 0n && pending > 0n) {
+    return withCost(t('profile.readyPlusPending', { amount: formatAthProfileAmount(ready) }));
+  }
+  if (ready > 0n) return withCost(t('profile.readyAmount', { amount: formatAthProfileAmount(ready) }));
   if (pending > 0n) return t('profile.flushPending');
   return t('profile.zeroAthReady');
 }
@@ -19371,9 +19388,12 @@ function renderAthClaimStatus() {
       : t('profile.zeroAthReady'));
     return;
   }
-  setText(claimAirdropStatus, perCredit && perCredit > 0n
-    ? formatAthProfileAmount(credits * perCredit)
-    : String(credits));
+  // Claimable amount AND what taking it costs, on the row itself. The cost does not scale with the amount, which
+  // is the whole reason it is worth showing: it is the same 0.063 GRAM whether the claim carries 100 ATH or 10,000.
+  setText(claimAirdropStatus, t('profile.amountWithCost', {
+    amount: perCredit && perCredit > 0n ? formatAthProfileAmount(credits * perCredit) : String(credits),
+    cost: airdropClaimCostLabel(),
+  }));
 }
 
 function renderAthProfileStats() {
@@ -20857,10 +20877,10 @@ async function refreshAthPoolState() {
         totalPool: pool.totalPool,
         athPerCredit: pool.athPerCredit,
       };
-      // The claim note's per-claim maximum is credits-per-claim x ath-per-credit, and the second half only exists
-      // once this read lands. Without a refresh here the note would keep the cost-only wording for the whole
-      // session — the advice to batch would be missing exactly where it is worth reading.
-      refreshProfileFeeLabels();
+      // The claim row shows ATH, and ATH is credits x ath-per-credit — a figure that only exists once this read
+      // lands. Without a render here the row keeps showing the raw credit count until the next ticket refresh
+      // happens to come round.
+      renderAthClaimStatus();
     }
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] pool read failed', error);

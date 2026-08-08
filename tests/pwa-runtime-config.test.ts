@@ -5617,10 +5617,14 @@ describe('PWA runtime config guard', () => {
   });
 
 
-  it('PWA-AIRDROP-CLAIM-NOTE-01: the claim note quotes the contract, not a number someone typed', () => {
-    // The note tells the user a claim costs the same GRAM whatever it carries, and advises batching up to the
-    // per-claim cap. Both halves are only useful if they match the chain: a stale cost misstates what the wallet
-    // will be asked to sign, and a stale cap advises a batch AirdropTicket would refuse at gate 26112.
+  it('PWA-AIRDROP-CLAIM-NOTE-01: the claim and flush rows quote a cost taken from the source, not typed', () => {
+    // REWORKED 2026-08-08. This began as a paragraph under the row and the owner cut it: the price belongs ON the
+    // row, where the decision is, with no explanation around it. (The paragraph was also attached to the WRONG
+    // row — "Flush ATH" instead of "Claim ATH" — and browser-checking that it rendered proved the mechanism while
+    // saying nothing about the placement.)
+    //
+    // What survives is the rule worth keeping: both figures come from the source that the wallet is actually asked
+    // to sign. A stale cost on a money row is the defect this file already records three times.
     const app = readFileSync('web/app.js', 'utf8');
     const ticket = readFileSync('contracts/AirdropTicket.tact', 'utf8');
 
@@ -5629,33 +5633,38 @@ describe('PWA runtime config guard', () => {
       expect(match, `${name} must exist in AirdropTicket.tact`).toBeTruthy();
       return (match as RegExpMatchArray)[1];
     };
-    const clientValue = (name: string): string => {
-      const match = app.match(new RegExp(`const ${name} = ([0-9_]+)n;`));
-      expect(match, `${name} must exist in web/app.js`).toBeTruthy();
+    const clientValue = (source: string, name: string): string => {
+      const match = source.match(new RegExp(`const ${name} = ([0-9_]+)n;`));
+      expect(match, `${name} must exist`).toBeTruthy();
       return (match as RegExpMatchArray)[1].replaceAll('_', '');
     };
 
-    expect(clientValue('AIRDROP_CLAIM_MIN_VALUE_NANOTONS'), 'claim cost mirrors AT_CLAIM_MIN_VALUE')
+    expect(clientValue(app, 'AIRDROP_CLAIM_MIN_VALUE_NANOTONS'), 'claim cost mirrors AT_CLAIM_MIN_VALUE')
       .toBe(contractValue('AT_CLAIM_MIN_VALUE'));
-    expect(clientValue('AIRDROP_MAX_CREDITS_PER_CLAIM'), 'per-claim cap mirrors AT_MAX_CREDITS_PER_CLAIM')
-      .toBe(contractValue('AT_MAX_CREDITS_PER_CLAIM'));
 
-    // The note must actually be rendered from those mirrors, not merely hold them.
-    expect(app).toMatch(/flushAthNote\.textContent = maxAth === null/);
+    // The claim row: live figure when the ticket reported one, the mirror before that.
     expect(app).toMatch(/athTicketState\.claimMinValue \?\? AIRDROP_CLAIM_MIN_VALUE_NANOTONS/);
-    expect(app).toMatch(/AIRDROP_MAX_CREDITS_PER_CLAIM \* perCredit/);
-    // ath-per-credit arrives from a chain read; without this the note keeps its cost-only wording all session.
-    expect(app).toMatch(/athPerCredit: pool\.athPerCredit,[\s\S]{0,400}refreshProfileFeeLabels\(\)/);
+    expect(app).toMatch(/cost: airdropClaimCostLabel\(\)/);
 
-    const html = readFileSync('web/index.html', 'utf8');
-    expect(html).toMatch(/<p class="settings-note" id="flushAthNote"><\/p>/);
-    // The user never sees the internal credit unit — the note is written in ATH (owner's standing rule).
+    // The flush row: one message per bucket that will actually be sent, priced from the same constant the send
+    // attaches — so the row cannot quote a nominal figure while the wallet is asked for double it.
+    const transactions = readFileSync('web/pwa-contract-transactions.mjs', 'utf8');
+    expect(clientValue(transactions, 'REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS')).toBeTruthy();
+    expect(app).toMatch(/BigInt\(buckets\) \* REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS/);
+    expect(app).toMatch(/nonNegativeBigInt\(due\) > 0n && nonNegativeBigInt\(pending\) === 0n/);
+    // Nothing to send means nothing to charge for: a price beside a button that will refuse is its own small lie.
+    expect(app).toMatch(/cost > 0n[\s\S]{0,200}profile\.amountWithCost/);
+
+    // The paragraph and its keys are gone, and so is the one-off class it needed.
+    expect(app).not.toMatch(/flushAthNote/);
+    expect(readFileSync('web/index.html', 'utf8')).not.toMatch(/flushAthNote|settings-note/);
+    expect(readFileSync('web/styles.css', 'utf8')).not.toMatch(/settings-note/);
     for (const locale of ['en', 'ru'] as const) {
-      const note = (I18N_STRINGS[locale] as Record<string, string>)['profile.claimCostBatchNote'];
-      expect(note, `${locale} batch note exists`).toBeTruthy();
-      expect(note).toContain('{cost}');
-      expect(note).toContain('{max}');
-      expect(note, 'the note speaks ATH, never credits').not.toMatch(/credit|кредит/i);
+      const dict = I18N_STRINGS[locale] as Record<string, string>;
+      expect(dict['profile.claimCostNote'], `${locale} note key retired`).toBeUndefined();
+      expect(dict['profile.claimCostBatchNote'], `${locale} batch note key retired`).toBeUndefined();
+      expect(dict['profile.amountWithCost']).toContain('{amount}');
+      expect(dict['profile.amountWithCost']).toContain('{cost}');
     }
   });
 
