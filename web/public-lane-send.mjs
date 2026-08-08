@@ -14,9 +14,9 @@
 // the only rule that needs no chain read and cannot be forged into a refused publish). The shard keeps only what it
 // needs and returns the surplus via mode-128, so overpaying an existing shard costs nothing.
 
-import { buildPublicPublishBrowser } from './public-publish-browser.mjs?v=3';
-import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=36';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=30';
+import { buildPublicPublishBrowser } from './public-publish-browser.mjs?v=4';
+import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=37';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=31';
 
 /**
  * Shape a PublicPublish as the wallet-message form sendPlathoWalletTransaction consumes:

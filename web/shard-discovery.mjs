@@ -27,9 +27,9 @@
 // Addresses are returned as url-safe friendly STRINGS, which is the wire form toncenter packs 35% tighter than
 // raw hex (measured 2026-07-18) and what every consumer here ultimately needs.
 
-import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=36';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=14';
-import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=30';
+import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=37';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
+import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=31';
 import {
   recordShardStateInit,
   introShardStateInit,
@@ -39,7 +39,7 @@ import {
   recoveryShardAddressBytes,
   publicShardAddressBytes,
   rawAddress,
-} from './shard-address.mjs?v=6';
+} from './shard-address.mjs?v=7';
 
 export const EPOCH_SECONDS = 86400;
 
