@@ -25,9 +25,19 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 const VITEST = 'node_modules/vitest/vitest.mjs';
 const CONFIG = 'vitest.all.config.ts';
-// Whole-bundle guards: they read the shipped file list rather than app.js, so a discovery pass over app.js readers
-// would miss them — and they are exactly the two that catch "it builds but must not ship".
-const ALWAYS = ['tests/web-no-locale-leak.test.ts', 'tests/static-web-deploy-prep.test.ts'];
+// Whole-bundle guards: they read the shipped file list rather than app.js as text, so a discovery pass over app.js
+// readers misses them — and they are exactly the ones that catch "it builds but must not ship".
+//
+// WEB-GRAPH-01 was NOT here until 2026-08-08, and the omission cost a near-miss: a new module (message-plain-text.mjs)
+// was imported by app.js and not added to ROOT_RUNTIME_FILES, so the production bundle would have served an app.js
+// whose first import 404s — the whole graph dead, every user on the boot watchdog. The targeted gate was fully green
+// on that tree. WEB-GRAPH-01 catches it precisely, names the file and names the list to add it to, and runs in under
+// 200ms; leaving it to the once-per-batch full suite meant the fast gate could bless a bundle that cannot boot.
+const ALWAYS = [
+  'tests/web-no-locale-leak.test.ts',
+  'tests/static-web-deploy-prep.test.ts',
+  'tests/web-bundle-graph-complete.test.ts',
+];
 
 const readers = readdirSync('tests')
   .filter((name) => name.endsWith('.test.ts'))
@@ -55,7 +65,7 @@ if (i18nKeys.status !== 0) process.exit(i18nKeys.status ?? 1);
 const prep = spawnSync(process.execPath, ['scripts/prepare_static_web_deploy.mjs', '--mode', 'both'], { stdio: 'inherit' });
 if (prep.status !== 0) process.exit(prep.status ?? 1);
 
-console.log(`\n[targeted] ${files.length} файлов: каждый читает web/app.js, плюс два сторожа бандла\n`);
+console.log(`\n[targeted] ${files.length} файлов: каждый читает web/app.js, плюс ${ALWAYS.length} сторожа бандла\n`);
 const run = spawnSync(process.execPath, [VITEST, 'run', '--config', CONFIG, ...files], { stdio: 'inherit' });
 if (run.status !== 0) process.exit(run.status ?? 1);
 console.log('\n[targeted] зелено. Полная сюита — ОДИН раз на пачку: npm run evidence:suite');

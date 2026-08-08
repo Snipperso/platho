@@ -17,16 +17,27 @@
  *
  *   node scripts/check_i18n_keys.mjs
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 const { I18N_STRINGS } = await import('../web/i18n-strings.mjs');
-const app = readFileSync('web/app.js', 'utf8');
 const html = readFileSync('web/index.html', 'utf8');
+
+// EVERY MODULE, not just app.js. The first version read app.js alone, which was true of the code at the time and
+// stopped being true the moment a module other than app.js called t() — public-channel-subscriptions.mjs does, for
+// the words on a channel card. A checker whose input set is narrower than the thing it checks reports "чисто" about
+// the part it happened to look at, which is worse than not running: the missing key still renders as [key].
+const sources = ['web/app.js'];
+for (const name of readdirSync('web')) {
+  if (name.endsWith('.mjs') && name !== 'i18n.mjs' && name !== 'i18n-strings.mjs') sources.push(`web/${name}`);
+}
 
 const plainKeys = new Set();
 const pluralKeys = new Set();
-for (const m of app.matchAll(/\bt\(\s*'([a-zA-Z0-9_.]+)'/g)) plainKeys.add(m[1]);
-for (const m of app.matchAll(/\btPlural\(\s*'([a-zA-Z0-9_.]+)'/g)) pluralKeys.add(m[1]);
+for (const path of sources) {
+  const source = readFileSync(path, 'utf8');
+  for (const m of source.matchAll(/\bt\(\s*'([a-zA-Z0-9_.]+)'/g)) plainKeys.add(m[1]);
+  for (const m of source.matchAll(/\btPlural\(\s*'([a-zA-Z0-9_.]+)'/g)) pluralKeys.add(m[1]);
+}
 // The static markup asks for keys too (data-i18n, -placeholder, -title, -aria-label, -alt).
 for (const m of html.matchAll(/data-i18n(?:-[a-z-]+)?="([a-zA-Z0-9_.]+)"/g)) plainKeys.add(m[1]);
 for (const key of pluralKeys) plainKeys.delete(key);   // a key used both ways is satisfied by its plural forms

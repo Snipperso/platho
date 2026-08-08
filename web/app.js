@@ -32,6 +32,10 @@ import {
   sendPlathoWalletTransaction,
 } from './platho-wallet.mjs?v=31';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
+import {
+  createInlineFormatRegex, messagePreviewText,
+  MSG_HEADING_RE, MSG_QUOTE_RE, MSG_ULIST_RE, MSG_OLIST_RE, MSG_ALIGN_RE,
+} from './message-plain-text.mjs?v=1';
 import { createProfileAvatarMediaStore } from './profile-avatar-media-store.mjs?v=1';
 import {
   createIndexedDbEncryptedMessageHistoryStore,
@@ -67,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=19';
+} from './public-channel-subscriptions.mjs?v=20';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -223,7 +227,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=46';
+} from './i18n.mjs?v=47';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -239,7 +243,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v886';
+const PLATHO_APP_RUNTIME_VERSION = 'v887';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -2233,12 +2237,10 @@ function trimTrailingUrlPunctuation(url) {
 // Block (line-level): '# ' heading (1-3 -> small/smaller), '> ' blockquote, '- '/'* ' ul, '1. ' ol,
 // and a '::center '/'::justify ' paragraph-leading alignment prefix (alignment is not standard markdown and is
 // block-level, so it rides as a paragraph prefix parsed here; old clients show the literal prefix).
-const INLINE_FORMAT_RE = /\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|\[([^\]\n]{1,200})\]\(([^\s()]{1,2000})\)|(https?:\/\/[^\s<>"']+)/g;
-const MSG_HEADING_RE = /^(#{1,3})\s+(.+)$/;
-const MSG_QUOTE_RE = /^>\s?(.*)$/;
-const MSG_ULIST_RE = /^[-*]\s+(.+)$/;
-const MSG_OLIST_RE = /^\d+\.\s+(.+)$/;
-const MSG_ALIGN_RE = /^::(center|justify)\s+([\s\S]*)$/;
+// The grammar itself lives in message-plain-text.mjs, imported above — the renderer here and the summarising
+// readers (thread previews, reply quotes) must parse the SAME markers, and a second copy is how one of them ends
+// up printing '# ' on screen. This regex is this renderer's own instance: it is global, so it carries lastIndex.
+const INLINE_FORMAT_RE = createInlineFormatRegex();
 
 function appendInlineFormatted(parent, text) {
   const str = String(text ?? '');
@@ -7769,10 +7771,14 @@ function replyQuoteTargetRow(scroller, quote, refEntryId, snippet) {
   // user's own message #3 and the peer's message #3 both exist. "Nearest above" then lands on whichever came last,
   // which is a coin flip. The quote carries the target's text, denormalized, precisely so the reference survives
   // without a lookup — so use it: the row whose message text matches the quoted snippet IS the target.
-  const wanted = String(snippet ?? '').trim();
+  // BOTH SIDES STRIPPED. The snippet is built by replySnippetFromContent, which projects the formatting markers
+  // away; the row's message still carries them. Comparing the two forms directly makes every quote of a formatted
+  // message ('# Word' vs 'Word') fail to match, and the resolver silently falls back to position — the coin flip
+  // this snippet check exists to replace.
+  const wanted = messagePreviewText(snippet);
   const matchesSnippet = (row) => {
     if (!wanted) return false;
-    const text = String(messageForRow(row)?.text ?? '').trim();
+    const text = messagePreviewText(messageForRow(row)?.text);
     if (!text) return false;
     return text === wanted || text.startsWith(wanted) || wanted.startsWith(text);
   };
@@ -7793,14 +7799,19 @@ function replyQuoteTargetRow(scroller, quote, refEntryId, snippet) {
 }
 
 // Snippet for a quote strip + the wire block: first text, else a media word (denormalized, like Telegram).
+//
+// The text is stripped of its formatting markers for the same reason the previews are — a quote of a heading read
+// '# Word' inside the strip. The media words are translated in the SENDER's language, which is a real trade and the
+// right side of it: the pair that talks to each other shares a language, so localising serves the common case, and
+// the alternative was English for every reader including both Russians in the only conversation that exists.
 function replySnippetFromContent(item) {
   const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
   const text = String(item?.text ?? '').trim() || String(blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text ?? '').trim();
-  if (text) return text;
-  if (blocks.some((block) => block?.type === 'image') || item?.imageUrl || item?.attachment?.type === 'image') return 'Image';
-  if (blocks.some((block) => block?.type === 'file')) return 'File';
-  if (blocks.some((block) => block?.type === 'share')) return 'Shared post';
-  return 'Message';
+  if (text) return messagePreviewText(text);
+  if (blocks.some((block) => block?.type === 'image') || item?.imageUrl || item?.attachment?.type === 'image') return t('chat.previewImage');
+  if (blocks.some((block) => block?.type === 'file')) return t('chat.previewFile');
+  if (blocks.some((block) => block?.type === 'share')) return t('chat.previewSharedPost');
+  return t('chat.previewMessage');
 }
 
 // ---- Public post detail screen (per-post comments, opened from the "Comments" action) -------------------------
@@ -10844,7 +10855,7 @@ function ensureSavedMessagesThread() {
   if (existing) return existing;
   const created = createRecipientThread(own);
   if (!created?.ok || !created.thread) return null;
-  created.thread.preview = 'Notes to yourself';
+  created.thread.preview = t('chat.previewSavedNotes');
   threads.unshift(created.thread);
   return created.thread;
 }
@@ -11336,8 +11347,8 @@ function refreshThreadAfterMessageChange(thread) {
   const last = thread.messages?.[thread.messages.length - 1] ?? null;
   const status = messageStatusKey(last);
   thread.preview = last
-    ? (messagePreviewFromBlocks(last.blocks) || last.text || (last.attachment ? 'Image' : ''))
-    : 'No messages yet';
+    ? (messagePreviewFromBlocks(last.blocks) || messagePreviewText(last.text) || (last.attachment ? t('chat.previewImage') : ''))
+    : t('chat.previewNoMessages');
   // No thread.time write: the list's side label is computed at render from the last message's real timestamp
   // (formatThreadListTimestamp) — the old constant 'now'/'new' words carried no information.
   thread.state = status === 'failed'
@@ -16193,15 +16204,18 @@ function stripInlineFormatting(text) {
     .trim();
 }
 
+// One line describing a message, for a list row. The text goes through messagePreviewText because the formatting
+// markers are part of the TEXT (see message-plain-text.mjs) — the row that prints them raw is the reader that never
+// learned the grammar. The media words are translated: they are prose shown to a person, not protocol tokens.
 function messagePreviewFromBlocks(blocks = []) {
   const text = blocks.find((block) => block?.type === 'text' && String(block.text ?? '').trim())?.text;
-  if (text) return String(text).trim();
+  if (text) return messagePreviewText(text);
   const imageCount = blocks.filter((block) => block?.type === 'image').length;
-  if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
+  if (imageCount > 0) return tPlural('chat.previewImages', imageCount);
   const fileBlocks = blocks.filter((block) => block?.type === 'file');
-  if (fileBlocks.length === 1) return String(fileBlocks[0].name ?? 'File');
-  if (fileBlocks.length > 1) return `${fileBlocks.length} files`;
-  if (blocks.some((block) => block?.type === 'share')) return 'Shared post';
+  if (fileBlocks.length === 1) return String(fileBlocks[0].name ?? '').trim() || t('chat.previewFile');
+  if (fileBlocks.length > 1) return tPlural('chat.previewFiles', fileBlocks.length);
+  if (blocks.some((block) => block?.type === 'share')) return t('chat.previewSharedPost');
   return '';
 }
 
@@ -17081,7 +17095,13 @@ function applyConversationStatusOnlyPatch(thread) {
     }
     // A confirming send gains its chain entry id (the swipe-reply anchor) — keep it current without a rebuild.
     if (message.chainEntryId !== undefined && message.chainEntryId !== null) {
+      const gained = node.dataset.entryId === undefined;
       node.dataset.entryId = String(message.chainEntryId);
+      // The gesture paths (swipe, double-click) read the dataset live, so they start working the moment it is set.
+      // The DESKTOP button does not: it is built once at render, and appendRowReplyButton refuses a row with no
+      // anchor. Without this line a message sent seconds ago had no hover Reply until something else forced a
+      // structural rebuild — the affordance would appear, eventually, for reasons the user cannot see.
+      if (gained) appendRowReplyButton(node, beginPrivateReplyForRow);
     }
   }
   return true;
@@ -17624,7 +17644,12 @@ function appendRowReplyButton(row, onReply) {
     event.stopPropagation();
     onReply(row);
   });
-  rowActionsCluster(row).append(button);
+  // Before Copy, never after. On a fresh render Copy does not exist yet and this is a plain append; when the button
+  // is added LATER — a send that just gained its chain anchor — Copy is already in the cluster, and appending would
+  // put the same two buttons in the opposite order on those rows alone.
+  const cluster = rowActionsCluster(row);
+  const copy = cluster.querySelector(':scope > .row-copy-button');
+  if (copy) cluster.insertBefore(button, copy); else cluster.append(button);
 }
 
 // Desktop-visible copy affordance (v651, mobile = long-press): rendered only when the row has copyable TEXT
@@ -23149,6 +23174,27 @@ async function attemptConvMessagePublishDirect(context) {
     const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, coldFloor);
     parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
   }
+
+  // MY OWN MESSAGE'S CHAIN ANCHOR — what makes a reply to it possible at all.
+  //
+  // OWNER, 2026-08-08: "I can only reply to the other person's messages." Correct, and the reason was that nothing
+  // ever gave an outgoing message a chainEntryId: privateChainMessageOrderFields runs only on RECEIVED entries, and
+  // every reply affordance (swipe, double-click, the hover button) is gated on the row carrying one. The mechanism
+  // for the other half was fully built and documented — applyConversationStatusOnlyPatch has a branch titled "a
+  // confirming send gains its chain entry id" — and had no writer, so it never ran once.
+  //
+  // The id is the publish seq, and it is known HERE rather than read back later: nextOutgoingSeq is the local
+  // monotonic counter that IS the record's identity on the shard (the chain last_seq only seeds a cold epoch), so
+  // the peer stores this exact number for this exact message. MIN, not max, because a multipart message is anchored
+  // by its FIRST record on both sides — the receiver takes orderedByChain[0] — and the parts are published with
+  // strictly increasing seq in part order.
+  //
+  // Stamped BEFORE the broadcast, deliberately. Waiting for the delivery confirm would leave the message unrepliable
+  // for the 4-200s that MEASURABLY separates a broadcast from a block, which is exactly when someone wants to add to
+  // what they just said. If the send then fails, the anchor points at a record the peer does not have — but the peer
+  // does not have the quoted message either, so the quote strip falls back to its snippet, which is the honest
+  // rendering of "I am answering something you never received".
+  message.chainEntryId = String(Math.min(...parts.map((part) => part.seq)));
 
   // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
   // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a

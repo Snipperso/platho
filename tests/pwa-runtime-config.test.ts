@@ -3339,9 +3339,12 @@ describe('PWA runtime config guard', () => {
     const download = app.slice(app.indexOf('async function downloadFileBlock'), app.indexOf('function buildFileBlockChip'));
     expect(download).toMatch(/isTelegramEnv\(\)/);
     expect(download).toMatch(/URL\.revokeObjectURL/);
-    // Previews: thread list + reply snippet know about files; copy ignores them (text-only filter).
-    expect(app).toMatch(/if \(fileBlocks\.length === 1\) return String\(fileBlocks\[0\]\.name \?\? 'File'\);/);
-    expect(app).toMatch(/if \(blocks\.some\(\(block\) => block\?\.type === 'file'\)\) return 'File';/);
+    // Previews: thread list + reply snippet know about files; copy ignores them (text-only filter). A single file
+    // shows its own NAME (the informative thing); the word "file" is only the fallback, and since v887 it is a
+    // translated word rather than an English literal on a Russian screen.
+    expect(app).toMatch(/if \(fileBlocks\.length === 1\) return String\(fileBlocks\[0\]\.name \?\? ''\)\.trim\(\) \|\| t\('chat\.previewFile'\);/);
+    expect(app).toMatch(/if \(fileBlocks\.length > 1\) return tPlural\('chat\.previewFiles', fileBlocks\.length\);/);
+    expect(app).toMatch(/if \(blocks\.some\(\(block\) => block\?\.type === 'file'\)\) return t\('chat\.previewFile'\);/);
     expect(css).toMatch(/\.message-file-chip \{/);
   });
 
@@ -4820,7 +4823,10 @@ describe('PWA runtime config guard', () => {
     // link is built only when its url passes the scheme allowlist, a rejected scheme degrades to the literal typed
     // text, and every anchor is built by buildExternalLinkAnchor (never innerHTML).
     const linkifyFn = app.slice(app.indexOf('function appendInlineFormatted('), app.indexOf('function messageTextHasBlockFormatting('));
-    expect(app).toMatch(/const INLINE_FORMAT_RE = \//); // the bold/italic/code | [label](url) | bare-url tokenizer
+    // The bold/italic/code | [label](url) | bare-url tokenizer. It lives in the shared grammar module (v887 — the
+    // summarising readers must strip exactly what this renders), and app.js takes its OWN instance because the
+    // regex is global and this renderer drives it with exec() in a loop.
+    expect(app).toMatch(/const INLINE_FORMAT_RE = createInlineFormatRegex\(\);/);
     expect(linkifyFn).toMatch(/const safe = safeExternalUrl\(match\[6\]\);/); // labeled: url is group 6
     expect(linkifyFn).toMatch(/parent\.append\(safe \? buildExternalLinkAnchor\(match\[5\], safe\) : document\.createTextNode\(match\[0\]\)\)/);
     expect(linkifyFn).toMatch(/const trimmed = trimTrailingUrlPunctuation\(match\[7\]\);/); // bare: url is group 7
@@ -4913,7 +4919,12 @@ describe('PWA runtime config guard', () => {
     expect(inlineFn).toMatch(/const el = document\.createElement\('strong'\);\s*el\.textContent = match\[2\];/);
     expect(inlineFn).toMatch(/const el = document\.createElement\('em'\);\s*el\.textContent = match\[3\];/);
     expect(inlineFn).toMatch(/buildExternalLinkAnchor\(match\[5\], safe\)/);
-    expect(app).toMatch(/const INLINE_FORMAT_RE = \/\\\*\\\*\\\*\(\[\^\*\\n\]\+\)\\\*\\\*\\\*\|/); // *** alternative is FIRST
+    // *** alternative is FIRST, or **bold** eats the opening pair and the italic never closes. The pattern moved to
+    // the shared grammar module (v887) so the previews strip exactly what this renders; the ORDER is the property,
+    // and it is asserted against the source string the module builds its regex from.
+    const grammar = readFileSync('web/message-plain-text.mjs', 'utf8');
+    expect(grammar).toMatch(/const INLINE_FORMAT_SOURCE = '\\\\\*\\\\\*\\\\\*\(\[\^\*\\\\n\]\+\)\\\\\*\\\\\*\\\\\*\|/);
+    expect(app).toMatch(/const INLINE_FORMAT_RE = createInlineFormatRegex\(\);/);
     expect(inlineFn).not.toMatch(/innerHTML/);
     const blockFn = app.slice(app.indexOf('function appendFormattedMessageText('), app.indexOf('function appendFormattedMessageText(') + 3200);
     expect(blockFn).toMatch(/if \(!messageTextHasBlockFormatting\(str\)\)/); // inline fast path
@@ -4928,9 +4939,12 @@ describe('PWA runtime config guard', () => {
     expect(blockFn).toMatch(/msg-align-\$\{align\}/);
     expect(blockFn).not.toMatch(/innerHTML/);
     // Block-marker regexes.
-    expect(app).toMatch(/const MSG_HEADING_RE = \/\^\(#\{1,3\}\)/);
-    expect(app).toMatch(/const MSG_QUOTE_RE = /);
-    expect(app).toMatch(/const MSG_ALIGN_RE = \/\^::\(center\|justify\)/);
+    // Block-marker regexes — in the shared grammar module since v887, imported here. ONE definition is the point:
+    // the renderer below and the preview stripper must agree on what a heading is, or a list row prints '# '.
+    expect(grammar).toMatch(/export const MSG_HEADING_RE = \/\^\(#\{1,3\}\)/);
+    expect(grammar).toMatch(/export const MSG_QUOTE_RE = /);
+    expect(grammar).toMatch(/export const MSG_ALIGN_RE = \/\^::\(center\|justify\)/);
+    expect(app).toMatch(/import \{[\s\S]{0,240}MSG_HEADING_RE[\s\S]{0,240}\} from '\.\/message-plain-text\.mjs/);
     // The 5 message render sites go through the formatter (private bubble + legacy, public post/comment + legacy,
     // shared-post embed). Covered by count.
     expect(app.match(/appendFormattedMessageText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
@@ -6991,7 +7005,12 @@ describe('PWA runtime config guard', () => {
     // to drift, and the drift is invisible to whoever writes the message.
     const build = app.slice(app.indexOf('function buildComposerEditorDom('), app.indexOf('function buildComposerEditorDom(') + 1400);
     expect(build, 'the rebuild reuses MSG_HEADING_RE').toMatch(/const heading = MSG_HEADING_RE\.exec\(line\);/);
-    expect(app.match(/const MSG_HEADING_RE = /g)?.length, 'declared exactly once').toBe(1);
+    // Declared exactly once, in the shared grammar module (v887), and IMPORTED here — the composer rebuild, the
+    // receive renderer and the preview stripper all ask the same object what a heading is.
+    const grammar = readFileSync('web/message-plain-text.mjs', 'utf8');
+    expect(grammar.match(/export const MSG_HEADING_RE = /g)?.length, 'declared exactly once').toBe(1);
+    expect(app.match(/const MSG_HEADING_RE\s*=/g) ?? [], 'app.js imports it and must not redeclare it').toEqual([]);
+    expect(app).toMatch(/import \{[\s\S]{0,240}MSG_HEADING_RE[\s\S]{0,240}\} from '\.\/message-plain-text\.mjs/);
     expect(app, 'no second heading regex anywhere').not.toMatch(/COMPOSER_HEADING_LINE_RE/);
   });
 });

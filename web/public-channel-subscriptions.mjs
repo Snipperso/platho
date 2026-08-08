@@ -1,3 +1,10 @@
+// The words this module puts on screen are PROSE, so they are translated here rather than shipped in English and
+// hoped over. Importing the i18n engine into a data module is safe in both runtimes: it holds the active locale in
+// a module variable, touches the DOM only inside try/catch, and falls back to English when initI18n never ran —
+// which is exactly what the Node tests get, unchanged.
+import { t, tPlural } from './i18n.mjs?v=47';
+import { messagePreviewText } from './message-plain-text.mjs?v=1';
+
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY = 'platho.publicSubscriptions.v1';
 export const PUBLIC_CHANNEL_FEED_CACHE_KEY = 'platho.publicChannelFeeds.v1';
@@ -283,13 +290,27 @@ function normalizeFeedBlocks(blocks) {
   }).filter(Boolean);
 }
 
+// The first TEXT block, verbatim — this feeds the rendered article body as well as the card, so the formatting
+// markers must survive here (the renderer parses them). Stripping happens at the PREVIEW call site, which is the
+// only reader that wants words without their grammar.
 function feedBlocksPreview(blocks) {
   const text = (blocks ?? []).find((block) => block?.type === 'text' && nonEmptyString(block.text))?.text;
   if (text) return text;
   const imageCount = (blocks ?? []).filter((block) => block?.type === 'image').length;
-  if (imageCount > 0) return imageCount === 1 ? 'Image' : `${imageCount} images`;
-  if ((blocks ?? []).some((block) => block?.type === 'share')) return 'Shared post';
+  if (imageCount > 0) return tPlural('chat.previewImages', imageCount);
+  if ((blocks ?? []).some((block) => block?.type === 'share')) return t('chat.previewSharedPost');
   return null;
+}
+
+/** The one line a channel card shows: a title, else the first text, else a media word — never raw markup. */
+function publicChannelPreviewLine(latest) {
+  const title = nonEmptyString(latest?.title);
+  if (title) return messagePreviewText(title);
+  const fromBlocks = feedBlocksPreview(latest?.blocks);
+  if (fromBlocks) return messagePreviewText(fromBlocks);
+  const text = nonEmptyString(latest?.text);
+  if (text) return messagePreviewText(text);
+  return latest?.imageUrl ? t('chat.previewImage') : t('public.previewWaitingFeed');
 }
 
 function stripStoredPublicFeedVerification(cache) {
@@ -351,7 +372,7 @@ export function publicChannelFeedToThread(channel, feed) {
     subtitle: normalizedChannel.subtitle,
     time: shortTime(latest?.createdAt) ?? 'public',
     state: posts.length > 0 ? 'channel' : 'syncing',
-    preview: latest?.title ?? feedBlocksPreview(latest?.blocks) ?? latest?.text ?? (latest?.imageUrl ? 'Image' : 'Waiting for public feed'),
+    preview: publicChannelPreviewLine(latest),
     messages: posts.map((post) => ({
       type: 'in',
       text: post.title ? `${post.title}\n${post.text}` : (feedBlocksPreview(post.blocks) ?? post.text),
