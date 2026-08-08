@@ -91,8 +91,15 @@ describe('MODCONTENT — a module version must move when the module does', () =>
       .toContain(`./app.js?v=${runtime}"`);
     expect(sw, 'the service worker precaches a different app.js than the runtime version claims')
       .toContain(`'./app.js?v=${runtime}'`);
-    expect(html).toContain(`id="appVersionLabel">v${runtime}<`);
-    expect(html).toContain(`id="profileVersionLabel">v${runtime}<`);
+    // Matched with a pattern rather than a literal substring: the profile badge was HIDDEN on 2026-08-07 (it is an
+    // operator affordance, not something a reader of the profile needs), which put a `hidden` attribute between the
+    // id and the `>`. The element still carries the version and still IS one of the five anchors — hiding it must
+    // not be mistaken for removing it, and pinning the exact character after the id would have forced a choice
+    // between the gate and the UI decision.
+    for (const id of ['appVersionLabel', 'profileVersionLabel']) {
+      expect(html, `${id} must carry the running release version`)
+        .toMatch(new RegExp(`id="${id}"[^>]*>v${runtime}<`));
+    }
     // And the tool that cascades every OTHER module is told to keep its hands off this one.
     const tool = readFileSync('scripts/bump_module_versions.mjs', 'utf8');
     expect(tool).toContain("const RELEASE_VERSIONED = new Set(['app.js']);");

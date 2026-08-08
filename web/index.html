@@ -12,7 +12,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=290">
+    <link rel="stylesheet" href="./styles.css?v=291">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v883</span>
+              <span class="app-version-label" id="appVersionLabel">v884</span>
             </div>
           </div>
         </div>
@@ -401,6 +401,9 @@
               </div>
               <div class="settings-list">
                 <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <!-- Written by refreshProfileFeeLabels: it quotes the contract's own claim cost and per-claim cap,
+                     which the param-less static translation pass cannot interpolate. -->
+                <p class="settings-note" id="flushAthNote"></p>
               </div>
             </section>
           </div>
@@ -412,8 +415,13 @@
               <h1>Platho.app</h1>
               <p id="profileHandle" data-i18n="nav.profile">Profile</p>
               <!-- Build version, duplicated from the rail badge: the rail is hidden on the narrow (mobile / TG
-                   Mini App) layout, and TMA webviews cache hard — this is the on-device way to verify the build. -->
-              <span class="app-version-label" id="profileVersionLabel">v883</span>
+                   Mini App) layout, and TMA webviews cache hard — this is the on-device way to verify the build.
+                   HIDDEN (owner, 2026-08-07): it is an operator affordance, not something a reader of the profile
+                   needs. Everything behind it is intact — the element still exists, still receives the version
+                   text, and still carries the click handler that copies the private-lane diagnostic; removing
+                   `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
+                   the element would also break PWA-CONFIG-01B. -->
+              <span class="app-version-label" id="profileVersionLabel" hidden>v884</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -456,13 +464,12 @@
               <h2 data-i18n="chat.messages">Messages</h2>
               <div class="settings-list">
                 <label class="settings-select-row compact-select-row" for="privateSenderModeSelect">
-                  <span data-i18n="chat.privateSender">Private sender</span>
-                  <select id="privateSenderModeSelect" aria-label="Default private sender mode" data-i18n-aria-label="chat.defaultPrivateSenderMode">
-                    <option value="share" data-i18n="chat.shareWalletAddress">Share wallet address</option>
+                  <span data-i18n="chat.privateSender">Send private messages</span>
+                  <select id="privateSenderModeSelect" aria-label="Send private messages by default" data-i18n-aria-label="chat.defaultPrivateSenderMode">
+                    <option value="share" data-i18n="chat.senderModeWithWallet">With wallet address</option>
                     <option value="anonymous" data-i18n="chat.anonymous">Anonymous</option>
                   </select>
                 </label>
-                <button id="syncMessagesButton" type="button"><span data-i18n="sync.syncMessages">Sync messages</span><strong id="messageSyncStatus" data-i18n="sync.statusTapToSync">tap to sync</strong></button>
                 <button id="replaceVaultKeysButton" type="button"><span data-i18n="sync.replaceMessageKeys">Replace message keys</span><strong id="vaultRotateStatus" data-i18n="sync.statusActivateAccountFirst">activate account first</strong></button>
               </div>
             </section>
@@ -470,13 +477,6 @@
             <section class="profile-section" aria-label="Public channels" data-i18n-aria-label="public.channels">
               <h2 data-i18n="public.channels">Public channels</h2>
               <div class="settings-list">
-                <label class="settings-select-row compact-select-row" for="publicSyncWindowSelect">
-                  <span data-i18n="public.historySync">History sync</span>
-                  <select id="publicSyncWindowSelect" aria-label="Public sync window" data-i18n-aria-label="public.syncWindow">
-                    <option value="short" data-i18n="public.syncWindowShort">Short - newest 128 entries</option>
-                    <option value="long" data-i18n="public.syncWindowLong">Long - retained history, up to 1 year</option>
-                  </select>
-                </label>
                 <label class="settings-select-row compact-select-row" for="publicCommentsDefaultSelect">
                   <span data-i18n="public.comments">Comments</span>
                   <select id="publicCommentsDefaultSelect" aria-label="Default public comment setting" data-i18n-aria-label="public.defaultCommentSetting">
@@ -493,9 +493,9 @@
             <section class="profile-section" aria-label="Usernames and avatars" data-i18n-aria-label="username.usernamesAndAvatarsLabel">
               <h2 data-i18n="username.usernamesAndAvatars">Usernames and Avatars</h2>
               <div class="settings-list">
-                <button id="mintUsernameButton" type="button"><span data-i18n="username.mintAthName">Mint .ath name</span><strong class="profile-action-status" id="mintUsernameStatus" data-i18n="username.mintFee">100-10k ATH + GRAM fee</strong></button>
+                <button id="mintUsernameButton" type="button"><span data-i18n="username.mintAthName">Mint .ath name</span><strong class="profile-action-status" id="mintUsernameStatus">100-10k ATH + 1.1 GRAM</strong></button>
                 <button id="linkUsernameButton" type="button"><span data-i18n="username.linkAthName">Link .ath name</span><strong id="linkedUsernameStatus" data-i18n="username.statusVerify">verify</strong></button>
-                <button id="setAvatarButton" type="button"><span data-i18n="avatar.setAvatar">Set avatar</span><strong class="profile-action-status" id="setAvatarStatus" data-i18n="avatar.setFee">100 ATH + GRAM fee</strong></button>
+                <button id="setAvatarButton" type="button"><span data-i18n="avatar.setAvatar">Set avatar</span><strong class="profile-action-status" id="setAvatarStatus">100 ATH + from 0.2395 GRAM</strong></button>
                 <input id="profileAvatarInput" type="file" accept="image/*" hidden>
                 <!-- [OWNER 2026-08-03] Moved out of the Wallet tab. This picks whether other people see an address or
                      a .ath name — that is identity, not money, and it belongs beside the name it selects between. -->
@@ -770,6 +770,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=883" type="module"></script>
+    <script src="./app.js?v=884" type="module"></script>
   </body>
 </html>

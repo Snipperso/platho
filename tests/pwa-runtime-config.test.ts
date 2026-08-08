@@ -493,7 +493,12 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="changeWalletPasswordButton"/);
     expect(html).toMatch(/id="receiveWalletTonButton"/);
     expect(html).toMatch(/id="privateSenderModeSelect"/);
-    expect(html).toMatch(/Share wallet address/);
+    // The row's label and its option read as one sentence — "Send private messages — with wallet address" —
+    // because "Private sender" named a person and left the reader hunting for who that was (owner, 2026-08-07).
+    // The option carries its OWN key: chat.shareWalletAddress is the composer eye's tooltip, where the same words
+    // are an action rather than a choice.
+    expect(html).toMatch(/data-i18n="chat\.privateSender">Send private messages</);
+    expect(html).toMatch(/data-i18n="chat\.senderModeWithWallet">With wallet address</);
     expect(html).toMatch(/Anonymous/);
     expect(html).toMatch(/id="sendWalletTonButton"/);
     expect(html).toMatch(/id="unlockWalletStatus"/);
@@ -764,8 +769,10 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toContain('walletTonBalanceButton');
     expect(html).not.toContain('walletTonBalanceStatus');
     expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
-    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="syncMessagesButton"[\s\S]*id="replaceVaultKeysButton"/);
-    expect(html).toMatch(/Sync messages[\s\S]*tap to sync/);
+    // "Sync messages" removed 2026-08-07 — the header indicator on every tab already does it, and that row also
+    // doubled as a state store, so it went with its accessors rather than being left as a dead node.
+    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="replaceVaultKeysButton"/);
+    expect(html).not.toMatch(/id="syncMessagesButton"|id="messageSyncStatus"/);
     expect(html).toMatch(/Replace message keys[\s\S]*activate account first/);
     expect(enCopy).toMatch(/up to date/);
     expect(app).toMatch(/hasActiveVaultMessagingKeys/);
@@ -817,9 +824,20 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/requireProfileRegistryAddress\(\)/);
     expect(app).toMatch(/amount: PROFILE_AVATAR_PRICE_ATH/);
     expect(app).not.toMatch(/assertVaultProfileAvatarCanStart|submitVaultProfileAvatarRegistration|requireProfileRegistryVaultRoute/);
-    expect(html).toMatch(/<h2 data-i18n="public\.channels">Public channels<\/h2>[\s\S]*id="publicSyncWindowSelect"[\s\S]*id="publicCommentsDefaultSelect"/);
+    // "History sync" removed 2026-08-07; the Public channels section is now the comments default alone.
+    expect(html).toMatch(/<h2 data-i18n="public\.channels">Public channels<\/h2>[\s\S]*id="publicCommentsDefaultSelect"/);
     expect(html).toMatch(/<h2 data-i18n="username\.usernamesAndAvatars">Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
-    expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ GRAM fee/);
+    // The fee rows quote a NUMBER, not a currency (owner, 2026-08-07: "лучше явно написать сколько грам"), and it
+    // is interpolated at runtime from the constants the wallet is asked to sign — see refreshProfileFeeLabels.
+    // The markup keeps a matching literal as the pre-script fallback, so both are pinned to the same figures.
+    expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ 1\.1 GRAM/);
+    expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ from 0\.2395 GRAM/);
+    expect(html, 'these rows are written by refreshProfileFeeLabels, not by the param-less static pass')
+      .not.toMatch(/id="(mintUsernameStatus|setAvatarStatus)"[^>]*data-i18n=/);
+    const appSource = readFileSync('web/app.js', 'utf8');
+    expect(appSource).toMatch(/function profileAvatarFloorNanotons\(\)/);
+    expect(appSource).toMatch(/publicPublishValueForKind\(3\) \+ PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS/);
+    expect(appSource).toMatch(/t\('username\.mintFee', \{[\s\S]{0,120}estimatedUsernameMintTonFeeNanotons\(\)/);
     expect(html).not.toMatch(/Link TON DNS[\s\S]*id="linkedTonDnsStatus"[\s\S]*verify/);
     expect(html).toMatch(/Link \.ath name[\s\S]*id="linkedUsernameStatus"[\s\S]*verify/);
     expect(app).not.toMatch(/linkTonDnsButton\?\.addEventListener\('click'/);
@@ -852,7 +870,7 @@ describe('PWA runtime config guard', () => {
     // direct pay sends the ATH transfer to the registry address from the config+manifest pin, with no declared
     // route to disagree with.)
     expect(enCopy).toMatch(/ATH; 50% goes to burn/);
-    expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ GRAM fee/);
+    expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ from 0\.2395 GRAM/);
     expect(enCopy).toMatch(/Set profile avatar/);
     expect(app).toMatch(/requestProfileAvatarUploadDetails/);
     expect(app).toMatch(/estimatedProfileAvatarTonFeeNanotons/);
@@ -911,7 +929,6 @@ describe('PWA runtime config guard', () => {
     const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
     expect(walletPanel, 'the ATH block lives in the Wallet tab now').toMatch(/id="flushAthButton"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
-    expect(html).toMatch(/id="syncMessagesButton"/);
     expect(html).not.toMatch(/id="keySuiteStatus"/);
     expect(app).toMatch(/installActionState/);
     expect(enCopy).toMatch(/Got it/);
@@ -945,13 +962,10 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="installBody"/);
     expect(manifest).toMatch(/"platform": "webapp"/);
     expect(manifest).toMatch(/"url": "https:\/\/platho\.app\/manifest\.webmanifest"/);
-    expect(html).toMatch(/id="publicSyncWindowSelect"/);
     expect(html).toMatch(/id="publicCommentsDefaultSelect"/);
     expect(html).toMatch(/>Closed</);
     expect(html).toMatch(/>Allowed - not recommended</);
     expect(html).toMatch(/<option value="disabled" data-i18n="public\.commentsClosed">Closed<\/option>[\s\S]*<option value="enabled" data-i18n="public\.commentsAllowedNotRecommended">Allowed - not recommended<\/option>/);
-    expect(html).toMatch(/Short - newest 128 entries/);
-    expect(html).toMatch(/Long - retained history, up to 1 year/);
     expect(html).toMatch(/id="walletAddressStatus"/);
     expect(html).toMatch(/id="mintUsernameButton"/);
     expect(html).not.toMatch(/id="flushUsernameRefundButton"/);
@@ -2709,18 +2723,20 @@ describe('PWA runtime config guard', () => {
     expect(readFileSync('contracts/PublicShard.tact', 'utf8')).toMatch(/const PS_PAGE_CAP: Int = 96;/);
     expect(app).toMatch(/maximum: Object\.freeze\(\{ id: 'maximum', label: 'Maximum', maxBytes: 64 \* 1024 \}\)/);
     expect(app).toMatch(/function imagePartsForSend\(attachment, label = 'image'\)/);
-    // (The configurable read window and its 'long' mode were properties of paging one shared log; a shard is
-    // read as its newest page, so there is no window to configure and no minEntryId to compute.)
-    expect(html).toMatch(/<option value="short" data-i18n="public\.syncWindowShort">Short - newest 128 entries<\/option>/);
-    expect(html).toMatch(/<option value="long" data-i18n="public\.syncWindowLong">Long - retained history, up to 1 year<\/option>/);
-    expect(html).not.toMatch(/<option value="7">/);
-    expect(html).not.toMatch(/<option value="30">/);
-    expect(html).not.toMatch(/<option value="90">/);
-    expect(app).toMatch(/if \(text === 'all' \|\| text === 'long'\) return 'long'/);
-    expect(app).toMatch(/return 'short'/);
-    expect(app).toMatch(/return normalized === 'long' \? t\('public\.longHistory'\) : t\('public\.shortHistory'\)/);
-    expect(EN_STRINGS['public.longHistory']).toBe('long public history');
-    expect(EN_STRINGS['public.shortHistory']).toBe('short public history');
+    // The "History sync" control is GONE (owner, 2026-08-07), and this gate is why it lasted as long as it did:
+    // the comment that used to stand here already said the configurable window was a property of paging one
+    // shared log and that a shard has no window to configure — and the lines right below it pinned that control's
+    // markup and its normaliser anyway. So the gate held a dead switch in place while explaining that it was
+    // dead. By the time it was removed, publicSyncCutoffMs() had been returning null unconditionally: both
+    // options rendered the same feed, and a user choosing "retained history, up to 1 year" was told they had
+    // widened their history and got nothing.
+    expect(html).not.toMatch(/publicSyncWindowSelect/);
+    expect(html).not.toMatch(/public\.syncWindow/);
+    // Anchored on the definitions: the comment explaining the removal names these functions, and a bare
+    // substring match would fail against the very note that records why they are gone.
+    expect(app).not.toMatch(/function (publicSyncCutoffMs|normalizePublicSyncWindow|isFreshPublicTimestamp)\(/);
+    // And the date-filtered feed view it fed goes with it: the feed shows whatever the shard still retains.
+    expect(app).not.toMatch(/function publicFeedCacheForCurrentWindow/);
   });
 
   it('PWA-MSG-02: private composer cannot create streams larger than the default private sync window', () => {
@@ -5580,21 +5596,68 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(message\.type !== 'out'\) \{\s*hydrateThreadAvatarFromPointer\(\s*thread,/);
   });
 
-  it('PWA-SYNC-MESSAGES-INFLIGHT-01: the manual Sync messages button stays disabled across re-renders while its run is in flight', () => {
+  it('PWA-SYNC-MESSAGES-INFLIGHT-01: a manual sync cannot be started twice over itself', () => {
+    // REBASELINED 2026-08-07. The profile "Sync messages" button was removed — every tab already carries the sync
+    // indicator, and the header's tap-to-sync is now the only entry point. The gate used to pin that button's
+    // disabled attribute; a disabled control is one way to stop a double run, but it was never the load-bearing
+    // one. The flag is: it guards the body itself, so a second tap during an await returns instead of launching a
+    // parallel pass over the same shards.
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/let messageSyncManualInFlight = false;/);
-    // refreshMessagingControls must respect the in-flight flag (not re-enable the button mid-sync on a re-render).
-    expect(app).toMatch(/syncMessagesButton\.disabled = !plathoWallet \|\| !signedActionsReady \|\| messageSyncManualInFlight;/);
-    // The shared manual-sync body (settings button + the header indicator's tap on the Private tab) sets the
-    // flag before the await and clears it in finally.
     const handlerSource = app.slice(
       app.indexOf('async function runManualPrivateMessageSync()'),
-      app.indexOf("syncMessagesButton?.addEventListener('click'"),
+      app.indexOf("publicChannelSearch?.addEventListener('input'"),
     );
+    expect(handlerSource.length, 'the slice anchors must actually bracket the function').toBeGreaterThan(200);
+    expect(handlerSource, 'a re-entrant call must bail out before doing any work')
+      .toMatch(/if \(messageSyncManualInFlight\) return;/);
     expect(handlerSource).toMatch(/messageSyncManualInFlight = true;/);
+    // Cleared in `finally`, so a throw cannot wedge the lane shut for the rest of the session.
     expect(handlerSource).toMatch(/finally \{\s*messageSyncManualInFlight = false;/);
   });
 
+
+  it('PWA-AIRDROP-CLAIM-NOTE-01: the claim note quotes the contract, not a number someone typed', () => {
+    // The note tells the user a claim costs the same GRAM whatever it carries, and advises batching up to the
+    // per-claim cap. Both halves are only useful if they match the chain: a stale cost misstates what the wallet
+    // will be asked to sign, and a stale cap advises a batch AirdropTicket would refuse at gate 26112.
+    const app = readFileSync('web/app.js', 'utf8');
+    const ticket = readFileSync('contracts/AirdropTicket.tact', 'utf8');
+
+    const contractValue = (name: string): string => {
+      const match = ticket.match(new RegExp(`const ${name}: Int = (\\d+);`));
+      expect(match, `${name} must exist in AirdropTicket.tact`).toBeTruthy();
+      return (match as RegExpMatchArray)[1];
+    };
+    const clientValue = (name: string): string => {
+      const match = app.match(new RegExp(`const ${name} = ([0-9_]+)n;`));
+      expect(match, `${name} must exist in web/app.js`).toBeTruthy();
+      return (match as RegExpMatchArray)[1].replaceAll('_', '');
+    };
+
+    expect(clientValue('AIRDROP_CLAIM_MIN_VALUE_NANOTONS'), 'claim cost mirrors AT_CLAIM_MIN_VALUE')
+      .toBe(contractValue('AT_CLAIM_MIN_VALUE'));
+    expect(clientValue('AIRDROP_MAX_CREDITS_PER_CLAIM'), 'per-claim cap mirrors AT_MAX_CREDITS_PER_CLAIM')
+      .toBe(contractValue('AT_MAX_CREDITS_PER_CLAIM'));
+
+    // The note must actually be rendered from those mirrors, not merely hold them.
+    expect(app).toMatch(/flushAthNote\.textContent = maxAth === null/);
+    expect(app).toMatch(/athTicketState\.claimMinValue \?\? AIRDROP_CLAIM_MIN_VALUE_NANOTONS/);
+    expect(app).toMatch(/AIRDROP_MAX_CREDITS_PER_CLAIM \* perCredit/);
+    // ath-per-credit arrives from a chain read; without this the note keeps its cost-only wording all session.
+    expect(app).toMatch(/athPerCredit: pool\.athPerCredit,[\s\S]{0,400}refreshProfileFeeLabels\(\)/);
+
+    const html = readFileSync('web/index.html', 'utf8');
+    expect(html).toMatch(/<p class="settings-note" id="flushAthNote"><\/p>/);
+    // The user never sees the internal credit unit — the note is written in ATH (owner's standing rule).
+    for (const locale of ['en', 'ru'] as const) {
+      const note = (I18N_STRINGS[locale] as Record<string, string>)['profile.claimCostBatchNote'];
+      expect(note, `${locale} batch note exists`).toBeTruthy();
+      expect(note).toContain('{cost}');
+      expect(note).toContain('{max}');
+      expect(note, 'the note speaks ATH, never credits').not.toMatch(/credit|кредит/i);
+    }
+  });
 
   it('PWA-CONFIG-06B: profile avatar rides ONE direct-pay wallet transfer (shard bytes + paid pointer)', () => {
     const app = readFileSync('web/app.js', 'utf8');

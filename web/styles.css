@@ -2316,6 +2316,20 @@ a .avatar.has-image,
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* An explanatory line under a settings row — not a control, so it is quieter than the rows and carries no border.
+   Empty until the script fills it (the text quotes contract figures the static translation pass cannot
+   interpolate), and `:empty` keeps the grid gap from reserving space for a line that is not there yet. */
+.settings-note {
+  margin: -2px 2px 0;
+  color: var(--muted-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.settings-note:empty {
+  display: none;
+}
+
 .public-feed {
   /* Cap the implicit grid column at the container width (same fix as .settings-list above): without it the
      single auto column sizes to its widest child's max-content, so a feed card with a long unbroken token
