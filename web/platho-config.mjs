@@ -186,6 +186,15 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   airdropPool: {
     address: 'UQBa1zD7DySeGO4crmeB7ZAuDu1xDRE6DIOsYfFFYke4Y-xL',
   },
+  // [ADDED 2026-08-08] The market-stability reserve seller, so the client can quote and buy ATH instead of only
+  // earning it. It was the one live contract with NO entry here, and that gap cost real time: looking for its address
+  // sent me into artifacts/local, where a file NAMED `...verify_input.live.json` describes a DEAD generation (its
+  // ATHMaster differs from this one), and I reported to the owner that the 60M reserve was unfunded. On chain it is
+  // funded, idle and selling. Addresses belong in this file, pinned against the verified genesis input — see
+  // tests/client-config-matches-live-genesis.test.ts.
+  marketStabilitySeller: {
+    address: 'UQAxFB71mW7q9bv8qXjk9kMIS_JgAS08QDWlnLYJafGYtbzG',
+  },
   usernameRegistry: {
     address: 'UQBR-Ujp5676B3xTiqQ77R2OIjZYBn1GxUvI8V3bmHVV0F_W',
   },
