@@ -55,6 +55,8 @@ const ROOT_RUNTIME_FILES = new Set([
   'airdrop-pool-read.mjs',
   // The reserve seller: its live state (price step + what is left on it) and the buy message.
   'market-stability-read.mjs',
+  'username-nft-owned.mjs',
+  'username-nft-transfer.mjs',
   'market-stability-buy-send.mjs',
   'shard-code.mjs',
   'username-ton-rpc-provider.mjs',
