@@ -5381,3 +5381,22 @@ button.feed-item:hover {
 .nft-card-send:hover {
   border-color: rgba(48, 213, 176, 0.42);
 }
+
+/* Quick start, top-up step: the address and its own copy button on one row. The step's primary button is Next now;
+   copying belongs next to the thing being copied, not disguised as the way forward. */
+.quick-start-address-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-start-address-row .quick-start-step-address {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.quick-start-address-copy {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+}
