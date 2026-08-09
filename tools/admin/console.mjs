@@ -23,6 +23,7 @@ const TONCENTER = 'https://toncenter.com/api/v2';
 const $ = (id) => document.getElementById(id);
 let addresses = null;
 let wallet = null;
+let walletBalance = 0n;
 const lastRead = new Map();   // bucket key -> decoded values, so an action can use the number it displayed
 
 function setStatus(text, tone = '') {
@@ -152,6 +153,14 @@ async function runAction(bucket, action, values) {
   if (amount !== null && amount <= 0n) return;
   const unit = action.arg?.kind === 'amountFrom' ? 'GRAM' : 'ATH';
   const human = amount === null ? action.label : `${action.label}: ${fmt(amount, unit)}`;
+  // PRE-FLIGHT, because the chain's refusal is unreadable. An account that cannot pay rejects the external before the
+  // VM starts, and the lite server reports that as "exitcode=0, steps=0, gas_used=0" — a sentence that says nothing
+  // about an empty wallet to anyone who has not seen it before.
+  const needed = action.value + 20_000_000n;   // the action's own value plus room for the external's own fees
+  if (walletBalance < needed) {
+    setStatus(`На кошельке пульта ${GRAM(walletBalance)} — для этой операции нужно около ${GRAM(needed)}. Пополните адрес, показанный выше.`, 'bad');
+    return;
+  }
   if (!window.confirm(`${bucket.title}\n${human}\n\nОтправить?`)) return;
   setStatus(`${bucket.title}: отправка…`);
   const transport = {
@@ -179,9 +188,23 @@ async function connectWallet() {
     // acceptable rather than a compromise.
     $('phrase').value = '';
     $('walletAddress').textContent = wallet.address;
+    // WHAT THE ADDRESS IS AND WHETHER IT CAN PAY, said out loud on connect.
+    //
+    // The first real send failed with "inbound external message rejected ... exitcode=0, steps=0, gas_used=0" — the
+    // account could not accept the external at all, so no code ran and nothing in the message was at fault. The
+    // account was empty. And the reason an operator can fund a wallet and still be looking at an empty one is that
+    // THIS derivation is Platho's: same 24 words, v5r1, wallet_id 0x7fffff11 — another wallet app derives a
+    // DIFFERENT address from the same phrase. Fund the address shown here, not the one another app shows.
     const info = await fetch(`${TONCENTER}/getAddressInformation?address=${wallet.address}`).then((r) => r.json());
-    $('walletBalance').textContent = GRAM(BigInt(info.result?.balance ?? 0));
-    setStatus('Кошелёк подключён', 'good');
+    const balance = BigInt(info.result?.balance ?? 0);
+    const state = info.result?.state ?? 'unknown';
+    walletBalance = balance;
+    $('walletBalance').textContent = GRAM(balance);
+    if (balance === 0n) {
+      setStatus(`Этот адрес ПУСТ (${state}). Пополните именно его — от той же фразы другой кошелёк даёт другой адрес.`, 'bad');
+      return;
+    }
+    setStatus(`Кошелёк подключён${state !== 'active' ? ' (ещё не развёрнут — развернётся первой отправкой)' : ''}`, 'good');
   } catch (error) {
     setStatus(`Кошелёк не принят: ${error.message}`, 'bad');
   }

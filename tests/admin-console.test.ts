@@ -167,6 +167,22 @@ describe('operator console', () => {
     expect(server, 'and no business following ..').toMatch(/if \(!full\.startsWith\(ROOT \+ sep\)\) return null;/);
   });
 
+  it('ADMIN-05C: an empty or foreign-derived wallet is named before it can fail on chain', () => {
+    // The first real send came back as "inbound external message rejected ... exitcode=0, steps=0, gas_used=0" — the
+    // account could not accept the external at all, so nothing in the message was at fault and nothing in that
+    // sentence says so. The account was empty, and the reason an operator can fund a wallet and still be looking at
+    // an empty one is that this page derives Platho's address: the same 24 words give a DIFFERENT v5r1 address in
+    // another wallet app. Both halves have to be said out loud, before the button and before the chain refuses.
+    const source = readFileSync('tools/admin/console.mjs', 'utf8');
+    expect(source).toMatch(/if \(balance === 0n\) \{[\s\S]{0,200}Этот адрес ПУСТ/);
+    expect(source).toMatch(/if \(walletBalance < needed\) \{/);
+    expect(source, 'the pre-flight must run BEFORE the confirm').toMatch(
+      /if \(walletBalance < needed\) \{[\s\S]{0,400}\}\s*\n\s*if \(!window\.confirm/,
+    );
+    const html = readFileSync('tools/admin/index.html', 'utf8');
+    expect(html).toMatch(/Пополнять нужно адрес, который появится ниже/);
+  });
+
   it('ADMIN-06: a failed read is never rendered as a zero', () => {
     // The one failure mode that makes the page worse than nothing: showing "0 к выводу" when it could not ask.
     const source = readFileSync('tools/admin/console.mjs', 'utf8');
