@@ -2988,16 +2988,21 @@ describe('PWA runtime config guard', () => {
     expect(html).not.toMatch(/id="refreshVaultButton"/);
   });
 
-  it('PWA-EMPTY-CHANNEL-01: a followed channel with no posts shows a clean card with Unfollow (no Preview-only)', () => {
+  it('PWA-EMPTY-CHANNEL-01: a followed channel with no posts is not rendered at all, and stays followed', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const mjs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
-    // The "no posts yet" placeholder for a followed channel is flagged so its card can drop the useless comment button.
-    expect(mjs).toMatch(/text: thread\.preview,[\s\S]*?compact: true,[\s\S]*?emptyChannel: true,/);
-    // appendPublicItemActions skips the comment button for an empty-channel card (nothing to comment on), leaving
-    // Private chat + Unfollow — so an empty channel stays unfollowable, with Unfollow the clear action.
-    expect(app).toMatch(/if \(!item\.emptyChannel\) \{[\s\S]*?const commentButton = document\.createElement\('button'\)/);
-    // Unfollow is the shared post action, so it also reaches the empty-channel placeholder card.
-    expect(app).toMatch(/if \(!isOwnPost && isPublicChannelSubscribed\(item\.channelId\)\)[\s\S]*?textContent = t\('public\.unfollow'\)/);
+    // [OWNER 2026-08-09] The placeholder card is GONE. It read "waiting for public feed" — a row that says nothing,
+    // cannot be opened and cannot be commented on, held open for a channel that may never publish. A channel with
+    // no messages now contributes no feed item at all.
+    expect(mjs).toMatch(/if \(messages\.length === 0\) continue;/);
+    expect(mjs, 'no placeholder item may be built').not.toMatch(/emptyChannel/);
+    expect(app, 'nothing may branch on a flag that is never set').not.toMatch(/emptyChannel/);
+    // THE SUBSCRIPTION IS UNTOUCHED — that was the whole condition on hiding it. It lives in a different structure,
+    // so the channel stays followed and reappears by itself the moment it has a post.
+    expect(mjs).not.toMatch(/setPublicChannelSubscribed|subscribed: false/);
+    expect(app).toMatch(/function isPublicChannelSubscribed/);
+    // And it remains unfollowable while hidden: the channel's own view carries a follow toggle.
+    expect(app).toMatch(/publicChannelViewFollowButton\.textContent = followed \? t\('public\.unfollow'\) : t\('public\.follow'\)/);
     expect(EN_STRINGS['public.unfollow']).toBe('Unfollow');
   });
 
@@ -4491,7 +4496,12 @@ describe('PWA runtime config guard', () => {
     const html = readFileSync('web/index.html', 'utf8');
     // Owner ask (v752): newer public posts on TOP, not bottom. renderPublicFeed renders the (newest-N) window
     // REVERSED so the newest article sits first, and the "show older" button is appended AFTER the item loop.
-    const render = app.slice(app.indexOf('function renderPublicFeed('), app.indexOf('function renderPublicFeed(') + 5900);
+    // Sliced to the function's real END, not a byte count. It used to take a fixed 5900 characters, so ADDING a
+    // branch to renderPublicFeed pushed the anchorUnread assertion outside the window and failed a gate that had
+    // nothing to do with the change — a guard that breaks on unrelated edits teaches people to edit the guard.
+    const renderStart = app.indexOf('function renderPublicFeed(');
+    const render = app.slice(renderStart, app.indexOf('\nfunction expandClampedBody(', renderStart));
+    expect(render.length, 'renderPublicFeed slice must not collapse or run away').toBeGreaterThan(2000);
     expect(render).toMatch(/for \(const item of windowItems\.slice\(\)\.reverse\(\)\)/);
     // The show-older button is inserted AFTER the item loop (i.e. at the bottom of the list), not before it.
     expect(render.indexOf('windowItems.slice().reverse()')).toBeLessThan(render.indexOf('buildShowOlderButton(hiddenOlderCount)'));
@@ -4696,7 +4706,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function closePublicChannelView\(options = \{\}\)/);
     expect(app).toMatch(/function renderPublicChannelView\(\)/);
     // The view filters the SAME chronological items by channelId (one data path with the feed, no second store).
-    expect(app).toMatch(/item\.channelId === publicChannelViewChannelId && item\.emptyChannel !== true/);
+    // The `&& item.emptyChannel !== true` half went with the placeholder it guarded against (v896).
+    expect(app).toMatch(/filter\(\(item\) => item\.channelId === publicChannelViewChannelId\)/);
     // NOT-followed channels ride as a TRANSIENT feed source so the standard sync walk fetches the preview...
     expect(app).toMatch(/publicChannelPreviewChannelId && !channels\.some\(\(channel\) => channel\.id === publicChannelPreviewChannelId\)/);
     // ...the preview is EXCLUDED from the main feed render + unread counts until followed...
