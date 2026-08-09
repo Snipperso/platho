@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=26';
+} from './public-channel-subscriptions.mjs?v=27';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=53';
+} from './i18n.mjs?v=54';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v893';
+const PLATHO_APP_RUNTIME_VERSION = 'v894';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -21148,7 +21148,7 @@ async function openBuyAthDialog() {
   ];
 
   const proceed = await openActionDialog({
-    title: t('profile.buyAthTitleStar'),
+    title: t('profile.buyAthTitle'),
     hint: '',
     submitLabel: t('profile.buyAthSubmit'),
     fields,
