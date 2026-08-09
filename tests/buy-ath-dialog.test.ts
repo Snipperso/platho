@@ -36,14 +36,19 @@ describe('buy ATH from the reserve', () => {
 
   it('BUYATH-02B: the CONTROLS come first and the prose sits under the button', () => {
     // OWNER 2026-08-09: "не нравится стена текста над кнопками". The dialog opened with four paragraphs and buried
-    // the inputs below them. Nothing was cut — the prose became footnotes, which the title's asterisk points at —
+    // the inputs below them. Nothing was cut — the prose became footnotes below the button —
     // but the order is now load-bearing and easy to undo by adding one more explanatory `note` field.
     const start = app.indexOf('const fields = [');
     const fields = app.slice(start, app.indexOf('const proceed = await openActionDialog({', start));
     expect(fields, 'the fields list must hold the inputs and nothing else').toMatch(/type: 'custom',[\s\S]{0,80}buy-ath-inputs/);
     expect(fields, 'no prose above the controls').not.toMatch(/type: 'note'/);
     expect(app).toMatch(/footnotes: \(\) => buyAthFootnotes\(state\),/);
-    expect(app).toMatch(/title: t\('profile\.buyAthTitleStar'\),/);
+    // [OWNER 2026-08-09] The title carried an asterisk pointing at footnotes that are rendered as BULLETS. A mark
+    // promising a matching footnote, with no matching footnote anywhere below it, is a small broken promise —
+    // and the bullets read fine without it. Assert it stays gone rather than dropping the line: the starred key
+    // is retired in every locale, so a reappearance would be someone reintroducing the mismatch.
+    expect(app).toMatch(/title: t\('profile\.buyAthTitle'\),/);
+    expect(app).not.toMatch(/buyAthTitleStar/);
     // The footnote list renders AFTER the submit button in the markup, not before it.
     expect(html).toMatch(/id="actionSubmitButton"[\s\S]{0,700}id="actionFootnotes"/);
   });
@@ -86,7 +91,7 @@ describe('buy ATH from the reserve', () => {
     const keys = [
       'profile.buyAth', 'profile.buyAthTitle', 'profile.buyAthSubmit',
       'profile.buyAthFromPrice', 'profile.buyAthSoldOut', 'profile.buyAthUnavailable',
-      'profile.buyAthWalletRequired', 'profile.buyAthTitleStar', 'profile.buyAthAmountLabel',
+      'profile.buyAthWalletRequired', 'profile.buyAthTitle', 'profile.buyAthAmountLabel',
       'profile.buyAthCostLabel', 'profile.buyAthFootStep', 'profile.buyAthFootPool',
       'profile.buyAthFootAirdrop', 'profile.buyAthFootSpend',
       'profile.buyAthSummaryAmount', 'profile.buyAthSummaryPrice', 'profile.buyAthSummaryFee',
@@ -95,6 +100,10 @@ describe('buy ATH from the reserve', () => {
     ];
     for (const locale of Object.keys(I18N_STRINGS)) {
       for (const key of keys) expect(I18N_STRINGS[locale][key], `${locale} is missing ${key}`).toBeTruthy();
+      // [OWNER 2026-08-09] The starred variant is retired in EVERY locale, not just English: the title's
+      // asterisk promised a footnote that is rendered as a bullet, and a mark with nothing to point at is a
+      // small broken promise repeated ten times.
+      expect(I18N_STRINGS[locale]['profile.buyAthTitleStar'], `${locale} still has the starred title`).toBeUndefined();
     }
     // The interpolations the copy depends on must survive translation, or the sentence loses its number.
     for (const locale of Object.keys(I18N_STRINGS)) {
