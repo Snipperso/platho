@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Platho — операторский пульт</title>
+    <link rel="stylesheet" href="./console.css">
+  </head>
+  <body>
+    <!--
+      ЛОКАЛЬНЫЙ ПУЛЬТ. Не выкладывается: сборщик деплоя ходит только по web/ и берёт файлы по белому списку, так что
+      всё, что лежит здесь, непубликуемо ПО ПОСТРОЕНИЮ, а не по дисциплине. Это не опрятность — выложенный пульт
+      отдаёт атакующему карту операционной поверхности бесплатно. Гейт tests/admin-console.test.ts стережёт это.
+
+      Запуск: статический сервер из КОРНЯ репозитория, затем /tools/admin/. Из корня — потому что страница читает
+      адреса из artifacts/mainnet_genesis_verify_input.json, того самого файла, чей sha256 назван в отчёте проверки
+      генезиса. Один источник адресов, привязанный к проверке, или никакого.
+
+      Интерфейс по-русски и без переводов: пользователь ровно один.
+    -->
+    <header>
+      <h1>Операторский пульт</h1>
+      <p>
+        Ни одна операция здесь не требует привилегий: контроллер отобран печатью, а получатель у каждой зашит
+        в контракт на генезисе. Кошелёк пульта нужен только чтобы заплатить за газ.
+      </p>
+      <p class="manifest">Манифест генезиса: <code id="manifestHash">…</code></p>
+    </header>
+
+    <section class="wallet">
+      <h2>Кошелёк пульта</h2>
+      <p class="note">
+        Отдельный кошелёк с парой GRAM. Украсть через эту страницу нельзя — адреса получателей выбрать невозможно.
+        Фраза нигде не сохраняется и стирается из поля сразу после подключения.
+      </p>
+      <textarea id="phrase" rows="2" placeholder="24 слова" autocomplete="off" spellcheck="false"></textarea>
+      <div class="wallet-row">
+        <button id="connect" type="button">Подключить</button>
+        <code id="walletAddress">не подключён</code>
+        <strong id="walletBalance"></strong>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <button id="refresh" type="button">Перечитать цепь</button>
+      <span id="status"></span>
+    </div>
+
+    <main id="cards"></main>
+
+    <script type="module" src="./console.mjs"></script>
+  </body>
+</html>
