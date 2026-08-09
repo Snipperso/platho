@@ -3006,6 +3006,41 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['public.unfollow']).toBe('Unfollow');
   });
 
+  it('PWA-UNLOCK-RESUME-01: an unlock interrupted by backgrounding is re-armed on resume', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    // [OWNER 2026-08-09] "Sometimes the unlock dialog does not appear on resume, though the wallet is locked."
+    //
+    // THE CHAIN, because no single link of it looks wrong on its own:
+    //   1. the prompt clears walletUnlockPromptPending BEFORE opening the password dialog;
+    //   2. lockPlathoWallet — the only thing that re-arms that flag — returns immediately when the wallet is
+    //      ALREADY locked, which it is for as long as the dialog is up;
+    //   3. so backgrounding with the dialog open leaves pending=false with nobody able to set it again.
+    // The app resumes locked, looking unlocked, and silent. Each step is individually reasonable, so this gate
+    // pins the JOIN rather than the steps.
+    expect(app).toMatch(/let walletUnlockPromptInterrupted = false;/);
+    // Recorded when the app goes away, and only when an unlock was genuinely in flight — that is what separates an
+    // interruption from a dialog the user closed on purpose to browse the public feed locked.
+    expect(app).toMatch(/function noteWalletUnlockInterruptedByBackground\(\) \{[\s\S]{0,120}?if \(walletUnlockPromise\) walletUnlockPromptInterrupted = true;/);
+    const hidden = app.slice(
+      app.indexOf("document.addEventListener('visibilitychange'"),
+      app.indexOf("window.addEventListener('pagehide'"),
+    );
+    expect(hidden).toMatch(/noteWalletUnlockInterruptedByBackground\(\);[\s\S]{0,40}?lockPlathoWalletForBackground\(\);/);
+    expect(app).toMatch(/addEventListener\('pagehide'[\s\S]{0,80}?noteWalletUnlockInterruptedByBackground\(\);/);
+    // BOTH resume doors go through the re-arming path, not the bare scheduler that cannot set the flag.
+    expect(hidden).toMatch(/resumeWalletUnlockPrompt\(\);/);
+    expect(app).toMatch(/resumePendingPrivateSendRetries\(\);[\s\S]{0,40}?resumeWalletUnlockPrompt\(\);/);
+    const resumeSrc = app.slice(
+      app.indexOf('function resumeWalletUnlockPrompt()'),
+      app.indexOf('function shouldOpenWalletUnlockPrompt()'),
+    );
+    expect(resumeSrc).toMatch(/walletUnlockPromptInterrupted = false;[\s\S]{0,80}?armWalletUnlockPrompt\(\);/);
+    // A deliberate dismissal must NOT be re-prompted on every app switch: the non-interrupted path is unchanged.
+    expect(resumeSrc).toMatch(/scheduleWalletUnlockPrompt\(\);/);
+    // And a successful unlock forgets the interruption, so it cannot fire a second prompt behind the first.
+    expect(app).toMatch(/function markWalletUnlocked\(\) \{[\s\S]{0,200}?walletUnlockPromptInterrupted = false;/);
+  });
+
   it('PWA-CONFIG-02: production config passes only with mainnet and provider module configured', () => {
     const report = validatePlathoAppConfig(productionConfig);
 
@@ -6631,6 +6666,10 @@ describe('PWA runtime config guard', () => {
     const schedSrc = app.slice(app.indexOf('function scheduleWalletUnlockPrompt('), app.indexOf('function armWalletUnlockPrompt('));
     expect(schedSrc).toMatch(/showBootScreenForRelock\(\);/);
     expect(schedSrc.indexOf('showBootScreenForRelock();')).toBeLessThan(schedSrc.indexOf('walletUnlockPromptTimer = setTimeout('));
+    // ...and the timer may NEVER bail while that overlay is up. showBootScreenForRelock runs BEFORE the timer, so a
+    // silent `return` inside it would leave the branded overlay covering the whole app with nothing behind it to
+    // lift it — a worse stranding than the missing prompt that lives next door.
+    expect(schedSrc).toMatch(/if \(!shouldOpenWalletUnlockPrompt\(\)\) \{[\s\S]{0,400}?markBootAppReady\(\);[\s\S]{0,40}?return;/);
     // A boot trace (console-only) surfaces which step a stuck boot stopped on.
     expect(app).toMatch(/function setBootDebug\(step\)/);
 
