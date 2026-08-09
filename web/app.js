@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=29';
+} from './public-channel-subscriptions.mjs?v=30';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=55';
+} from './i18n.mjs?v=56';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v898';
+const PLATHO_APP_RUNTIME_VERSION = 'v899';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1953,11 +1953,39 @@ function markInstallPromptDismissed() {
   localStorageOrNull()?.setItem(INSTALL_PROMPT_DISMISSED_STORAGE_KEY, '1');
 }
 
+// [OWNER 2026-08-09] The owner reported dialogs climbing on top of each other. They did: this one and the
+// activation welcome are SEPARATE elements, each showing itself with no idea the other exists, so the order was
+// whichever fired first — the install card appeared, then "Account activated" landed on top of it seconds later.
+//
+// One queue instead of two independent shows. The install prompt is the LOWEST priority thing the app ever says:
+// it is an invitation, not news, so it waits for anything else to finish and is re-offered when the way is clear.
+let installPromptDeferred = false;
+
+function blockingDialogOpen() {
+  return Boolean(activeActionDialog)
+    || Boolean(quickStartDialog && !quickStartDialog.hidden)
+    || Boolean(activationWelcomeDialog && !activationWelcomeDialog.hidden);
+}
+
 function openInstallDialogIfUseful() {
   if (isTelegramEnv()) return;
   if (!installDialog || installPromptDismissed() || isStandaloneApp()) return;
+  if (blockingDialogOpen()) {
+    // Remembered, not dropped: the moment that dialog closes this is offered again, so the invitation is delayed
+    // rather than lost. Without the memory, activating an account would silently cost the user the install prompt.
+    installPromptDeferred = true;
+    return;
+  }
+  installPromptDeferred = false;
   installDialog.hidden = false;
   refreshInstallButtons();
+}
+
+/** Called wherever a higher-priority dialog closes. Re-offers the install card only if it was actually deferred. */
+function offerDeferredInstallPrompt() {
+  if (!installPromptDeferred) return;
+  installPromptDeferred = false;
+  openInstallDialogIfUseful();
 }
 
 function closeInstallDialog({ dismissed = true } = {}) {
@@ -25095,9 +25123,28 @@ function quickStartGoToStepByKey(key) {
 function buildQuickStartTopUpBody() {
   const wrap = document.createElement('div');
   wrap.className = 'quick-start-key-body';
+  // [OWNER 2026-08-09] The address row carries its OWN copy button. The step's primary button used to BE the copy
+  // action and silently doubled as Next, so a step with Back and Skip had no visible way forward — copying was the
+  // only way on, which nobody can guess.
+  const addrRow = document.createElement('div');
+  addrRow.className = 'quick-start-address-row';
   const addr = document.createElement('div');
   addr.className = 'quick-start-step-address';
-  addr.textContent = currentWalletReceiveAddress() || storedWalletAddressForCopy() || t('quickstart.createWalletFirst');
+  const addressText = currentWalletReceiveAddress() || storedWalletAddressForCopy() || '';
+  addr.textContent = addressText || t('quickstart.createWalletFirst');
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'icon-button quick-start-address-copy';
+  copyBtn.title = t('wallet.copyAddress');
+  copyBtn.setAttribute('aria-label', t('wallet.copyAddress'));
+  copyBtn.disabled = !addressText;
+  copyBtn.append(Object.assign(document.createElement('span'), { className: 'icon icon-copy', ariaHidden: 'true' }));
+  copyBtn.addEventListener('click', async () => {
+    if (!addressText) return;
+    await copyTextToClipboard(addressText);
+    flashWalletIdentityStatus(t('wallet.addressCopied'));
+  });
+  addrRow.append(addr, copyBtn);
   const balanceLine = document.createElement('div');
   balanceLine.className = 'quick-start-balance-line';
   const check = document.createElement('button');
@@ -25116,7 +25163,7 @@ function buildQuickStartTopUpBody() {
   check.addEventListener('click', () => { refresh(); });
   renderBalance();
   refresh();
-  wrap.append(addr, balanceLine, check);
+  wrap.append(addrRow, balanceLine, check);
   return wrap;
 }
 
@@ -25227,17 +25274,13 @@ const QUICK_START_STEPS = [
   {
     key: 'topup',
     title: t('quickstart.topUpTitle'),
-    action: t('quickstart.copyAddressAction'),
+    action: t('common.continue'),
     optional: true,
     why: t('quickstart.topUpWhy'),
     autoDone: () => false,
     body: () => buildQuickStartTopUpBody(),
-    run: async () => {
-      const address = currentWalletReceiveAddress() || storedWalletAddressForCopy() || '';
-      if (!address) return false;
-      await copyTextToClipboard(address);
-      return true;
-    },
+    // Plain Next. Copying lives on the address row where the thing being copied is.
+    run: async () => true,
   },
   {
     key: 'activate',
@@ -25313,6 +25356,9 @@ function closeQuickStart() {
   // Every exit runs through here — finish, ✕ and skip-out alike — so the deferred welcome is released once, from
   // one place, whichever way the overlay was left.
   flushPendingActivationWelcome();
+  // ...and only THEN the install card. If the line above just opened the welcome, this defers again and fires when
+  // that closes — which is the order the owner asked for: "activated" first, "install Platho" after.
+  offerDeferredInstallPrompt();
   if (!quickStartBackupMode) {
     // Explicit dismissal (X / Skip-out): stop onboarding for good AND drop the in-progress resume marker.
     try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }
@@ -25374,6 +25420,8 @@ function openActivationWelcomeDialog() {
 
 function closeActivationWelcomeDialog() {
   if (activationWelcomeDialog) activationWelcomeDialog.hidden = true;
+  // The install invitation waited for this. Now it may speak.
+  offerDeferredInstallPrompt();
 }
 
 function maybeShowActivationWelcome(walletAddress) {
