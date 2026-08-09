@@ -76,12 +76,47 @@ describe('quick-start resume + activation gate guard', () => {
     // The balance reader accepts an explicit address; the default keeps the unlocked-wallet callers unchanged.
     expect(app).toMatch(/async function loadConnectedTonWalletBalance\(address = requirePlathoWalletAddress\(\)\)/);
     // Top-up "Check balance" button: gapped body + the shared plate-CTA class (same look as "Add contact").
-    const topup = app.slice(
-      app.indexOf('function buildQuickStartTopUpBody()'),
-      app.indexOf('function buildQuickStartTopUpBody()') + 900,
-    );
+    // Sliced to the function's real END, not a byte count: a fixed +900 pushed this assertion out of the window
+    // the moment the step gained its own copy button, failing a gate that had nothing to do with the change.
+    const topupStart = app.indexOf('function buildQuickStartTopUpBody()');
+    const topup = app.slice(topupStart, app.indexOf('\nfunction buildQuickStartActivateBody(', topupStart));
+    expect(topup.length, 'the slice must not collapse or run away').toBeGreaterThan(400);
     expect(topup).toMatch(/wrap\.className = 'quick-start-key-body';/);
     expect(topup).toMatch(/check\.className = 'discovery-cta-action';/);
+    // [OWNER 2026-08-09] The address row owns the copy action, and the step's primary button is a plain Next. It
+    // used to BE the copy button and silently doubled as the way forward, so a step showing Back and Skip had no
+    // visible Next at all — copying was the only way on, which nobody can guess.
+    expect(topup).toMatch(/addrRow\.append\(addr, copyBtn\);/);
+    expect(topup).toMatch(/wrap\.append\(addrRow, balanceLine, check\);/);
+    const steps = app.slice(app.indexOf("key: 'topup'"), app.indexOf("key: 'activate'"));
+    expect(steps).toMatch(/action: t\('common\.continue'\),/);
+    expect(steps, 'the primary button must not copy anything').not.toMatch(/copyTextToClipboard/);
+  });
+
+  it('QS-RESUME-06: the install invitation queues behind everything else, and is not lost', () => {
+    // [OWNER 2026-08-09] Dialogs climbing on top of each other after activation. The install card and the
+    // activation welcome are SEPARATE elements, each showing itself with no idea the other exists, so the order was
+    // whichever fired first: the install card appeared, then "Account activated" landed on top of it.
+    //
+    // The install prompt is the lowest-priority thing the app ever says — an invitation, not news — so it yields to
+    // anything open and is re-offered afterwards. DEFERRED, not dropped: without the memory, activating an account
+    // would silently cost the user the prompt entirely.
+    expect(app).toMatch(/function blockingDialogOpen\(\)/);
+    const blocking = app.slice(app.indexOf('function blockingDialogOpen()'), app.indexOf('function openInstallDialogIfUseful()'));
+    for (const other of ['activeActionDialog', 'quickStartDialog', 'activationWelcomeDialog']) {
+      expect(blocking, `${other} must be able to hold the install card back`).toMatch(new RegExp(other));
+    }
+    const open = app.slice(app.indexOf('function openInstallDialogIfUseful()'), app.indexOf('function offerDeferredInstallPrompt()'));
+    expect(open).toMatch(/if \(blockingDialogOpen\(\)\) \{[\s\S]{0,400}?installPromptDeferred = true;[\s\S]{0,40}?return;/);
+    expect(open.indexOf('installPromptDeferred = true')).toBeLessThan(open.indexOf('installDialog.hidden = false'));
+    // Released from BOTH doors: closing the welcome, and leaving quick start. The quick-start exit flushes the
+    // welcome FIRST, so if that opens, this defers again and fires when the welcome closes — which is the order
+    // the owner asked for: "activated" first, "install Platho" after.
+    expect(app).toMatch(/function closeActivationWelcomeDialog\(\) \{[\s\S]{0,240}?offerDeferredInstallPrompt\(\);/);
+    expect(app).toMatch(/flushPendingActivationWelcome\(\);[\s\S]{0,300}?offerDeferredInstallPrompt\(\);/);
+    const closeQs = app.slice(app.indexOf('function closeQuickStart()'), app.indexOf('function closeQuickStart()') + 900);
+    expect(closeQs.indexOf('flushPendingActivationWelcome()'), 'the welcome must be released before the invitation')
+      .toBeLessThan(closeQs.indexOf('offerDeferredInstallPrompt()'));
   });
 
   it('QS-RESUME-05: the stepper fits a narrow phone/TG-Mini-App screen (no horizontal overflow)', () => {
