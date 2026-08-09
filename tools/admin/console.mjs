@@ -163,8 +163,24 @@ async function runAction(bucket, action, values) {
   }
   if (!window.confirm(`${bucket.title}\n${human}\n\nОтправить?`)) return;
   setStatus(`${bucket.title}: отправка…`);
+  // THE EXIT CODE IS PART OF THE ANSWER, and dropping it cost the first real send.
+  //
+  // The console wallet held 2 GRAM but had never been deployed. `seqno` on an account with no code returns
+  // exit_code -13 with GARBAGE on the stack — measured: 0x14c97, i.e. 85143. My wrapper checked only `ok`, so
+  // getPlathoWalletSeqno read 85143 as the seqno, and because that is not zero the external went out WITHOUT the
+  // StateInit that deploys the wallet. The chain rejected it before the VM started: "exitcode=0, steps=0,
+  // gas_used=0" — a sentence with nothing in it about any of this.
+  //
+  // An uninit wallet's seqno IS zero, and saying so is what makes the first send deploy the wallet instead of
+  // failing forever. -13 and -256 are the two shapes uninit takes across endpoints.
   const transport = {
-    runGetMethod: (call) => rpc('runGetMethod', { address: call.address, method: call.method, stack: call.stack ?? [] }),
+    runGetMethod: async (call) => {
+      const result = await rpc('runGetMethod', { address: call.address, method: call.method, stack: call.stack ?? [] });
+      const exit = Number(result?.exit_code ?? 0);
+      if (exit === 0) return result;
+      if (call.method === 'seqno' && (exit === -13 || exit === -256)) return { ...result, stack: [['num', '0x0']] };
+      throw new Error(`${call.method}: геттер вернул ${exit}`);
+    },
     sendBoc: ({ boc }) => rpc('sendBoc', { boc }),
   };
   await sendPlathoWalletTransaction(wallet, {

@@ -183,6 +183,22 @@ describe('operator console', () => {
     expect(html).toMatch(/Пополнять нужно адрес, который появится ниже/);
   });
 
+  it('ADMIN-05D: a getter’s exit code is read, and an uninit wallet reports seqno 0', () => {
+    // The first real send failed on a wallet holding 2 GRAM: it had never been deployed, `seqno` on an account with
+    // no code returns exit_code -13 with garbage on the stack (measured: 0x14c97 = 85143), and the wrapper checked
+    // only `ok`. The wallet signed against 85143, which is not zero, so the external went out WITHOUT the StateInit
+    // that deploys it — rejected before the VM started, reported as "exitcode=0, steps=0, gas_used=0".
+    //
+    // This is the one place the console's own thin RPC was allowed to differ from the app's transport, and the
+    // difference turned out to be a correctness check rather than pacing.
+    const source = readFileSync('tools/admin/console.mjs', 'utf8');
+    expect(source).toMatch(/const exit = Number\(result\?\.exit_code \?\? 0\);/);
+    expect(source).toMatch(/if \(call\.method === 'seqno' && \(exit === -13 \|\| exit === -256\)\) return \{ \.\.\.result, stack: \[\['num', '0x0'\]\] \};/);
+    expect(source, 'any other non-zero exit must be an error, not a value').toMatch(/throw new Error\(`\$\{call\.method\}: геттер вернул \$\{exit\}`\)/);
+    // And the bucket reads had this check from the start — assert both halves, so a refactor cannot drop one.
+    expect(source).toMatch(/if \(result\.exit_code !== 0\) throw new Error\(`геттер вернул \$\{result\.exit_code\}`\);/);
+  });
+
   it('ADMIN-06: a failed read is never rendered as a zero', () => {
     // The one failure mode that makes the page worse than nothing: showing "0 к выводу" when it could not ask.
     const source = readFileSync('tools/admin/console.mjs', 'utf8');
