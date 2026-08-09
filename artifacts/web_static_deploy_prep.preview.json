@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-09T10:45:34.135Z",
+  "generatedAt": "2026-08-09T11:06:54.267Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -1165,6 +1165,8 @@
       "preview-mobile.png",
       "publish-builder.mjs",
       "static-server.js",
+      "username-nft-owned.mjs",
+      "username-nft-transfer.mjs",
       "vendor/@noble/ciphers/README.md",
       "vendor/@noble/ciphers/_arx.d.ts",
       "vendor/@noble/ciphers/_arx.d.ts.map",
