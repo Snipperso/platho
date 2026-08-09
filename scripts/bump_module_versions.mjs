@@ -1,6 +1,17 @@
 #!/usr/bin/env node
 /*
- * PROPAGATE `?v=` BUMPS TO THEIR FIXED POINT.
+ * MAKE EVERY CACHE KEY MATCH THE CONTENT IT KEYS. Three phases, in this order:
+ *
+ *   1. module `?v=` counters — bumped to their fixed point (the cascade described below);
+ *   2. the app build id — `./app.js?v=b<hash>` in index.html and sw.js, DERIVED from web/app.js;
+ *   3. the service-worker cache id — `CACHE_NAME`, DERIVED from every precached asset's content.
+ *
+ * Phases 2 and 3 replaced two hand-maintained counters that both shipped stale at least once: a release moved
+ * `./app.js?v=` and left the version label behind (devices never reloaded), and a CACHE_NAME bump was missed so a
+ * changed icon reached nobody. A derived key cannot be forgotten, because it is not written by anyone. Neither is
+ * circular: web/app.js never names its own token, and sw.js is not one of the assets it precaches.
+ *
+ * The product version (`1.0.0`) is NOT touched here and is not a cache key — see PLATHO_APP_RUNTIME_VERSION.
  *
  * A cached browser keeps serving a module until its `?v=` moves — that is what MODCONTENT-01 guards, after two profile
  * rows shipped as raw i18n keys because i18n-strings.mjs changed and stayed at ?v=33.
@@ -18,6 +29,14 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  APP_TOKEN_SITES,
+  SERVICE_WORKER,
+  appBuildId,
+  appTokenPattern,
+  cacheId,
+  cacheNamePattern,
+} from './web_cache_ids.mjs';
 
 const RUN = process.argv.includes('--run');
 const BASELINE = 'artifacts/module-version-content-baseline.json';
@@ -46,10 +65,11 @@ function versionedModules() {
   return out;
 }
 
-// app.js is NOT a module this tool may bump. Its `?v=` IS the release version and must equal
-// PLATHO_APP_RUNTIME_VERSION and the #appVersionLabel — all three of which live INSIDE app.js, so auto-bumping it on
-// a content change desynchronises the label, and editing the label changes the content, which bumps it again. That
-// circle cost a release cycle on 2026-08-04. The release step cascades all four by hand, together.
+// app.js is not a COUNTER-versioned module: phase 2 gives it a content-derived build id instead. The counter rule
+// cannot apply to it. It once had to equal the version label living inside app.js, so bumping the counter edited
+// app.js, which made the counter stale again — a circle that cost a release cycle on 2026-08-04. A hash has no such
+// circle (app.js never contains its own token), which is exactly why phase 2 can do automatically what no counter
+// could. The exclusion stays so the two phases can never both claim app.js.
 const RELEASE_VERSIONED = new Set(['app.js']);
 
 function resolveModulePath(name) {
@@ -112,9 +132,63 @@ for (let round = 1; round <= 50; round += 1) {
   console.log(`круг ${round}: поднято ${stale.length}`);
 }
 
+// ── PHASE 2: the app build id, and PHASE 3: the service-worker cache id ─────────────────────────────────────────
+// Both are DERIVED from content — see scripts/web_cache_ids.mjs for what from and why. The order between them is
+// mandatory: the cache id is computed AFTER the build id is written, because index.html is a precached asset and
+// carries the build id.
+function appTokensInUse() {
+  const out = [];
+  for (const file of APP_TOKEN_SITES) {
+    for (const m of readFileSync(file, 'utf8').matchAll(appTokenPattern())) out.push({ file, token: m[2] });
+  }
+  return out;
+}
+
+function writeAppBuildId(to) {
+  const touched = [];
+  for (const file of APP_TOKEN_SITES) {
+    const before = readFileSync(file, 'utf8');
+    const after = before.replace(appTokenPattern(), `$1${to}`);
+    if (after !== before) {
+      writeFileSync(file, after, 'utf8');
+      touched.push(file);
+    }
+  }
+  return touched;
+}
+
+const wantBuildId = appBuildId();
+const staleBuildSites = appTokensInUse().filter((site) => site.token !== wantBuildId);
+
 if (!RUN) {
-  console.log('всё в порядке: ни один изменённый модуль не остался со старой ?v=');
+  const problems = [];
+  for (const site of staleBuildSites) problems.push(`${site.file}: ./app.js?v=${site.token} -> ${wantBuildId}`);
+  if (problems.length === 0) {
+    const haveCacheId = readFileSync(SERVICE_WORKER, 'utf8').match(cacheNamePattern())?.[2];
+    const wantCacheId = cacheId();
+    if (haveCacheId !== wantCacheId) problems.push(`${SERVICE_WORKER}: CACHE_NAME platho-pwa-${haveCacheId} -> platho-pwa-${wantCacheId}`);
+  } else {
+    // The build id is not written yet, so the exact cache id cannot be computed here — it will move regardless.
+    problems.push(`${SERVICE_WORKER}: CACHE_NAME пересчитается вместе с ним`);
+  }
+  if (problems.length > 0) {
+    for (const line of problems) console.log(line);
+    console.log(`\nвсего: ${problems.length}. Запусти с --run, чтобы применить.`);
+    process.exit(1);
+  }
+  console.log('всё в порядке: ни один изменённый модуль не остался со старой ?v=, идентификаторы сборки и кэша совпадают');
   process.exit(0);
+}
+
+const buildSitesTouched = writeAppBuildId(wantBuildId);
+if (buildSitesTouched.length > 0) console.log(`идентификатор сборки: ${wantBuildId} (${buildSitesTouched.join(', ')})`);
+
+const swBefore = readFileSync(SERVICE_WORKER, 'utf8');
+if (!cacheNamePattern().test(swBefore)) throw new Error(`no CACHE_NAME line in ${SERVICE_WORKER}`);
+const swAfter = swBefore.replace(cacheNamePattern(), `$1${cacheId()}$3`);
+if (swAfter !== swBefore) {
+  writeFileSync(SERVICE_WORKER, swAfter, 'utf8');
+  console.log(`идентификатор кэша: ${swAfter.match(cacheNamePattern())[2]}`);
 }
 
 // Refresh the baseline to the state that now holds. Doing it here rather than by a separate --update run is the point:

@@ -287,25 +287,21 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    // The sidebar version badge (index.html label) and the runtime const MUST be EQUAL in any given bundle: the
-    // update-detect (handleServiceWorkerControllerChange) compares the LIVE index.html label to the running const,
-    // and the badge is the one on-device way to tell which build a device runs (TMA webviews cache hard). They had
-    // silently drifted (v672 vs v691) — pin the equality so a release bumps both or neither.
-    const versionLabel = html.match(/id="appVersionLabel">(v\d+)<\/span>/)?.[1];
-    const runtimeVersion = app.match(/const PLATHO_APP_RUNTIME_VERSION = '(v\d+)'/)?.[1];
-    expect(versionLabel).toBeTruthy();
+    // The sidebar badge and the runtime const both show THE product version — one semantic number (1.0.0) a human
+    // decides on. They MUST be equal in any given bundle; they had silently drifted once (v672 vs v691).
+    const versionLabel = html.match(/id="appVersionLabel">(\d+\.\d+\.\d+)<\/span>/)?.[1];
+    const runtimeVersion = app.match(/const PLATHO_APP_RUNTIME_VERSION = '(\d+\.\d+\.\d+)'/)?.[1];
+    expect(versionLabel, 'the badge must show a semantic version').toBeTruthy();
     expect(runtimeVersion).toBe(versionLabel);
-    expect(Number(String(versionLabel).slice(1))).toBeGreaterThanOrEqual(720);
-    // The app.js cache-bust query MUST track the app version — and until 2026-08-02 this comment SAID so while the
-    // assertion below pinned an independent literal, so the two could drift and did: a release bumped the ?v= to 801
-    // and left the label at v800. The update-detect compares the LIVE label to the RUNNING const, both read v800, it
-    // concluded "no new version" and never reloaded. Devices sat on the old build through a full cache clear, because
-    // no cache was involved — the server was honestly serving a v800 label.
-    //
-    // Derived from versionLabel now, so all three move together or the release fails here.
-    const versionNumber = String(versionLabel).slice(1);
-    expect(html).toContain(`<script src="./app.js?v=${versionNumber}" type="module">`);
-    expect(readFileSync('web/sw.js', 'utf8')).toContain(`./app.js?v=${versionNumber}`);
+    // The app entry point is cache-busted by a BUILD ID, deliberately not by the version. Until 2026-08-09 these
+    // were one counter, and the two jobs pull in opposite directions: a version must stand still across a one-line
+    // hotfix, and a cache key that stands still serves the old bundle to every installed client forever, with
+    // nothing able to dislodge it. Same token in index.html and in the service worker's precache list, or the
+    // worker warms a URL nothing requests. MODCONTENT-03 owns the harder half — that the token equals the hash of
+    // web/app.js — which no amount of agreement between these two files can show.
+    const buildId = html.match(/<script src="\.\/app\.js\?v=(b[0-9a-f]{8})" type="module">/)?.[1];
+    expect(buildId, 'index.html must load app.js at a content-derived build id').toBeTruthy();
+    expect(readFileSync('web/sw.js', 'utf8')).toContain(`./app.js?v=${buildId}`);
     // Version-agnostic on purpose: MODCONTENT-01 owns "the ?v= tracks the content". A literal number here reddened
     // on every unrelated stylesheet change, which teaches people to edit tests until they go green.
     expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=\d+">/);
@@ -2262,11 +2258,28 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function submitVaultAuthExternalWithNonceConfirmation'),
     );
 
-    expect(swSource).toMatch(/async function liveAppRuntimeVersion/);
+    expect(swSource).toMatch(/async function liveAppBuildId/);
     expect(swSource).toMatch(/fetch\(`\.\/\?platho_version_check=\$\{Date\.now\(\)\}`/);
-    expect(swSource).toMatch(/html\.match\(\/id="appVersionLabel">v\(\\d\+\)<\\\/span>\/\)/);
-    expect(swSource).not.toMatch(/html\.match\(\/\\\.\\\/app\\\.js\\\?v=\(\\d\+\)\/\)/);
-    expect(swSource).toMatch(/liveVersion === PLATHO_APP_RUNTIME_VERSION/);
+    // [2026-08-09] INVERTED, and the inversion is the point. This used to require reading the #appVersionLabel and
+    // FORBID reading the script tag. Under semantic versioning that is exactly backwards: the label no longer moves
+    // per deploy, so comparing it would answer "same version, nothing new" about a bundle that HAS changed, and the
+    // page would keep running the old code until the user closed it. The build id is the half that moves, so the
+    // build id is the half that gets compared — and it is read from the very tag the browser will fetch.
+    expect(swSource).toContain('html.match(/src="\\.\\/app\\.js\\?v=([A-Za-z0-9]+)"/)');
+    // Sliced to the reader's own end: the surrounding span also holds the badge's click wiring, and the claim here
+    // is about what DECIDES a build is new, not about the badge existing.
+    const buildIdReader = app.slice(
+      app.indexOf('async function liveAppBuildId'),
+      app.indexOf('async function handleServiceWorkerControllerChange'),
+    );
+    expect(buildIdReader.length, 'the slice must not collapse or run away').toBeGreaterThan(200);
+    expect(buildIdReader, 'the version label must not be what decides whether a build is new').not.toMatch(/appVersionLabel/);
+    // The running build id is READ OFF the module's own URL rather than declared. A declared one would be a second
+    // copy of a number that lives in index.html, and every such copy in this project has eventually shipped stale.
+    expect(app).toContain("return new URL(import.meta.url).searchParams.get('v') ?? '';");
+    // Either side unknown means cannot-tell, and cannot-tell must NOT reload: an empty running id compared against
+    // a real live one differs forever, which is a reload on every controller change.
+    expect(swSource).toMatch(/!liveBuildId \|\| !PLATHO_APP_BUILD_ID \|\| liveBuildId === PLATHO_APP_BUILD_ID/);
     expect(swSource).toMatch(/pendingServiceWorkerAppShellReload = false/);
     expect(swSource).toMatch(/pendingServiceWorkerAppShellReload = true/);
     expect(swSource).toMatch(/flashWalletIdentityStatus\(t\('wallet\.updateReadyReload'\)\)/);
@@ -6484,7 +6497,9 @@ describe('PWA runtime config guard', () => {
     // Membership, not version — the same convention the styles.css line below states explicitly. The invariant is
     // that the precache is NAMED and VERSIONED (a bump is how a changed asset without a ?v= query, e.g. an icon
     // SVG, reaches devices at all); pinning the exact number only manufactured churn on every such bump.
-    expect(sw).toMatch(/const CACHE_NAME = 'platho-pwa-prototype-v\d+';/);
+    // Since 2026-08-09 the key is DERIVED from the content of every asset in the list below, so it can no longer be
+    // forgotten; MODCONTENT-03 checks the value against that content. Shape only here.
+    expect(sw).toMatch(/const CACHE_NAME = 'platho-pwa-[0-9a-f]{12}';/);
     // ...and the bump must actually FETCH. A plain cache.add() goes through the browser HTTP cache, so an asset
     // whose URL has no ?v= (every icon SVG, the manifest) was re-cached from the same stale bytes and the new build
     // shipped the old file — MEASURED on the owner's device, reloaded onto v856 and still showing the old glyph.
@@ -6497,12 +6512,13 @@ describe('PWA runtime config guard', () => {
     expect(sw).toMatch(/\.\/assets\/icons\/swap-circular\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/swap-vertical\.svg/);
     expect(sw).toMatch(/\.\/assets\/icons\/download\.svg/);
-    // Derived from index.html's badge, not a literal — this was the FOURTH copy of the app version, and the release
-    // that bumped the other three left this one behind. Every copy that can be derived, is.
-    const swVersionNumber = String(readFileSync('web/index.html', 'utf8')
-      .match(/id="appVersionLabel">v(\d+)<\/span>/)?.[1] ?? '');
-    expect(swVersionNumber).toBeTruthy();
-    expect(sw).toContain(`./app.js?v=${swVersionNumber}`);
+    // Derived from index.html's script tag, not a literal — the worker's copy of the app entry point's token was
+    // the one a release left behind, and it means the precache warms a URL nothing ever requests. Every copy that
+    // can be derived, is.
+    const swBuildId = String(readFileSync('web/index.html', 'utf8')
+      .match(/\.\/app\.js\?v=(b[0-9a-f]{8})"/)?.[1] ?? '');
+    expect(swBuildId).toBeTruthy();
+    expect(sw).toContain(`./app.js?v=${swBuildId}`);
     // [SPLIT 2026-08-02] MEMBERSHIP ONLY below — the `?v=` literals are gone from these assertions.
     //
     // Pinning the version here made this file a THIRD copy of every module version, and on 2026-08-02 that copy
