@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
   PLATHO_APP_CONFIG,
@@ -3039,6 +3039,52 @@ describe('PWA runtime config guard', () => {
     expect(resumeSrc).toMatch(/scheduleWalletUnlockPrompt\(\);/);
     // And a successful unlock forgets the interruption, so it cannot fire a second prompt behind the first.
     expect(app).toMatch(/function markWalletUnlocked\(\) \{[\s\S]{0,200}?walletUnlockPromptInterrupted = false;/);
+  });
+
+  it('PWA-HIDDEN-DISPLAY-01: a styled block that hides via `hidden` has a rule that lets it', () => {
+    const css = readFileSync('web/styles.css', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // THE CLASS OF BUG, not the two selectors that exposed it. An author `display:` rule beats the UA
+    // `[hidden] { display: none }` outright — author sheets outrank the user-agent sheet — so `node.hidden = true`
+    // silently does nothing to a styled block, which keeps its border, padding and min-height.
+    //
+    // [OWNER 2026-08-09] Seen as an empty bordered box above the dialog button AND dead space below it: the summary
+    // and the footnote list, both hidden, both still holding their place in every dialog without a summary. The
+    // trap was already documented in this file for .settings-list buttons and fixed one selector at a time.
+    // This asserts the SET: every class that ships the attribute in the markup and carries a display rule.
+    const hiding = new Set<string>();
+    for (const tag of html.match(/<[a-z]+[^>]*\shidden(?=[\s>/])[^>]*>/g) ?? []) {
+      for (const cls of /\sclass="([^"]+)"/.exec(tag)?.[1]?.split(/\s+/) ?? []) if (cls) hiding.add(cls);
+    }
+    // JS-toggled blocks the markup cannot reveal, named explicitly because that is how they were missed.
+    for (const cls of ['action-summary', 'action-footnotes']) hiding.add(cls);
+    expect(hiding.size, 'the scan found nothing — the parser drifted, not the CSS').toBeGreaterThan(3);
+    const offenders: string[] = [];
+    for (const cls of hiding) {
+      const rule = new RegExp(`(^|[,}])\\s*\\.${cls}\\s*\\{([^}]*)\\}`, 'm').exec(css);
+      const display = rule ? /display:\s*([a-z-]+)/.exec(rule[2])?.[1] : null;
+      if (!display || display === 'none') continue;
+      if (!new RegExp(`\\.${cls}\\[hidden\\]`).test(css)) offenders.push(`.${cls} sets display:${display}, no [hidden] rule`);
+    }
+    expect(offenders, 'a styled block that cannot hide is a block that stays on screen').toEqual([]);
+  });
+
+  it('PWA-DIALOG-CLOSE-ICON-01: the dialog close control is a mask icon, not a text glyph', () => {
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // [OWNER 2026-08-09] "X is not centred in the box." MEASURED before changing anything: the &times; ink centre
+    // sits 4.5px above the baseline while the line box centre sits 6.5px above it, so place-items:center centred
+    // the BOX and left the ink 2px low — 5% of a 40px button, in EIGHT dialogs at once. Every other icon in the app
+    // is a mask, which has no baseline and is therefore centred by construction rather than by luck of the font.
+    expect(html, 'a text glyph cannot be centred reliably — use the mask icon').not.toMatch(/&times;/);
+    expect((html.match(/class="icon icon-close"/g) ?? []).length).toBeGreaterThanOrEqual(8);
+    expect(css).toMatch(/\.icon-close \{ --mask: url\("\.\/assets\/icons\/close\.svg"\); \}/);
+    expect(existsSync('web/assets/icons/close.svg'), 'the mask asset must ship').toBe(true);
+    // Symmetric about the centre of its own viewBox, or the mask just moves the problem into the file.
+    const svg = readFileSync('web/assets/icons/close.svg', 'utf8');
+    expect(svg).toMatch(/viewBox="0 0 24 24"/);
+    const coords = (svg.match(/[\d.]+/g) ?? []).map(Number).filter((n) => n >= 5 && n <= 19);
+    expect(Math.min(...coords) + Math.max(...coords), 'ink must straddle 12').toBeCloseTo(24, 1);
   });
 
   it('PWA-CONFIG-02: production config passes only with mainnet and provider module configured', () => {
