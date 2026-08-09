@@ -89,8 +89,24 @@ export async function discoverUsernameNftAddresses({
  */
 export function safeInlineImage(value) {
   const text = String(value ?? '').trim();
-  if (!/^data:image\/(svg\+xml|png|jpeg|webp)[;,]/i.test(text)) return null;
-  return text.length <= 512 * 1024 ? text : null;
+  if (!text || text.length > 1024 * 1024) return null;
+  // Already a self-contained data: URI — take it as-is.
+  if (/^data:image\/(svg\+xml|png|jpeg|webp)[;,]/i.test(text)) return text;
+  // TEP-64 `image_data` arrives as BARE base64 of the image bytes, not as a URI — which is what the first version
+  // of this got wrong, rejecting every real name's art and rendering the list as a wall of text. A remote `image`
+  // URL sits beside it in the same response and is still refused: img-src forbids it, and naming a host would hand
+  // that host the wallet's identity.
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(text)) return null;
+  let head = '';
+  try {
+    head = atob(text.slice(0, 512)).trimStart().toLowerCase();
+  } catch {
+    return null;
+  }
+  // Decoded and CHECKED, not assumed. The art is an SVG the registry generates on chain, so anything else in this
+  // field is not our art — and an <img> is the only element it will ever reach, where SVG cannot run script.
+  if (!head.startsWith('<svg') && !head.startsWith('<?xml')) return null;
+  return `data:image/svg+xml;base64,${text}`;
 }
 
 /**

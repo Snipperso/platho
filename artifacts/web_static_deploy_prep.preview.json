@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-09T11:44:55.461Z",
+  "generatedAt": "2026-08-09T12:24:12.831Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 231,
-    "totalBytes": 5644052,
-    "bundleSha256": "6c4d92ea821602b161ecb78623804e2cf515dc4d79a321493cd42936ce38283f",
+    "totalBytes": 5646290,
+    "bundleSha256": "2c2d9a23f587a405fd342945e0d02bbf756545b23b839157db4aacb7471a8245",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -24,8 +24,8 @@
       },
       {
         "path": "app.js",
-        "bytes": 1319488,
-        "sha256": "7030b0935c236f353062446b6dfc0108f79af5270bd9d0d25cb20cd8e1ea5fa8"
+        "bytes": 1320566,
+        "sha256": "c9bf4517aefcf816f8d3eafea7a526200586bf96a53e9d250260d1ff9ff91da4"
       },
       {
         "path": "assets/icons/about.svg",
@@ -509,18 +509,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 641514,
-        "sha256": "1161a31f2a6b0d67aab2cee7526e8ae9fae0ec076afdd5d002ff5c13680ccac3"
+        "bytes": 641083,
+        "sha256": "b973fecc9000afcb825e05f7c21588ceb070c2584a75213cf666cfa76ff644de"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4608,
-        "sha256": "66633b68921bea5839d8fb94a724e42c71ebcf9a780b0d58dacb55ae629c9a96"
+        "sha256": "b26b8560461398f49fc7b8b7ca1a9a8a7608854b1e64a98e88b00cf5a5e2c4cc"
       },
       {
         "path": "index.html",
         "bytes": 64865,
-        "sha256": "4d3ab16de75f982f313915307ef73deaa21d9f126335d16a64aefa3a379569f7"
+        "sha256": "c23e59c990b12d09dd565b0021039cf6558428095391353b791adf10611fd937"
       },
       {
         "path": "intro-bucket.mjs",
@@ -660,7 +660,7 @@
       {
         "path": "public-channel-subscriptions.mjs",
         "bytes": 24528,
-        "sha256": "0ab1485b49e4318b21676907e7a6a19931754c278ed47b08fe044ca16ea5e7ca"
+        "sha256": "40d95bd8353072660f49b998972118b0d4e3264ab97c9d6382f941d6311cdb64"
       },
       {
         "path": "public-lane-send.mjs",
@@ -759,13 +759,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 136622,
-        "sha256": "56671e64f22c4c25b917e312d969c8662446038142252cf26d6a3a42e33988cf"
+        "bytes": 137239,
+        "sha256": "c36205aab6678cdedd7821a492e2b765787401974055c150e455f11793f17ea2"
       },
       {
         "path": "sw.js",
         "bytes": 8228,
-        "sha256": "bb48a69378c326b01516b4478cc4601b3235c20ead758cc34a62ea6a4fb7e813"
+        "sha256": "4c6282e1b0832855cabaa903b43fa10cc7cdca955cb15a9ebc40978e06846604"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -789,8 +789,8 @@
       },
       {
         "path": "username-nft-owned.mjs",
-        "bytes": 10422,
-        "sha256": "0cf17f85ca3cf7d54a380a75b77ed8ffd545e010a1dd0e7dcd3f8f227e1ca5f0"
+        "bytes": 11396,
+        "sha256": "87e56389fabdebd29a11ac923c94e9dd55ecf7e4ddedb38be3a52b909cd910e9"
       },
       {
         "path": "username-nft-transfer.mjs",

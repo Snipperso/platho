@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=24';
+} from './public-channel-subscriptions.mjs?v=25';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -224,7 +224,7 @@ import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=1';
+} from './username-nft-owned.mjs?v=2';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=51';
+} from './i18n.mjs?v=52';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v891';
+const PLATHO_APP_RUNTIME_VERSION = 'v892';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19890,10 +19890,21 @@ async function requestWalletDisplayIdentity(mode) {
     ? readLinkedPlathoUsername(plathoWallet?.address)
     : readWalletDisplayIdentity(plathoWallet?.address);
   let value = current?.mode === normalizedMode ? current.label : '';
-  // Quick-pick names this profile is already known to own (linked/minted before) so a multi-username owner can
-  // switch without retyping. Only for .ath display; the picked name is still re-verified on submit.
+  // [OWNER 2026-08-09] The quick-pick list comes from the CHAIN now, not from what this device happens to
+  // remember. That is the whole difference: the remembered list keeps offering a name that was TRANSFERRED AWAY
+  // until the verification on submit refuses it, which makes the app look broken for doing the right thing. A
+  // chain-verified list drops it by itself, and picking from it means never typing a name at all.
+  let ownedNames = null;
+  if (normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT && plathoWallet?.address) {
+    ownedNames = await loadOwnedUsernameNfts()
+      .then((result) => result.owned.map((nft) => nft.label).filter(Boolean))
+      .catch(() => null);
+  }
+  // Falls back to the remembered list when the chain could not be reached. A dialog that refuses to open offline
+  // would be worse than one offering a name it re-verifies on submit anyway — and the free-text field below stays
+  // in both cases, because the list can be short (indexer down) or hold an item whose name nobody could prove.
   const knownNames = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? readKnownPlathoUsernames(plathoWallet?.address)
+    ? (ownedNames ?? readKnownPlathoUsernames(plathoWallet?.address))
     : [];
   const fields = [];
   if (knownNames.length > 0) {
@@ -21544,35 +21555,36 @@ async function loadOwnedUsernameNfts() {
 }
 
 function usernameNftCardNode(nft, onTransfer) {
-  const row = document.createElement('div');
-  row.className = 'nft-card';
-  if (nft.image) {
-    const art = document.createElement('img');
-    // A data: URI only — see safeInlineImage. Never a remote URL: img-src forbids it, and naming a host would
-    // hand that host the wallet's identity.
-    art.src = nft.image;
-    art.alt = '';
-    art.className = 'nft-card-art';
-    art.loading = 'lazy';
-    row.append(art);
-  }
-  const text = document.createElement('div');
-  text.className = 'nft-card-text';
+  const card = document.createElement('div');
+  card.className = 'nft-card';
+  // THE ART LEADS. It is the reason this screen exists — the names are drawn on chain by the registry itself, and a
+  // list that renders them as lines of text throws away the entire point of having them.
+  const art = document.createElement('img');
+  // A data: URI only — see safeInlineImage. Never a remote URL: img-src forbids it, and naming a host would hand
+  // that host the wallet's identity.
+  if (nft.image) art.src = nft.image;
+  art.alt = '';
+  art.className = 'nft-card-art';
+  art.loading = 'lazy';
+  art.hidden = !nft.image;
+  card.append(art);
+
+  const foot = document.createElement('div');
+  foot.className = 'nft-card-foot';
   const name = document.createElement('strong');
   // A name is shown only when hashing it reproduced the item's own name_hash. When it did not, the item is still
-  // the user's — the chain said so — but it is honestly presented as an item at an address.
-  name.textContent = nft.label ? `${nft.label}.ath` : t('username.unnamedItem');
-  const where = document.createElement('span');
-  where.className = 'nft-card-address';
-  where.textContent = shortAddress(nft.itemAddress);
-  text.append(name, where);
+  // the user's — the chain said so — but it is honestly presented by the one thing left that identifies it.
+  // THAT is the only case where an address belongs on screen: for a named item it is noise nobody can act on.
+  name.className = 'nft-card-name';
+  name.textContent = nft.label ? `${nft.label}.ath` : shortAddress(nft.itemAddress);
   const send = document.createElement('button');
   send.type = 'button';
   send.className = 'nft-card-send';
   send.textContent = t('username.transferName');
   send.addEventListener('click', () => onTransfer(nft));
-  row.append(text, send);
-  return row;
+  foot.append(name, send);
+  card.append(foot);
+  return card;
 }
 
 async function openMyUsernamesDialog() {
