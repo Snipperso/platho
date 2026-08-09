@@ -255,11 +255,29 @@ applyStaticTranslations();
 // consts, which are declared a few hundred lines below, and a `const` read before its declaration throws
 // ReferenceError — at module top level that aborts the whole script and the app never boots. It runs with the
 // other boot-time UI initialisers instead, after every element const exists.
-// MUST equal the #appVersionLabel in index.html (PWA-CONFIG-01B pins the equality): the update-detect
-// (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
-// release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
-// renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v899';
+// THE product version, and the only number in this app that is called a version. Semantic (MAJOR.MINOR.PATCH):
+// PATCH for fixes, MINOR for a feature a user would notice, MAJOR for a break. It is what the badge renders and
+// what a human quotes, and it MUST equal both #appVersionLabel and #profileVersionLabel (MODCONTENT-03 pins it).
+//
+// It is deliberately NOT the cache key. A product version stands still across a one-line hotfix; a cache key must
+// move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
+// it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
+// PLATHO_APP_BUILD_ID below for the half that moves per build.
+const PLATHO_APP_RUNTIME_VERSION = '1.0.0';
+
+// The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
+// constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
+// number in this project has eventually shipped stale. This one cannot — it IS the query the browser fetched.
+// Empty only if the module was somehow loaded without the query, which the update-detect treats as "unknown".
+const PLATHO_APP_BUILD_ID = plathoRunningBuildId();
+
+function plathoRunningBuildId() {
+  try {
+    return new URL(import.meta.url).searchParams.get('v') ?? '';
+  } catch {
+    return '';
+  }
+}
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -799,6 +817,9 @@ function copyPrivateThreadDiagnostic() {
     const own = ownRuntimeWalletRaw();
     const dump = {
       version: PLATHO_APP_RUNTIME_VERSION,
+      // The version alone no longer identifies a build (it stands still across hotfixes), so the diagnostic carries
+      // the build id too — otherwise a report from a device could not be tied to the bundle that produced it.
+      build: PLATHO_APP_BUILD_ID,
       own,
       threads: (threads ?? []).filter((thread) => !thread.publicChannelId).map((thread) => ({
         id: thread.id,
@@ -4127,7 +4148,14 @@ function reloadForPendingServiceWorkerAppShellUpdate() {
   return true;
 }
 
-async function liveAppRuntimeVersion() {
+// What the server is serving RIGHT NOW, identified by build rather than by version.
+//
+// This used to read the #appVersionLabel and compare it with the running version const, which worked only while
+// the version was a per-deploy counter. Under semantic versioning the label stands still across a hotfix, so that
+// comparison would answer "same version, nothing new" for a bundle that HAS changed and leave the page running
+// the old code until the user closed it. The build id is the thing that moves per deploy, so it is the thing to
+// compare — and it is read from the script tag, which is also what the browser will actually fetch.
+async function liveAppBuildId() {
   try {
     const response = await fetch(`./?platho_version_check=${Date.now()}`, {
       cache: 'no-store',
@@ -4135,16 +4163,18 @@ async function liveAppRuntimeVersion() {
     });
     if (!response.ok) return null;
     const html = await response.text();
-    const match = html.match(/id="appVersionLabel">v(\d+)<\/span>/);
-    return match ? `v${match[1]}` : null;
+    const match = html.match(/src="\.\/app\.js\?v=([A-Za-z0-9]+)"/);
+    return match ? match[1] : null;
   } catch {
     return null;
   }
 }
 
 async function handleServiceWorkerControllerChange() {
-  const liveVersion = await liveAppRuntimeVersion();
-  if (!liveVersion || liveVersion === PLATHO_APP_RUNTIME_VERSION) {
+  const liveBuildId = await liveAppBuildId();
+  // Either side unknown means "cannot tell", and cannot-tell must NOT reload: an empty running id compared against
+  // a real live one would differ forever and reload the page on every controller change.
+  if (!liveBuildId || !PLATHO_APP_BUILD_ID || liveBuildId === PLATHO_APP_BUILD_ID) {
     pendingServiceWorkerAppShellReload = false;
     refreshMessagingControls();
     return;
@@ -8918,8 +8948,9 @@ function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
   setText(brandNetworkLabel, ui.brandNetworkLabel ?? appConfig.network?.label ?? appConfig.mode);
   setText(appVersionLabel, PLATHO_APP_RUNTIME_VERSION);
-  // Mirror on the Profile pane: the rail (and its badge) is hidden on the narrow mobile / TG Mini App layout,
-  // and TMA webviews cache hard — the Profile badge is the on-device way to verify which build is running.
+  // Mirrored on the Profile pane because the rail (and its badge) is hidden on the narrow mobile / TG Mini App
+  // layout. Both show the VERSION, not the build: the build id is not something to read off a screen, so it rides
+  // the diagnostic that tapping either badge copies to the clipboard.
   setText(profileVersionLabel, PLATHO_APP_RUNTIME_VERSION);
   renderPaneHeaders();
   setText(identityName, ui.identityName);
