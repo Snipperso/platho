@@ -23,12 +23,29 @@ describe('buy ATH from the reserve', () => {
   });
 
   it('BUYATH-02: the copy is assembled from the airdrop pool state, not hardcoded', () => {
-    expect(app).toMatch(/function buyAthDialogNotes\(state\)/);
+    expect(app).toMatch(/function buyAthFootnotes\(state\)/);
     expect(app).toMatch(/const remaining = athPoolState\.remainingBudget;/);
     expect(app).toMatch(/const airdropStillRunning = remaining !== null && remaining !== undefined && nonNegativeBigInt\(remaining\) > 0n;/);
-    // The two phase-bound lines ride the SAME condition, and the post-airdrop line is the else branch.
-    expect(app).toMatch(/if \(airdropStillRunning\) \{[\s\S]{0,200}profile\.buyAthEarned[\s\S]{0,200}profile\.buyAthNow'\)[\s\S]{0,120}\} else \{[\s\S]{0,160}profile\.buyAthNowAfter/);
-    expect(app).toMatch(/if \(airdropStillRunning\) notes\.push\([\s\S]{0,120}profile\.buyAthPoolLine/);
+    // The two PHASE-BOUND footnotes — a pool that does not exist yet and an airdrop still paying out — ride the same
+    // condition, because they stop being true on the same event. The step price and "you can already spend it" are
+    // unconditional: both stay true forever.
+    expect(app).toMatch(/if \(airdropStillRunning\) \{[\s\S]{0,400}profile\.buyAthFootPool[\s\S]{0,300}profile\.buyAthFootAirdrop[\s\S]{0,40}\}/);
+    expect(app, 'the step line is unconditional').toMatch(/const lines = \[t\('profile\.buyAthFootStep'/);
+    expect(app, 'so is the spend line').toMatch(/\}\s*\n\s*lines\.push\(t\('profile\.buyAthFootSpend'\)\);/);
+  });
+
+  it('BUYATH-02B: the CONTROLS come first and the prose sits under the button', () => {
+    // OWNER 2026-08-09: "не нравится стена текста над кнопками". The dialog opened with four paragraphs and buried
+    // the inputs below them. Nothing was cut — the prose became footnotes, which the title's asterisk points at —
+    // but the order is now load-bearing and easy to undo by adding one more explanatory `note` field.
+    const start = app.indexOf('const fields = [');
+    const fields = app.slice(start, app.indexOf('const proceed = await openActionDialog({', start));
+    expect(fields, 'the fields list must hold the inputs and nothing else').toMatch(/type: 'custom',[\s\S]{0,80}buy-ath-inputs/);
+    expect(fields, 'no prose above the controls').not.toMatch(/type: 'note'/);
+    expect(app).toMatch(/footnotes: \(\) => buyAthFootnotes\(state\),/);
+    expect(app).toMatch(/title: t\('profile\.buyAthTitleStar'\),/);
+    // The footnote list renders AFTER the submit button in the markup, not before it.
+    expect(html).toMatch(/id="actionSubmitButton"[\s\S]{0,700}id="actionFootnotes"/);
   });
 
   it('BUYATH-03: an UNREADABLE pool falls to the SHORT copy, never the long one', () => {
@@ -67,12 +84,13 @@ describe('buy ATH from the reserve', () => {
   it('BUYATH-07: every user-visible string goes through t(), in all ten locales', async () => {
     const { I18N_STRINGS } = await import('../web/i18n-strings.mjs');
     const keys = [
-      'profile.buyAth', 'profile.buyAthTitle', 'profile.buyAthHint', 'profile.buyAthSubmit',
+      'profile.buyAth', 'profile.buyAthTitle', 'profile.buyAthSubmit',
       'profile.buyAthFromPrice', 'profile.buyAthSoldOut', 'profile.buyAthUnavailable',
-      'profile.buyAthWalletRequired', 'profile.buyAthEarned', 'profile.buyAthNow', 'profile.buyAthNowAfter',
-      'profile.buyAthPriceLine', 'profile.buyAthPoolLine', 'profile.buyAthAmountLabel', 'profile.buyAthCostLabel',
+      'profile.buyAthWalletRequired', 'profile.buyAthTitleStar', 'profile.buyAthAmountLabel',
+      'profile.buyAthCostLabel', 'profile.buyAthFootStep', 'profile.buyAthFootPool',
+      'profile.buyAthFootAirdrop', 'profile.buyAthFootSpend',
       'profile.buyAthSummaryAmount', 'profile.buyAthSummaryPrice', 'profile.buyAthSummaryFee',
-      'profile.buyAthFeeNote', 'profile.buyAthEnterAmount', 'profile.buyAthLowBalance',
+      'profile.buyAthSummaryBalance', 'profile.buyAthEnterAmount', 'profile.buyAthLowBalance',
       'profile.buyAthSending', 'profile.buyAthSent', 'profile.buyAthBusy', 'profile.buyAthFailed',
     ];
     for (const locale of Object.keys(I18N_STRINGS)) {
@@ -80,9 +98,10 @@ describe('buy ATH from the reserve', () => {
     }
     // The interpolations the copy depends on must survive translation, or the sentence loses its number.
     for (const locale of Object.keys(I18N_STRINGS)) {
-      expect(I18N_STRINGS[locale]['profile.buyAthPriceLine'], `${locale} price line`).toContain('{price}');
-      expect(I18N_STRINGS[locale]['profile.buyAthPriceLine'], `${locale} price line`).toContain('{amount}');
-      expect(I18N_STRINGS[locale]['profile.buyAthPoolLine'], `${locale} pool line`).toContain('{price}');
+      expect(I18N_STRINGS[locale]['profile.buyAthFootStep'], `${locale} step line`).toContain('{price}');
+      expect(I18N_STRINGS[locale]['profile.buyAthFootStep'], `${locale} step line`).toContain('{amount}');
+      expect(I18N_STRINGS[locale]['profile.buyAthFootPool'], `${locale} pool line`).toContain('{price}');
+      expect(I18N_STRINGS[locale]['profile.buyAthFootPool'], `${locale} pool line`).toContain('{liquidityAth}');
     }
   });
 
@@ -91,6 +110,7 @@ describe('buy ATH from the reserve', () => {
     // computing "the pool price" from the seller's own multiplier would print the seller's price twice and quietly
     // turn an honest comparison into a tautology.
     expect(app).toMatch(/const POOL_LAUNCH_PRICE_LABEL = '0\.001';/);
-    expect(app).toMatch(/profile\.buyAthPoolLine', \{ price: POOL_LAUNCH_PRICE_LABEL \}/);
+    expect(app).toMatch(/price: POOL_LAUNCH_PRICE_LABEL,/);
+    expect(app).toMatch(/const POOL_LIQUIDITY_ATH_LABEL = '15 000 000';/);
   });
 });

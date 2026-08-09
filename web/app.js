@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=21';
+} from './public-channel-subscriptions.mjs?v=22';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -233,7 +233,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=48';
+} from './i18n.mjs?v=49';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -249,7 +249,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v888';
+const PLATHO_APP_RUNTIME_VERSION = 'v889';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -385,6 +385,7 @@ const actionFields = document.querySelector('#actionFields');
 const actionSummary = document.querySelector('#actionSummary');
 const actionCancelButton = document.querySelector('#actionCancelButton');
 const actionSubmitButton = document.querySelector('#actionSubmitButton');
+const actionFootnotes = document.querySelector('#actionFootnotes');
 const imageLightboxDialog = document.querySelector('#imageLightboxDialog');
 const imageLightboxViewport = document.querySelector('.image-lightbox-viewport');
 const imageLightboxImage = document.querySelector('#imageLightboxImage');
@@ -5317,6 +5318,23 @@ function collectActionDialogValues() {
   return values;
 }
 
+/** Footnotes under the submit button — explanation the reader can reach for, not wade through. */
+function renderActionFootnotes(footnotes) {
+  if (!actionFootnotes) return;
+  const lines = (typeof footnotes === 'function' ? footnotes() : footnotes) ?? [];
+  actionFootnotes.replaceChildren();
+  if (!Array.isArray(lines) || lines.length === 0) {
+    actionFootnotes.hidden = true;
+    return;
+  }
+  actionFootnotes.hidden = false;
+  for (const line of lines) {
+    const item = document.createElement('li');
+    item.textContent = String(line ?? '');
+    actionFootnotes.append(item);
+  }
+}
+
 function renderActionSummary(summary, values = {}) {
   if (!actionSummary) return;
   const lines = typeof summary === 'function' ? summary(values) : summary;
@@ -5751,6 +5769,9 @@ async function openActionDialog(config = {}) {
     };
     actionTitle.textContent = config.title ?? t('dialog.defaultTitle');
     actionHint.textContent = config.hint ?? t('dialog.reviewBeforeSigning');
+    // An EMPTY hint hides the line rather than leaving a blank paragraph pushing the first control down. A dialog
+    // whose explanation lives in footnotes has nothing to say up here, and the gap read as a rendering bug.
+    actionHint.hidden = actionHint.textContent === '';
     actionHint.dataset.tone = config.tone ?? 'muted';
     actionForm.autocomplete = config.formAutocomplete ?? 'off';
     actionForm.method = config.formMethod ?? 'post';
@@ -5763,6 +5784,7 @@ async function openActionDialog(config = {}) {
     actionSubmitButton.disabled = false;
     actionFields.replaceChildren(...(config.fields ?? []).map(createActionField));
     renderActionSummary(config.summary, collectActionDialogValues());
+    renderActionFootnotes(config.footnotes);
     actionDialog.hidden = false;
     requestAnimationFrame(() => actionFields.querySelector('textarea, input:not([readonly]):not([type="hidden"]):not(.password-manager-username), select')?.focus());
   });
@@ -21166,29 +21188,31 @@ function renderBuyAthStatus() {
 //
 // An UNREADABLE pool shows the shorter text, not the longer one. That is the whole discipline in one line: the
 // shorter version asserts strictly less, so it cannot be the wrong thing to say when we do not know.
-function buyAthDialogNotes(state) {
+function buyAthFootnotes(state) {
   const remaining = athPoolState.remainingBudget;
   const airdropStillRunning = remaining !== null && remaining !== undefined && nonNegativeBigInt(remaining) > 0n;
-  const notes = [];
+  const lines = [t('profile.buyAthFootStep', {
+    price: marketStabilityUnitPriceLabel(state) ?? '-',
+    amount: formatAthAtomicGrouped(maxBuyableAtomic(state)),
+  })];
   if (airdropStillRunning) {
-    notes.push({ type: 'note', text: t('profile.buyAthEarned') });
-    notes.push({ type: 'note', text: t('profile.buyAthNow') });
-  } else {
-    notes.push({ type: 'note', text: t('profile.buyAthNowAfter') });
+    // Both of these describe the PRE-LAUNCH world: a pool that does not exist yet, and an airdrop still paying out.
+    // They ride the same signal because they end on the same event.
+    lines.push(t('profile.buyAthFootPool', {
+      price: POOL_LAUNCH_PRICE_LABEL,
+      liquidityAth: POOL_LIQUIDITY_ATH_LABEL,
+      liquidityGram: POOL_LIQUIDITY_GRAM_LABEL,
+    }));
+    lines.push(t('profile.buyAthFootAirdrop'));
   }
-  notes.push({
-    type: 'note',
-    text: t('profile.buyAthPriceLine', {
-      price: marketStabilityUnitPriceLabel(state) ?? '-',
-      amount: formatAthAtomicGrouped(maxBuyableAtomic(state)),
-    }),
-  });
-  if (airdropStillRunning) notes.push({ type: 'note', text: t('profile.buyAthPoolLine', { price: POOL_LAUNCH_PRICE_LABEL }) });
-  return notes;
+  lines.push(t('profile.buyAthFootSpend'));
+  return lines;
 }
 
 /** The price the liquidity pool will open at — 15,000,000 ATH against 15,000 GRAM. Stated, never computed from it. */
 const POOL_LAUNCH_PRICE_LABEL = '0.001';
+const POOL_LIQUIDITY_ATH_LABEL = '15 000 000';
+const POOL_LIQUIDITY_GRAM_LABEL = '15 000';
 
 /**
  * Wait for the seller to be free, then buy.
@@ -21247,24 +21271,32 @@ async function openBuyAthDialog() {
     return BigInt(whole || '0') * (10n ** BigInt(decimals)) + BigInt(padded || '0');
   };
 
-  const buildField = (input, id, label, onInput) => {
+  // SHAPED LIKE THE WALLET HEADLINE CARDS, by request — the owner pointed at the GRAM/ATH pair at the top of the
+  // Wallet tab and said that is what money should look like here. The visible label is the bare TICKER, exactly as
+  // those cards do it: a ticker is not translated, so the pair reads GRAM / ATH in every locale instead of a
+  // translated phrase beside an untranslated one. The full question stays as the accessible name.
+  const buildField = (input, id, ticker, ariaLabel, onInput) => {
     input.type = 'text';
     input.inputMode = 'decimal';
     input.autocomplete = 'off';
     input.id = id;
-    input.className = 'action-input';
+    input.className = 'buy-ath-input';
     input.placeholder = '0';
+    input.setAttribute('aria-label', ariaLabel);
     input.addEventListener('input', onInput);
     const wrap = document.createElement('label');
-    wrap.className = 'action-field';
+    wrap.className = 'buy-ath-card';
     const span = document.createElement('span');
-    span.textContent = label;
+    span.textContent = ticker;
     wrap.append(span, input);
     return wrap;
   };
 
+  // ORDER, and it is the whole point of the v889 rework: the controls come FIRST. What was here before opened with
+  // four paragraphs of explanation and put the inputs underneath, so the reader had to read an essay to reach the
+  // thing they came for (a wall of text above the buttons, in his words). The prose lost nothing — it moved below the
+  // button as footnotes, and the asterisk in the title points at it.
   const fields = [
-    ...buyAthDialogNotes(state),
     {
       type: 'custom',
       className: 'action-custom-field buy-ath-inputs',
@@ -21272,11 +21304,11 @@ async function openBuyAthDialog() {
         const box = document.createElement('div');
         box.className = 'buy-ath-pair';
         box.append(
-          buildField(athInput, 'buyAthAmountInput', t('profile.buyAthAmountLabel'), () => {
+          buildField(athInput, 'buyAthAmountInput', 'ATH', t('profile.buyAthAmountLabel'), () => {
             const parsed = parseDecimal(athInput.value, 9);
             setAmount(parsed ?? 0n, { skip: 'ath' });
           }),
-          buildField(gramInput, 'buyAthCostInput', t('profile.buyAthCostLabel'), () => {
+          buildField(gramInput, 'buyAthCostInput', 'GRAM', t('profile.buyAthCostLabel'), () => {
             const parsed = parseDecimal(gramInput.value, 9);
             setAmount(parsed === null ? 0n : athForNanotons(parsed, state.currentMultiplier), { skip: 'gram' });
           }),
@@ -21284,20 +21316,22 @@ async function openBuyAthDialog() {
         return box;
       },
     },
-    // The overhead is real money leaving the wallet for one hop, so it is named — and so is the fact that whatever
-    // is not needed comes back, which is the contract's own behaviour and the reason over-providing is safe.
-    { type: 'note', text: t('profile.buyAthFeeNote') },
   ];
 
   const proceed = await openActionDialog({
-    title: t('profile.buyAthTitle'),
-    hint: t('profile.buyAthHint'),
+    title: t('profile.buyAthTitleStar'),
+    hint: '',
     submitLabel: t('profile.buyAthSubmit'),
     fields,
+    footnotes: () => buyAthFootnotes(state),
     summary: () => [
       { label: t('profile.buyAthSummaryAmount'), value: formatAthProfileAmount(amountAtomic) },
       { label: t('profile.buyAthSummaryPrice'), value: `${formatGramNanotons(quoteNanotonsForAth(amountAtomic, state.currentMultiplier))} GRAM` },
+      // Named because it is real money leaving the wallet for one hop; whatever is not needed comes back, which is
+      // the contract's own behaviour and the reason over-providing is safe.
       { label: t('profile.buyAthSummaryFee'), value: `${formatGramNanotons(MARKET_STABILITY_BUY_OVERHEAD)} GRAM` },
+      // The balance belongs next to the price: "can I afford this" is the question the summary is being read for.
+      { label: t('profile.buyAthSummaryBalance'), value: `${formatGramNanotons(nonNegativeBigInt(vaultPocketState.wallet?.ton_balance ?? 0n))} GRAM` },
     ],
     validateSubmit: async () => {
       if (amountAtomic <= 0n) return { ok: false, error: t('profile.buyAthEnterAmount') };

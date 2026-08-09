@@ -5251,3 +5251,50 @@ button.feed-item:hover {
 @media (max-width: 480px) {
   .buy-ath-pair { grid-template-columns: 1fr; }
 }
+
+/* Buy-ATH input cards: the same shape as the Wallet tab's GRAM/ATH headline, which the owner pointed at as what
+   money should look like here. Accent uppercase ticker above, the number big and bold below — the field reads as money rather than
+   as a form control, and the ticker needs no translation. */
+.buy-ath-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(48, 213, 176, 0.16);
+  border-radius: 14px;
+  background: var(--surface, rgba(255, 255, 255, 0.03));
+}
+.buy-ath-card span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.buy-ath-card input.buy-ath-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  /* Clamped like the headline card: a long value scales down instead of overflowing a narrow phone. */
+  font-size: clamp(20px, 5.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.buy-ath-card input.buy-ath-input:focus {
+  outline: none;
+}
+.buy-ath-card:focus-within {
+  border-color: rgba(48, 213, 176, 0.45);
+}
+
+/* Footnotes under the submit button — the explanation the title's asterisk points at. */
+.action-footnotes {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
