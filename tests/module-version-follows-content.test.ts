@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+// The SAME derivation the bump tool writes with — not a second copy of the algorithm. A copy would let the gate
+// certify a value the tool never produces, which is the failure this whole file exists to prevent one level down.
+import { appBuildId, cacheId, cacheIdFromEntries, precacheEntries } from '../scripts/web_cache_ids.mjs';
 
 // A CHANGED module must get a NEW `?v=`, or every installed client keeps serving the old copy from cache.
 //
@@ -73,37 +76,73 @@ describe('MODCONTENT — a module version must move when the module does', () =>
     expect(stale, `a changed module kept its version, so cached clients will not see it:\n${stale.join('\n')}`).toEqual([]);
   });
 
-  it('MODCONTENT-03: the FIVE release anchors agree, and the bump tool never touches app.js', () => {
-    // FIVE, and the fifth is the one that gets missed: PLATHO_APP_RUNTIME_VERSION, ./app.js?v= in index.html,
-    // #appVersionLabel, #profileVersionLabel, and './app.js?v=' in sw.js. The bump tool rewrites every OTHER
-    // ?v= in sw.js but not this one, precisely because app.js is excluded from it — so sw.js keeps the previous
-    // release's app.js in its precache list and this guard is the only thing that says so. (Caught red on
-    // 2026-08-04 with the other four already bumped.)
-    // app.js?v= IS the release version. PLATHO_APP_RUNTIME_VERSION, #appVersionLabel and #profileVersionLabel all
-    // live INSIDE app.js, so a tool that auto-bumps app.js on a content change desynchronises the label — and fixing
-    // the label changes the content, which bumps it again. That circle burned a release cycle on 2026-08-04.
+  it('MODCONTENT-03: one product version in three places, and both cache keys equal the content they key', () => {
+    // [2026-08-09] The product version and the cache keys used to be the SAME `vNNN` counter, written by hand in
+    // five places that had to agree. They are different jobs and now different things:
+    //
+    //   VERSION — semantic, 1.0.0, moves when a human decides it does. PLATHO_APP_RUNTIME_VERSION + both badges.
+    //   BUILD ID — `./app.js?v=b<hash>`, moves on every byte of app.js. index.html + sw.js.
+    //   CACHE ID — CACHE_NAME, moves on every byte of every precached asset. sw.js.
+    //
+    // The three assertions below are not the same shape. The version is checked for AGREEMENT (three copies of a
+    // number a human types). The two ids are checked against the CONTENT THEY ARE DERIVED FROM, which is strictly
+    // stronger: agreement alone was green on 2026-08-04 for a set of anchors that all said the same stale thing.
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
     const sw = readFileSync('web/sw.js', 'utf8');
-    const runtime = app.match(/const PLATHO_APP_RUNTIME_VERSION = 'v(\d+)';/)?.[1];
-    expect(runtime, 'PLATHO_APP_RUNTIME_VERSION is unreadable').toBeTruthy();
-    expect(html, 'index.html loads a different app.js than the runtime version claims')
-      .toContain(`./app.js?v=${runtime}"`);
-    expect(sw, 'the service worker precaches a different app.js than the runtime version claims')
-      .toContain(`'./app.js?v=${runtime}'`);
+
+    const version = app.match(/const PLATHO_APP_RUNTIME_VERSION = '(\d+\.\d+\.\d+)';/)?.[1];
+    expect(version, 'PLATHO_APP_RUNTIME_VERSION must be a semantic version').toBeTruthy();
     // Matched with a pattern rather than a literal substring: the profile badge was HIDDEN on 2026-08-07 (it is an
     // operator affordance, not something a reader of the profile needs), which put a `hidden` attribute between the
-    // id and the `>`. The element still carries the version and still IS one of the five anchors — hiding it must
-    // not be mistaken for removing it, and pinning the exact character after the id would have forced a choice
-    // between the gate and the UI decision.
+    // id and the `>`. The element still carries the version — hiding it must not be mistaken for removing it, and
+    // pinning the exact character after the id would have forced a choice between the gate and the UI decision.
     for (const id of ['appVersionLabel', 'profileVersionLabel']) {
-      expect(html, `${id} must carry the running release version`)
-        .toMatch(new RegExp(`id="${id}"[^>]*>v${runtime}<`));
+      expect(html, `${id} must show the product version`)
+        .toMatch(new RegExp(`id="${id}"[^>]*>${version.replace(/\./g, '\\.')}<`));
     }
-    // And the tool that cascades every OTHER module is told to keep its hands off this one.
+    // The package manifest is the fourth place a human reads a version off this project. Nothing breaks
+    // functionally when it drifts — it just puts two different answers to "what version is this" side by side,
+    // which is the exact confusion the move to semantic versioning was meant to end.
+    expect(JSON.parse(readFileSync('package.json', 'utf8')).version, 'package.json states a different version')
+      .toBe(version);
+
+    // The build id, recomputed here from web/app.js. A stale token in either file is red without anyone having to
+    // remember what the previous one was.
+    const buildId = appBuildId();
+    expect(buildId, 'the build id must not look like a counter').toMatch(/^b[0-9a-f]{8}$/);
+    expect(html, 'index.html loads an app.js build that is not the one in the tree').toContain(`./app.js?v=${buildId}"`);
+    expect(sw, 'the service worker precaches an app.js build that is not the one in the tree')
+      .toContain(`'./app.js?v=${buildId}'`);
+
+    // The cache id, recomputed here from every precached asset. This is the guard that a changed icon — an asset
+    // with no `?v=` of its own — actually reaches devices; a missed bump meant it reached none.
+    expect(sw, 'CACHE_NAME does not match the content of the precache').toContain(`const CACHE_NAME = 'platho-pwa-${cacheId()}';`);
+
+    // And the tool that cascades COUNTER-versioned modules still keeps its hands off app.js, so the counter phase
+    // and the build-id phase can never both claim it.
     const tool = readFileSync('scripts/bump_module_versions.mjs', 'utf8');
     expect(tool).toContain("const RELEASE_VERSIONED = new Set(['app.js']);");
     expect(tool).toContain('if (RELEASE_VERSIONED.has(name)) return null;');
+  });
+
+  it('MODCONTENT-04: the two derived ids actually follow content — a constant would pass MODCONTENT-03', () => {
+    // The counter-case. MODCONTENT-03 compares the files against these functions, so a derivation that returned a
+    // fixed string would make it green while guarding nothing. Feed both a change and require the answer to move.
+    expect(appBuildId(Buffer.from('one'))).not.toBe(appBuildId(Buffer.from('two')));
+    expect(appBuildId(Buffer.from('one'))).toBe(appBuildId(Buffer.from('one')));
+
+    const entries = precacheEntries();
+    expect(entries.length, 'the precache scan must not come back empty').toBeGreaterThan(80);
+    // Bytes move it...
+    const changedBytes = entries.map((e, i) => (i === 0 ? { ...e, sha256: `${e.sha256}x` } : e));
+    expect(cacheIdFromEntries(changedBytes)).not.toBe(cacheIdFromEntries(entries));
+    // ...and so does the URL alone, which is what catches a re-versioned or newly added asset whose file is
+    // unchanged or shared (the two `?v=` variants of manifest.webmanifest are the same bytes twice).
+    const changedUrl = entries.map((e, i) => (i === 0 ? { ...e, url: `${e.url}?rev` } : e));
+    expect(cacheIdFromEntries(changedUrl)).not.toBe(cacheIdFromEntries(entries));
+    // Dropping one must move it too, or removing an asset would leave devices holding the old cache.
+    expect(cacheIdFromEntries(entries.slice(1))).not.toBe(cacheIdFromEntries(entries));
   });
 
   it('MODCONTENT-02: the baseline covers the modules that matter — an empty scan must not pass', () => {
