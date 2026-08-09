@@ -5299,54 +5299,70 @@ button.feed-item:hover {
   line-height: 1.5;
 }
 
-/* .ath names as property — the list in "My .ath names" and its art.
-   The picture is an on-chain SVG delivered as a data: URI (see safeInlineImage); img-src forbids a remote one, so
-   there is nothing here that can reach out to a host. Sized in one place so a tall or square SVG both behave. */
+/* .ath names as property — the list in "My .ath names".
+   THE ART LEADS: the registry draws each name on chain, and that picture is the whole reason this screen exists.
+   It arrives as an on-chain SVG in a data: URI (see safeInlineImage) — img-src forbids a remote one, so nothing
+   here can reach out to a host. Two columns from 420px so four names fit without a scroll. */
 .nft-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 52vh;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  max-height: 58vh;
   overflow-y: auto;
+}
+
+@media (min-width: 420px) {
+  .nft-card-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .nft-card {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
+  flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--panel-2);
+  overflow: hidden;
 }
 
 .nft-card-art {
-  width: 56px;
-  height: 56px;
-  flex: 0 0 56px;
-  border-radius: 10px;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
   object-fit: cover;
   background: var(--panel-3);
 }
 
-.nft-card-text {
+.nft-card-foot {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
-.nft-card-text strong {
-  font-size: 15px;
+.nft-card-name {
+  font-size: 14px;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
-.nft-card-address {
-  font-size: 11px;
-  color: var(--muted);
-}
-
+/* Matches every other button in the app (panel-2 fill, --line border, accent-tinted hover). The first version had
+   no rule at all and fell through to the browser default — a grey slab in a dark themed dialog. */
 .nft-card-send {
   flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-3);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.nft-card-send:hover {
+  border-color: rgba(48, 213, 176, 0.42);
 }
