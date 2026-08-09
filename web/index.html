@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v889</span>
+              <span class="app-version-label" id="appVersionLabel">v890</span>
             </div>
           </div>
         </div>
@@ -402,9 +402,10 @@
                   <strong id="athSupplyStatus">-</strong>
                 </div>
               </div>
-              <div class="settings-list">
-                <button id="flushAthButton" type="button"><span data-i18n="profile.flushAth">Flush ATH</span><strong class="profile-action-status" id="flushAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
-              </div>
+              <!-- [OWNER 2026-08-09] "Flush ATH" lived here and is gone. It swept the registries' burn dues to
+                   ATHMaster — a protocol housekeeping errand, not something a user has any reason to press, and it
+                   cost two chain reads on every wallet refresh to render a row nobody needed. Both flushes (and the
+                   treasury ones the app never offered) are in the local operator console, tools/admin. -->
             </section>
           </div>
         </section>
@@ -421,7 +422,7 @@
                    text, and still carries the click handler that copies the private-lane diagnostic; removing
                    `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
                    the element would also break PWA-CONFIG-01B. -->
-              <span class="app-version-label" id="profileVersionLabel" hidden>v889</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>v890</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -775,6 +776,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=889" type="module"></script>
+    <script src="./app.js?v=890" type="module"></script>
   </body>
 </html>

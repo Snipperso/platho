@@ -42,7 +42,9 @@ describe('wallet tab + durable comment cache guard', () => {
       'changeWalletPasswordButton', 'receiveWalletTonButton', 'sendWalletTonButton',
       'exportWalletKeyButton', 'importWalletKeyButton', 'exportWalletSeedButton',
       'registerVaultKeysButton',
-      'athDropIssuedStatus', 'athSupplyStatus', 'flushAthButton',
+      // flushAthButton was in this list until v890, when the row was deleted outright — see the absence gate
+      // in tests/pwa-runtime-config.test.ts PWA-CONFIG-07C.
+      'athDropIssuedStatus', 'athSupplyStatus',
     ];
     for (const id of moved) {
       expect(walletPanel, `${id} lives in the Wallet tab`).toContain(`id="${id}"`);
