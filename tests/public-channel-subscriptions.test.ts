@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 import {
@@ -33,15 +34,19 @@ describe('PWA public channel subscriptions', () => {
       state: 'syncing',
     });
 
-    // The empty-channel placeholder renders like an ordinary post: author name once (no syncing/public
-    // labels), no title, the "waiting" line as the body, and the channel wallet for the avatar.
-    const item = publicChannelThreadsToFeedItems(threads)[0];
-    expect(item.compact).toBe(true);
-    expect(item.meta).toEqual(['platho']);
-    expect(item.title).toBeNull();
-    expect(item.text).toBe('Waiting for public feed');
-    expect(item.author).toBe('platho');
-    expect(item.authorWallet).toBe(DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET);
+    // [OWNER 2026-08-09] The seeded channel produces NO feed item until it actually has posts. It used to emit a
+    // placeholder card reading "waiting for public feed", which was an empty seat held for a channel that may never
+    // publish — the owner asked for those gone. The SUBSCRIPTION above is what survives, and it is asserted intact.
+    //
+    // The placeholder had a SECOND job nobody had written down: on a fresh install it was the only thing in the
+    // Public tab while platho.app's posts were still loading, so removing it blanked the first run. That job moved
+    // to the feed's own empty state, which now says "waiting" while publicSyncPhase is 'syncing' and only claims
+    // "no public posts" once the sync has settled — said once for the whole feed instead of once per silent
+    // channel. Pinned here because this test is where the two behaviours meet.
+    expect(publicChannelThreadsToFeedItems(threads)).toEqual([]);
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/if \(publicSyncPhase === 'syncing' && !publicChannelSearchQuery\) \{\s*renderPublicEmpty\(t\('public\.previewWaitingFeed'\)/);
+    expect(app).toMatch(/renderPublicEmpty\(publicChannelSearchQuery \? t\('public\.noPostsFound'\) : t\('public\.noPosts'\)/);
   });
 
   it('PUBLIC-SUB-02: config declares chain channel authors, not bundled channel messages', () => {

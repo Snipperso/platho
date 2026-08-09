@@ -428,27 +428,14 @@ export function publicChannelThreadsToFeedItems(threads) {
   const items = [];
   for (const thread of threads ?? []) {
     const messages = thread.messages ?? [];
-    if (messages.length === 0) {
-      // Render the "waiting for posts" placeholder like a real post (avatar + author name once + body),
-      // not a labelled syncing card — so the hardcoded official-channel message is visually
-      // indistinguishable from an ordinary public post.
-      items.push({
-        id: thread.id,
-        channelId: thread.publicChannelId,
-        authorWallet: thread.publicChannelAuthorWallet,
-        avatarImageUrl: thread.avatarImageUrl,
-        author: thread.name,
-        meta: [thread.name].filter(Boolean),
-        title: null,
-        text: thread.preview,
-        comments: [],
-        compact: true,
-        // A followed channel with no posts yet: there is nothing to comment on, so its card drops the disabled
-        // "Preview only" button and shows just the Unfollow (+ Private chat) — see appendPublicItemActions.
-        emptyChannel: true,
-      });
-      continue;
-    }
+    // [OWNER 2026-08-09] A followed channel with NO posts contributes nothing to the feed. It used to render a
+    // placeholder card reading "waiting for public feed", which is a row that says nothing, cannot be opened and
+    // cannot be commented on — an empty seat held for a channel that may never publish.
+    //
+    // The SUBSCRIPTION is untouched: it lives in publicChannelSubscriptions, not here, so the channel stays
+    // followed, keeps its place in the registry, and starts appearing the moment it has a post. Unfollowing it
+    // meanwhile is still possible from the channel's own view, which carries its own follow toggle.
+    if (messages.length === 0) continue;
     for (const message of messages) {
       items.push({
         id: message.publicPostId,
