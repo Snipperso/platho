@@ -12,7 +12,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=298">
+    <link rel="stylesheet" href="./styles.css?v=299">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">v897</span>
+              <span class="app-version-label" id="appVersionLabel">v898</span>
             </div>
           </div>
         </div>
@@ -432,7 +432,7 @@
                    text, and still carries the click handler that copies the private-lane diagnostic; removing
                    `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
                    the element would also break PWA-CONFIG-01B. -->
-              <span class="app-version-label" id="profileVersionLabel" hidden>v897</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>v898</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -558,7 +558,7 @@
               <p id="recipientHint" data-i18n="dialog.newChatHint">Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device.</p>
             </div>
             <button class="icon-button" id="closeNewChatButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
           <div class="action-field">
@@ -584,7 +584,7 @@
               <p data-i18n="dialog.sharePostHint">Send this post to your notes, a private contact, or your own channel.</p>
             </div>
             <button class="icon-button" id="sharePostCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
           <div class="share-post-list" id="sharePostList"></div>
@@ -600,7 +600,7 @@
               <p id="actionHint" data-i18n="dialog.reviewDetailsBeforeSigning">Review details before signing.</p>
             </div>
             <button class="icon-button" id="actionCancelButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
           <div class="action-fields" id="actionFields"></div>
@@ -626,7 +626,7 @@
                 <span class="icon icon-download"></span>
               </button>
               <button class="icon-button" id="imageLightboxCloseButton" type="button" aria-label="Close full-size preview" title="Close" data-i18n-aria-label="dialog.closeFullSizePreview" data-i18n-title="common.close">
-                <span aria-hidden="true">&times;</span>
+                <span class="icon icon-close" aria-hidden="true"></span>
               </button>
             </div>
           </header>
@@ -644,7 +644,7 @@
               <p id="docsLead" data-i18n="docs.lead">Protocol notes and application model.</p>
             </div>
             <button class="icon-button" id="docsCloseButton" type="button" aria-label="Close documents" title="Close" data-i18n-aria-label="docs.closeDocuments" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
           <div class="docs-layout">
@@ -662,7 +662,7 @@
               <p id="installLead" data-i18n="install.lead">Use it as an app, outside stores and platform gates.</p>
             </div>
             <button class="icon-button" id="installCloseButton" type="button" aria-label="Close install prompt" title="Close" data-i18n-aria-label="install.closePrompt" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
           <p id="installBody" data-i18n="install.body">Platho is a static PWA. After installation, the app shell, docs, and bounded local encrypted history are cached on this device. The cache improves recovery, but it is not a universal backup. Network access is still required for contract reads, verified public feed updates, message-history retrieval, and sending transactions. Platho does not use a server account that can read your messages or hold your keys.</p>
@@ -687,7 +687,7 @@
               <p id="activationWelcomeLead" data-i18n="welcome.lead">Welcome to Platho. Your wallet is connected to the network - you can begin.</p>
             </div>
             <button class="icon-button" id="activationWelcomeCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
           <p class="activation-welcome-mission" data-i18n="welcome.mission">Platho exists to secure a person's right to private correspondence, and is built so that this right depends on nobody's decision.</p>
@@ -717,7 +717,7 @@
               <p id="quickStartLead" data-i18n="quickstart.lead">A keyless, end-to-end encrypted messenger on TON.</p>
             </div>
             <button class="icon-button" id="quickStartCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
-              <span aria-hidden="true">&times;</span>
+              <span class="icon icon-close" aria-hidden="true"></span>
             </button>
           </header>
 
@@ -786,6 +786,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=897" type="module"></script>
+    <script src="./app.js?v=898" type="module"></script>
   </body>
 </html>
