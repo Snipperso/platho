@@ -924,10 +924,11 @@ describe('PWA runtime config guard', () => {
     expect(enCopy).toMatch(/avatar media is public/);
     // The ATH block moved to the WALLET tab with the rest of the money surface, and its two stats swapped order on
     // purpose: "activity drop issued" is the number this user's own ATH comes from, so it leads; "current supply"
-    // is protocol context and follows. Flush stays last — it is the action, after the numbers that justify it.
-    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="athDropIssuedStatus"[\s\S]*id="athSupplyStatus"[\s\S]*id="flushAthButton"[\s\S]*id="flushAthStatus"/);
+    // is protocol context and follows. The actions (claim, buy) lead the section; the flush row that used to
+    // trail the stats was deleted in v890 and the section now ENDS on the numbers.
+    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="claimAirdropButton"[\s\S]*id="buyAthButton"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="athSupplyStatus"/);
     const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
-    expect(walletPanel, 'the ATH block lives in the Wallet tab now').toMatch(/id="flushAthButton"/);
+    expect(walletPanel, 'the ATH block lives in the Wallet tab now').toMatch(/id="athSupplyStatus"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
     expect(html).not.toMatch(/id="keySuiteStatus"/);
     expect(app).toMatch(/installActionState/);
@@ -4126,7 +4127,11 @@ describe('PWA runtime config guard', () => {
     // outside the mutex.
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getView\(forWallet/); // activation (own registration)
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getView\(ownerWallet/); // register-or-repair preflight
-    expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getGlobal\(\{ address: requireUsernameRegistryAddress\(\)/); // username registry
+    // The registry get_global reads (UsernameRegistry + ProfileRegistry) were wrapped here until v890. They existed
+    // for ONE reason — feeding the "Flush ATH" row's burn-due numbers — and went with it, taking two sequential
+    // chain reads off every ATH stats refresh. Assert they are gone rather than dropping the line silently: if a
+    // registry global is ever read from the client again it must arrive INSIDE the mutex, not beside it.
+    expect(app).not.toMatch(/provider\.getGlobal\(\{/);
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getJettonData\(/); // ATH stats
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletData\(/); // external ATH balance
     expect(app).toMatch(/withVaultReadLock\(\(\) => provider\.getWalletAddress\(owner/); // ATH wallet address
@@ -5529,28 +5534,36 @@ describe('PWA runtime config guard', () => {
     // the unified cycle); spinning taps no-op. The discovery header's separate refresh button is GONE.
     expect(html).not.toMatch(/<span class="global-sync-indicator"/);
     expect((html.match(/<button type="button" class="global-sync-indicator"/g) ?? []).length).toBeGreaterThanOrEqual(6);
-    // v707: the flush is paid by the WALLET (not the Vault shown in the rail) — the submit pre-checks the
-    // wallet GRAM balance BEFORE the send (fail-open on an unreadable balance) and maps the shortfall to an
-    // actionable localized status instead of "sync delayed"; browser zoom is disabled app-wide (viewport meta
-    // + html/body touch-action + the WebKit gesture kill) while the lightbox keeps its OWN pointer/transform
-    // zoom (touch-action:none viewport).
-    expect(app).toMatch(/const walletBalanceNanotons = await loadConnectedTonWalletBalance\(\)\.catch\(\(\) => null\);/);
-    expect(app).toMatch(/if \(walletBalanceNanotons !== null && nonNegativeBigInt\(walletBalanceNanotons\) < requiredNanotons\)/);
-    expect(app).toMatch(/error\.code = 'PLATHO_WALLET_GRAM_REQUIRED';/);
-    expect(app).toMatch(/if \(state\.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED'\) return t\('profile\.flushNeedsWalletGram'\);/);
-    expect(app.indexOf("error.code = 'PLATHO_WALLET_GRAM_REQUIRED'")).toBeLessThan(app.indexOf('const transaction = createWalletTransaction(messages)'));
-    expect(EN_STRINGS['profile.flushNeedsWalletGram']).toBe('top up wallet GRAM');
+    // v707, re-aimed at the airdrop claim in v890 when the ATH-flush row was deleted: a direct-pay send is paid
+    // by the WALLET (not the rail balance the user watches), so the submit pre-checks the wallet GRAM balance
+    // BEFORE signing — fail-open on an unreadable balance — and maps the shortfall to an actionable localized
+    // status instead of "sync delayed". The pre-check must come before the transaction is built, or it is
+    // decoration. Browser zoom is disabled app-wide (viewport meta + html/body touch-action + the WebKit
+    // gesture kill) while the lightbox keeps its OWN pointer/transform zoom (touch-action:none viewport).
+    const claimSubmitSource = app.slice(
+      app.indexOf('async function submitAirdropClaim()'),
+      app.indexOf("claimAirdropButton?.addEventListener('click'"),
+    );
+    expect(claimSubmitSource).toMatch(/const walletBalanceNanotons = await loadConnectedTonWalletBalance\(\)\.catch\(\(\) => null\);/);
+    expect(claimSubmitSource).toMatch(/if \(walletBalanceNanotons !== null && nonNegativeBigInt\(walletBalanceNanotons\) < required\)/);
+    expect(claimSubmitSource).toMatch(/error\.code = 'PLATHO_WALLET_GRAM_REQUIRED';/);
+    expect(claimSubmitSource.indexOf("error.code = 'PLATHO_WALLET_GRAM_REQUIRED'"))
+      .toBeLessThan(claimSubmitSource.indexOf('const transaction = createWalletTransaction('));
+    expect(app).toMatch(/if \(athClaimState\.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED'\) \{ setText\(claimAirdropStatus, t\('common\.needsWalletGram'\)\); return; \}/);
+    // Renamed out of the profile.flush* family with the row: the string now serves the claim alone, and a key
+    // named after a deleted feature is how a reader concludes the feature is still there.
+    expect(EN_STRINGS['common.needsWalletGram']).toBe('top up wallet GRAM');
+    expect(EN_STRINGS['profile.flushNeedsWalletGram'], 'flush-named key retired').toBeUndefined();
     expect(html).toMatch(/name="viewport"[^>]*maximum-scale=1, user-scalable=no/);
     const cssZoom = readFileSync('web/styles.css', 'utf8');
     expect(cssZoom).toMatch(/html,\s*body \{[\s\S]*?touch-action: pan-x pan-y;/);
     expect(app).toMatch(/for \(const gestureEventType of \['gesturestart', 'gesturechange', 'gestureend'\]\)/);
-    // v704 ATH-flush overlay integration: EVERY chain re-read of the flush state routes through the in-flight
-    // overlay merge (behavioral coverage in tests/ath-flush-overlay.test.ts), and the post-send optimistic
-    // state derives through the SAME merge — a bare overwrite is what re-armed the button mid-flight.
-    expect(app).toMatch(/athFlushState = applyAthFlushOptimisticOverlay\(await readAthBurnFlushState\(\)\)/);
-    expect(app).toMatch(/athFlushOptimisticFlush = \{\s*username: \{ flushed: flushedBuckets\.includes\('username'\), baselineDue: usernameDue \}/);
-    expect(app).toMatch(/\.\.\.applyAthFlushOptimisticOverlay\(state\),/);
-    expect(app).not.toMatch(/athFlushState = await readAthBurnFlushState\(\)/);
+    // v704's ATH-flush overlay is GONE with the row it served (v890). Asserting its absence rather than deleting
+    // the block: an overlay is a correctness device for an optimistic UI, and if a flush row ever comes back it
+    // must come back WITH one — a silent reappearance without the merge is the mid-flight re-arm bug returning.
+    expect(app).not.toMatch(/applyAthFlushOptimisticOverlay/);
+    expect(app).not.toMatch(/athFlushOptimisticFlush/);
+    expect(app).not.toMatch(/readAthBurnFlushState/);
     expect(app).toMatch(/function syncNowForCurrentScreen\(\)/);
     expect(app).toMatch(/if \(isGlobalSyncActive\(\) \|\| messageSyncManualInFlight\) return;/);
     expect(app).toMatch(/publicPane\?\.dataset\?\.discoverOpen === 'true'\) \{\s*refreshPublicDiscovery\(\)/);
@@ -5660,14 +5673,15 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/athTicketState\.claimMinValue \?\? AIRDROP_CLAIM_MIN_VALUE_NANOTONS/);
     expect(app).toMatch(/cost: airdropClaimCostLabel\(\)/);
 
-    // The flush row: one message per bucket that will actually be sent, priced from the same constant the send
-    // attaches — so the row cannot quote a nominal figure while the wallet is asked for double it.
+    // The flush row is gone (v890), and with it the only client-side caller of the burn-flush message value. The
+    // CONSTANT stays in the transaction codec — the on-chain flushes still exist and the operator console fires
+    // them — but nothing in the app may quote or send it any more.
     const transactions = readFileSync('web/pwa-contract-transactions.mjs', 'utf8');
     expect(clientValue(transactions, 'REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS')).toBeTruthy();
-    expect(app).toMatch(/BigInt\(buckets\) \* REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS/);
-    expect(app).toMatch(/nonNegativeBigInt\(due\) > 0n && nonNegativeBigInt\(pending\) === 0n/);
-    // Nothing to send means nothing to charge for: a price beside a button that will refuse is its own small lie.
-    expect(app).toMatch(/cost > 0n[\s\S]{0,200}profile\.amountWithCost/);
+    expect(app).not.toMatch(/REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS/);
+    // The claim row still prices itself, and still only when there is something to charge for: a price beside a
+    // button that will refuse is its own small lie.
+    expect(app).toMatch(/setText\(claimAirdropStatus, t\('profile\.amountWithCost'/);
 
     // The paragraph and its keys are gone, and so is the one-off class it needed.
     expect(app).not.toMatch(/flushAthNote/);
@@ -6054,17 +6068,13 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function setView(view)'),
       app.indexOf('function renderThreads'),
     );
-    const flushSource = app.slice(
-      app.indexOf('async function readAthBurnFlushState'),
-      app.indexOf('async function submitProfileAvatarUpdate'),
+    const claimSource = app.slice(
+      app.indexOf('async function submitAirdropClaim()'),
+      app.indexOf("claimAirdropButton?.addEventListener('click'"),
     );
-
     expect(initialStateSource).toMatch(/total_supply:\s*null/);
-    expect(initialStateSource).toMatch(/let athFlushState = \{/);
     expect(renderSource).toMatch(/if \(value === null \|\| value === undefined\) return '-'/);
-    expect(app).toMatch(/function renderAthFlushStatus/);
     expect(refreshSource).toMatch(/provider\.getJettonData\(\{ address: requireAthMasterAddress\(\) \}\)/);
-    expect(refreshSource).toMatch(/await refreshAthFlushState\(\)/);
     expect(refreshSource).toMatch(/total_supply:\s*data\?\.total_supply === null \|\| data\?\.total_supply === undefined\s*\?\s*null\s*:\s*nonNegativeBigInt\(data\.total_supply\)/);
     expect(refreshSource).not.toMatch(/ATH_TOTAL_SUPPLY_ATOMIC/);
     // Profile reads are serialized (one at a time) to avoid the iOS concurrent-read freeze (v509 pattern):
@@ -6073,26 +6083,39 @@ describe('PWA runtime config guard', () => {
     // Burn ATH user row removed (see the index.html assertions). The ATHBurn message primitive itself stays
     // for the protocol buyback/burn-due path; there is no longer a user-facing wallet-burn handler to assert.
     expect(app).not.toMatch(/async function submitAthWalletBurn/);
-    expect(app).toMatch(/flushAthButton\?\.addEventListener\('click'/);
-    // [OWNER 2026-08-03] Starts at 2s now: the claimed balance took visibly long to appear, and post-April TON
-    // settles in well under a second, so a 5s first look was pure waiting.
-    expect(app).toMatch(/const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = \[2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000\]/);
-    expect(flushSource).toMatch(/function queueAthFlushPostTransactionRefresh\(\)/);
-    expect(flushSource).toMatch(/queueAthFlushPostTransactionRefresh\(\)/);
-    expect(flushSource).toMatch(/resolveUsernameRegistryProvider\(\)[\s\S]*provider\.getGlobal/);
-    expect(flushSource).toMatch(/resolveProfileRegistryProvider\(\)[\s\S]*provider\.getGlobal/);
-    expect(flushSource).toMatch(/createUsernameRegistryMessage\('FlushBurnAthDue'/);
-    expect(flushSource).toMatch(/createProfileRegistryMessage\('FlushProfileBurnAthDue'/);
-    expect(flushSource).toMatch(/REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS/);
-    expect(flushSource).toMatch(/createWalletTransaction\(messages\)/);
-    expect(app).not.toMatch(/set(?:Interval|Timeout)\(\s*(?:async\s*)?\(\s*\)\s*=>\s*submitAthDueFlush/);
-    // Optimistic supply drop: submitting a flush immediately lowers "Current supply" by the flushed amount
-    // (display-only overlay set AFTER the successful send), converging to the chain read once the burn lands
-    // (supply <= baseline - amount) or on TTL expiry — a downstream failure self-corrects.
-    expect(flushSource).toMatch(/athSupplyOptimisticBurn = \{\s*baseline: athProtocolState\.total_supply,\s*amount: flushedAmount,\s*until: Date\.now\(\) \+ ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS,/);
-    expect(app).toMatch(/function athSupplyDisplayValue\(\)/);
-    expect(app).toMatch(/setText\(athSupplyStatus, formatAthProfileAmount\(athSupplyDisplayValue\(\)\)\)/);
-    expect(app).toMatch(/supply <= baseline - amount/);
+    // [OWNER 2026-08-03] Starts at 2s: the claimed balance took visibly long to appear, and post-April TON
+    // settles in well under a second, so a 5s first look was pure waiting. Renamed off the flush in v890 —
+    // the airdrop claim is the only sender that queues it now.
+    expect(app).toMatch(/const ATH_POST_TRANSACTION_REFRESH_DELAYS_MS = \[2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000\]/);
+    expect(app).toMatch(/function queueAthPostTransactionRefresh\(\)/);
+    expect(claimSource).toMatch(/queueAthPostTransactionRefresh\(\)/);
+    // [OWNER 2026-08-09] The "Flush ATH" row is DELETED, and this is the gate that keeps it deleted. It swept the
+    // registries' burn dues to ATHMaster — protocol housekeeping with no reason to face a user — and its state
+    // cost TWO registry getGlobal reads on every ATH stats refresh, on the phone, to render a row that read "0
+    // ATH ready" for everyone. Both flushes live in the local operator console (tools/admin) instead. The
+    // message builders and the value constant stay in the codec: the on-chain operations are unchanged.
+    for (const gone of [
+      /flushAthButton/, /flushAthStatus/, /submitAthDueFlush/, /athFlushState/, /renderAthFlushStatus/,
+      /refreshAthFlushState/, /athFlushCostNanotons/, /athFlushStatusText/, /athFlushReadyAmount/,
+      /athFlushPendingCount/, /athFlushStateKnown/, /createUsernameRegistryMessage\('FlushBurnAthDue'/,
+      /createProfileRegistryMessage\('FlushProfileBurnAthDue'/,
+    ]) expect(app, `${gone.source} retired with the flush row`).not.toMatch(gone);
+    expect(readFileSync('web/index.html', 'utf8')).not.toMatch(/flushAthButton|flushAthStatus|profile\.flushAth/);
+    // The optimistic supply overlay went with it: submitAthDueFlush was its ONLY writer, so what remained would
+    // have been a display device nothing could ever arm — the shape of dead code that reads as a live feature.
+    for (const gone of [/athSupplyOptimisticBurn/, /ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS/, /athSupplyDisplayValue/]) {
+      expect(app, `${gone.source} had no writer left`).not.toMatch(gone);
+    }
+    expect(app).toMatch(/setText\(athSupplyStatus, formatAthProfileAmount\(athProtocolState\.total_supply\)\)/);
+    // The strings the row owned are gone from every locale, not just the two spot-checked ones.
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      const dict = I18N_STRINGS[locale as keyof typeof I18N_STRINGS] as Record<string, string>;
+      for (const key of ['profile.flushAth', 'profile.flushPending', 'profile.flushing',
+        'profile.readyAmount', 'profile.readyPlusPending',
+        'wallet.athFlushBlocked', 'wallet.athFlushSubmitted']) {
+        expect(dict[key], `${locale}/${key} retired with the flush row`).toBeUndefined();
+      }
+    }
   });
 
   // PWA-CONFIG-07B removed with the CapsuleHub index walk. "Uses the key indexes, never a global tail scan" was the
