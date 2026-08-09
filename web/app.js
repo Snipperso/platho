@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=23';
+} from './public-channel-subscriptions.mjs?v=24';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -149,6 +149,7 @@ import {
   PUBLIC_POST_TEXT_MAX_BYTES,
   readPublicPostPayload,
   readPublicPartHeaderInfo,
+  serializeBoc,
   tonCell,
   USERNAME_MINT_DIRECT_NOTIFY_VALUE_NANOTONS,
   USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS,
@@ -220,6 +221,16 @@ import {
   resolveAuthoritativeUsernameItemOwnership,
 } from './username-ton-rpc-provider.mjs?v=59';
 import {
+  collectOwnedUsernameNfts,
+  discoverUsernameNftAddresses,
+  usernameNftCandidateFromLabel,
+} from './username-nft-owned.mjs?v=1';
+import {
+  USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
+  buildUsernameNftTransferBody,
+  nextUsernameNftTransferQueryId,
+} from './username-nft-transfer.mjs?v=1';
+import {
   encodeCanvasToWebp,
   isWebpBytes,
 } from './webp-encoder.mjs?v=1';
@@ -232,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=50';
+} from './i18n.mjs?v=51';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -248,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v890';
+const PLATHO_APP_RUNTIME_VERSION = 'v891';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -476,6 +487,8 @@ const profileAvatarInput = document.querySelector('#profileAvatarInput');
 const mintUsernameButton = document.querySelector('#mintUsernameButton');
 const mintUsernameStatus = document.querySelector('#mintUsernameStatus');
 const linkUsernameButton = document.querySelector('#linkUsernameButton');
+const myUsernamesButton = document.querySelector('#myUsernamesButton');
+const myUsernamesStatus = document.querySelector('#myUsernamesStatus');
 const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
 const toncenterApiKeyInput = document.querySelector('#toncenterApiKeyInput');
 const toncenterKeyStatus = document.querySelector('#toncenterKeyStatus');
@@ -3885,6 +3898,19 @@ function readKnownPlathoUsernames(owner = plathoWallet?.address) {
   return [...names];
 }
 
+// Drop a name from the quick-pick list. Its counterpart existed from the day names could be ACQUIRED; this one is
+// new because until now there was no place in the app where a name could be given AWAY.
+function removeKnownPlathoUsername(label, owner = plathoWallet?.address) {
+  const normalized = typeof label === 'string' ? label.trim() : '';
+  const key = knownPlathoUsernamesStorageKey(owner);
+  if (!normalized || !key) return;
+  try {
+    localStorageOrNull()?.setItem(key, JSON.stringify(readKnownPlathoUsernames(owner).filter((entry) => entry !== normalized)));
+  } catch {
+    // Cosmetic quick-pick list; safe to drop on a storage failure.
+  }
+}
+
 function addKnownPlathoUsername(label, owner = plathoWallet?.address) {
   const normalized = typeof label === 'string' ? label.trim() : '';
   const key = knownPlathoUsernamesStorageKey(owner);
@@ -3938,6 +3964,7 @@ function renderWalletIdentity(status = null) {
     setText(walletAddressStatus, hasStored ? storedLabel : t('wallet.notCreated'));
     setText(walletDisplayModeStatus, t('wallet.addressMode'));
     setText(linkedUsernameStatus, t('wallet.verify'));
+    renderMyUsernamesStatus();
     if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.ADDRESS;
     if (copyWalletAddressButton) copyWalletAddressButton.disabled = !storedAddress;
     return;
@@ -3951,6 +3978,7 @@ function renderWalletIdentity(status = null) {
     ? canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional')
     : t('wallet.addressMode'));
   setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional'));
+  renderMyUsernamesStatus();
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
 }
@@ -21433,6 +21461,234 @@ async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry,
   }
   return { nameHash, itemAddress, minted, pending };
 }
+
+// ── .ath names as property: look at them, and hand them over ────────────────────────────────────────────────────
+//
+// The names always were TEP-62 NFTs, and Platho always was their owner's wallet. What was missing was the button:
+// until now, seeing or moving a name meant connecting the same seed to Tonkeeper — a wallet sending its user off to
+// find another wallet.
+//
+// The LIST is the hard half, and web/username-nft-owned.mjs carries the reasoning: there is no on-chain answer to
+// "what does this wallet own", so it is a local floor plus an indexer, and neither is believed — both only propose
+// an address that the chain then confirms.
+//
+// NOTE WHAT THIS DOES NOT DO: it adds no chain read to the wallet tab's refresh. The row's status is computed from
+// local storage alone and the reads happen when the dialog opens. Two getters on every refresh to render a row
+// nobody had opened is exactly what the ATH-flush row cost, and it was deleted this morning for it.
+let ownedUsernameNftsInFlight = false;
+
+function renderMyUsernamesStatus() {
+  if (!myUsernamesButton || !myUsernamesStatus) return;
+  myUsernamesButton.disabled = !plathoWallet?.address || ownedUsernameNftsInFlight;
+  if (!plathoWallet?.address) {
+    setProfileActionStatus(myUsernamesStatus, t('common.walletRequiredStatus'), '');
+    return;
+  }
+  if (ownedUsernameNftsInFlight) {
+    setProfileActionStatus(myUsernamesStatus, t('common.checking'), 'busy');
+    return;
+  }
+  // The LOCAL count, and the wording says so: this is what the device remembers, not a claim about the chain.
+  const known = readKnownPlathoUsernames().length;
+  setProfileActionStatus(myUsernamesStatus, known > 0 ? tPlural('username.knownNames', known) : t('username.openList'), '');
+}
+
+/** Verify one item address on chain: authoritative, and owned by this wallet. */
+async function verifyOwnedUsernameNft(itemAddress) {
+  const registryAddress = requireUsernameRegistryAddress();
+  const registryProvider = await resolveUsernameRegistryProvider();
+  const itemProvider = await resolveUsernameNftItemProvider();
+  return withVaultReadLock(() => resolveAuthoritativeUsernameItemOwnership({
+    registryProvider,
+    itemProvider,
+    itemAddress,
+    registryAddress,
+    registryCallOptions: { address: registryAddress, ...criticalChainReadOptions() },
+    itemCallOptions: { address: itemAddress, ...criticalChainReadOptions() },
+  }));
+}
+
+async function loadOwnedUsernameNfts() {
+  const wallet = requirePlathoWallet().address;
+  const registryAddress = requireUsernameRegistryAddress();
+  const registryProvider = await resolveUsernameRegistryProvider();
+
+  // The floor: names this device already knows. Derived to item addresses locally, then confirmed like any other.
+  const candidateAddresses = [];
+  for (const label of readKnownPlathoUsernames()) {
+    const candidate = await usernameNftCandidateFromLabel(label, {
+      registryProvider,
+      callOptions: { address: registryAddress, ...criticalChainReadOptions() },
+    }).catch(() => null);
+    if (candidate?.itemAddress) candidateAddresses.push(candidate);
+  }
+
+  // The indexer sees what the floor cannot — a name somebody TRANSFERRED here. Its failure is reported, never
+  // silently swallowed into an empty list: this list is a statement about the user's property.
+  let indexerAddresses = null;
+  let indexerError = null;
+  try {
+    indexerAddresses = await discoverUsernameNftAddresses({ ownerWallet: wallet, collectionAddress: registryAddress });
+  } catch (error) {
+    indexerError = error;
+    console.warn('username nft discovery unavailable', error);
+  }
+
+  return collectOwnedUsernameNfts({
+    ownerWallet: wallet,
+    candidateAddresses,
+    indexerAddresses,
+    indexerError,
+    verifyItem: verifyOwnedUsernameNft,
+  });
+}
+
+function usernameNftCardNode(nft, onTransfer) {
+  const row = document.createElement('div');
+  row.className = 'nft-card';
+  if (nft.image) {
+    const art = document.createElement('img');
+    // A data: URI only — see safeInlineImage. Never a remote URL: img-src forbids it, and naming a host would
+    // hand that host the wallet's identity.
+    art.src = nft.image;
+    art.alt = '';
+    art.className = 'nft-card-art';
+    art.loading = 'lazy';
+    row.append(art);
+  }
+  const text = document.createElement('div');
+  text.className = 'nft-card-text';
+  const name = document.createElement('strong');
+  // A name is shown only when hashing it reproduced the item's own name_hash. When it did not, the item is still
+  // the user's — the chain said so — but it is honestly presented as an item at an address.
+  name.textContent = nft.label ? `${nft.label}.ath` : t('username.unnamedItem');
+  const where = document.createElement('span');
+  where.className = 'nft-card-address';
+  where.textContent = shortAddress(nft.itemAddress);
+  text.append(name, where);
+  const send = document.createElement('button');
+  send.type = 'button';
+  send.className = 'nft-card-send';
+  send.textContent = t('username.transferName');
+  send.addEventListener('click', () => onTransfer(nft));
+  row.append(text, send);
+  return row;
+}
+
+async function openMyUsernamesDialog() {
+  if (ownedUsernameNftsInFlight) return;
+  ownedUsernameNftsInFlight = true;
+  renderMyUsernamesStatus();
+  let result = null;
+  try {
+    result = await loadOwnedUsernameNfts();
+  } catch (error) {
+    console.error(error);
+    flashWalletIdentityStatus(t('common.syncDelayed'));
+    return;
+  } finally {
+    ownedUsernameNftsInFlight = false;
+    renderMyUsernamesStatus();
+  }
+
+  let picked = null;
+  const footnotes = [];
+  // An indexer that could not be asked leaves the list SHORT, and saying so is not a nicety: an incomplete list of
+  // somebody's property that presents itself as complete is the one failure this whole lane is shaped to avoid.
+  if (!result.complete) footnotes.push(t('username.listMayBeIncomplete'));
+  await openActionDialog({
+    title: t('username.myNames'),
+    hint: result.owned.length === 0 ? t('username.noNamesFound') : '',
+    submitLabel: t('common.close'),
+    footnotes,
+    fields: [{
+      type: 'custom',
+      className: 'nft-card-list',
+      render: () => {
+        const box = document.createDocumentFragment();
+        for (const nft of result.owned) {
+          box.append(usernameNftCardNode(nft, (chosen) => { picked = chosen; closeActionDialog(null); }));
+        }
+        return box;
+      },
+    }],
+  });
+  if (picked) await openUsernameNftTransferDialog(picked);
+}
+
+async function openUsernameNftTransferDialog(nft) {
+  const displayName = nft.label ? `${nft.label}.ath` : shortAddress(nft.itemAddress);
+  const values = await openActionDialog({
+    title: t('username.transferNameTitle', { name: displayName }),
+    hint: t('username.transferIrreversible'),
+    tone: 'warning',
+    submitLabel: t('username.transferName'),
+    fields: [{
+      type: 'text',
+      id: 'usernameTransferRecipient',
+      name: 'recipient',
+      label: t('username.recipientWallet'),
+      placeholder: 'UQ…',
+      required: true,
+    }],
+    footnotes: [
+      t('username.transferCostNote', { amount: formatTonNanotons(USERNAME_NFT_TRANSFER_VALUE_NANOTONS) }),
+      t('username.transferLosesName'),
+    ],
+    validateSubmit: async (submitted) => {
+      const recipient = String(submitted?.recipient ?? '').trim();
+      try {
+        // Refused HERE rather than by a bounce: the item rejects a non-basechain owner at 18032, and a typo that
+        // costs a round trip and returns an opcode number is not an answer anybody can act on.
+        buildUsernameNftTransferBody({ queryId: 1n, newOwner: recipient, responseDestination: plathoWallet.address });
+      } catch {
+        return { ok: false, error: t('username.recipientInvalid') };
+      }
+      if (parseTonAddress(recipient).raw === parseTonAddress(plathoWallet.address).raw) {
+        return { ok: false, error: t('username.recipientIsSelf') };
+      }
+      return { ok: true, result: { recipient } };
+    },
+  });
+  if (!values?.recipient) return;
+  await submitUsernameNftTransfer(nft, values.recipient);
+}
+
+async function submitUsernameNftTransfer(nft, recipient) {
+  requireNoPendingServiceWorkerAppShellReload();
+  const wallet = requirePlathoWallet();
+  try {
+    const body = buildUsernameNftTransferBody({
+      queryId: nextUsernameNftTransferQueryId(),
+      newOwner: recipient,
+      // The change comes back here rather than settling into the item's balance.
+      responseDestination: wallet.address,
+    });
+    await sendPlathoWalletTransaction(wallet, createWalletTransaction([{
+      address: nft.itemAddress,
+      amount: USERNAME_NFT_TRANSFER_VALUE_NANOTONS.toString(),
+      payload: tonCell.bytesToBase64(serializeBoc(body)),
+      // A refused transfer must return the money, not burn it.
+      bounce: true,
+    }]));
+    // GIVING A NAME AWAY MEANS LOSING IT, and the local link has to go with it. Without this the client keeps
+    // stamping a name it no longer owns onto everything it sends — recipients re-verify and reject, so it is not a
+    // security hole, but it is the app lying to its own user about who they are. (This is the FM-4 note from the
+    // v564 transfer audit, closed here because there is finally a place in the app where a name is handed over.)
+    if (nft.label && readLinkedPlathoUsername()?.label === nft.label) clearLinkedPlathoUsername();
+    removeKnownPlathoUsername(nft.label);
+    flashWalletIdentityStatus(t('username.transferSubmitted'));
+    renderMyUsernamesStatus();
+    renderWalletIdentity();
+  } catch (error) {
+    console.error(error);
+    flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+      ? t('common.needsWalletGram')
+      : t('username.transferFailed'));
+  }
+}
+
+myUsernamesButton?.addEventListener('click', () => { openMyUsernamesDialog().catch((error) => console.error(error)); });
 
 async function resolveUsernameNftItemProvider() {
   const provider = globalThis.plathoUsernameNftItemProvider

@@ -66,9 +66,31 @@ export async function discoverUsernameNftAddresses({
     const address = rawAddress(item?.address);
     if (!address || seen.has(address)) continue;
     seen.add(address);
-    out.push({ itemAddress: address, proposedName: normalizeUsernameLabel(item?.metadata?.name) });
+    out.push({
+      itemAddress: address,
+      proposedName: normalizeUsernameLabel(item?.metadata?.name),
+      proposedImage: safeInlineImage(item?.metadata?.image_data ?? item?.metadata?.image),
+    });
   }
   return out;
+}
+
+/**
+ * A picture we are willing to render, or null.
+ *
+ * The art is ON CHAIN — the registry generates the SVG itself — but the client has no TEP-64 dictionary reader left
+ * (it went with the Vault), and re-implementing the registry's generator would be a copy of a derived value: the day
+ * the art changes, the copy lies. So the picture comes from the same indexer answer we already fetch.
+ *
+ * That is a COSMETIC trust, and the boundary is drawn so it stays cosmetic. Only a self-contained `data:` image is
+ * accepted: a remote URL would be blocked by img-src anyway, and accepting one would leak the wallet's identity to
+ * whatever host it named. SVG rendered through <img> cannot run script. And the NAME beside the picture is settled
+ * by hashing, never by this — so the worst a hostile indexer achieves is a wrong thumbnail next to a right name.
+ */
+export function safeInlineImage(value) {
+  const text = String(value ?? '').trim();
+  if (!/^data:image\/(svg\+xml|png|jpeg|webp)[;,]/i.test(text)) return null;
+  return text.length <= 512 * 1024 ? text : null;
 }
 
 /**
@@ -130,12 +152,22 @@ export async function collectOwnedUsernameNfts({
   const seen = new Map();
   for (const candidate of [...candidateAddresses, ...(indexerAddresses ?? [])]) {
     const raw = rawAddress(candidate?.itemAddress ?? candidate);
-    if (!raw || seen.has(raw)) continue;
-    seen.set(raw, normalizeUsernameLabel(candidate?.label ?? candidate?.proposedName));
+    if (!raw) continue;
+    const proposed = {
+      label: normalizeUsernameLabel(candidate?.label ?? candidate?.proposedName),
+      image: safeInlineImage(candidate?.proposedImage),
+    };
+    // A later source may still supply the PICTURE for an item the local floor named, but never the name.
+    if (seen.has(raw)) {
+      const held = seen.get(raw);
+      if (!held.image && proposed.image) held.image = proposed.image;
+      continue;
+    }
+    seen.set(raw, proposed);
   }
 
   const owned = [];
-  for (const [itemAddress, proposedLabel] of seen) {
+  for (const [itemAddress, { label: proposedLabel, image }] of seen) {
     // SEQUENTIALLY. Concurrent chain reads are the iOS run-loop stall this codebase has paid for repeatedly, and a
     // wallet with a dozen names is not worth re-learning it.
     let record = null;
@@ -160,6 +192,7 @@ export async function collectOwnedUsernameNfts({
       itemAddress,
       nameHash: record.name_hash ?? null,
       label,
+      image,
       tier: record.item_state?.tier ?? null,
       usernameLen: record.item_state?.username_len ?? null,
     });
