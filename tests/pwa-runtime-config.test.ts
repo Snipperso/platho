@@ -708,8 +708,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/LINKED_PLATHO_USERNAME_STORAGE_PREFIX/);
     expect(app).toMatch(/readLinkedPlathoUsername/);
     expect(app).toMatch(/writeLinkedPlathoUsername/);
+    // A .ath name is OWNED, not resolved — the TON DNS wording it replaced is still forbidden. The copy that used
+    // to carry that distinction lived in the link dialog's summary row, deleted in v893: it restated the button and
+    // its label was a hardcoded English 'Check' no locale translated, so a Russian dialog read "Check:". Assert the
+    // row is gone and that no untranslated label sneaks back into a dialog that has ten locales.
     expect(app).not.toMatch(/name resolves to this wallet/);
-    expect(enCopy).toMatch(/permanent name, currently owned by this wallet/);
+    expect(app).not.toMatch(/label: 'Check'/);
+    expect(EN_STRINGS['username.permanentNameOwned'], 'summary row retired').toBeUndefined();
+    expect(EN_STRINGS['username.verifyOwnership'], 'summary row retired').toBeUndefined();
     expect(app).not.toMatch(/No TON DNS linked/);
     expect(app).not.toMatch(/Optional setup', value: 'Link TON DNS in Usernames and Avatars/);
     expect(enCopy).toMatch(/No \.ath name linked/);
