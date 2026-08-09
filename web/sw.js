@@ -1,9 +1,9 @@
-const CACHE_NAME = 'platho-pwa-prototype-v932';
+const CACHE_NAME = 'platho-pwa-prototype-v933';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=298',
-  './app.js?v=895',
+  './app.js?v=896',
   './i18n.mjs?v=55',
   './i18n-strings.mjs?v=57',
   './boot-signal-field.mjs?v=1',
@@ -13,7 +13,7 @@ const ASSETS = [
   './platho-config.mjs?v=120',
   './capsule-part-policy.mjs?v=10',
   './message-pricing-policy.mjs?v=14',
-  './public-channel-subscriptions.mjs?v=28',
+  './public-channel-subscriptions.mjs?v=29',
   './recipient-identities.mjs?v=6',
   './channels/platho.app/feed.json',
   './encrypted-message-store.mjs?v=6',

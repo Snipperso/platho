@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=28';
+} from './public-channel-subscriptions.mjs?v=29';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v895';
+const PLATHO_APP_RUNTIME_VERSION = 'v896';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -6673,9 +6673,9 @@ function publicItemDescriptionButton(item) {
 function appendPublicItemActions(article, item) {
   const actions = document.createElement('div');
   actions.className = 'feed-actions';
-  // A followed channel with no posts yet has nothing to comment on — skip the disabled "Preview only" button so
-  // its card shows just Private chat + Unfollow (the Unfollow being the clear action for an empty channel).
-  if (!item.emptyChannel) {
+  // The empty-channel placeholder card that this branch used to skip is gone (v896): a followed channel with no
+  // posts is simply not rendered, so every item reaching here is a real post with something to comment on.
+  {
     const commentButton = document.createElement('button');
     commentButton.type = 'button';
     const commentsAllowed = item.commentsAllowed !== false;
@@ -6953,7 +6953,17 @@ function renderPublicFeed(items, options = {}) {
     // The discovery CTA sits at the very top for a newcomer (no channels followed) — shown ABOVE the posts, and also
     // above the empty-state so a newcomer with a truly empty feed still gets a way in.
     if (shouldShowDiscoveryCta()) publicFeed.append(buildDiscoveryCtaCard());
-    renderPublicEmpty(publicChannelSearchQuery ? t('public.noPostsFound') : t('public.noPosts'), publicChannelSearchQuery ? t('public.tryAnotherSearch') : t('public.followOrPublishFirst'));
+    // "No public posts" is a CONCLUSION, and stating it while the first sync is still running would be a guess
+    // dressed as one — on a fresh install the feed is empty for the seconds before platho.app's posts land. This
+    // used to be masked by a per-channel placeholder card that said "waiting for public feed"; that card is gone
+    // (v896, it also held an empty seat for channels that never publish), so the waiting has to be said HERE, once
+    // for the whole feed, instead of once per silent channel. setPublicSyncPhase repaints this surface on every
+    // transition, so the message settles by itself when the sync finishes.
+    if (publicSyncPhase === 'syncing' && !publicChannelSearchQuery) {
+      renderPublicEmpty(t('public.previewWaitingFeed'), t('common.checking'));
+    } else {
+      renderPublicEmpty(publicChannelSearchQuery ? t('public.noPostsFound') : t('public.noPosts'), publicChannelSearchQuery ? t('public.tryAnotherSearch') : t('public.followOrPublishFirst'));
+    }
     requestAnimationFrame(updatePublicJumpDownVisibility);
     return;
   }
@@ -8135,9 +8145,7 @@ function publicChannelViewChannel() {
 
 function publicChannelViewItems() {
   if (!publicChannelViewChannelId) return [];
-  return publicFeedItemsChronological().filter((item) => (
-    item.channelId === publicChannelViewChannelId && item.emptyChannel !== true
-  ));
+  return publicFeedItemsChronological().filter((item) => item.channelId === publicChannelViewChannelId);
 }
 
 function openPublicChannelView(source = {}) {
