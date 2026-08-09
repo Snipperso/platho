@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=27';
+} from './public-channel-subscriptions.mjs?v=28';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=54';
+} from './i18n.mjs?v=55';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v894';
+const PLATHO_APP_RUNTIME_VERSION = 'v895';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -21484,6 +21484,11 @@ async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry,
 // local storage alone and the reads happen when the dialog opens. Two getters on every refresh to render a row
 // nobody had opened is exactly what the ATH-flush row cost, and it was deleted this morning for it.
 let ownedUsernameNftsInFlight = false;
+// [OWNER 2026-08-09] The last CHAIN-VERIFIED count. Without it the row kept claiming four names straight after the
+// dialog had just shown three: the row read local storage while the dialog read the chain, so the app displayed a
+// number it had itself disproved seconds earlier. The dialog does the expensive work; throwing its answer away was
+// the whole bug. `{ count, complete }` — an incomplete read says "3+" rather than claiming three is all there is.
+let ownedUsernameNftsVerified = null;
 
 function renderMyUsernamesStatus() {
   if (!myUsernamesButton || !myUsernamesStatus) return;
@@ -21496,7 +21501,15 @@ function renderMyUsernamesStatus() {
     setProfileActionStatus(myUsernamesStatus, t('common.checking'), 'busy');
     return;
   }
-  // The LOCAL count, and the wording says so: this is what the device remembers, not a claim about the chain.
+  if (ownedUsernameNftsVerified) {
+    const { count, complete } = ownedUsernameNftsVerified;
+    setProfileActionStatus(myUsernamesStatus, complete
+      ? (count > 0 ? tPlural('username.knownNames', count) : t('username.openList'))
+      : t('username.knownNamesPartial', { count: String(count) }), '');
+    return;
+  }
+  // Nothing verified yet this session — what the device remembers, and no chain read to find out. Two getters per
+  // wallet refresh to render a row nobody had opened is what the ATH-flush row cost, and it was deleted for it.
   const known = readKnownPlathoUsernames().length;
   setProfileActionStatus(myUsernamesStatus, known > 0 ? tPlural('username.knownNames', known) : t('username.openList'), '');
 }
@@ -21542,13 +21555,17 @@ async function loadOwnedUsernameNfts() {
     console.warn('username nft discovery unavailable', error);
   }
 
-  return collectOwnedUsernameNfts({
+  const result = await collectOwnedUsernameNfts({
     ownerWallet: wallet,
     candidateAddresses,
     indexerAddresses,
     indexerError,
     verifyItem: verifyOwnedUsernameNft,
   });
+  // KEEP the answer. This is the only place in the app that knows how many names the chain will vouch for, and the
+  // row above it used to go on quoting local storage regardless.
+  ownedUsernameNftsVerified = { count: result.owned.length, complete: result.complete };
+  return result;
 }
 
 function usernameNftCardNode(nft, onTransfer) {
@@ -21656,45 +21673,66 @@ async function openUsernameNftTransferDialog(nft) {
       if (parseTonAddress(recipient).raw === parseTonAddress(plathoWallet.address).raw) {
         return { ok: false, error: t('username.recipientIsSelf') };
       }
+      // [OWNER 2026-08-09] THE SEND HAPPENS HERE, not after the dialog closes. It used to run afterwards, so the
+      // window vanished the instant the button was pressed and the only feedback was a flash on a row the user was
+      // not looking at — the owner's report was, in short, "did it send or not, no idea". Inside validateSubmit the
+      // dialog stays open showing the checking hint, a failure is stated in place instead of behind a closed
+      // window, and the close itself becomes the signal that the external is away.
+      try {
+        await submitUsernameNftTransfer(nft, recipient);
+      } catch (error) {
+        console.error(error);
+        return {
+          ok: false,
+          error: error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+            ? t('common.needsWalletGram')
+            : t('username.transferFailed'),
+        };
+      }
       return { ok: true, result: { recipient } };
     },
   });
   if (!values?.recipient) return;
-  await submitUsernameNftTransfer(nft, values.recipient);
+  // Said plainly, in its own words, because "the window closed" is not an answer to "did it go?". The chain still
+  // has to include it — hence "sent", not "transferred".
+  await openActionDialog({
+    title: t('username.transferSubmittedTitle'),
+    hint: t('username.transferSubmittedHint', { name: displayName, recipient: shortAddress(values.recipient) }),
+    submitLabel: t('common.close'),
+    fields: [],
+  });
 }
 
 async function submitUsernameNftTransfer(nft, recipient) {
   requireNoPendingServiceWorkerAppShellReload();
   const wallet = requirePlathoWallet();
-  try {
-    const body = buildUsernameNftTransferBody({
-      queryId: nextUsernameNftTransferQueryId(),
-      newOwner: recipient,
-      // The change comes back here rather than settling into the item's balance.
-      responseDestination: wallet.address,
-    });
-    await sendPlathoWalletTransaction(wallet, createWalletTransaction([{
-      address: nft.itemAddress,
-      amount: USERNAME_NFT_TRANSFER_VALUE_NANOTONS.toString(),
-      payload: tonCell.bytesToBase64(serializeBoc(body)),
-      // A refused transfer must return the money, not burn it.
-      bounce: true,
-    }]));
-    // GIVING A NAME AWAY MEANS LOSING IT, and the local link has to go with it. Without this the client keeps
-    // stamping a name it no longer owns onto everything it sends — recipients re-verify and reject, so it is not a
-    // security hole, but it is the app lying to its own user about who they are. (This is the FM-4 note from the
-    // v564 transfer audit, closed here because there is finally a place in the app where a name is handed over.)
-    if (nft.label && readLinkedPlathoUsername()?.label === nft.label) clearLinkedPlathoUsername();
-    removeKnownPlathoUsername(nft.label);
-    flashWalletIdentityStatus(t('username.transferSubmitted'));
-    renderMyUsernamesStatus();
-    renderWalletIdentity();
-  } catch (error) {
-    console.error(error);
-    flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
-      ? t('common.needsWalletGram')
-      : t('username.transferFailed'));
-  }
+  // THROWS on failure, deliberately. The caller runs this inside the dialog's validateSubmit, which turns a throw
+  // into a sentence shown in the still-open window; swallowing it here would put the failure behind a window that
+  // had already closed, which is exactly what made a transfer indistinguishable from a success.
+  const body = buildUsernameNftTransferBody({
+    queryId: nextUsernameNftTransferQueryId(),
+    newOwner: recipient,
+    // The change comes back here rather than settling into the item's balance.
+    responseDestination: wallet.address,
+  });
+  await sendPlathoWalletTransaction(wallet, createWalletTransaction([{
+    address: nft.itemAddress,
+    amount: USERNAME_NFT_TRANSFER_VALUE_NANOTONS.toString(),
+    payload: tonCell.bytesToBase64(serializeBoc(body)),
+    // A refused transfer must return the money, not burn it.
+    bounce: true,
+  }]));
+  // GIVING A NAME AWAY MEANS LOSING IT, and the local link has to go with it. Without this the client keeps
+  // stamping a name it no longer owns onto everything it sends — recipients re-verify and reject, so it is not a
+  // security hole, but it is the app lying to its own user about who they are. (This is the FM-4 note from the
+  // v564 transfer audit, closed here because there is finally a place in the app where a name is handed over.)
+  if (nft.label && readLinkedPlathoUsername()?.label === nft.label) clearLinkedPlathoUsername();
+  removeKnownPlathoUsername(nft.label);
+  // The cached chain count is now WRONG by one and must not be quoted as fact. Dropping it rather than decrementing
+  // it: the truth is one chain read away and the local floor covers the gap until the list is opened again.
+  ownedUsernameNftsVerified = null;
+  renderMyUsernamesStatus();
+  renderWalletIdentity();
 }
 
 myUsernamesButton?.addEventListener('click', () => { openMyUsernamesDialog().catch((error) => console.error(error)); });
