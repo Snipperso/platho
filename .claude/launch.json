@@ -6,6 +6,13 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8777", "--directory", "web"],
       "port": 8777
+    },
+    {
+      "name": "platho-tools",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8778"],
+      "port": 8778,
+      "url": "http://localhost:8778"
     }
   ]
 }
