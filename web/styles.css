@@ -3341,11 +3341,21 @@ button.feed-item:hover {
   border-color: var(--line);
 }
 
-/* The `display: flex` above (specificity 0,1,1) outranks the UA `[hidden] { display: none }`
-   (0,1,0), so a settings/action button with the `hidden` attribute would stay visible. Restore
-   native hiding for these buttons -- e.g. #walletBackupWarning, which toggles via `.hidden`. */
+/* An author `display:` rule beats the UA `[hidden] { display: none }` regardless of specificity -- author sheets
+   win over the user-agent sheet -- so any element given a display here keeps rendering when `hidden` is set.
+   Restore native hiding for the elements that toggle that way.
+
+   [OWNER 2026-08-09] .action-summary and .action-footnotes were missing from this list, and the owner saw the
+   result: an empty bordered box with min-height 42px sitting between the content and the button in EVERY dialog
+   that has no summary -- renderActionSummary sets `hidden = true` and the box stayed. The trap was already
+   documented right here for buttons; the two blocks below just never got added. */
 .action-grid button[hidden],
-.settings-list button[hidden] {
+.settings-list button[hidden],
+.action-summary[hidden],
+.action-footnotes[hidden],
+/* Found by the completeness gate, not by eye: walletTonGroup.hidden = !plathoWallet, so with no wallet the
+   Receive/Send GRAM pair was meant to disappear and did not. */
+.wallet-ton-group[hidden] {
   display: none;
 }
 
@@ -4680,6 +4690,11 @@ button.feed-item:hover {
 .icon-down { --mask: url("./assets/icons/down.svg"); }
 .icon-up { --mask: url("./assets/icons/up.svg"); }
 .icon-back { --mask: url("./assets/icons/back.svg"); }
+/* [OWNER 2026-08-09] "X is not centred in the box." It was a text glyph (&times;) in eight dialogs while every
+   other icon in the app is a mask. Measured: the glyph ink centre sits 4.5px above the baseline while the line
+   box centre sits 6.5px above it, so place-items:center centred the BOX and left the ink 2px low — 5% of a 40px
+   button. A mask has no baseline, so it is centred by construction rather than by luck of the font. */
+.icon-close { --mask: url("./assets/icons/close.svg"); }
 .icon-chevron-down { --mask: url("./assets/icons/chevron-down.svg"); }
 .icon-refresh { --mask: url("./assets/icons/refresh.svg"); }
 .icon-swap-vertical { --mask: url("./assets/icons/swap-vertical.svg"); }
