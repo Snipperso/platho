@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=25';
+} from './public-channel-subscriptions.mjs?v=26';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=52';
+} from './i18n.mjs?v=53';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v892';
+const PLATHO_APP_RUNTIME_VERSION = 'v893';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -19943,13 +19943,10 @@ async function requestWalletDisplayIdentity(mode) {
     submitLabel: t('username.linkName'),
     fields,
     checkingHint: t('username.verifyingName'),
-    summary: (values) => {
-      const chosen = (values.displayName?.trim() || values.pick || '').trim();
-      return [{
-        label: 'Check',
-        value: chosen ? t('username.verifyOwnership', { chosen }) : t('username.permanentNameOwned'),
-      }];
-    },
+    // [OWNER 2026-08-09] The summary row is gone. It restated the button ("verify X is owned by this wallet" above
+    // "Link name") and its label was a hardcoded English 'Check' that no locale ever translated — which is why a
+    // Russian dialog read "Check:". A line that repeats the button in a language the reader did not choose is
+    // worse than no line.
     validateSubmit: async (values) => {
       const chosen = (values.displayName?.trim() || values.pick || '').trim();
       try {
