@@ -38,7 +38,8 @@
     "preprod:check": "node scripts/preprod_guard.mjs",
     "test:debug:files": "bash scripts/debug-test-files.sh",
     "web:deploy": "node scripts/deploy_static_web.mjs",
-    "web:deploy:preview": "node scripts/deploy_static_web.mjs --mode preview"
+    "web:deploy:preview": "node scripts/deploy_static_web.mjs --mode preview",
+    "admin": "node scripts/serve_admin.mjs"
   },
   "keywords": [],
   "author": "",
