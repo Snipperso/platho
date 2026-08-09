@@ -95,6 +95,24 @@ describe('operator console', () => {
     expect(appImports, 'the app must not import the console').not.toMatch(/tools\/admin/);
   });
 
+  it('ADMIN-05B: there is ONE command to run it, and opening it as a file explains itself', () => {
+    // The owner double-clicked index.html and got "Access to script ... from origin 'null' has been blocked by CORS
+    // policy" — a message about the mechanism, not the mistake. A page whose only failure mode is unexplained is a
+    // page nobody uses twice.
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(pkg.scripts.admin, 'npm run admin must exist').toBe('node scripts/serve_admin.mjs');
+    const html = readFileSync('tools/admin/index.html', 'utf8');
+    expect(html).toMatch(/location\.protocol === 'file:'/);
+    expect(html, 'the hint must name the command').toMatch(/npm run admin/);
+    // A CLASSIC script: over file:// the module never loads, so only non-module code can report it.
+    expect(html).toMatch(/<script>\s*\n\s*if \(location\.protocol === 'file:'\)/);
+    // And the server must serve the repo root, because the addresses live in artifacts/ while the page lives in tools/.
+    const server = readFileSync('scripts/serve_admin.mjs', 'utf8');
+    expect(server).toMatch(/const ALLOWED_PREFIXES = \['tools', 'web', 'artifacts'\];/);
+    expect(server, 'a local tool has no business exposing the whole tree').toMatch(/if \(!ALLOWED_PREFIXES\.includes\(top\)\) return null;/);
+    expect(server, 'and no business following ..').toMatch(/if \(!full\.startsWith\(ROOT \+ sep\)\) return null;/);
+  });
+
   it('ADMIN-06: a failed read is never rendered as a zero', () => {
     // The one failure mode that makes the page worse than nothing: showing "0 к выводу" when it could not ask.
     const source = readFileSync('tools/admin/console.mjs', 'utf8');
