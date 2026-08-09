@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { shouldIncludeWebRuntimeFile } from '../scripts/prepare_static_web_deploy.mjs';
 import {
-  BUCKETS, FEE_ACCUMULATOR_FLUSH_EXEC, MARKET_STABILITY_FLUSH_EXEC,
+  BUCKETS, BUYBACK_EXECUTE_EXEC, BUYBACK_FUNDING_ENVELOPE, FEE_ACCUMULATOR_FLUSH_EXEC, MARKET_STABILITY_FLUSH_EXEC,
   PROFILE_ATH_BURN_EXEC, PROFILE_ATH_TREASURY_EXEC, USERNAME_ATH_BURN_EXEC, USERNAME_ATH_TREASURY_EXEC,
 } from '../tools/admin/buckets.mjs';
 
@@ -33,16 +33,27 @@ const contractFields = (file: string, struct: string): string[] => {
 
 describe('operator console', () => {
   it('ADMIN-01: every field index is the one the .tact struct actually declares', () => {
+    let checked = 0;
     for (const bucket of BUCKETS) {
-      const fields = contractFields(bucket.contract, bucket.struct);
-      expect(fields.length, `${bucket.struct} looks empty — the parser or the struct moved`).toBeGreaterThan(3);
-      for (const row of bucket.rows) {
-        expect(
-          fields[row.at],
-          `${bucket.key}: slot ${row.at} is "${fields[row.at]}" in ${bucket.struct}, console says "${row.field}"`,
-        ).toBe(row.field);
+      // Both reads, where a card declares two. The buyback's execution quote lives in a DIFFERENT struct from the
+      // rest of its card, so a second-getter row is exactly as exposed to positional drift as a first-getter one —
+      // and it feeds a SIGNED message rather than a label, which makes it the worse of the two to get wrong.
+      for (const read of [bucket, bucket.extra].filter(Boolean)) {
+        const fields = contractFields(bucket.contract, read.struct);
+        expect(fields.length, `${read.struct} looks empty — the parser or the struct moved`).toBeGreaterThan(3);
+        for (const row of read.rows) {
+          expect(
+            fields[row.at],
+            `${bucket.key}: slot ${row.at} is "${fields[row.at]}" in ${read.struct}, console says "${row.field}"`,
+          ).toBe(row.field);
+          checked += 1;
+        }
       }
     }
+    // The loop above proves nothing if `extra` is silently dropped from every bucket, so pin that the second read
+    // is actually reached — the completeness half of the assertion.
+    expect(BUCKETS.filter((b) => b.extra).length, 'the buyback card reads a second getter').toBeGreaterThan(0);
+    expect(checked).toBeGreaterThan(20);
   });
 
   it('ADMIN-02: every opcode matches its message declaration', () => {
@@ -79,6 +90,67 @@ describe('operator console', () => {
     expect(USERNAME_ATH_BURN_EXEC).toBe(sumOf(username, 'USERNAME_ATH_BURN_EXEC_RESERVE', 'USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
     expect(PROFILE_ATH_TREASURY_EXEC).toBe(sumOf(profile, 'PROFILE_ATH_TRANSFER_EXEC_RESERVE', 'PROFILE_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
     expect(PROFILE_ATH_BURN_EXEC).toBe(sumOf(profile, 'PROFILE_ATH_BURN_EXEC_RESERVE', 'PROFILE_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
+
+    // The buyback's two figures mean DIFFERENT things and are mirrored separately: what the caller must attach
+    // (gate 22216) and what the contract must have accumulated before a chunk can fire at all (gate 22212). The
+    // second is not a value anyone sends — it is what the button waits for, and pinning it is what keeps the
+    // "недоступно" line honest as the contract's own envelope changes.
+    const buyback = readFileSync('contracts/BuybackBurn.tact', 'utf8');
+    expect(buyback).toContain(`const BUYBACK_PTON_TRANSFER_GAS_NANOTONS: Int = ${BUYBACK_EXECUTE_EXEC};`);
+    expect(buyback).toContain(`const BUYBACK_FUNDING_ENVELOPE_NANOTONS: Int = ${BUYBACK_FUNDING_ENVELOPE};`);
+    expect(buyback).toMatch(/throwUnless\(22216, context\(\)\.value >= BUYBACK_PTON_TRANSFER_GAS_NANOTONS\)/);
+    expect(buyback).toMatch(/throwUnless\(22212, self\.reserve_due_ton >= BUYBACK_FUNDING_ENVELOPE_NANOTONS\)/);
+  });
+
+  it('ADMIN-03C: the buyback sends only values the contract will compare against itself', () => {
+    // This action is the one place the console builds a message from THREE fields at once, and every one of them is
+    // checked by the receiver against its own state: query_id against last_terminal + 1, and the quote pair against
+    // the frozen route evidence. A typed-in figure could only ever bounce, so there is no input — assert that the
+    // body is assembled from the read, in the contract's field order and widths.
+    const source = readFileSync('tools/admin/console.mjs', 'utf8');
+    expect(source).toMatch(/cell\.uint\(values\.last_terminal_query_id \+ 1n, 64, 'query_id'\)/);
+    expect(source).toMatch(/cell\.uint\(values\.evidence_quote_out_atomic_ath, 128, 'quote_out_atomic_ath'\)/);
+    expect(source).toMatch(/cell\.uint\(values\.evidence_dex_min_out_atomic_ath, 128, 'dex_min_out_atomic_ath'\)/);
+
+    const contract = readFileSync('contracts/BuybackBurn.tact', 'utf8');
+    const message = contract.slice(contract.indexOf('message(0x42594558) ExecuteBuybackChunk'));
+    const fields = message.slice(0, message.indexOf('}'));
+    expect(fields).toMatch(/query_id: Int as uint64;[\s\S]*quote_out_atomic_ath: Int as uint128;[\s\S]*dex_min_out_atomic_ath: Int as uint128;/);
+    expect(contract).toMatch(/throwUnless\(22044, queryId == self\.last_terminal_query_id \+ 1\)/);
+    expect(contract).toMatch(/throwUnless\(22046, quoteOut == self\.evidence_quote_out_atomic_ath\)/);
+    expect(contract).toMatch(/throwUnless\(22047, dexMinOut == self\.evidence_dex_min_out_atomic_ath\)/);
+
+    // Every field the body reads must be a field the card actually fetches, or the message ships an `undefined`.
+    const bucket = BUCKETS.find((b) => b.key === 'buyback_burn')!;
+    const fetched = new Set([...bucket.rows, ...(bucket.extra?.rows ?? [])].map((row) => row.field));
+    for (const field of ['last_terminal_query_id', 'evidence_quote_out_atomic_ath', 'evidence_dex_min_out_atomic_ath']) {
+      expect(fetched.has(field), `${field} is sent but never read`).toBe(true);
+    }
+  });
+
+  it('ADMIN-03D: an action with preconditions states the unmet one instead of bouncing', () => {
+    // The reason this button did not exist for a week: a non-zero balance satisfies ONE of its four conditions, so
+    // `enabledBy` alone would have offered the press at 3.27 GRAM accumulated and let the chain answer 22212 — a
+    // number that tells the operator nothing. Each rule must carry the sentence shown in its place.
+    const source = readFileSync('tools/admin/console.mjs', 'utf8');
+    expect(source).toMatch(/function actionBlockedReason\(action, values\)/);
+    expect(source).toMatch(/note\.textContent = blocked === null \? \(action\.note \?\? ''\) : `Недоступно: \$\{blocked\}\.`/);
+    // Re-checked at press, not only at render: `phase` moves without anyone touching the page.
+    expect(source).toMatch(/const blocked = actionBlockedReason\(action, values\);\s*\n\s*if \(blocked !== null\) \{ setStatus/);
+
+    let ruled = 0;
+    for (const bucket of BUCKETS) {
+      for (const action of bucket.actions) {
+        const fetched = new Set([...bucket.rows, ...(bucket.extra?.rows ?? [])].map((row) => row.field));
+        for (const rule of action.requires ?? []) {
+          expect(fetched.has(rule.field), `${action.id}: rule on "${rule.field}", which the card never reads`).toBe(true);
+          expect(rule.unmet, `${action.id}: rule on "${rule.field}" has no sentence for the operator`).toBeTruthy();
+          expect(rule.equals !== undefined || rule.atLeast !== undefined, `${action.id}: rule on "${rule.field}" tests nothing`).toBe(true);
+          ruled += 1;
+        }
+      }
+    }
+    expect(ruled, 'the buyback declares its preconditions').toBeGreaterThanOrEqual(4);
   });
 
   it('ADMIN-03B: a query_id action is enabled by a bucket, and never sends a zero id', () => {

@@ -33,6 +33,8 @@ function setStatus(text, tone = '') {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Gap between any two chain reads. ONE number: the buyback card's second getter must be paced like every other. */
+const READ_SPACING_MS = 1100;
 
 /**
  * MEASURED, twice. Six reads through Promise.all: four came back 429. Spaced 200ms apart: still four. The keyless
@@ -58,10 +60,10 @@ async function rpc(path, body, attempt = 0) {
 }
 
 /** Positional read of a getter stack. The arity check is what makes positional survivable — see buckets.mjs. */
-function decode(bucket, stack) {
+function decode(bucket, rows, stack) {
   if (!Array.isArray(stack)) throw new Error(`${bucket.key}: пустой стек`);
   const out = {};
-  for (const row of bucket.rows) {
+  for (const row of rows) {
     const item = stack[row.at];
     if (!item) throw new Error(`${bucket.key}: в стеке нет позиции ${row.at} (${row.field})`);
     if (item[0] !== 'num') throw new Error(`${bucket.key}: позиция ${row.at} (${row.field}) не число — структура сдвинулась`);
@@ -88,9 +90,19 @@ async function readBucket(bucket) {
   try {
     const result = await rpc('runGetMethod', { address, method: bucket.getter, stack: [] });
     if (result.exit_code !== 0) throw new Error(`геттер вернул ${result.exit_code}`);
-    const values = decode(bucket, result.stack);
+    const values = decode(bucket, bucket.rows, result.stack);
+    let rows = bucket.rows;
+    // The second getter, where a card declares one. SEQUENTIAL and after the first, like every other read on this
+    // page: six parallel reads is what earned the 429 that blanked the whole console on its first run.
+    if (bucket.extra) {
+      await sleep(READ_SPACING_MS);
+      const more = await rpc('runGetMethod', { address, method: bucket.extra.getter, stack: [] });
+      if (more.exit_code !== 0) throw new Error(`${bucket.extra.getter} вернул ${more.exit_code}`);
+      Object.assign(values, decode(bucket, bucket.extra.rows, more.stack));
+      rows = [...bucket.rows, ...bucket.extra.rows];
+    }
     lastRead.set(bucket.key, values);
-    body.replaceChildren(...bucket.rows.map((row) => {
+    body.replaceChildren(...rows.map((row) => {
       const line = document.createElement('div');
       line.className = row.primary ? 'row is-primary' : 'row';
       const label = document.createElement('span');
@@ -118,15 +130,19 @@ function renderActions(bucket, values) {
   box.replaceChildren();
   for (const action of bucket.actions) {
     const amount = actionAmount(action, values);
-    const unit = action.arg?.kind === 'amountFrom' ? 'GRAM' : 'ATH';
+    const unit = actionUnit(action);
+    const blocked = actionBlockedReason(action, values);
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = amount === null ? action.label : `${action.label} — ${fmt(amount, unit)}`;
-    button.disabled = amount !== null && amount <= 0n;
+    button.disabled = blocked !== null || (amount !== null && amount <= 0n);
     button.addEventListener('click', () => { runAction(bucket, action, values).catch((e) => setStatus(String(e.message ?? e), 'bad')); });
     const note = document.createElement('p');
     note.className = 'note';
-    note.textContent = action.note ?? '';
+    // The reason REPLACES the description while it applies: an operator looking at a dead button wants to know what
+    // is missing, not what the button would have done.
+    note.textContent = blocked === null ? (action.note ?? '') : `Недоступно: ${blocked}.`;
+    if (blocked !== null) note.dataset.blocked = 'true';
     box.append(button, note);
   }
 }
@@ -137,7 +153,25 @@ function buildBody(action, values) {
   // A query_id only has to be positive and not already used by a pending flush, so wall-clock milliseconds are safe
   // and — unlike the buyback's strict last+1 — cannot be raced out from under the caller.
   if (action.arg?.kind === 'queryId') cell.uint(BigInt(Date.now()), action.arg.bits, 'query_id');
+  // The buyback is the one operation whose every argument is a value the contract will compare against ITSELF:
+  // query_id against last_terminal + 1 (22044), and the pair against the frozen route evidence (22046/22047). So
+  // all three are read back out of the state we just fetched. Nothing here is a choice, and offering the operator
+  // a field to type into would only be offering them a way to bounce.
+  if (action.arg?.kind === 'buybackExecute') {
+    cell.uint(values.last_terminal_query_id + 1n, 64, 'query_id');
+    cell.uint(values.evidence_quote_out_atomic_ath, 128, 'quote_out_atomic_ath');
+    cell.uint(values.evidence_dex_min_out_atomic_ath, 128, 'dex_min_out_atomic_ath');
+  }
   return cell.endCell();
+}
+
+/**
+ * The unit of the figure on the button. Declared per action wherever the guess would be wrong: the registries' ATH
+ * dues are the reason the fallback says ATH, and the buyback's enabling bucket is GRAM.
+ */
+function actionUnit(action) {
+  if (action.unit) return action.unit;
+  return action.arg?.kind === 'amountFrom' ? 'GRAM' : 'ATH';
 }
 
 /** The bucket whose being non-zero makes an action worth offering, and the figure to show on the button. */
@@ -147,11 +181,32 @@ function actionAmount(action, values) {
   return null;
 }
 
+/**
+ * Why an action cannot run right now, in the operator's words, or null when it can.
+ *
+ * A disabled button that does not say why is a broken button. This exists because the buyback has FOUR conditions
+ * and a non-zero balance satisfies only one of them: without this the console would offer the press at 3.27 GRAM
+ * accumulated and the chain would answer with bounce code 22212, which explains nothing to anyone.
+ */
+function actionBlockedReason(action, values) {
+  for (const rule of action.requires ?? []) {
+    const value = values[rule.field];
+    if (value === undefined) return `нет данных: ${rule.field}`;
+    if (rule.equals !== undefined && value !== rule.equals) return rule.unmet;
+    if (rule.atLeast !== undefined && value < rule.atLeast) return rule.unmet;
+  }
+  return null;
+}
+
 async function runAction(bucket, action, values) {
   if (!wallet) { setStatus('Сначала подключите кошелёк пульта', 'bad'); return; }
   const amount = actionAmount(action, values);
   if (amount !== null && amount <= 0n) return;
-  const unit = action.arg?.kind === 'amountFrom' ? 'GRAM' : 'ATH';
+  // Re-checked here and not only at render: the read that disabled this button may be minutes old, and `phase`
+  // in particular changes without anyone touching the page — a swap started elsewhere makes the press bounce.
+  const blocked = actionBlockedReason(action, values);
+  if (blocked !== null) { setStatus(`${action.label}: недоступно — ${blocked}`, 'bad'); return; }
+  const unit = actionUnit(action);
   const human = amount === null ? action.label : `${action.label}: ${fmt(amount, unit)}`;
   // PRE-FLIGHT, because the chain's refusal is unreadable. An account that cannot pay rejects the external before the
   // VM starts, and the lite server reports that as "exitcode=0, steps=0, gas_used=0" — a sentence that says nothing
@@ -260,7 +315,7 @@ async function refreshAll() {
   setStatus('Чтение цепи…');
   for (const bucket of BUCKETS) {
     await readBucket(bucket);
-    await sleep(1100);   // the keyless bucket is ~1 request per second; see rpc()
+    await sleep(READ_SPACING_MS);   // the keyless bucket is ~1 request per second; see rpc()
   }
   const failed = BUCKETS.filter((b) => $(`card-${b.key}`).dataset.state === 'error').length;
   setStatus(failed === 0 ? 'Прочитано' : `Прочитано, ${failed} не ответили`, failed === 0 ? 'good' : 'bad');

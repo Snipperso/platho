@@ -76,3 +76,6 @@ main { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(
 
 .actions { display: grid; gap: 6px; }
 .actions .note { margin: 0 0 6px; font-size: 11px; }
+/* A dead button has to say why. Muted rather than red: an unmet precondition is the normal state of the buyback
+   between accumulations, not a fault. */
+.actions .note[data-blocked="true"] { color: var(--muted); font-style: italic; }

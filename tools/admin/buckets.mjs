@@ -31,6 +31,13 @@ export const USERNAME_ATH_TREASURY_EXEC = 50_000_000n;   // USERNAME_ATH_TRANSFE
 export const USERNAME_ATH_BURN_EXEC = 7_000_000n;        // USERNAME_ATH_BURN_EXEC_RESERVE + LOCAL
 export const PROFILE_ATH_TREASURY_EXEC = 50_000_000n;
 export const PROFILE_ATH_BURN_EXEC = 7_000_000n;
+// The buyback pays for its own STON.fi hop out of the RESERVE it accumulated; the caller funds only the compute that
+// starts it. NOT returned, unlike the flushes above — there is no refund path in the receiver and the surplus simply
+// joins the contract's balance. It is 0.05 GRAM, and it is the protocol's own contract, so this is a rounding error
+// rather than a cost, but a note that claimed a refund would be a lie.
+export const BUYBACK_EXECUTE_EXEC = 50_000_000n;         // BUYBACK_PTON_TRANSFER_GAS_NANOTONS (gate 22216)
+/** What must have ACCUMULATED before a chunk can fire at all (gate 22212). One chunk spends exactly this. */
+export const BUYBACK_FUNDING_ENVELOPE = 51_050_000_000n; // BUYBACK_FUNDING_ENVELOPE_NANOTONS
 
 /** GRAM = 9 decimals, ATH = 9 decimals. Kept separate because the unit is what a reader gets wrong, not the scale. */
 export const UNIT = { gram: 'GRAM', ath: 'ATH', bool: 'bool' };
@@ -115,11 +122,44 @@ export const BUCKETS = [
       { field: 'route_refund_due_ton', at: 8, label: 'Возврат с маршрута', unit: UNIT.gram },
       { field: 'last_terminal_query_id', at: 10, label: 'Последний query_id', unit: null },
     ],
-    // ExecuteBuybackChunk deliberately has NO button yet. It needs the frozen quote pair out of the contract's own
-    // state and its query_id must be EXACTLY last_terminal + 1 — the strict form the seller later moved away from
-    // because it is racy. Neither is hard, but neither can be written blind, and the lane cannot fire at all until
-    // 51.05 GRAM has accumulated above. A button that bounces every time is worse than an honest empty space.
-    actions: [],
+    // A SECOND read, and the only card that needs one: the execution quote is frozen into the CONFIG view while
+    // everything else the operator looks at lives in the state view. Showing it rather than fetching it silently is
+    // the point — these two numbers ARE the price the swap will accept, and the operator signs them.
+    extra: {
+      getter: 'get_buyback_burn_config',
+      struct: 'BuybackBurnConfigView',
+      rows: [
+        { field: 'route_frozen', at: 4, label: 'Маршрут заморожен', unit: UNIT.bool },
+        { field: 'evidence_quote_out_atomic_ath', at: 19, label: 'Котировка (ожидаемый выход)', unit: UNIT.ath },
+        { field: 'evidence_dex_min_out_atomic_ath', at: 20, label: 'Минимум с биржи', unit: UNIT.ath },
+      ],
+    },
+    actions: [
+      {
+        id: 'buyback-execute',
+        label: 'Выкупить и сжечь',
+        // "BYEX" — op(32) | query_id(64) | quote_out(128) | dex_min_out(128). The operator types NOTHING: all three
+        // come out of the contract's own state, because all three are values the contract will compare against
+        // itself. query_id must be EXACTLY last_terminal + 1 (gate 22044) and the pair must equal the frozen
+        // evidence (22046/22047) — a hand-entered figure here could only ever be wrong.
+        opcode: 0x42594558n,
+        arg: { kind: 'buybackExecute' },
+        enabledBy: 'reserve_due_ton',
+        unit: UNIT.gram,
+        value: BUYBACK_EXECUTE_EXEC,
+        // FOUR preconditions, not one, and this is why the button did not exist until now. `enabledBy` alone would
+        // have offered it at 3.27 GRAM accumulated and bounced on 22212 every time — the failure this file's own
+        // header calls worse than an honest empty space. Each unmet condition names itself under the button.
+        requires: [
+          { field: 'route_frozen', equals: 1n, unmet: 'маршрут STON.fi ещё не заморожен' },
+          { field: 'phase', equals: 0n, unmet: 'предыдущий выкуп ещё не завершён' },
+          { field: 'reserve_due_ton', atLeast: BUYBACK_FUNDING_ENVELOPE, unmet: 'накоплено меньше 51.05 GRAM на один выкуп' },
+          { field: 'evidence_quote_out_atomic_ath', atLeast: 1n, unmet: 'котировка маршрута не зафиксирована' },
+        ],
+        note: 'Один выкуп тратит ровно 51.05 GRAM из накопленного: GRAM уходит на STON.fi, купленный ATH сжигается. '
+          + 'Котировка и query_id берутся из состояния контракта. 0.05 GRAM на исполнение НЕ возвращаются.',
+      },
+    ],
   },
   {
     key: 'username_registry',
