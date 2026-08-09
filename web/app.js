@@ -259,7 +259,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v896';
+const PLATHO_APP_RUNTIME_VERSION = 'v897';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -1211,6 +1211,17 @@ let walletIdentityFlashTimer = null;
 let profileAvatarPickerSuppressedUntil = 0;
 let imageLightboxPreviousFocus = null;
 let walletUnlockPromise = null;
+// [OWNER 2026-08-09] "Sometimes the unlock dialog does not appear on resume, though the wallet is locked."
+//
+// The chain was: the unlock prompt clears walletUnlockPromptPending BEFORE it opens the password dialog, and
+// lockPlathoWallet — the ONLY thing that re-arms it — returns immediately when the wallet is already locked. So
+// backgrounding WHILE the unlock dialog was open left pending=false with nobody to set it again: the app came back
+// unlocked-looking, locked in fact, and silent.
+//
+// This remembers that an unlock was IN FLIGHT when the app went away, which is what separates an interruption from
+// a deliberate dismissal. A user who closes the dialog to browse the public feed locked is not asked again; a user
+// whose dialog was taken away by the OS is.
+let walletUnlockPromptInterrupted = false;
 let walletAutoLockTimer = null;
 let walletUnlockPromptPending = false;
 let walletUnlockPromptTimer = null;
@@ -4055,6 +4066,7 @@ function noteWalletActivity() {
 function markWalletUnlocked() {
   lastWalletUnlockAt = Date.now();
   walletUnlockPromptPending = false;
+  walletUnlockPromptInterrupted = false;
   clearWalletUnlockPromptTimer();
   clearTelegramBackgroundLockTimer();
 }
@@ -4202,6 +4214,25 @@ function lockPlathoWalletForBackground() {
   lockPlathoWallet(t('wallet.locked'), { transient: true });
 }
 
+/** An unlock was on screen when the app went away — the dialog may not survive, so the intent has to. */
+function noteWalletUnlockInterruptedByBackground() {
+  if (walletUnlockPromise) walletUnlockPromptInterrupted = true;
+}
+
+/**
+ * Coming back to the foreground. An INTERRUPTED unlock is re-armed (armWalletUnlockPrompt sets the pending flag
+ * that lockPlathoWallet could not, because the wallet was already locked); anything else keeps the old behaviour,
+ * so a dialog the user closed on purpose does not come back on every app switch.
+ */
+function resumeWalletUnlockPrompt() {
+  if (walletUnlockPromptInterrupted) {
+    walletUnlockPromptInterrupted = false;
+    armWalletUnlockPrompt();
+    return;
+  }
+  scheduleWalletUnlockPrompt();
+}
+
 function shouldOpenWalletUnlockPrompt() {
   return Boolean(walletUnlockPromptPending)
     && !document.hidden
@@ -4220,7 +4251,13 @@ function scheduleWalletUnlockPrompt(delayMs = 180) {
   showBootScreenForRelock();
   walletUnlockPromptTimer = setTimeout(async () => {
     walletUnlockPromptTimer = null;
-    if (!shouldOpenWalletUnlockPrompt()) return;
+    if (!shouldOpenWalletUnlockPrompt()) {
+      // The branded overlay went up ABOVE, before this timer, and something in between (a dialog opening, the app
+      // being hidden again) has since made the prompt unwanted. Bailing silently would leave the overlay covering
+      // the whole app with nothing behind it to lift it — a worse failure than the missing prompt this fixes.
+      markBootAppReady();
+      return;
+    }
     walletUnlockPromptPending = false;
     try {
       const wallet = await loadPlathoWallet();
@@ -24791,10 +24828,11 @@ document.addEventListener('visibilitychange', () => {
     clearMessageAutoSyncTimer();
     clearVaultAutoRefreshTimer();
     stopIntroReceiveLane();
+    noteWalletUnlockInterruptedByBackground();
     lockPlathoWalletForBackground();
   } else {
     clearTelegramBackgroundLockTimer();
-    scheduleWalletUnlockPrompt();
+    resumeWalletUnlockPrompt();
     scheduleMessageAutoSync(2_000);
     armIntroReceiveLane().catch((error) => console.warn('[intro] arm on visible failed', error));
     // Retry a recovery restore that a transient RPC error left incomplete (it did not latch), and re-fire a backup a
@@ -24813,6 +24851,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('pagehide', () => {
+  noteWalletUnlockInterruptedByBackground();
   clearMessageAutoSyncTimer();
   clearVaultAutoRefreshTimer();
   lockPlathoWalletForBackground();
@@ -24821,7 +24860,7 @@ window.addEventListener('pageshow', () => {
   clearTelegramBackgroundLockTimer();
   resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
-  scheduleWalletUnlockPrompt();
+  resumeWalletUnlockPrompt();
   scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
     refreshVaultNow({ includeActivation: true }).catch((error) => {
