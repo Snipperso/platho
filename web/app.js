@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=22';
+} from './public-channel-subscriptions.mjs?v=23';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -149,7 +149,6 @@ import {
   PUBLIC_POST_TEXT_MAX_BYTES,
   readPublicPostPayload,
   readPublicPartHeaderInfo,
-  REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
   tonCell,
   USERNAME_MINT_DIRECT_NOTIFY_VALUE_NANOTONS,
   USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS,
@@ -233,7 +232,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=49';
+} from './i18n.mjs?v=50';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -249,7 +248,7 @@ applyStaticTranslations();
 // (handleServiceWorkerControllerChange) compares the LIVE index.html label against this running const, so a
 // release that bumps one without the other either misses updates or flags them forever. The sidebar badge also
 // renders this — it is the one on-device way to tell WHICH build a device actually runs (TMA webviews cache hard).
-const PLATHO_APP_RUNTIME_VERSION = 'v889';
+const PLATHO_APP_RUNTIME_VERSION = 'v890';
 
 document.documentElement.dataset.plathoAppJs = 'started';
 // 'ready' is the terminal healthy marker for the boot-guard watchdog; late
@@ -662,10 +661,8 @@ rpcKeyRow?.addEventListener('click', (event) => {
 });
 
 refreshToncenterKeyUi();
-const flushAthButton = document.querySelector('#flushAthButton');
 const buyAthButton = document.querySelector('#buyAthButton');
 const buyAthStatus = document.querySelector('#buyAthStatus');
-const flushAthStatus = document.querySelector('#flushAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
 const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
 const claimAirdropButton = document.querySelector('#claimAirdropButton');
@@ -1302,9 +1299,9 @@ const SEND_LOCK_MAX_GRACE_MS = 600 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
-// Starts at 2s: a claim/flush executes within a couple of TON blocks, and the owner watches the number the whole
-// time. The long tail stays for a chain that is slow to include.
-const ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000];
+// Starts at 2s: an airdrop claim executes within a couple of TON blocks, and the owner watches the number the
+// whole time. The long tail stays for a chain that is slow to include.
+const ATH_POST_TRANSACTION_REFRESH_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000];
 const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
 // Foreground IDLE fast tier. There is no push in a no-backend messenger — the recipient must poll to
@@ -1490,31 +1487,9 @@ let vaultProtocolState = {
 let athProtocolState = {
   total_supply: null,
 };
-// Optimistic burn overlay for the "Current supply" row: set when a burn flush is submitted so the number
-// drops IMMEDIATELY by the flushed amount instead of waiting ~15-45s for the burn chain (wallet -> registry
-// -> ATH master) to land. Display-only — never feeds a transaction; cleared as soon as the chain read
-// reflects the burn (supply <= baseline - amount) or on TTL expiry, so a downstream failure self-corrects.
-let athSupplyOptimisticBurn = null;
-const ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS = 5 * 60 * 1000;
-// After a flush is SENT, the chain keeps answering the pre-flush state (due>0, pending=0) until the wallet
-// transaction lands — and the immediate post-transaction refresh used to overwrite the optimistic "flushing"
-// state with that stale read, re-arming the button mid-flight ("250 ATH ready" + active button right after a
-// tap; a second tap would send a duplicate flush). This overlay holds the flushed buckets at due=0/pending+1
-// until the chain visibly moves (pending counted or the due changed) or the TTL expires (lost transaction ->
-// the button honestly re-arms). Protocol-level counters, not wallet-scoped.
-let athFlushOptimisticFlush = null;
-const ATH_FLUSH_OPTIMISTIC_FLUSH_TTL_MS = 5 * 60 * 1000;
 // External-message fee headroom on top of the summed message values when pre-checking the WALLET balance.
-// Shared by every direct-pay pre-flight (ATH flush, avatar, public post/comment) — one number, one meaning.
+// Shared by every direct-pay pre-flight (avatar, public post/comment) — one number, one meaning.
 const WALLET_FEE_HEADROOM_NANOTONS = 10_000_000n;
-let athFlushState = {
-  username_burn_due_ath: null,
-  profile_burn_due_ath: null,
-  username_pending_burn_flush_count: null,
-  profile_pending_burn_flush_count: null,
-  busy: false,
-  error: null,
-};
 
 // This wallet's activity-credit ticket. `credits === null` means NOT READ YET — distinct from a read that found no
 // account, which is `credits = 0n` and the ordinary state of a wallet that has not published. Conflating the two
@@ -14476,19 +14451,6 @@ function airdropClaimCostLabel() {
   return t('common.gramAmount', { amount: formatTonNanotons(cost) });
 }
 
-/**
- * What a flush will cost: one message per bucket that actually has something to send. The condition mirrors
- * submitAthDueFlush exactly — due > 0 and nothing already pending — so the row quotes the value the wallet will be
- * asked to sign, not a nominal per-message figure.
- */
-function athFlushCostNanotons(state = athFlushState) {
-  const buckets = [
-    [state.username_burn_due_ath, state.username_pending_burn_flush_count],
-    [state.profile_burn_due_ath, state.profile_pending_burn_flush_count],
-  ].filter(([due, pending]) => nonNegativeBigInt(due) > 0n && nonNegativeBigInt(pending) === 0n).length;
-  return BigInt(buckets) * REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS;
-}
-
 function profileAvatarTonFeeLabel(attachment) {
   if (!attachment) return t('avatar.estimatedAfterCompression');
   const parts = Math.max(1, imageAttachmentPartCount(attachment));
@@ -16749,7 +16711,6 @@ function refreshMessagingControls() {
   // The comments checkbox (and its label dim class) is owned by refreshPublicSendButtonState — one predicate
   // for the whole public composer row, no scattered weaker writes.
   refreshPublicSendButtonState();
-  renderAthFlushStatus();
   railItems.forEach((item) => {
     item.disabled = false;
     item.title = item.getAttribute('aria-label') ?? '';
@@ -18069,7 +18030,7 @@ async function submitAirdropClaim() {
   athClaimState = { busy: false, error: null, errorCode: null, pendingSince: Date.now() };
   renderAthProfileStats();
   renderAthClaimStatus();
-  queueAthFlushPostTransactionRefresh();
+  queueAthPostTransactionRefresh();
 }
 
 claimAirdropButton?.addEventListener('click', async () => {
@@ -18087,7 +18048,7 @@ claimAirdropButton?.addEventListener('click', async () => {
       pendingSince: athClaimState.pendingSince ?? null,
     };
     flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
-      ? t('profile.flushNeedsWalletGram')
+      ? t('common.needsWalletGram')
       : t('common.syncDelayed'));
     console.error(error);
   } finally {
@@ -18096,27 +18057,6 @@ claimAirdropButton?.addEventListener('click', async () => {
 });
 
 buyAthButton?.addEventListener('click', () => { openBuyAthDialog().catch((error) => console.error(error)); });
-
-flushAthButton?.addEventListener('click', async () => {
-  try {
-    flushAthButton.disabled = true;
-    await submitAthDueFlush();
-  } catch (error) {
-    athFlushState = {
-      ...athFlushState,
-      busy: false,
-      error: String(error?.message ?? error ?? 'ATH flush blocked'),
-      errorCode: error?.code ?? null,
-    };
-    renderAthFlushStatus();
-    flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
-      ? t('profile.flushNeedsWalletGram')
-      : t('wallet.athFlushBlocked'));
-    console.error(error);
-  } finally {
-    renderAthFlushStatus();
-  }
-});
 
 replaceVaultKeysButton?.addEventListener('click', async () => {
   try {
@@ -19485,83 +19425,6 @@ function formatAthAtomicGrouped(value) {
   return groupDecimalText(formatAthAtomic(value));
 }
 
-// Merge the in-flight flush overlay into a fresh chain read (see athFlushOptimisticFlush). Per bucket: while
-// the chain still shows the EXACT pre-flush picture (same due, zero pending), keep displaying due=0/pending+1
-// so the button stays down and the status says "flushing"; the moment the chain moves (pending counted, due
-// changed — including a NEW accrual arriving mid-flight) that bucket trusts the chain again. Display-only:
-// nothing here signs, sends, or feeds a transaction.
-function applyAthFlushOptimisticOverlay(state) {
-  const overlay = athFlushOptimisticFlush;
-  if (!overlay) return state;
-  if (Date.now() > overlay.until) {
-    athFlushOptimisticFlush = null;
-    return state;
-  }
-  const out = { ...state };
-  for (const bucket of ['username', 'profile']) {
-    const hold = overlay[bucket];
-    if (!hold?.flushed) continue;
-    const dueKey = `${bucket}_burn_due_ath`;
-    const pendingKey = `${bucket}_pending_burn_flush_count`;
-    const chainDue = nonNegativeBigInt(state[dueKey]);
-    const chainPending = nonNegativeBigInt(state[pendingKey]);
-    if (chainPending > 0n || chainDue !== hold.baselineDue) {
-      hold.flushed = false;
-      continue;
-    }
-    out[dueKey] = 0n;
-    out[pendingKey] = chainPending + 1n;
-  }
-  if (!overlay.username?.flushed && !overlay.profile?.flushed) athFlushOptimisticFlush = null;
-  return out;
-}
-
-function athFlushReadyAmount(state = athFlushState) {
-  return nonNegativeBigInt(state.username_burn_due_ath) + nonNegativeBigInt(state.profile_burn_due_ath);
-}
-
-function athFlushPendingCount(state = athFlushState) {
-  return nonNegativeBigInt(state.username_pending_burn_flush_count) + nonNegativeBigInt(state.profile_pending_burn_flush_count);
-}
-
-function athFlushStateKnown(state = athFlushState) {
-  return state.username_burn_due_ath !== null || state.profile_burn_due_ath !== null;
-}
-
-function athFlushStatusText(state = athFlushState) {
-  if (state.busy) return t('profile.flushing');
-  // The one actionable failure gets its own words: the flush is paid by the WALLET, and "sync delayed"
-  // told the user nothing about topping it up.
-  if (state.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') return t('profile.flushNeedsWalletGram');
-  if (state.error) return t('common.syncDelayed');
-  if (!athFlushStateKnown(state)) return t('common.checking');
-  const ready = athFlushReadyAmount(state);
-  const pending = athFlushPendingCount(state);
-  // The cost rides along only when this press would actually send something. With every bucket already pending
-  // there is nothing to pay for, and quoting a price for a button that will refuse would be its own small lie.
-  const cost = athFlushCostNanotons(state);
-  const withCost = (text) => (cost > 0n
-    ? t('profile.amountWithCost', { amount: text, cost: t('common.gramAmount', { amount: formatTonNanotons(cost) }) })
-    : text);
-  if (ready > 0n && pending > 0n) {
-    return withCost(t('profile.readyPlusPending', { amount: formatAthProfileAmount(ready) }));
-  }
-  if (ready > 0n) return withCost(t('profile.readyAmount', { amount: formatAthProfileAmount(ready) }));
-  if (pending > 0n) return t('profile.flushPending');
-  return t('profile.zeroAthReady');
-}
-
-function renderAthFlushStatus() {
-  const ready = athFlushReadyAmount();
-  const canFlush = Boolean(plathoWallet?.address) && !athFlushState.busy && ready > 0n;
-  if (flushAthButton) flushAthButton.disabled = !canFlush;
-  setProfileActionStatus(
-    flushAthStatus,
-    !plathoWallet?.address ? t('common.walletRequiredStatus') : athFlushStatusText(),
-    athFlushState.error ? 'error' : (athFlushState.busy ? 'busy' : ''),
-  );
-}
-
 function formatBasisPointsPercent(bps) {
   const basis = nonNegativeBigInt(bps);
   const whole = basis / 100n;
@@ -19569,19 +19432,6 @@ function formatBasisPointsPercent(bps) {
   return fraction === 0n
     ? `${whole}%`
     : `${whole}.${fraction.toString().padStart(2, '0').replace(/0+$/, '')}%`;
-}
-
-function athSupplyDisplayValue() {
-  const supply = athProtocolState.total_supply;
-  if (supply === null || !athSupplyOptimisticBurn) return supply;
-  const { baseline, amount, until } = athSupplyOptimisticBurn;
-  if (Date.now() > until || supply <= baseline - amount) {
-    // The chain read now reflects the burn (or the overlay expired) — trust the chain.
-    athSupplyOptimisticBurn = null;
-    return supply;
-  }
-  const adjusted = supply - amount;
-  return adjusted < 0n ? 0n : adjusted;
 }
 
 /** Whether a claim can be signed right now, and why not when it cannot. */
@@ -19611,7 +19461,7 @@ function renderAthClaimStatus() {
   if (claimAirdropButton) claimAirdropButton.disabled = athClaimState.busy || !athClaimReady();
   if (!claimAirdropStatus) return;
   if (athClaimState.busy) { setText(claimAirdropStatus, t('profile.claiming')); return; }
-  if (athClaimState.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') { setText(claimAirdropStatus, t('profile.flushNeedsWalletGram')); return; }
+  if (athClaimState.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') { setText(claimAirdropStatus, t('common.needsWalletGram')); return; }
   if (athClaimState.error) { setText(claimAirdropStatus, t('common.syncDelayed')); return; }
   if (athTicketState.credits === null) { setText(claimAirdropStatus, t('profile.statusChecking')); return; }
   // A claim already on its way: the ticket moved the credits into flight and is waiting on the redeem leg. Showing
@@ -19635,8 +19485,7 @@ function renderAthClaimStatus() {
 }
 
 function renderAthProfileStats() {
-  setText(athSupplyStatus, formatAthProfileAmount(athSupplyDisplayValue()));
-  renderAthFlushStatus();
+  setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
   const total = nonNegativeBigInt(
     vaultProtocolState?.airdrop_total_allocation_ath,
     VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
@@ -21008,62 +20857,6 @@ async function resolveAthMasterProvider() {
   return provider;
 }
 
-async function readAthBurnFlushState() {
-  const readOptions = criticalChainReadOptions();
-  // Read the two registry globals SEQUENTIALLY (not concurrently) — concurrent toncenter reads stall the iOS
-  // run loop (the v509 pattern). Keep the {status,value/reason} settled shape the rest of the fn expects.
-  const usernameResult = await resolveUsernameRegistryProvider()
-    .then((provider) => withVaultReadLock(() => provider.getGlobal({ address: requireUsernameRegistryAddress(), ...readOptions })))
-    .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
-  const profileResult = await resolveProfileRegistryProvider()
-    .then(({ provider, address }) => withVaultReadLock(() => provider.getGlobal({ address, ...readOptions })))
-    .then((value) => ({ status: 'fulfilled', value }), (reason) => ({ status: 'rejected', reason }));
-  const next = {
-    username_burn_due_ath: null,
-    profile_burn_due_ath: null,
-    username_pending_burn_flush_count: null,
-    profile_pending_burn_flush_count: null,
-    busy: athFlushState.busy,
-    error: null,
-  };
-  if (usernameResult.status === 'fulfilled') {
-    next.username_burn_due_ath = nonNegativeBigInt(usernameResult.value?.burn_due_ath);
-    next.username_pending_burn_flush_count = nonNegativeBigInt(usernameResult.value?.pending_burn_flush_count);
-  } else {
-    noteTonRpcRateLimit(usernameResult.reason);
-  }
-  if (profileResult.status === 'fulfilled') {
-    next.profile_burn_due_ath = nonNegativeBigInt(profileResult.value?.burn_due_ath);
-    next.profile_pending_burn_flush_count = nonNegativeBigInt(profileResult.value?.pending_burn_flush_count);
-  } else {
-    noteTonRpcRateLimit(profileResult.reason);
-  }
-  if (usernameResult.status === 'rejected' && profileResult.status === 'rejected') {
-    throw usernameResult.reason ?? profileResult.reason ?? new Error('ATH flush state is unavailable');
-  }
-  return next;
-}
-
-async function refreshAthFlushState() {
-  renderAthFlushStatus();
-  try {
-    // The overlay keeps a just-sent flush visible (button down, "flushing") while the chain still answers
-    // the pre-flush state — a bare overwrite here used to re-arm the button mid-flight.
-    athFlushState = applyAthFlushOptimisticOverlay(await readAthBurnFlushState());
-    renderAthFlushStatus();
-    return athFlushState;
-  } catch (error) {
-    athFlushState = {
-      ...athFlushState,
-      busy: false,
-      error: String(error?.message ?? error ?? 'ATH flush state unavailable'),
-      errorCode: null,
-    };
-    renderAthFlushStatus();
-    throw error;
-  }
-}
-
 async function refreshAthProtocolStats() {
   return await refreshAthProtocolStatsRun();
 }
@@ -21383,21 +21176,16 @@ async function submitBuyAth(amountAtomic) {
 
 async function refreshAthProtocolStatsRun() {
   renderAthProfileStats();
-  // Serialize the ATH-stats reads (jetton -> flush), one at a time. Reads that overlap are the iOS
-  // run-loop-stall pattern (v509).
+  // Serialize the ATH-stats reads, one at a time. Reads that overlap are the iOS run-loop-stall pattern (v509).
   try {
     const provider = await resolveAthMasterProvider();
-    if (!provider?.getJettonData) {
-      await refreshAthFlushState();
-      return athProtocolState;
-    }
+    if (!provider?.getJettonData) return athProtocolState;
     const data = await withVaultReadLock(() => provider.getJettonData({ address: requireAthMasterAddress() }));
     athProtocolState = {
       total_supply: data?.total_supply === null || data?.total_supply === undefined
         ? null
         : nonNegativeBigInt(data.total_supply),
     };
-    await refreshAthFlushState();
     await refreshAthTicketState();
     await refreshAthPoolState();
     await refreshMarketStabilityState();
@@ -21405,12 +21193,11 @@ async function refreshAthProtocolStatsRun() {
     return athProtocolState;
   } catch (error) {
     noteTonRpcRateLimit(error);
-    await refreshAthFlushState().catch(() => {});
     return athProtocolState;
   }
 }
 
-function queueAthFlushPostTransactionRefresh() {
+function queueAthPostTransactionRefresh() {
   // [OWNER 2026-08-03] Claimed 100 ATH and the balance did not appear for a long time. The ticket stats were re-read
   // on this schedule, but the ATH BALANCE CARD is fed by a DIFFERENT path (refreshVaultNavBalanceInBackground), which
   // nobody told about the claim — so the number the user was actually watching waited for the next background tick.
@@ -21420,7 +21207,7 @@ function queueAthFlushPostTransactionRefresh() {
     refreshVaultNavBalanceInBackground().catch(() => {});
   };
   tick();
-  for (const delayMs of ATH_FLUSH_POST_TRANSACTION_REFRESH_DELAYS_MS) setTimeout(tick, delayMs);
+  for (const delayMs of ATH_POST_TRANSACTION_REFRESH_DELAYS_MS) setTimeout(tick, delayMs);
 }
 
 function isVaultViewActive() {
@@ -21878,97 +21665,6 @@ async function submitUsernameMint() {
   // (submitUsernameMintDirect). The removed Vault half read the Vault user/global, verified a Vault->registry
   // route and signed a Vault auth external — none of which exists once the wallet pays the registry itself.
   return submitUsernameMintDirect(username);
-}
-
-async function submitAthDueFlush() {
-  requireNoPendingServiceWorkerAppShellReload();
-  requirePlathoWallet();
-  athFlushState = {
-    ...athFlushState,
-    busy: true,
-    error: null,
-    errorCode: null,
-  };
-  renderAthFlushStatus();
-  const state = await readAthBurnFlushState();
-  athFlushState = {
-    ...state,
-    busy: true,
-    error: null,
-    errorCode: null,
-  };
-  renderAthFlushStatus();
-  const messages = [];
-  const flushedBuckets = [];
-  const usernameDue = nonNegativeBigInt(state.username_burn_due_ath);
-  const profileDue = nonNegativeBigInt(state.profile_burn_due_ath);
-  const usernamePending = nonNegativeBigInt(state.username_pending_burn_flush_count);
-  const profilePending = nonNegativeBigInt(state.profile_pending_burn_flush_count);
-  if (usernameDue > 0n && usernamePending === 0n) {
-    messages.push(createUsernameRegistryMessage('FlushBurnAthDue', {
-      query_id: nextQueryId(),
-    }, {
-      usernameRegistryAddress: requireUsernameRegistryAddress(),
-      valueNanotons: REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
-    }));
-    flushedBuckets.push('username');
-  }
-  if (profileDue > 0n && profilePending === 0n) {
-    messages.push(createProfileRegistryMessage('FlushProfileBurnAthDue', {
-      query_id: nextQueryId(),
-    }, {
-      profileRegistryAddress: requireProfileRegistryAddress(),
-      valueNanotons: REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
-    }));
-    flushedBuckets.push('profile');
-  }
-  if (messages.length === 0) {
-    const pending = athFlushPendingCount(state);
-    throw new Error(pending > 0n ? 'ATH burn flush is already pending' : 'No ATH is ready to flush');
-  }
-  // The flush messages are paid by the WALLET, not the Vault (the rail balance the user sees) — a zero-GRAM
-  // wallet broadcast never lands and the only feedback was "flush pending" until the overlay TTL re-armed
-  // (owner hit exactly this). Check the wallet balance FIRST and fail with an actionable status instead of
-  // sending into the void. Fail-open on an unreadable balance (null): a flaky read must not block a funded
-  // wallet — the send itself remains the authority.
-  const requiredNanotons = BigInt(messages.length) * REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS
-    + WALLET_FEE_HEADROOM_NANOTONS;
-  const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
-  if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < requiredNanotons) {
-    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(requiredNanotons) }));
-    error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
-    throw error;
-  }
-  const transaction = createWalletTransaction(messages);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  // Arm the in-flight overlay FIRST, then derive the displayed state through the same merge every later
-  // refresh uses — one source for the optimistic picture (see applyAthFlushOptimisticOverlay).
-  athFlushOptimisticFlush = {
-    username: { flushed: flushedBuckets.includes('username'), baselineDue: usernameDue },
-    profile: { flushed: flushedBuckets.includes('profile'), baselineDue: profileDue },
-    until: Date.now() + ATH_FLUSH_OPTIMISTIC_FLUSH_TTL_MS,
-  };
-  athFlushState = {
-    ...applyAthFlushOptimisticOverlay(state),
-    busy: false,
-    error: null,
-  };
-  globalThis.plathoLastAthDueFlush = { state, messages, transaction, result, flushedBuckets };
-  // Optimistic supply drop: the flushed dues WILL be burned once the chain processes the flush; show the
-  // post-burn supply right away (display-only overlay, cleared when the chain read reflects the burn).
-  const flushedAmount = (flushedBuckets.includes('username') ? usernameDue : 0n)
-    + (flushedBuckets.includes('profile') ? profileDue : 0n);
-  if (athProtocolState.total_supply !== null && flushedAmount > 0n) {
-    athSupplyOptimisticBurn = {
-      baseline: athProtocolState.total_supply,
-      amount: flushedAmount,
-      until: Date.now() + ATH_SUPPLY_OPTIMISTIC_BURN_TTL_MS,
-    };
-  }
-  renderAthProfileStats();
-  queueAthFlushPostTransactionRefresh();
-  flashWalletIdentityStatus(t('wallet.athFlushSubmitted'));
-  return result;
 }
 
 // Direct-pay avatar funding (clean-17). notify_value 66M is above the ~49M a FIRST avatar record needs to land at
@@ -24375,7 +24071,6 @@ globalThis.plathoVaultTransactions = {
   createPublicPostPayload,
   createWalletTransaction,
   submitUsernameMint,
-  submitAthDueFlush,
   submitProfileAvatarUpdate,
   submitVaultRegisterMessagingKeys,
   syncPrivateCapsulesFromChain,
