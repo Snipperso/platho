@@ -101,13 +101,32 @@ describe('operator console', () => {
     // page nobody uses twice.
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
     expect(pkg.scripts.admin, 'npm run admin must exist').toBe('node scripts/serve_admin.mjs');
+
+    // A DOUBLE-CLICKABLE launcher, because two attempts to start this by typing failed for two different reasons and
+    // neither was the operator's fault. cmd is not subject to the PowerShell execution policy; %~dp0 makes it work
+    // from wherever the repo was cloned; and it refuses with a sentence rather than a flash if node is missing.
+    const bat = readFileSync('tools/admin/admin.bat', 'utf8');
+    expect(bat, 'CRLF, or Windows reads it as one line').toContain('\r\n');
+    expect(bat).toMatch(/cd \/d "%~dp0\.\.\\\.\."/);
+    expect(bat).toMatch(/where node >nul 2>nul/);
+    expect(bat).toMatch(/node scripts\\serve_admin\.mjs/);
+    expect(bat, 'the launcher must not open the browser itself — it would race the port').not.toMatch(/start "" http/);
+    // The server opens it instead, from the callback that knows the socket is accepting.
+    const opens = readFileSync('scripts/serve_admin.mjs', 'utf8');
+    expect(opens).toMatch(/\}\)\.listen\(PORT, '127\.0\.0\.1', \(\) => \{[\s\S]{0,900}spawn\(command, args/);
     const html = readFileSync('tools/admin/index.html', 'utf8');
     expect(html).toMatch(/location\.protocol === 'file:'/);
-    expect(html, 'the hint must name the command').toMatch(/npm run admin/);
+    // The hint names the NODE form, not npm. On Windows npm ships as a PowerShell script and the default execution
+    // policy refuses it outright — the owner's second failure in a row — and telling anyone to relax a machine
+    // security setting to look at a balance is not a fix.
+    expect(html, 'the hint must name a command that needs no npm').toMatch(/node scripts\/serve_admin\.mjs/);
     // A CLASSIC script: over file:// the module never loads, so only non-module code can report it.
     expect(html).toMatch(/<script>\s*\n\s*if \(location\.protocol === 'file:'\)/);
-    // And the server must serve the repo root, because the addresses live in artifacts/ while the page lives in tools/.
     const server = readFileSync('scripts/serve_admin.mjs', 'utf8');
+    // The root is derived from the SCRIPT, so the command works from any directory. A cwd-based root turns "run it
+    // from the wrong folder" into a page of 404s with no explanation.
+    expect(server).toMatch(/const ROOT = resolve\(dirname\(fileURLToPath\(import\.meta\.url\)\), '\.\.'\);/);
+    expect(server, 'never the working directory').not.toMatch(/const ROOT = resolve\('\.'\)/);
     expect(server).toMatch(/const ALLOWED_PREFIXES = \['tools', 'web', 'artifacts'\];/);
     expect(server, 'a local tool has no business exposing the whole tree').toMatch(/if \(!ALLOWED_PREFIXES\.includes\(top\)\) return null;/);
     expect(server, 'and no business following ..').toMatch(/if \(!full\.startsWith\(ROOT \+ sep\)\) return null;/);
