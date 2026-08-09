@@ -116,10 +116,11 @@ function renderActions(bucket, values) {
   const box = $(`card-${bucket.key}`).querySelector('.actions');
   box.replaceChildren();
   for (const action of bucket.actions) {
-    const amount = action.arg?.kind === 'amountFrom' ? values[action.arg.field] : null;
+    const amount = actionAmount(action, values);
+    const unit = action.arg?.kind === 'amountFrom' ? 'GRAM' : 'ATH';
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = amount === null ? action.label : `${action.label} — ${fmt(amount, 'GRAM')}`;
+    button.textContent = amount === null ? action.label : `${action.label} — ${fmt(amount, unit)}`;
     button.disabled = amount !== null && amount <= 0n;
     button.addEventListener('click', () => { runAction(bucket, action, values).catch((e) => setStatus(String(e.message ?? e), 'bad')); });
     const note = document.createElement('p');
@@ -132,14 +133,25 @@ function renderActions(bucket, values) {
 function buildBody(action, values) {
   const cell = beginCell().uint(action.opcode, 32, 'op');
   if (action.arg?.kind === 'amountFrom') cell.uint(values[action.arg.field], action.arg.bits, action.arg.field);
+  // A query_id only has to be positive and not already used by a pending flush, so wall-clock milliseconds are safe
+  // and — unlike the buyback's strict last+1 — cannot be raced out from under the caller.
+  if (action.arg?.kind === 'queryId') cell.uint(BigInt(Date.now()), action.arg.bits, 'query_id');
   return cell.endCell();
+}
+
+/** The bucket whose being non-zero makes an action worth offering, and the figure to show on the button. */
+function actionAmount(action, values) {
+  if (action.arg?.kind === 'amountFrom') return values[action.arg.field];
+  if (action.enabledBy) return values[action.enabledBy];
+  return null;
 }
 
 async function runAction(bucket, action, values) {
   if (!wallet) { setStatus('Сначала подключите кошелёк пульта', 'bad'); return; }
-  const amount = action.arg?.kind === 'amountFrom' ? values[action.arg.field] : null;
+  const amount = actionAmount(action, values);
   if (amount !== null && amount <= 0n) return;
-  const human = amount === null ? action.label : `${action.label}: ${fmt(amount, 'GRAM')}`;
+  const unit = action.arg?.kind === 'amountFrom' ? 'GRAM' : 'ATH';
+  const human = amount === null ? action.label : `${action.label}: ${fmt(amount, unit)}`;
   if (!window.confirm(`${bucket.title}\n${human}\n\nОтправить?`)) return;
   setStatus(`${bucket.title}: отправка…`);
   const transport = {

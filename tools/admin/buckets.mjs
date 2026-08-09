@@ -23,6 +23,14 @@
 /** Nanoton value that must ride along with a flush. Both are returned to the caller — see 'change-returned'. */
 export const MARKET_STABILITY_FLUSH_EXEC = 2_000_000n;
 export const FEE_ACCUMULATOR_FLUSH_EXEC = 5_000_000n;
+// The registries' ATH flushes are 'in-flight-record' rather than 'change-returned': the caller funds TRANSPORT for a
+// jetton hop, the amount itself is held in a pending record and restored on failure or bounce. So these are not
+// refunded the way the TON flushes are — 0.05 GRAM for a treasury hop, 0.007 for a burn. I had left all four out as
+// "not going to guess the value"; the owner asked why there was no burn button and the answer was two greps away.
+export const USERNAME_ATH_TREASURY_EXEC = 50_000_000n;   // USERNAME_ATH_TRANSFER_EXEC_RESERVE + LOCAL
+export const USERNAME_ATH_BURN_EXEC = 7_000_000n;        // USERNAME_ATH_BURN_EXEC_RESERVE + LOCAL
+export const PROFILE_ATH_TREASURY_EXEC = 50_000_000n;
+export const PROFILE_ATH_BURN_EXEC = 7_000_000n;
 
 /** GRAM = 9 decimals, ATH = 9 decimals. Kept separate because the unit is what a reader gets wrong, not the scale. */
 export const UNIT = { gram: 'GRAM', ath: 'ATH', bool: 'bool' };
@@ -124,9 +132,28 @@ export const BUCKETS = [
       { field: 'treasury_due_ath', at: 7, label: 'ATH казначейству', unit: UNIT.ath, primary: true },
       { field: 'burn_due_ath', at: 8, label: 'ATH на сжигание', unit: UNIT.ath, primary: true },
     ],
-    // The two ATH flushes here carry a query_id and an IN-FLIGHT RECORD rather than a plain amount, so their value
-    // requirement is not the flat exec reserve the TON flushes use. Read before wired, not guessed.
-    actions: [],
+    // These carry a query_id, not an amount: the contract flushes its WHOLE due and files a pending record under
+    // that id. The id only has to be positive and unused, so a timestamp is safe and cannot be raced.
+    actions: [
+      {
+        id: 'username-flush-treasury',
+        label: 'Вывести ATH казначейству',
+        opcode: 0x60A9BDDBn,
+        arg: { kind: 'queryId', bits: 64 },
+        enabledBy: 'treasury_due_ath',
+        value: USERNAME_ATH_TREASURY_EXEC,
+        note: 'Уходит весь долг целиком на казначейский адрес. 0.05 GRAM на перенос жетона.',
+      },
+      {
+        id: 'username-flush-burn',
+        label: 'Сжечь ATH',
+        opcode: 0xE9A2C2CBn,
+        arg: { kind: 'queryId', bits: 64 },
+        enabledBy: 'burn_due_ath',
+        value: USERNAME_ATH_BURN_EXEC,
+        note: 'Весь долг уходит в сжигание через ATHMaster. 0.007 GRAM на исполнение.',
+      },
+    ],
   },
   {
     key: 'profile_registry',
@@ -139,7 +166,26 @@ export const BUCKETS = [
       { field: 'treasury_due_ath', at: 11, label: 'ATH казначейству', unit: UNIT.ath, primary: true },
       { field: 'burn_due_ath', at: 12, label: 'ATH на сжигание', unit: UNIT.ath, primary: true },
     ],
-    actions: [],
+    actions: [
+      {
+        id: 'profile-flush-treasury',
+        label: 'Вывести ATH казначейству',
+        opcode: 0x50A61110n,
+        arg: { kind: 'queryId', bits: 64 },
+        enabledBy: 'treasury_due_ath',
+        value: PROFILE_ATH_TREASURY_EXEC,
+        note: 'Уходит весь долг целиком на казначейский адрес. 0.05 GRAM на перенос жетона.',
+      },
+      {
+        id: 'profile-flush-burn',
+        label: 'Сжечь ATH',
+        opcode: 0x50A61111n,
+        arg: { kind: 'queryId', bits: 64 },
+        enabledBy: 'burn_due_ath',
+        value: PROFILE_ATH_BURN_EXEC,
+        note: 'Весь долг уходит в сжигание через ATHMaster. 0.007 GRAM на исполнение.',
+      },
+    ],
   },
   {
     key: 'airdrop_pool',

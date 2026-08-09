@@ -1,7 +1,10 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { shouldIncludeWebRuntimeFile } from '../scripts/prepare_static_web_deploy.mjs';
-import { BUCKETS, FEE_ACCUMULATOR_FLUSH_EXEC, MARKET_STABILITY_FLUSH_EXEC } from '../tools/admin/buckets.mjs';
+import {
+  BUCKETS, FEE_ACCUMULATOR_FLUSH_EXEC, MARKET_STABILITY_FLUSH_EXEC,
+  PROFILE_ATH_BURN_EXEC, PROFILE_ATH_TREASURY_EXEC, USERNAME_ATH_BURN_EXEC, USERNAME_ATH_TREASURY_EXEC,
+} from '../tools/admin/buckets.mjs';
 
 // The operator console reads every accounting bucket in the protocol and puts the numbers on one screen. Its whole
 // value is being BELIEVED, so the two ways it could quietly lie are what this gate exists for.
@@ -62,6 +65,38 @@ describe('operator console', () => {
     const fee = readFileSync('contracts/FeeAccumulator.tact', 'utf8');
     expect(mss).toContain(`const MARKET_STABILITY_TREASURY_FLUSH_EXEC_RESERVE: Int = ${MARKET_STABILITY_FLUSH_EXEC};`);
     expect(fee).toContain(`const FEEACCUMULATOR_FLUSH_EXEC_RESERVE: Int = ${FEE_ACCUMULATOR_FLUSH_EXEC};`);
+
+    // The registry ATH flushes are a SUM of two reserves, so the mirror can be wrong in a way a single grep would
+    // miss — assert the addition, not the presence.
+    const sumOf = (source: string, ...names: string[]): bigint => names.reduce((total, name) => {
+      const found = new RegExp(`const ${name}: Int = (\\d+);`).exec(source);
+      if (!found) throw new Error(`missing constant ${name}`);
+      return total + BigInt(found[1]);
+    }, 0n);
+    const username = readFileSync('contracts/UsernameRegistry.tact', 'utf8');
+    const profile = readFileSync('contracts/ProfileRegistry.tact', 'utf8');
+    expect(USERNAME_ATH_TREASURY_EXEC).toBe(sumOf(username, 'USERNAME_ATH_TRANSFER_EXEC_RESERVE', 'USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
+    expect(USERNAME_ATH_BURN_EXEC).toBe(sumOf(username, 'USERNAME_ATH_BURN_EXEC_RESERVE', 'USERNAME_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
+    expect(PROFILE_ATH_TREASURY_EXEC).toBe(sumOf(profile, 'PROFILE_ATH_TRANSFER_EXEC_RESERVE', 'PROFILE_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
+    expect(PROFILE_ATH_BURN_EXEC).toBe(sumOf(profile, 'PROFILE_ATH_BURN_EXEC_RESERVE', 'PROFILE_DUE_FLUSH_LOCAL_EXEC_RESERVE'));
+  });
+
+  it('ADMIN-03B: a query_id action is enabled by a bucket, and never sends a zero id', () => {
+    // These flush the WHOLE due and carry no amount, so nothing in the message says whether there is anything to
+    // flush. Without enabledBy the button would look pressable against an empty registry and bounce on 19221/21261.
+    const source = readFileSync('tools/admin/console.mjs', 'utf8');
+    expect(source).toMatch(/if \(action\.arg\?\.kind === 'queryId'\) cell\.uint\(BigInt\(Date\.now\(\)\), action\.arg\.bits, 'query_id'\);/);
+    expect(source).toMatch(/if \(action\.enabledBy\) return values\[action\.enabledBy\];/);
+    for (const bucket of BUCKETS) {
+      for (const action of bucket.actions) {
+        if (action.arg?.kind !== 'queryId') continue;
+        expect(action.enabledBy, `${action.id} must name the bucket that enables it`).toBeTruthy();
+        expect(
+          bucket.rows.some((row) => row.field === action.enabledBy),
+          `${action.id}: enabledBy "${action.enabledBy}" is not a row this card reads`,
+        ).toBe(true);
+      }
+    }
   });
 
   it('ADMIN-04: every bucket names an address the VERIFIED manifest carries', () => {
