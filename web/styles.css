@@ -5298,3 +5298,55 @@ button.feed-item:hover {
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* .ath names as property — the list in "My .ath names" and its art.
+   The picture is an on-chain SVG delivered as a data: URI (see safeInlineImage); img-src forbids a remote one, so
+   there is nothing here that can reach out to a host. Sized in one place so a tall or square SVG both behave. */
+.nft-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+.nft-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-2);
+}
+
+.nft-card-art {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--panel-3);
+}
+
+.nft-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.nft-card-text strong {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.nft-card-address {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.nft-card-send {
+  flex: 0 0 auto;
+}
