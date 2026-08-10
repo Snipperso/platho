@@ -3996,6 +3996,7 @@ button.feed-item:hover {
 }
 
 .quick-start-step-hint {
+  line-height: 1.45;
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-muted, #8b949e);

@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-10T10:50:18.644Z",
+  "generatedAt": "2026-08-10T10:58:06.979Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 232,
-    "totalBytes": 5677014,
-    "bundleSha256": "feb05600cde9b91f3e1e9cb5b416ce0669d6adf78539809ade94f7b44a78aab9",
+    "totalBytes": 5678575,
+    "bundleSha256": "6549832a7c732f37cb7fb9a9cbaa17e860a96022cd20a353859498c61d990383",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -25,7 +25,7 @@
       {
         "path": "app.js",
         "bytes": 1340942,
-        "sha256": "25477ae2b9f790d7ecf29940cb3242189dbf18e36a8b54b3ac518b0bec869d66"
+        "sha256": "fc52db7f032ddb1e8b904582545f551b730af471b21895f30c3585e07c5b479f"
       },
       {
         "path": "assets/icons/about.svg",
@@ -514,18 +514,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 644906,
-        "sha256": "53a095bb0b6de2008c0884a09c4899dffe9a7cb04fb9024b7af95c2ee5e81f9a"
+        "bytes": 646446,
+        "sha256": "bf2bb9b6b011a82d15f2b20e052e0c4b2399dda03a8b076e0e572177965e28d1"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4608,
-        "sha256": "fcb27655cd9f31e0f829231ee178f7ac7ce674760f21c402a33900b571b013e8"
+        "sha256": "bb675ea29494b6e301109dfc04cf386eecacb610221eef8e036435ce53ec4c39"
       },
       {
         "path": "index.html",
         "bytes": 65656,
-        "sha256": "71ee90d5d5d6e003e4639aa1b6df04092688b4a48aa5d0630aefd52c596aa505"
+        "sha256": "92f75225ba881b3fc779247903250502f8bd6be390db6cfa8f4b82c411d13ef3"
       },
       {
         "path": "intro-bucket.mjs",
@@ -665,7 +665,7 @@
       {
         "path": "public-channel-subscriptions.mjs",
         "bytes": 24284,
-        "sha256": "94acb5c535eb113bd5e091ad976a5b952073f626a243845931193b80edea78a2"
+        "sha256": "f397e4caf1fe7e1b0aff7592e93cc93e4cf93d4142bdf041ed0dc760c0e13aa6"
       },
       {
         "path": "public-lane-send.mjs",
@@ -764,13 +764,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 142669,
-        "sha256": "6347c1462ac9a05645234f28494e935f98bfd41a1323b27c27ffb228a9d9265a"
+        "bytes": 142690,
+        "sha256": "9eb9e92fbc1b17af46f8f90f1db5ebfb142b349530dae18d2156d2a88b3205e5"
       },
       {
         "path": "sw.js",
         "bytes": 8576,
-        "sha256": "dc7d9baf699d2f7fecf44b5f139be9ccb833e0293e9e6ce3cbe4d1dbba7ff98f"
+        "sha256": "2ad935e9b4c3c57c1b09b0f740d208d53808ca48070d68dbf17205605241cc97"
       },
       {
         "path": "ton-dns-provider.mjs",
