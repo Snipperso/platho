@@ -3964,17 +3964,6 @@ button.feed-item:hover {
   text-align: center;
 }
 
-.quick-start-step-body input[type="text"],
-.quick-start-step-body input:not([type]) {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-}
-
 .quick-start-step-address {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
@@ -4076,10 +4065,15 @@ button.feed-item:hover {
   color: var(--rose);
 }
 
+/* [OWNER 2026-08-10] The quick-start step body joins this list instead of keeping its own look. Its old rule
+   styled `input[type="text"]` only — so the password fields that moved INTO step 1 got the browser default and
+   looked, in his words, frightening. It also disagreed with this one on radius, background and height, which
+   nobody noticed while the two never appeared on the same screen. One definition, every field. */
 .recipient-dialog input,
 .action-dialog input,
 .action-dialog select,
-.action-dialog textarea {
+.action-dialog textarea,
+.quick-start-step-body input {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -4118,7 +4112,8 @@ button.feed-item:hover {
 .recipient-dialog input:focus,
 .action-dialog input:focus,
 .action-dialog select:focus,
-.action-dialog textarea:focus {
+.action-dialog textarea:focus,
+.quick-start-step-body input:focus {
   border-color: rgba(48, 213, 176, 0.6);
 }
 
