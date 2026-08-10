@@ -12,7 +12,7 @@
     <link rel="manifest" href="./manifest.webmanifest?v=3">
     <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=301">
+    <link rel="stylesheet" href="./styles.css?v=305">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
@@ -29,7 +29,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">1.0.1</span>
+              <span class="app-version-label" id="appVersionLabel">1.0.2</span>
             </div>
           </div>
         </div>
@@ -377,7 +377,6 @@
                 <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
                 <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
                 <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
-                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
               </div>
             </section>
 
@@ -432,7 +431,7 @@
                    text, and still carries the click handler that copies the private-lane diagnostic; removing
                    `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
                    the element would also break PWA-CONFIG-01B. -->
-              <span class="app-version-label" id="profileVersionLabel" hidden>1.0.1</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.0.2</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -481,6 +480,11 @@
                     <option value="anonymous" data-i18n="chat.anonymous">Anonymous</option>
                   </select>
                 </label>
+                <!-- [OWNER 2026-08-10] Activation lives HERE, not in the Wallet tab: it registers your MESSAGING
+                     keys on-chain, which is what this section is about, and the row directly below it is the one
+                     that replaces those same keys ("activate account first"). The quick-start step has always told
+                     users to find it "on the Profile tab" — until today that sentence was simply wrong. -->
+                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
                 <button id="replaceVaultKeysButton" type="button"><span data-i18n="sync.replaceMessageKeys">Replace message keys</span><strong id="vaultRotateStatus" data-i18n="sync.statusActivateAccountFirst">activate account first</strong></button>
               </div>
             </section>
@@ -749,8 +753,10 @@
             <div class="quick-start-step-body" id="quickStartStepBody"></div>
             <p class="quick-start-status" id="quickStartStepStatus" aria-live="polite"></p>
             <div class="quick-start-actions quick-start-step-actions">
+              <!-- [OWNER 2026-08-10] Back + one primary, nothing else. Skip used to sit between them; once every
+                   optional step's primary learned to pass through on its own, Skip had no path left where it did
+                   anything the primary did not, so it is gone rather than hidden. -->
               <button class="secondary-button" id="quickStartBackButton" type="button" data-i18n="common.back">Back</button>
-              <button class="secondary-button" id="quickStartSkipButton" type="button" data-i18n="common.skip">Skip</button>
               <button class="recipient-submit" id="quickStartActionButton" type="button" data-i18n="wallet.create">Create wallet</button>
             </div>
           </div>
@@ -786,6 +792,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=ba566cee1" type="module"></script>
+    <script src="./app.js?v=b7453da30" type="module"></script>
   </body>
 </html>
