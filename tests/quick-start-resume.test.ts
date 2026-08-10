@@ -107,24 +107,35 @@ describe('quick-start resume + activation gate guard', () => {
       expect(eager, `${field} must never be resolved at module load`).toBe(0);
       expect(lazy, `every step must supply ${field} lazily`).toBe(5);
     }
-    // (c) [OWNER 2026-08-10] "Why do I have to press Create wallet — just create it." Entering the stepper with
-    // nothing stored starts step 1 on its own. It goes through the SAME named action the button calls, so the
-    // status line and failure wording cannot drift; cancelling the password leaves the ordinary step on screen.
-    expect(app).toMatch(/async function runQuickStartPrimaryAction\(\)/);
-    expect(app).toMatch(/quickStartActionButton\?\.addEventListener\('click', \(\) => \{ runQuickStartPrimaryAction\(\); \}\)/);
+    // (c) [OWNER 2026-08-10] "a modal on top of a modal". Step 1 IS the password form now — no dialog opens over
+    // the wizard at all. Two earlier attempts moved the stack around instead of removing it: auto-firing the prompt
+    // after rendering step 1 flashed that screen on both sides of the dialog, and firing it before revealing the
+    // stepper just put the dialog over the WELCOME card instead. The fields come from the SHARED spec, so the
+    // credential-username entry that makes password managers offer to save is the same node the dialog builds.
+    expect(app).toMatch(/function walletPasswordFieldSpecs\(\{/);
+    expect(app).toMatch(/const fields = walletPasswordFieldSpecs\(\{ confirm, create, passwordManagerUsername, passwordManagerNetworkGlobalId \}\);/);
+    expect(app).toMatch(/function buildQuickStartCreateWalletBody\(\)/);
+    const createBody = app.slice(
+      app.indexOf('function buildQuickStartCreateWalletBody()'),
+      app.indexOf('function quickStartCreateWalletPassword()'),
+    );
+    expect(createBody.length, 'the create-body slice must not collapse').toBeGreaterThan(300);
+    expect(createBody).toMatch(/walletPasswordFieldSpecs\(\{ confirm: true, create: true \}\)/);
+    expect(createBody).toMatch(/wrap\.append\(createActionField\(field\)\)/);
+    expect(createBody, 'the specs must be RENDERED, not retyped').not.toMatch(/credential-username/);
+    // Validation matches the dialog's own loop, and reports on the step's status line — nothing to dismiss.
+    expect(app).toMatch(/if \(password\.length < PLATHO_WALLET_PASSWORD_MIN_LENGTH\) \{[\s\S]{0,140}?t\('wallet\.passwordTooShort'/);
+    expect(app).toMatch(/if \(password !== confirmPassword\) return \{ error: t\('wallet\.passwordsDoNotMatch'\) \};/);
+    // The shared creator takes the already-collected password; every OTHER caller still gets the standalone prompt.
+    expect(app).toMatch(/async function runQuickStartCreateWallet\(collectedPassword = null\)/);
+    expect(app).toMatch(/const password = collectedPassword \?\? await requestNewWalletStoragePassword\(/);
+    // Counter-case: no dialog is opened from the wizard's own entry point any more.
     const begin = app.slice(
       app.indexOf("quickStartBeginButton?.addEventListener('click'"),
       app.indexOf("quickStartCloseButton?.addEventListener('click'"),
     );
-    expect(begin.length, 'the begin-handler slice must not collapse').toBeGreaterThan(200);
-    expect(begin).toMatch(/if \(!hasStoredPlathoWalletRecord\(\)\) \{[\s\S]{0,160}?await runQuickStartCreateWallet\(\)/);
-    // ORDER is the whole point: the prompt runs BEFORE the stepper is revealed. Firing it after the first render
-    // left the "Create wallet" screen flashing on both sides of the dialog — the very screen this removes.
-    expect(begin.indexOf('runQuickStartCreateWallet'), 'prompt first, stepper second')
-      .toBeLessThan(begin.indexOf('quickStartStepsView.hidden = false'));
-    // Counter-case: it must NOT fire for someone who already has a wallet, or every visit re-prompts for a password.
-    expect(begin, 'auto-create is gated on there being nothing yet')
-      .not.toMatch(/^\s*await runQuickStartCreateWallet\(\);/m);
+    expect(begin.length, 'the begin-handler slice must not collapse').toBeGreaterThan(120);
+    expect(begin, 'entering the wizard must not launch a dialog').not.toMatch(/runQuickStartCreateWallet|requestNewWalletStoragePassword/);
 
     expect(app).toMatch(/setText\(quickStartStepTitle, step\.title\(\)\);/);
     expect(app).toMatch(/setText\(quickStartStepWhy, step\.why\(\)\);/);
@@ -231,7 +242,7 @@ describe('quick-start resume + activation gate guard', () => {
     const createStep = app.slice(app.indexOf('const QUICK_START_STEPS = ['), app.indexOf("t('quickstart.addKeyTitle')"));
     expect(createStep.length, 'the create-wallet step slice must not collapse').toBeGreaterThan(200);
     expect(createStep).toMatch(/optional: false,/);
-    expect(createStep).toMatch(/run: \(\) => runQuickStartCreateWallet\(\)/);
+    expect(createStep).toMatch(/return runQuickStartCreateWallet\(password\);/);
     expect(app, 'a refused mandatory step still reports it').toMatch(/t\('quickstart\.notCompleted'\)/);
 
     // (2) The get-a-key plate spans the body. Same specificity as the hug-your-text rule it overrides, so SOURCE

@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.4';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.5';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -13365,21 +13365,21 @@ async function decryptPlathoWalletRecord(record, password) {
   return wallet;
 }
 
-async function requestWalletPasswordInput({
-  title,
-  hint,
-  submitLabel,
+/**
+ * The password fields, as data. ONE definition rendered in two places: the modal dialog below, and the quick-start
+ * step-1 body, which builds the same nodes with createActionField instead of opening a dialog over the wizard.
+ *
+ * [OWNER 2026-08-10] "a modal on top of a modal" — asking for the password in a dialog stacked on the quick-start
+ * card is what he kept seeing; the answer is for step 1 to BE the form. Copying these specs into the
+ * stepper would have been the easy version and would have drifted — the credential-username field and its
+ * autocomplete hints are what make browser password managers offer to save the wallet password at all.
+ */
+function walletPasswordFieldSpecs({
   confirm = false,
   create = false,
-  // v794: password dialogs are X-only (outside-tap / Escape must not discard a half-typed password). The ✕
-  // stays (cancellable defaults true); the unlock flow already passes dismissOnBackdrop:false explicitly.
-  dismissOnBackdrop = false,
-  cancellable = true,
   passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
   passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
-  summary = [],
-  tone = 'muted',
-}) {
+} = {}) {
   const fields = [{
     id: 'walletPasswordManagerUsername',
     name: 'username',
@@ -13409,6 +13409,25 @@ async function requestWalletPasswordInput({
       minLength: PLATHO_WALLET_PASSWORD_MIN_LENGTH,
     });
   }
+  return fields;
+}
+
+async function requestWalletPasswordInput({
+  title,
+  hint,
+  submitLabel,
+  confirm = false,
+  create = false,
+  // v794: password dialogs are X-only (outside-tap / Escape must not discard a half-typed password). The ✕
+  // stays (cancellable defaults true); the unlock flow already passes dismissOnBackdrop:false explicitly.
+  dismissOnBackdrop = false,
+  cancellable = true,
+  passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
+  passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
+  summary = [],
+  tone = 'muted',
+}) {
+  const fields = walletPasswordFieldSpecs({ confirm, create, passwordManagerUsername, passwordManagerNetworkGlobalId });
   const result = await openActionDialog({
     title,
     hint,
@@ -25115,10 +25134,12 @@ async function restoreQuickStartDismissalFromTelegramCloud() {
   } catch { /* ignore */ }
 }
 
-async function runQuickStartCreateWallet() {
+async function runQuickStartCreateWallet(collectedPassword = null) {
   if (hasStoredPlathoWalletRecord()) return true;
   const walletDraft = await createPlathoWallet(plathoWalletNetworkOptions());
-  const password = await requestNewWalletStoragePassword(t('wallet.encryptNewWallet'), {
+  // The quick-start step collects the password in its own body and passes it here, so no dialog opens over the
+  // wizard. Every other caller passes nothing and still gets the standalone prompt.
+  const password = collectedPassword ?? await requestNewWalletStoragePassword(t('wallet.encryptNewWallet'), {
     passwordManagerUsername: walletDraft.address,
     passwordManagerNetworkGlobalId: walletDraft.networkGlobalId,
   });
@@ -25313,6 +25334,42 @@ function buildQuickStartBackupBody() {
   return wrap;
 }
 
+// Step 1's body IS the password form — no dialog over the wizard. It renders the shared field specs with
+// createActionField, so the credential-username field and the autocomplete hints that make password managers work
+// are the same nodes the standalone dialog builds, from one definition.
+function buildQuickStartCreateWalletBody() {
+  const wrap = document.createElement('div');
+  wrap.className = 'quick-start-key-body';
+  for (const field of walletPasswordFieldSpecs({ confirm: true, create: true })) {
+    wrap.append(createActionField(field));
+  }
+  const summary = document.createElement('div');
+  summary.className = 'quick-start-step-summary';
+  for (const line of [
+    t('wallet.passwordNotSentSummary'),
+    t('wallet.passwordManagerSummary', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH, recommended: PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH }),
+    t('wallet.recoveryPhraseEncryptedSummary'),
+  ]) {
+    const row = document.createElement('div');
+    row.textContent = line;
+    summary.append(row);
+  }
+  wrap.append(summary);
+  return wrap;
+}
+
+/** Read the two password boxes out of the step body and validate them the same way the dialog loop does. */
+function quickStartCreateWalletPassword() {
+  const read = (id) => normalizeWalletPasswordInput(quickStartStepBody?.querySelector(`#${id}`)?.value ?? '');
+  const password = read('walletPassword');
+  const confirmPassword = read('walletPasswordConfirm');
+  if (password.length < PLATHO_WALLET_PASSWORD_MIN_LENGTH) {
+    return { error: t('wallet.passwordTooShort', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH }) };
+  }
+  if (password !== confirmPassword) return { error: t('wallet.passwordsDoNotMatch') };
+  return { password };
+}
+
 const QUICK_START_STEPS = [
   {
     title: () => t('quickstart.createWalletTitle'),
@@ -25320,8 +25377,12 @@ const QUICK_START_STEPS = [
     optional: false,
     why: () => t('quickstart.createWalletWhy'),
     autoDone: () => hasStoredPlathoWalletRecord(),
-    body: () => null,
-    run: () => runQuickStartCreateWallet(),
+    body: () => buildQuickStartCreateWalletBody(),
+    run: async () => {
+      const { password, error } = quickStartCreateWalletPassword();
+      if (error) return error;                       // shown on the step's own status line, nothing to dismiss
+      return runQuickStartCreateWallet(password);
+    },
   },
   {
     title: () => t('quickstart.addKeyTitle'),
@@ -25635,16 +25696,8 @@ function maybeShowQuickStartOnFirstRun() {
   return false;
 }
 
-quickStartBeginButton?.addEventListener('click', async () => {
+quickStartBeginButton?.addEventListener('click', () => {
   quickStartStepIndex = 0;
-  // [OWNER 2026-08-10] Starting the wizard IS the decision to create a wallet, so the password prompt runs FIRST,
-  // from the welcome panel — before the stepper is revealed. The first attempt fired it *after* rendering step 1,
-  // which left the "Create wallet" screen flashing on both sides of the dialog: the exact screen this exists to
-  // remove. On success the wallet now exists, step 1 auto-completes, and the stepper opens on step 2. Cancel the
-  // password and the stepper opens on step 1 with its button — the old behaviour, unchanged, as the fallback.
-  if (!hasStoredPlathoWalletRecord()) {
-    try { await runQuickStartCreateWallet(); } catch (error) { console.error(error); }
-  }
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
   if (quickStartStepsView) quickStartStepsView.hidden = false;
   renderQuickStartStep();

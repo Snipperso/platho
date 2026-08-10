@@ -3992,6 +3992,20 @@ button.feed-item:hover {
   color: var(--text);
 }
 
+/* The explanatory lines under step 1's password fields — the same three sentences the standalone dialog shows in
+   its summary box, in the same bordered plate so the step reads as one card rather than a form with loose text. */
+.quick-start-step-summary {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .quick-start-step-hint {
   margin-top: 6px;
   font-size: 12px;
