@@ -46,8 +46,20 @@ describe('quick-start resume + activation gate guard', () => {
     expect(activateBody).toMatch(/activate\.className = 'discovery-cta-action quick-start-key-cta';/);
     expect(activateBody).toMatch(/await submitVaultRegisterMessagingKeys\(\)/);
     // The fork itself: exactly one of the plate and the explanation is on screen.
-    expect(activateBody).toMatch(/activate\.hidden = underfunded;/);
-    expect(activateBody).toMatch(/hint\.hidden = !underfunded;/);
+    expect(activateBody).toMatch(/activate\.hidden = blocked;/);
+    expect(activateBody).toMatch(/hint\.hidden = !blocked;/);
+    // [MEASURED 2026-08-10, owner's report] A LOCKED wallet is the third state, and it used to be invisible: the
+    // plate showed, the click reached submitKeyShardRegisterDirect, and that throws on its first line because
+    // locking clears localVaultDraft. What the user saw was "could not complete — you can skip and do this later",
+    // which names the wrong problem and walks them away from a five-second fix. Locked outranks underfunded.
+    expect(activateBody).toMatch(/const locked = !plathoWallet;/);
+    expect(activateBody).toMatch(/const blocked = locked \|\| underfunded;/);
+    expect(activateBody).toMatch(/hint\.textContent = locked \? t\('quickstart\.unlockToActivate'\)/);
+    expect(I18N_STRINGS.en['quickstart.unlockToActivate']).toMatch(/locked/i);
+    expect(app).toMatch(/function quickStartActivationBlocked\(\)/);
+    expect(app).toMatch(/return !plathoWallet \|\| quickStartActivationUnderfunded\(\);/);
+    // Unlocking while the step is open must refresh it, or the fix would not show until a manual re-entry.
+    expect(app).toMatch(/function maybeResumeQuickStartAfterUnlock\(\)[\s\S]{0,400}?quickStartRefreshCurrentBalanceStep\(\);/);
     // Both retired controls are GONE, not merely hidden — "Back to top up" duplicated the footer's Back, and
     // "Check balance" restated a refresh that already happens on entry and on return-to-foreground.
     expect(activateBody, 'Back-to-top-up was a second copy of Back').not.toMatch(/backToTopUp/);
@@ -60,7 +72,7 @@ describe('quick-start resume + activation gate guard', () => {
     // The footer says which of the two states it is ending, and never blocks — nothing here can fail any more.
     const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf('let quickStartStepIndex = 0;'));
     expect(activateStep.length, 'the activate step slice must not collapse').toBeGreaterThan(300);
-    expect(activateStep).toMatch(/action: \(\) => \(quickStartActivationUnderfunded\(\) \? t\('common\.done'\) : t\('common\.continue'\)\)/);
+    expect(activateStep).toMatch(/action: \(\) => \(quickStartActivationBlocked\(\) \? t\('common\.done'\) : t\('common\.continue'\)\)/);
     expect(activateStep).toMatch(/run: async \(\) => true,/);
     expect(activateStep, 'the doomed-activation guidance string went with the gate').not.toMatch(/notEnoughToActivate/);
     expect(I18N_STRINGS.en['quickstart.notEnoughToActivate']).toBeUndefined();
@@ -95,6 +107,22 @@ describe('quick-start resume + activation gate guard', () => {
       expect(eager, `${field} must never be resolved at module load`).toBe(0);
       expect(lazy, `every step must supply ${field} lazily`).toBe(5);
     }
+    // (c) [OWNER 2026-08-10] "Why do I have to press Create wallet — just create it." Entering the stepper with
+    // nothing stored starts step 1 on its own. It goes through the SAME named action the button calls, so the
+    // status line and failure wording cannot drift; cancelling the password leaves the ordinary step on screen.
+    expect(app).toMatch(/async function runQuickStartPrimaryAction\(\)/);
+    expect(app).toMatch(/quickStartActionButton\?\.addEventListener\('click', \(\) => \{ runQuickStartPrimaryAction\(\); \}\)/);
+    const begin = app.slice(
+      app.indexOf("quickStartBeginButton?.addEventListener('click'"),
+      app.indexOf("quickStartCloseButton?.addEventListener('click'"),
+    );
+    expect(begin.length, 'the begin-handler slice must not collapse').toBeGreaterThan(200);
+    expect(begin).toMatch(/if \(quickStartStepIndex === 0 && !hasStoredPlathoWalletRecord\(\)\) runQuickStartPrimaryAction\(\);/);
+    // Counter-case: it must NOT fire for someone who already has a wallet — that would re-prompt for a password
+    // on every visit to the stepper.
+    expect(begin).toMatch(/!hasStoredPlathoWalletRecord\(\)/);
+    expect(begin, 'auto-start is gated, not unconditional').not.toMatch(/renderQuickStartStep\(\);\s*runQuickStartPrimaryAction\(\);/);
+
     expect(app).toMatch(/setText\(quickStartStepTitle, step\.title\(\)\);/);
     expect(app).toMatch(/setText\(quickStartStepWhy, step\.why\(\)\);/);
     expect(app).toMatch(/quickStartActionButton\.textContent = step\.action\(\);/);
@@ -211,7 +239,11 @@ describe('quick-start resume + activation gate guard', () => {
     expect(hug, 'the base hug rule must still exist').toBeGreaterThan(-1);
     expect(stretch, 'the stretch rule must exist').toBeGreaterThan(-1);
     expect(stretch, 'the stretch rule must come AFTER the hug rule to win').toBeGreaterThan(hug);
-    expect(css.slice(stretch, stretch + 120)).toMatch(/justify-self: stretch;/);
+    const stretchRule = css.slice(stretch, css.indexOf('}', stretch));
+    expect(stretchRule).toMatch(/justify-self: stretch;/);
+    // ...and the label sits in the MIDDLE of it. .discovery-cta-action is an inline-flex with no justify-content,
+    // which nobody could see while the plate hugged its text and became a left-shoved label once it spanned the row.
+    expect(stretchRule).toMatch(/justify-content: center;/);
   });
 
   it('QS-RESUME-08: the backup step puts its real action in the body, footer is Back + Continue', () => {
