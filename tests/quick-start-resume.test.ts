@@ -44,7 +44,13 @@ describe('quick-start resume + activation gate guard', () => {
     expect(activateBody).toMatch(/wrap\.className = 'quick-start-key-body';/);
     // The one action is the same full-width plate as the three steps before it.
     expect(activateBody).toMatch(/activate\.className = 'discovery-cta-action quick-start-key-cta';/);
-    expect(activateBody).toMatch(/await submitVaultRegisterMessagingKeys\(\)/);
+    expect(activateBody).toMatch(/await submitVaultRegisterMessagingKeys\(\{ preConfirmed: true \}\)/);
+    // [OWNER 2026-08-10] The wizard already covered the backup on its own step and shows the fee beside the
+    // balance, so the checkbox-by-checkbox confirmation (and its SECOND forced key download) is asking the same
+    // questions twice. Pressing Activate here means activate. Every other caller still gets the confirmation.
+    expect(app).toMatch(/async function submitKeyShardRegisterDirect\(\{ preConfirmed = false \} = \{\}\)/);
+    expect(app).toMatch(/if \(!preConfirmed\) \{[\s\S]{0,260}?confirmPlathoAccountActivation/);
+    expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
     // The fork itself: exactly one of the plate and the explanation is on screen.
     expect(activateBody).toMatch(/activate\.hidden = blocked;/);
     expect(activateBody).toMatch(/hint\.hidden = !blocked;/);

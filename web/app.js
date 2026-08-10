@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.12';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.13';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -22294,7 +22294,7 @@ function isKeyShardUninitError(error) {
 // clean-17 DIRECT-PAY register: publish the messaging keys straight to the user's KeyShard from their own wallet, no
 // Vault external. sender() == owner_wallet is the shard's whole authorisation. Gated behind privateLane.directPay so the
 // clean-15 Vault path below is untouched until cutover; the byte-exact KSG1 builder is pinned in tests/key-shard-register.
-async function submitKeyShardRegisterDirect() {
+async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
   if (!localVaultDraft?.message) throw new Error('Local messaging key draft is not ready');
   const ownerWallet = requireBasechainAddress(requirePlathoWalletAddress(), 'Connected wallet');
   const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
@@ -22319,8 +22319,13 @@ async function submitKeyShardRegisterDirect() {
     && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
   if (registeredMine) { vaultDraftStatus.textContent = t('vault.active'); return null; }
   const needsKeyBackup = walletKeyBackupPendingForStoredWallet();
-  if (!(await confirmPlathoAccountActivation(view ?? { exists: false }, { needsKeyBackup }))) return null;
-  if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
+  // [OWNER 2026-08-10] The wizard has ALREADY walked the user through the backup on its own step and put the fee
+  // on screen next to the balance, so re-confirming both here — checkbox by checkbox, plus a second forced key
+  // download — is asking the same questions twice. Pressing Activate there means activate.
+  if (!preConfirmed) {
+    if (!(await confirmPlathoAccountActivation(view ?? { exists: false }, { needsKeyBackup }))) return null;
+    if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
+  }
   vaultDraftStatus.textContent = t('vault.signing');
   const result = await publishKeyShardRegister({
     wallet: requirePlathoWallet(), transport, ownerWallet, profileRegistry: registry,
@@ -22332,11 +22337,11 @@ async function submitKeyShardRegisterDirect() {
   return result;
 }
 
-async function submitVaultRegisterMessagingKeys() {
+async function submitVaultRegisterMessagingKeys(options = {}) {
   // clean-17 direct-pay: messaging keys are published straight into the owner's KeyShard from their wallet
   // (submitKeyShardRegisterDirect); sender() == owner_wallet is the shard's whole authorisation. The removed
   // half built a Vault RegisterMessagingKeys auth external.
-  return submitKeyShardRegisterDirect();
+  return submitKeyShardRegisterDirect(options);
 }
 
 async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = {}) {
@@ -25271,7 +25276,7 @@ function buildQuickStartActivateBody() {
     activate.disabled = true;
     setText(quickStartStepStatus, t('quickstart.working'));
     try {
-      await submitVaultRegisterMessagingKeys();
+      await submitVaultRegisterMessagingKeys({ preConfirmed: true });
       setText(quickStartStepStatus, t('quickstart.done'));
     } catch (error) {
       console.error(error);
