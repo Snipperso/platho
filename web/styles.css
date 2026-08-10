@@ -4073,7 +4073,8 @@ button.feed-item:hover {
 .action-dialog input,
 .action-dialog select,
 .action-dialog textarea,
-.quick-start-step-body input {
+.quick-start-step-body input,
+.quick-start-step-body textarea {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
