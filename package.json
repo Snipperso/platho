@@ -42,8 +42,13 @@
     "admin": "node scripts/serve_admin.mjs"
   },
   "keywords": [],
-  "author": "",
-  "license": "UNLICENSED",
+  "author": "Platho",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Snipperso/platho.git"
+  },
+  "homepage": "https://platho.app",
+  "license": "SEE LICENSE IN LICENSE",
   "description": "No-backend encrypted messenger PWA and TON smart-contract suite",
   "dependencies": {
     "@noble/post-quantum": "^0.6.1"
