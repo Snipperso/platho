@@ -72,7 +72,7 @@ describe('quick-start resume + activation gate guard', () => {
     // The footer says which of the two states it is ending, and never blocks — nothing here can fail any more.
     const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf('let quickStartStepIndex = 0;'));
     expect(activateStep.length, 'the activate step slice must not collapse').toBeGreaterThan(300);
-    expect(activateStep).toMatch(/action: \(\) => \(quickStartActivationBlocked\(\) \? t\('common\.done'\) : t\('common\.continue'\)\)/);
+    expect(activateStep).toMatch(/action: \(\) => \(quickStartActivationBlocked\(\) \? t\('common\.done'\) : t\('common\.next'\)\)/);
     expect(activateStep).toMatch(/run: async \(\) => true,/);
     expect(activateStep, 'the doomed-activation guidance string went with the gate').not.toMatch(/notEnoughToActivate/);
     expect(I18N_STRINGS.en['quickstart.notEnoughToActivate']).toBeUndefined();
@@ -185,7 +185,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(topup).toMatch(/addrRow\.append\(addr, copyBtn\);/);
     expect(topup).toMatch(/wrap\.append\(addrRow, balanceLine, check\);/);
     const steps = app.slice(app.indexOf("key: 'topup'"), app.indexOf("key: 'activate'"));
-    expect(steps).toMatch(/action: \(\) => t\('common\.continue'\),/);
+    expect(steps).toMatch(/action: \(\) => t\('common\.next'\),/);
     expect(steps, 'the primary button must not copy anything').not.toMatch(/copyTextToClipboard/);
   });
 
@@ -237,7 +237,7 @@ describe('quick-start resume + activation gate guard', () => {
     const keyStep = app.slice(app.indexOf("t('quickstart.addKeyTitle')"), app.indexOf("key: 'export'"));
     expect(keyStep.length, 'the key step slice must not collapse').toBeGreaterThan(600);
     // (4) The primary is "Continue", not "Save key" — it moves the stepper on whether or not a key was typed.
-    expect(keyStep).toMatch(/action: \(\) => t\('common\.continue'\),/);
+    expect(keyStep).toMatch(/action: \(\) => t\('common\.next'\),/);
     expect(app, 'the Save-key label is orphaned and must not linger').not.toMatch(/quickstart\.saveKeyAction/);
     expect(I18N_STRINGS.en['quickstart.saveKeyAction'], 'and it must be gone from the dictionary too').toBeUndefined();
     // (3) An empty field ADVANCES instead of reporting a failure. That return value is the whole reason a Skip
@@ -289,7 +289,7 @@ describe('quick-start resume + activation gate guard', () => {
 
     const exportStep = app.slice(app.indexOf("key: 'export'"), app.indexOf("key: 'topup'"));
     expect(exportStep.length, 'the export step slice must not collapse').toBeGreaterThan(300);
-    expect(exportStep).toMatch(/action: \(\) => t\('common\.continue'\),/);
+    expect(exportStep).toMatch(/action: \(\) => t\('common\.next'\),/);
     expect(exportStep).toMatch(/body: \(\) => buildQuickStartBackupBody\(\),/);
     expect(exportStep).toMatch(/run: async \(\) => true,/);
     // The footer no longer runs the export, and that is the whole point — assert it moved rather than multiplied.
