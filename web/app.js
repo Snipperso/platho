@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=34';
+} from './public-channel-subscriptions.mjs?v=35';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=60';
+} from './i18n.mjs?v=61';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.6';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.7';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -25293,7 +25293,7 @@ function buildQuickStartActivateBody() {
     // renderQuickStartStep runs body() first and would overwrite this initial pass with the same value anyway.
     if (quickStartActionButton) {
       quickStartActionButton.disabled = false;
-      quickStartActionButton.textContent = blocked ? t('common.done') : t('common.continue');
+      quickStartActionButton.textContent = blocked ? t('common.done') : t('common.next');
     }
   };
   const refresh = async () => {
@@ -25386,7 +25386,7 @@ const QUICK_START_STEPS = [
   },
   {
     title: () => t('quickstart.addKeyTitle'),
-    action: () => t('common.continue'),
+    action: () => t('common.next'),
     optional: true,
     why: () => t('quickstart.addKeyWhy'),
     autoDone: () => false,
@@ -25429,7 +25429,7 @@ const QUICK_START_STEPS = [
   {
     key: 'export',
     title: () => t('quickstart.backupKeyTitle'),
-    action: () => t('common.continue'),
+    action: () => t('common.next'),
     optional: false,
     why: () => t('quickstart.backupKeyWhy'),
     autoDone: () => false,
@@ -25442,7 +25442,7 @@ const QUICK_START_STEPS = [
   {
     key: 'topup',
     title: () => t('quickstart.topUpTitle'),
-    action: () => t('common.continue'),
+    action: () => t('common.next'),
     optional: true,
     why: () => t('quickstart.topUpWhy'),
     autoDone: () => false,
@@ -25456,7 +25456,7 @@ const QUICK_START_STEPS = [
     // Last step, so this button ends the stepper either way — but it says WHY it is ending. "Continue" while
     // there is still an activation to run here, "Done" when the wallet is short and the only honest next move is
     // to come back later from the Profile tab.
-    action: () => (quickStartActivationBlocked() ? t('common.done') : t('common.continue')),
+    action: () => (quickStartActivationBlocked() ? t('common.done') : t('common.next')),
     optional: true,
     why: () => t('quickstart.activateWhy'),
     autoDone: () => hasActivePlathoAccount(),

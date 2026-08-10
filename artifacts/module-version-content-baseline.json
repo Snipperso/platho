@@ -68,12 +68,12 @@
     "sha256": "9c45e27d8b6a3bed431641d0e2d09af40271ddd82def381f69e6ac0210c31e9f"
   },
   "i18n-strings.mjs": {
-    "version": "62",
-    "sha256": "24e2cd8bece401b41f2470aa184aab67e2adbbf50a609b007103492add04c103"
+    "version": "63",
+    "sha256": "9f69579cb08137c305b180cb6eeb163ed204766b7257e8de83e816a7c970dc17"
   },
   "i18n.mjs": {
-    "version": "60",
-    "sha256": "f67cf46095f3b7e5b4846a56620a8aaefdf93fba2b48da06401a00db46b7a2ef"
+    "version": "61",
+    "sha256": "683bd6d4958ff252bbae737c13ccbab88300fc78d5746837bbab40ff486066e7"
   },
   "intro-bucket.mjs": {
     "version": "14",
@@ -176,8 +176,8 @@
     "sha256": "f818edcf7fbde2d3efd863ca924e4d629f0883853598b6a4a60c3dcfcde2b06d"
   },
   "public-channel-subscriptions.mjs": {
-    "version": "34",
-    "sha256": "159067d8a7a63e075d00b8d406e9fe96f3aa0425c089aad243abc6e003fe4eb7"
+    "version": "35",
+    "sha256": "644c0720c9478620972855f6acd6bd88830e5961a360c9dfba5ec82c84102d03"
   },
   "public-lane-send.mjs": {
     "version": "14",

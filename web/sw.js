@@ -1,14 +1,14 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-32db8dc69ad3';
+const CACHE_NAME = 'platho-pwa-b72e93aaf360';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=310',
-  './app.js?v=b7ef02ecc',
-  './i18n.mjs?v=60',
-  './i18n-strings.mjs?v=62',
+  './app.js?v=b78264991',
+  './i18n.mjs?v=61',
+  './i18n-strings.mjs?v=63',
   './boot-signal-field.mjs?v=1',
   './boot-signal-worker.js?v=1',
   './vendor/telegram-web-app.js?v=1',
@@ -16,7 +16,7 @@ const ASSETS = [
   './platho-config.mjs?v=120',
   './capsule-part-policy.mjs?v=10',
   './message-pricing-policy.mjs?v=14',
-  './public-channel-subscriptions.mjs?v=34',
+  './public-channel-subscriptions.mjs?v=35',
   './recipient-identities.mjs?v=6',
   './channels/platho.app/feed.json',
   './encrypted-message-store.mjs?v=6',
