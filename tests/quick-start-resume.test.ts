@@ -123,6 +123,13 @@ describe('quick-start resume + activation gate guard', () => {
     expect(createBody).toMatch(/walletPasswordFieldSpecs\(\{ confirm: true, create: true \}\)/);
     expect(createBody).toMatch(/wrap\.append\(createActionField\(field\)\)/);
     expect(createBody, 'the specs must be RENDERED, not retyped').not.toMatch(/credential-username/);
+    // ...and they must LOOK like every other field in the app. The stepper had its own input rule that covered
+    // `type="text"` only, so the password boxes landed unstyled, and it disagreed with the canonical one on
+    // radius, background and height besides. It now joins that selector list rather than restating it.
+    expect(css).toMatch(/\.action-dialog textarea,\s*\.quick-start-step-body input \{/);
+    expect(css).toMatch(/\.action-dialog textarea:focus,\s*\.quick-start-step-body input:focus \{/);
+    expect(css, 'the divergent stepper-only input rule must be gone')
+      .not.toMatch(/\.quick-start-step-body input\[type="text"\]/);
     // Validation matches the dialog's own loop, and reports on the step's status line — nothing to dismiss.
     expect(app).toMatch(/if \(password\.length < PLATHO_WALLET_PASSWORD_MIN_LENGTH\) \{[\s\S]{0,140}?t\('wallet\.passwordTooShort'/);
     expect(app).toMatch(/if \(password !== confirmPassword\) return \{ error: t\('wallet\.passwordsDoNotMatch'\) \};/);
