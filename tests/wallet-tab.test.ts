@@ -5,9 +5,10 @@ import { readFileSync } from 'node:fs';
 //
 // The old rule was sound for what it guarded: moving GRAM into the Vault before activation stranded it (withdraw
 // needed the registered auth key), so the tab was inert and dark-grey until activation, which lived in Profile.
-// Neither half of that survives. There is no Vault contract to strand funds in, and the Wallet tab now HOLDS the
-// activation button along with create/import wallet — the first things a new user touches. Gating it would lock
-// the way in, so it is deliberately ungated and that is what this pins.
+// Neither half of that survives. There is no Vault contract to strand funds in, and the Wallet tab holds create /
+// import / unlock wallet — the first things a new user touches. Gating it would lock the way in, so it is
+// deliberately ungated and that is what this pins. (Activation itself moved to Profile > Messages on 2026-08-10;
+// it never was a wallet operation, and the gate it used to justify was already gone by then.)
 describe('wallet tab + durable comment cache guard', () => {
   const app = readFileSync('web/app.js', 'utf8');
   const html = readFileSync('web/index.html', 'utf8');
@@ -23,7 +24,7 @@ describe('wallet tab + durable comment cache guard', () => {
     // Everything a brand-new user needs is IN this tab, which is why it cannot be gated on having an account.
     const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
     expect(walletPanel.length, 'the panel slice is real').toBeGreaterThan(1000);
-    for (const id of ['createWalletButton', 'importWalletButton', 'registerVaultKeysButton']) {
+    for (const id of ['createWalletButton', 'importWalletButton', 'unlockWalletButton']) {
       expect(walletPanel, `${id} is what a new user comes here for`).toContain(`id="${id}"`);
     }
 
@@ -41,7 +42,9 @@ describe('wallet tab + durable comment cache guard', () => {
       'walletBackupWarning', 'createWalletButton', 'importWalletButton', 'unlockWalletButton',
       'changeWalletPasswordButton', 'receiveWalletTonButton', 'sendWalletTonButton',
       'exportWalletKeyButton', 'importWalletKeyButton', 'exportWalletSeedButton',
-      'registerVaultKeysButton',
+      // registerVaultKeysButton was here until 2026-08-10 and now lives in Profile > Messages: activation
+      // registers MESSAGING keys, and the row that replaces those same keys sits directly under it. See the
+      // dedicated placement assertion below — moving it must not mean losing track of it.
       // flushAthButton was in this list until v890, when the row was deleted outright — see the absence gate
       // in tests/pwa-runtime-config.test.ts PWA-CONFIG-07C.
       'athDropIssuedStatus', 'athSupplyStatus',
@@ -50,6 +53,18 @@ describe('wallet tab + durable comment cache guard', () => {
       expect(walletPanel, `${id} lives in the Wallet tab`).toContain(`id="${id}"`);
       expect(profilePanel, `${id} no longer duplicates in Profile`).not.toContain(`id="${id}"`);
     }
+
+    // [OWNER 2026-08-10] Account activation went the OTHER way — out of Wallet and into Profile > Messages. It
+    // registers MESSAGING keys on-chain, which is what that section is for, and "Replace message keys" (whose own
+    // status reads "activate account first") sits directly under it, so the two read in the order you do them.
+    // The quick-start step had been telling users to find it "on the Profile tab" the whole time.
+    expect(walletPanel, 'activation is not a wallet operation').not.toContain('id="registerVaultKeysButton"');
+    const messages = profilePanel.slice(profilePanel.indexOf('aria-label="Messages"'), profilePanel.indexOf('aria-label="Public channels"'));
+    expect(messages.length, 'the Messages section slice must be real').toBeGreaterThan(200);
+    expect(messages, 'activation lives in Profile > Messages').toContain('id="registerVaultKeysButton"');
+    expect(messages.indexOf('id="registerVaultKeysButton"'), 'activate comes BEFORE replace-keys')
+      .toBeLessThan(messages.indexOf('id="replaceVaultKeysButton"'));
+    expect((html.match(/id="registerVaultKeysButton"/g) ?? []).length, 'moved, not copied').toBe(1);
 
     // Saving subscriptions came along for the ride in the old Wallet block but is a PUBLIC-CHANNELS action that
     // merely costs gas. It belongs where a user goes looking for it, not in the wallet.
@@ -88,7 +103,7 @@ describe('wallet tab + durable comment cache guard', () => {
     const group = walletPanel.indexOf('id="walletTonGroup"');
     expect(group, 'the GRAM row lost its id — app.js can no longer hide it').toBeGreaterThan(-1);
     for (const later of ['id="createWalletButton"', 'id="importWalletButton"', 'id="unlockWalletButton"',
-      'id="changeWalletPasswordButton"', 'id="exportWalletKeyButton"', 'id="registerVaultKeysButton"']) {
+      'id="changeWalletPasswordButton"', 'id="exportWalletKeyButton"', 'id="exportWalletSeedButton"']) {
       expect(group, `${later} must come AFTER the GRAM actions`).toBeLessThan(walletPanel.indexOf(later));
     }
     // Ships hidden, so a wallet-less first run never flashes the two actions before the refresh runs.

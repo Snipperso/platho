@@ -763,7 +763,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/indexedDB\.databases\(\)/);
     expect(app).toMatch(/caches\.keys\(\)/);
     expect(app).toMatch(/navigator\.serviceWorker\?\.getRegistrations/);
-    expect(html).toMatch(/<h2 data-i18n="common\.wallet">Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="registerVaultKeysButton"/);
+    expect(html).toMatch(/<h2 data-i18n="common\.wallet">Wallet<\/h2>[\s\S]*id="createWalletButton"[\s\S]*id="unlockWalletButton"[\s\S]*id="changeWalletPasswordButton"[\s\S]*id="exportWalletSeedButton"/);
     // [OWNER 2026-08-03] The balance BUTTON is gone: the headline card at the top of the section already shows the
     // same number, and a second copy of it right below read as a different figure. The GRAM row is now just the two
     // money actions, and the headline card is the single place the balance is rendered.
@@ -773,7 +773,9 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
     // "Sync messages" removed 2026-08-07 — the header indicator on every tab already does it, and that row also
     // doubled as a state store, so it went with its accessors rather than being left as a dead node.
-    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="replaceVaultKeysButton"/);
+    // [OWNER 2026-08-10] Activation moved here from the Wallet tab and leads the section: it registers the
+    // messaging keys that the row below it replaces. Order pinned in tests/wallet-tab.test.ts WALLET-TAB-02.
+    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="registerVaultKeysButton"[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).not.toMatch(/id="syncMessagesButton"|id="messageSyncStatus"/);
     expect(html).toMatch(/Replace message keys[\s\S]*activate account first/);
     expect(enCopy).toMatch(/up to date/);
@@ -1841,13 +1843,15 @@ describe('PWA runtime config guard', () => {
     // The five guided steps reuse the existing flows; create + back-up are mandatory (optional:false).
     expect(app).toMatch(/const QUICK_START_STEPS = \[/);
     expect(app).toMatch(/run: \(\) => runQuickStartCreateWallet\(\)/);
-    expect(app).toMatch(/run: \(\) => exportEncryptedWalletKeyFile\(\)/);
+    // The backup step's export moved OUT of the footer and into the body as its own plate (owner, 2026-08-10),
+    // so the call now lives in that plate's click handler — see QS-RESUME-08.
+    expect(app).toMatch(/await exportEncryptedWalletKeyFile\(\)/);
     // Step 2 (TON Center key) reads the input and applies the key (after validating it — see PWA-TONCENTER-KEY-VALIDATE-01).
     expect(app).toMatch(/const value = quickStartStepBody\?\.querySelector\('#quickStartKeyInput'\)\?\.value;[\s\S]*applyToncenterApiKey\(trimmed\)/);
     // v708 (owner): the get-a-key CTA sits BELOW the input with a clear gap and wears the shared
     // plate-action button class (the "Add contact" look) — input first in DOM, button second.
     expect(app).toMatch(/wrap\.className = 'quick-start-key-body';/);
-    expect(app).toMatch(/getKey\.className = 'discovery-cta-action';[\s\S]{0,220}wrap\.append\(input, getKey\);/);
+    expect(app).toMatch(/getKey\.className = 'discovery-cta-action quick-start-key-cta';[\s\S]{0,320}wrap\.append\(input, getKey\);/);
     const cssQuickKey = readFileSync('web/styles.css', 'utf8');
     expect(cssQuickKey).toMatch(/\.quick-start-key-body \{\s*display: grid;\s*gap: 12px;/);
     expect(cssQuickKey).toMatch(/\.quick-start-key-body > \.discovery-cta-action \{\s*justify-self: start;/);
@@ -2044,7 +2048,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*openQuickStartAtBackup\(\);\s*return true;/);
     expect(app).toMatch(/function openQuickStartAtBackup\(\)[\s\S]*quickStartStepIndexByKey\('export'\)/);
     // The export step is keyed so the lookup is robust to reordering.
-    expect(app).toMatch(/key: 'export',\s*title: t\('quickstart\.backupKeyTitle'\)/);
+    expect(app).toMatch(/key: 'export',\s*title: \(\) => t\('quickstart\.backupKeyTitle'\)/);
     expect(EN_STRINGS['quickstart.backupKeyTitle']).toBe('Back up your wallet key');
     // Closing the backup re-prompt must NOT permanently dismiss onboarding (the backup is still pending).
     expect(app).toMatch(/let quickStartBackupMode = false/);
