@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.11';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.12';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -19951,10 +19951,12 @@ async function confirmWalletPasswordForExport(wallet) {
   return true;
 }
 
-async function exportEncryptedWalletKeyFile() {
+async function exportEncryptedWalletKeyFile(alreadyUnlocked = null) {
   const record = readEncryptedPlathoWalletRecord();
   if (!record) throw new Error('No encrypted wallet key is stored on this device');
-  const unlocked = await requestAndDecryptEncryptedWallet(record, {
+  // The password here buys ONE thing: proof the record actually decrypts, so nobody walks away with a backup they
+  // cannot open. A caller holding the already-decrypted wallet has that proof in hand and is not asked again.
+  const unlocked = alreadyUnlocked ?? await requestAndDecryptEncryptedWallet(record, {
     title: t('wallet.exportWalletKey'),
     hint: t('wallet.exportWalletKeyHint'),
     submitLabel: t('wallet.exportWalletKey'),
@@ -25337,11 +25339,15 @@ function buildQuickStartBackupBody() {
   };
   plate(t('quickstart.seedPlateNote'), t('quickstart.saveSeedAction'), async () => {
     const wallet = requirePlathoWallet();
-    if (!(await confirmWalletPasswordForExport(wallet))) return;
+    // No password re-prompt HERE. An unlocked wallet can only exist because the password was entered in this
+    // session — plathoWallet lives in memory alone, is never cached, and the only three functions that set it
+    // (create / unlock / import key) all demand the password first. In the wizard that moment was seconds ago,
+    // on the step above. The Wallet tab keeps its prompt: there the gap between unlocking and pressing can be
+    // hours of the phone lying around unlocked, and the phrase is the one secret that never expires.
     await showWalletSeed(t('wallet.recoveryPhrase'), exportPlathoWalletRecoveryPhrase(wallet));
   });
   plate(t('quickstart.keyFilePlateNote'), t('quickstart.saveWalletKeyAction'), async () => {
-    const ok = await exportEncryptedWalletKeyFile();
+    const ok = await exportEncryptedWalletKeyFile(plathoWallet ?? null);
     setText(quickStartStepStatus, ok === false ? t('quickstart.notCompleted') : t('quickstart.done'));
   });
   return wrap;
