@@ -1842,7 +1842,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(!hasStoredPlathoWalletRecord\(\)\) \{\s*if \(quickStartDismissedForever\(\)\) return false;\s*openQuickStart\(\);\s*return true;/);
     // The five guided steps reuse the existing flows; create + back-up are mandatory (optional:false).
     expect(app).toMatch(/const QUICK_START_STEPS = \[/);
-    expect(app).toMatch(/run: \(\) => runQuickStartCreateWallet\(\)/);
+    expect(app).toMatch(/return runQuickStartCreateWallet\(password\);/);
     // The backup step's export moved OUT of the footer and into the body as its own plate (owner, 2026-08-10),
     // so the call now lives in that plate's click handler — see QS-RESUME-08.
     expect(app).toMatch(/await exportEncryptedWalletKeyFile\(\)/);
