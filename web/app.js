@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=36';
+} from './public-channel-subscriptions.mjs?v=37';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=62';
+} from './i18n.mjs?v=63';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.9';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.10';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -25315,54 +25315,35 @@ function buildQuickStartActivateBody() {
 // get-a-key plate one step earlier (owner, 2026-08-10 — same style, its own row, stretched). Moving the real
 // action out of the footer leaves the footer doing one job: Back and Continue, which is all a stepper footer
 // should ever mean. Feedback goes to the step status line, mirroring what the footer action used to report.
-// The ONE backup step offers BOTH ways and lets the user pick: the 24 words survive a forgotten password, the
-// encrypted file is one tap and needs no transcription. The file CONTAINS the same phrase, encrypted, so either
-// is genuinely enough.
-function quickStartSeedPhraseOrNull() {
-  if (!plathoWallet) return null;
-  try { return exportPlathoWalletRecoveryPhrase(plathoWallet) || null; } catch { return null; }
-}
-
-/** Set when the key file is actually written in this step — one of the two ways past it. */
-let quickStartKeyFileSaved = false;
-
 function buildQuickStartBackupBody() {
+  // [OWNER 2026-08-10] TWO buttons, each with a line saying what it saves. The inline phrase + "type SAVED" that
+  // stood here read as a school exercise and, worse, the file button sat under the words with nothing explaining
+  // it was a different thing. Both actions reuse the flows the Wallet tab already uses.
   const wrap = document.createElement('div');
   wrap.className = 'quick-start-key-body';
-  const phrase = quickStartSeedPhraseOrNull();
-  if (phrase) {
-    for (const field of seedBackupFieldSpecs(phrase)) wrap.append(createActionField(field));
-  } else {
-    const locked = document.createElement('div');
-    locked.className = 'quick-start-step-hint';
-    locked.textContent = t('quickstart.unlockToActivate');
-    wrap.append(locked);
-  }
-  const save = document.createElement('button');
-  save.type = 'button';
-  save.className = 'discovery-cta-action quick-start-key-cta';
-  save.textContent = t('quickstart.saveWalletKeyAction');
-  save.addEventListener('click', async () => {
-    save.disabled = true;
-    setText(quickStartStepStatus, t('quickstart.working'));
-    try {
-      const ok = await exportEncryptedWalletKeyFile();
-      if (ok !== false) quickStartKeyFileSaved = true;
-      setText(quickStartStepStatus, ok === false ? t('quickstart.notCompleted') : t('quickstart.done'));
-    } catch (error) {
-      console.error(error);
-      setText(quickStartStepStatus, t('quickstart.couldNotComplete', { reason: error?.message ?? t('quickstart.tryAgain') }));
-    } finally {
-      save.disabled = false;
-    }
+  const plate = (note, label, onClick) => {
+    const hint = document.createElement('div');
+    hint.className = 'quick-start-step-hint';
+    hint.textContent = note;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'discovery-cta-action quick-start-key-cta';
+    button.textContent = label;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try { await onClick(); } catch (error) { console.error(error); } finally { button.disabled = false; }
+    });
+    wrap.append(hint, button);
+  };
+  plate(t('quickstart.seedPlateNote'), t('quickstart.saveSeedAction'), async () => {
+    const wallet = requirePlathoWallet();
+    if (!(await confirmWalletPasswordForExport(wallet))) return;
+    await showWalletSeed(t('wallet.recoveryPhrase'), exportPlathoWalletRecoveryPhrase(wallet));
   });
-  wrap.append(save);
-  const summary = document.createElement('div');
-  summary.className = 'quick-start-step-summary';
-  const row = document.createElement('div');
-  row.textContent = t('wallet.seedBackupSummary');
-  summary.append(row);
-  wrap.append(summary);
+  plate(t('quickstart.keyFilePlateNote'), t('quickstart.saveWalletKeyAction'), async () => {
+    const ok = await exportEncryptedWalletKeyFile();
+    setText(quickStartStepStatus, ok === false ? t('quickstart.notCompleted') : t('quickstart.done'));
+  });
   return wrap;
 }
 
@@ -25466,17 +25447,10 @@ const QUICK_START_STEPS = [
     optional: false,
     why: () => t('quickstart.backupKeyWhy'),
     autoDone: () => false,
-    body: () => { quickStartKeyFileSaved = false; return buildQuickStartBackupBody(); },
-    // EITHER proof gets you past: the typed SAVED for the words, or a key file actually written.
-    run: async () => {
-      const typed = quickStartStepBody?.querySelector('#seedBackupConfirm')?.value;
-      if (seedBackupConfirmAccepted(typed)) {
-        if (plathoWallet) markTelegramSeedBackupConfirmed(plathoWallet.address);
-        return true;
-      }
-      if (quickStartKeyFileSaved) return true;
-      return t('quickstart.backupNeedsOne');
-    },
+    body: () => buildQuickStartBackupBody(),
+    // Both actions are one tap and neither leaves proof behind, so the footer simply moves on; the
+    // pending-backup nudge is what re-opens this step for anyone who did neither.
+    run: async () => true,
   },
   {
     key: 'topup',
