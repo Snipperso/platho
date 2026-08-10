@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.13';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.14';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -25252,7 +25252,10 @@ function quickStartActivationBlocked() {
   return !plathoWallet || quickStartActivationUnderfunded();
 }
 
+let quickStartActivationDone = false;
+
 function buildQuickStartActivateBody() {
+  quickStartActivationDone = false;
   // [OWNER 2026-08-10] TWO states, not one screen with four buttons.
   //
   //   funded  -> the balance line and ONE full-width "Activate account" plate. Footer: Back + Continue.
@@ -25277,6 +25280,10 @@ function buildQuickStartActivateBody() {
     setText(quickStartStepStatus, t('quickstart.working'));
     try {
       await submitVaultRegisterMessagingKeys({ preConfirmed: true });
+      // [OWNER 2026-08-10] The plate stayed live after a successful activation, offering to do again a thing that
+      // costs GRAM and is already done. applyGate re-reads this, so a later balance refresh cannot bring it back.
+      quickStartActivationDone = true;
+      applyGate();
       setText(quickStartStepStatus, t('quickstart.done'));
     } catch (error) {
       console.error(error);
@@ -25295,9 +25302,10 @@ function buildQuickStartActivateBody() {
     // fixable on the spot. maybeResumeQuickStartAfterUnlock re-renders this step, so unlocking updates it.
     const locked = !plathoWallet;
     const underfunded = quickStartActivationUnderfunded();
+    const done = quickStartActivationDone || hasActivePlathoAccount();
     const blocked = locked || underfunded;
-    activate.hidden = blocked;
-    hint.hidden = !blocked;
+    activate.hidden = blocked || done;
+    hint.hidden = !blocked || done;
     hint.textContent = locked ? t('quickstart.unlockToActivate') : (underfunded ? t('quickstart.notEnoughGramHint') : '');
     hint.classList.toggle('is-error', blocked);
     // The footer label follows the same fork (Continue when there is still something to do here, Done when there
@@ -25305,7 +25313,7 @@ function buildQuickStartActivateBody() {
     // renderQuickStartStep runs body() first and would overwrite this initial pass with the same value anyway.
     if (quickStartActionButton) {
       quickStartActionButton.disabled = false;
-      quickStartActionButton.textContent = blocked ? t('common.done') : t('common.next');
+      quickStartActionButton.textContent = blocked && !done ? t('common.done') : t('common.next');
     }
   };
   const refresh = async () => {

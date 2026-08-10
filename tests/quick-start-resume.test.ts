@@ -52,8 +52,13 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/if \(!preConfirmed\) \{[\s\S]{0,260}?confirmPlathoAccountActivation/);
     expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
     // The fork itself: exactly one of the plate and the explanation is on screen.
-    expect(activateBody).toMatch(/activate\.hidden = blocked;/);
-    expect(activateBody).toMatch(/hint\.hidden = !blocked;/);
+    expect(activateBody).toMatch(/activate\.hidden = blocked \|\| done;/);
+    // [OWNER 2026-08-10] A THIRD reason to hide it: already activated. The plate stayed live after success,
+    // offering to repeat a thing that costs GRAM. applyGate re-reads the flag, so a later balance refresh
+    // cannot resurrect it.
+    expect(activateBody).toMatch(/const done = quickStartActivationDone \|\| hasActivePlathoAccount\(\);/);
+    expect(activateBody).toMatch(/quickStartActivationDone = true;\s*applyGate\(\);/);
+    expect(activateBody).toMatch(/hint\.hidden = !blocked \|\| done;/);
     // [MEASURED 2026-08-10, owner's report] A LOCKED wallet is the third state, and it used to be invisible: the
     // plate showed, the click reached submitKeyShardRegisterDirect, and that throws on its first line because
     // locking clears localVaultDraft. What the user saw was "could not complete — you can skip and do this later",
