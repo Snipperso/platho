@@ -284,15 +284,20 @@ describe('quick-start resume + activation gate guard', () => {
     expect(body).toMatch(/t\('quickstart\.saveWalletKeyAction'\)/);
     expect(body).toMatch(/t\('quickstart\.seedPlateNote'\)/);
     expect(body).toMatch(/t\('quickstart\.keyFilePlateNote'\)/);
-    expect(body).toMatch(/await exportEncryptedWalletKeyFile\(\)/);
+    expect(body).toMatch(/await exportEncryptedWalletKeyFile\(plathoWallet \?\? null\)/);
     expect(body).toMatch(/await showWalletSeed\(t\('wallet\.recoveryPhrase'\)/);
     expect(body, 'the typed-SAVED box is gone').not.toMatch(/seedBackupConfirm/);
     for (const key of ['quickstart.saveSeedAction', 'quickstart.seedPlateNote', 'quickstart.keyFilePlateNote']) {
       expect(I18N_STRINGS.en[key], `${key} must ship`).toBeTruthy();
       expect(I18N_STRINGS.ru[key], `${key} must ship in ru`).toBeTruthy();
     }
-    // The phrase view reuses the Wallet tab's own flow, password confirmation included.
-    expect(body).toMatch(/confirmWalletPasswordForExport\(wallet\)/);
+    // [OWNER 2026-08-10] No password re-prompt in the wizard: an unlocked wallet can only exist because the
+    // password was entered this session (plathoWallet is memory-only, never cached, and the three functions that
+    // set it all demand the password), and here that was seconds ago on the step above.
+    expect(body, 'the wizard must not re-ask for a password it just took')
+      .not.toMatch(/confirmWalletPasswordForExport/);
+    // The Wallet tab keeps its prompt — there the gap can be hours of an unlocked phone.
+    expect(app).toMatch(/exportWalletSeedButton\?\.addEventListener[\s\S]{0,200}?confirmWalletPasswordForExport\(wallet\)/);
     // Continue now passes through, so the SAFETY NET is the pending-backup nudge, not the stepper. If this ever
     // stops re-opening the stepper on the backup step, a user can leave onboarding with no key file at all.
     expect(app).toMatch(/markWalletKeyBackupPending\(/);
