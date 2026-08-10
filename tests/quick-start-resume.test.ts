@@ -126,7 +126,7 @@ describe('quick-start resume + activation gate guard', () => {
     // ...and they must LOOK like every other field in the app. The stepper had its own input rule that covered
     // `type="text"` only, so the password boxes landed unstyled, and it disagreed with the canonical one on
     // radius, background and height besides. It now joins that selector list rather than restating it.
-    expect(css).toMatch(/\.action-dialog textarea,\s*\.quick-start-step-body input \{/);
+    expect(css).toMatch(/\.action-dialog textarea,\s*\.quick-start-step-body input,\s*\.quick-start-step-body textarea \{/);
     expect(css).toMatch(/\.action-dialog textarea:focus,\s*\.quick-start-step-body input:focus \{/);
     expect(css, 'the divergent stepper-only input rule must be gone')
       .not.toMatch(/\.quick-start-step-body input\[type="text"\]/);
@@ -274,35 +274,25 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/function buildQuickStartBackupBody\(\)/);
     const body = app.slice(
       app.indexOf('function buildQuickStartBackupBody()'),
-      app.indexOf('const QUICK_START_STEPS = ['),
+      app.indexOf('function buildQuickStartCreateWalletBody'),
     );
     expect(body.length, 'the slice must not collapse or run away').toBeGreaterThan(400);
-    // Same plate class as the get-a-key button, so ONE css rule stretches both and they cannot drift apart.
-    expect(body).toMatch(/save\.className = 'discovery-cta-action quick-start-key-cta';/);
-    expect(body).toMatch(/save\.textContent = t\('quickstart\.saveWalletKeyAction'\);/);
+    // [OWNER 2026-08-10] TWO labelled plates, each with a line saying what it saves. The inline phrase and the
+    // "type SAVED" box that stood here read as a school exercise, and the file button sat under the words with
+    // nothing to say it was a different thing entirely.
+    expect(body).toMatch(/t\('quickstart\.saveSeedAction'\)/);
+    expect(body).toMatch(/t\('quickstart\.saveWalletKeyAction'\)/);
+    expect(body).toMatch(/t\('quickstart\.seedPlateNote'\)/);
+    expect(body).toMatch(/t\('quickstart\.keyFilePlateNote'\)/);
     expect(body).toMatch(/await exportEncryptedWalletKeyFile\(\)/);
-    // The plate reports into the step status line — the footer used to do this and must not go silent.
-    expect(body).toMatch(/setText\(quickStartStepStatus, t\('quickstart\.working'\)\)/);
-    expect(body).toMatch(/setText\(quickStartStepStatus, ok === false \? t\('quickstart\.notCompleted'\) : t\('quickstart\.done'\)\)/);
-    // Re-entrancy: the plate disables itself for the duration, or a double tap saves the file twice.
-    expect(body).toMatch(/save\.disabled = true;[\s\S]*save\.disabled = false;/);
-
-    const exportStep = app.slice(app.indexOf("key: 'export'"), app.indexOf("key: 'topup'"));
-    expect(exportStep.length, 'the export step slice must not collapse').toBeGreaterThan(300);
-    expect(exportStep).toMatch(/action: \(\) => t\('common\.next'\),/);
-    expect(exportStep).toMatch(/body: \(\) => \{ quickStartKeyFileSaved = false; return buildQuickStartBackupBody\(\); \},/);
-    expect(exportStep).toMatch(/if \(quickStartKeyFileSaved\) return true;/);
-    // The footer no longer runs the export, and that is the whole point — assert it moved rather than multiplied.
-    expect(exportStep, 'the export must not ALSO hang off the footer action').not.toMatch(/exportEncryptedWalletKeyFile/);
-    // Scoped count, not a guessed global one: inside the stepper the export is reachable from exactly ONE place.
-    // (The wallet screen has its own separate save-key buttons and is none of this test's business.)
-    const stepper = app.slice(
-      app.indexOf('function buildQuickStartBackupBody()'),
-      app.indexOf('let quickStartStepIndex = 0;'),
-    );
-    expect(stepper.length, 'the stepper slice must not collapse or run away').toBeGreaterThan(1000);
-    expect((stepper.match(/exportEncryptedWalletKeyFile\(\)/g) ?? []).length, 'one way to save the file, not two')
-      .toBe(1);
+    expect(body).toMatch(/await showWalletSeed\(t\('wallet\.recoveryPhrase'\)/);
+    expect(body, 'the typed-SAVED box is gone').not.toMatch(/seedBackupConfirm/);
+    for (const key of ['quickstart.saveSeedAction', 'quickstart.seedPlateNote', 'quickstart.keyFilePlateNote']) {
+      expect(I18N_STRINGS.en[key], `${key} must ship`).toBeTruthy();
+      expect(I18N_STRINGS.ru[key], `${key} must ship in ru`).toBeTruthy();
+    }
+    // The phrase view reuses the Wallet tab's own flow, password confirmation included.
+    expect(body).toMatch(/confirmWalletPasswordForExport\(wallet\)/);
     // Continue now passes through, so the SAFETY NET is the pending-backup nudge, not the stepper. If this ever
     // stops re-opening the stepper on the backup step, a user can leave onboarding with no key file at all.
     expect(app).toMatch(/markWalletKeyBackupPending\(/);
