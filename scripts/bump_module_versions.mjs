@@ -11,7 +11,7 @@
  * changed icon reached nobody. A derived key cannot be forgotten, because it is not written by anyone. Neither is
  * circular: web/app.js never names its own token, and sw.js is not one of the assets it precaches.
  *
- * The product version (`1.0.0`) is NOT touched here and is not a cache key — see PLATHO_APP_RUNTIME_VERSION.
+ * The product version is NOT touched here and is not a cache key — see PLATHO_APP_RUNTIME_VERSION.
  *
  * A cached browser keeps serving a module until its `?v=` moves — that is what MODCONTENT-01 guards, after two profile
  * rows shipped as raw i18n keys because i18n-strings.mjs changed and stayed at ?v=33.
