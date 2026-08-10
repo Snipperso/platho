@@ -117,11 +117,14 @@ describe('quick-start resume + activation gate guard', () => {
       app.indexOf("quickStartCloseButton?.addEventListener('click'"),
     );
     expect(begin.length, 'the begin-handler slice must not collapse').toBeGreaterThan(200);
-    expect(begin).toMatch(/if \(quickStartStepIndex === 0 && !hasStoredPlathoWalletRecord\(\)\) runQuickStartPrimaryAction\(\);/);
-    // Counter-case: it must NOT fire for someone who already has a wallet — that would re-prompt for a password
-    // on every visit to the stepper.
-    expect(begin).toMatch(/!hasStoredPlathoWalletRecord\(\)/);
-    expect(begin, 'auto-start is gated, not unconditional').not.toMatch(/renderQuickStartStep\(\);\s*runQuickStartPrimaryAction\(\);/);
+    expect(begin).toMatch(/if \(!hasStoredPlathoWalletRecord\(\)\) \{[\s\S]{0,160}?await runQuickStartCreateWallet\(\)/);
+    // ORDER is the whole point: the prompt runs BEFORE the stepper is revealed. Firing it after the first render
+    // left the "Create wallet" screen flashing on both sides of the dialog — the very screen this removes.
+    expect(begin.indexOf('runQuickStartCreateWallet'), 'prompt first, stepper second')
+      .toBeLessThan(begin.indexOf('quickStartStepsView.hidden = false'));
+    // Counter-case: it must NOT fire for someone who already has a wallet, or every visit re-prompts for a password.
+    expect(begin, 'auto-create is gated on there being nothing yet')
+      .not.toMatch(/^\s*await runQuickStartCreateWallet\(\);/m);
 
     expect(app).toMatch(/setText\(quickStartStepTitle, step\.title\(\)\);/);
     expect(app).toMatch(/setText\(quickStartStepWhy, step\.why\(\)\);/);

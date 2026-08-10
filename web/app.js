@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.3';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.4';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -25635,16 +25635,19 @@ function maybeShowQuickStartOnFirstRun() {
   return false;
 }
 
-quickStartBeginButton?.addEventListener('click', () => {
+quickStartBeginButton?.addEventListener('click', async () => {
   quickStartStepIndex = 0;
+  // [OWNER 2026-08-10] Starting the wizard IS the decision to create a wallet, so the password prompt runs FIRST,
+  // from the welcome panel — before the stepper is revealed. The first attempt fired it *after* rendering step 1,
+  // which left the "Create wallet" screen flashing on both sides of the dialog: the exact screen this exists to
+  // remove. On success the wallet now exists, step 1 auto-completes, and the stepper opens on step 2. Cancel the
+  // password and the stepper opens on step 1 with its button — the old behaviour, unchanged, as the fallback.
+  if (!hasStoredPlathoWalletRecord()) {
+    try { await runQuickStartCreateWallet(); } catch (error) { console.error(error); }
+  }
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
   if (quickStartStepsView) quickStartStepsView.hidden = false;
   renderQuickStartStep();
-  // [OWNER 2026-08-10] "Why do I have to press Create wallet — just create it." Starting the wizard IS the
-  // decision to create a wallet, so step 1 begins on its own (the password dialog opens straight away). The step
-  // still renders behind it: cancel the password and the button is right there, which is the old screen exactly.
-  // Only when there is nothing yet — a stored wallet auto-completes step 1 and this never runs.
-  if (quickStartStepIndex === 0 && !hasStoredPlathoWalletRecord()) runQuickStartPrimaryAction();
 });
 quickStartCloseButton?.addEventListener('click', () => closeQuickStart());
 quickStartImportButtonEl?.addEventListener('click', () => { closeQuickStart(); walletKeyBackupInput?.click(); });
