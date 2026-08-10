@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=35';
+} from './public-channel-subscriptions.mjs?v=36';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=61';
+} from './i18n.mjs?v=62';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.7';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.8';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2996,6 +2996,32 @@ async function restoreWalletKeyBackupPendingFromTelegramCloud() {
   } catch { /* ignore */ }
 }
 
+/** The seed-backup fields, as data — the same two nodes in the hard gate and in the wizard's backup step. */
+function seedBackupFieldSpecs(phrase) {
+  return [{
+    id: 'recoveryPhrase',
+    label: t('wallet.seedBackupPhraseLabel'),
+    type: 'textarea',
+    value: phrase,
+    readOnly: true,
+    required: false,
+  }, {
+    id: 'seedBackupConfirm',
+    name: 'confirmText',
+    label: t('wallet.seedBackupConfirmLabel'),
+    type: 'text',
+    placeholder: 'SAVED',
+    autocomplete: 'off',
+    autocapitalize: 'characters',
+    spellcheck: false,
+  }];
+}
+
+/** The typed word is the literal SAVED in every locale — the label says so and the comparison depends on it. */
+function seedBackupConfirmAccepted(value) {
+  return String(value ?? '').trim().toUpperCase() === 'SAVED';
+}
+
 async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
   if (!isTelegramEnv() || !wallet) return;
   if (!force && isTelegramSeedBackupConfirmed(wallet.address)) return;
@@ -3021,32 +3047,10 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
       // [OWNER 2026-08-10] Plain "Continue", not "I wrote it down": the typed SAVED below is what confirms it,
       // so a second claim on the button was one assertion too many. Reuses the shared Continue label.
       submitLabel: t('common.continue'),
-      fields: [
-        {
-          id: 'recoveryPhrase',
-          label: t('wallet.seedBackupPhraseLabel'),
-          type: 'textarea',
-          value: phrase,
-          readOnly: true,
-          required: false,
-        },
-        {
-          id: 'seedBackupConfirm',
-          name: 'confirmText',
-          // [OWNER 2026-08-10] This label shipped as a raw English literal in an otherwise localized dialog —
-          // seen on a Russian screen. The typed word stays the literal SAVED on purpose: the check compares
-          // against it, and a locale-dependent password would lock out anyone who switched language mid-flow.
-          label: t('wallet.seedBackupConfirmLabel'),
-          type: 'text',
-          placeholder: 'SAVED',
-          autocomplete: 'off',
-          autocapitalize: 'characters',
-          spellcheck: false,
-        },
-      ],
+      fields: seedBackupFieldSpecs(phrase),
       summary: [t('wallet.seedBackupSummary')],
     });
-    if (String(result?.confirmText ?? '').trim().toUpperCase() === 'SAVED') {
+    if (seedBackupConfirmAccepted(result?.confirmText)) {
       markTelegramSeedBackupConfirmed(wallet.address);
       return;
     }
@@ -19239,7 +19243,7 @@ createWalletButton?.addEventListener('click', async () => {
     markWalletKeyBackupPending(walletDraft.address);
     // Inside Telegram, force a confirmed seed backup right after generation: the
     // WebView can evict localStorage and the seed is the only recovery path.
-    await enforceTelegramSeedBackupGate(walletDraft, { force: true });
+    if (!deferSeedGate) await enforceTelegramSeedBackupGate(walletDraft, { force: true });
     flashWalletIdentityStatus(t('wallet.walletReady'));
   } catch (error) {
     setText(walletAddressStatus, t('common.blocked'));
@@ -25134,7 +25138,7 @@ async function restoreQuickStartDismissalFromTelegramCloud() {
   } catch { /* ignore */ }
 }
 
-async function runQuickStartCreateWallet(collectedPassword = null) {
+async function runQuickStartCreateWallet(collectedPassword = null, { deferSeedGate = false } = {}) {
   if (hasStoredPlathoWalletRecord()) return true;
   const walletDraft = await createPlathoWallet(plathoWalletNetworkOptions());
   // The quick-start step collects the password in its own body and passes it here, so no dialog opens over the
@@ -25310,9 +25314,29 @@ function buildQuickStartActivateBody() {
 // get-a-key plate one step earlier (owner, 2026-08-10 — same style, its own row, stretched). Moving the real
 // action out of the footer leaves the footer doing one job: Back and Continue, which is all a stepper footer
 // should ever mean. Feedback goes to the step status line, mirroring what the footer action used to report.
+// The ONE backup step offers BOTH ways and lets the user pick: the 24 words survive a forgotten password, the
+// encrypted file is one tap and needs no transcription. The file CONTAINS the same phrase, encrypted, so either
+// is genuinely enough.
+function quickStartSeedPhraseOrNull() {
+  if (!plathoWallet) return null;
+  try { return exportPlathoWalletRecoveryPhrase(plathoWallet) || null; } catch { return null; }
+}
+
+/** Set when the key file is actually written in this step — one of the two ways past it. */
+let quickStartKeyFileSaved = false;
+
 function buildQuickStartBackupBody() {
   const wrap = document.createElement('div');
   wrap.className = 'quick-start-key-body';
+  const phrase = quickStartSeedPhraseOrNull();
+  if (phrase) {
+    for (const field of seedBackupFieldSpecs(phrase)) wrap.append(createActionField(field));
+  } else {
+    const locked = document.createElement('div');
+    locked.className = 'quick-start-step-hint';
+    locked.textContent = t('quickstart.unlockToActivate');
+    wrap.append(locked);
+  }
   const save = document.createElement('button');
   save.type = 'button';
   save.className = 'discovery-cta-action quick-start-key-cta';
@@ -25322,6 +25346,7 @@ function buildQuickStartBackupBody() {
     setText(quickStartStepStatus, t('quickstart.working'));
     try {
       const ok = await exportEncryptedWalletKeyFile();
+      if (ok !== false) quickStartKeyFileSaved = true;
       setText(quickStartStepStatus, ok === false ? t('quickstart.notCompleted') : t('quickstart.done'));
     } catch (error) {
       console.error(error);
@@ -25331,6 +25356,12 @@ function buildQuickStartBackupBody() {
     }
   });
   wrap.append(save);
+  const summary = document.createElement('div');
+  summary.className = 'quick-start-step-summary';
+  const row = document.createElement('div');
+  row.textContent = t('wallet.seedBackupSummary');
+  summary.append(row);
+  wrap.append(summary);
   return wrap;
 }
 
@@ -25381,10 +25412,11 @@ const QUICK_START_STEPS = [
     run: async () => {
       const { password, error } = quickStartCreateWalletPassword();
       if (error) return error;                       // shown on the step's own status line, nothing to dismiss
-      return runQuickStartCreateWallet(password);
+      return runQuickStartCreateWallet(password, { deferSeedGate: true });
     },
   },
   {
+    key: 'toncenter',
     title: () => t('quickstart.addKeyTitle'),
     action: () => t('common.next'),
     optional: true,
@@ -25433,11 +25465,17 @@ const QUICK_START_STEPS = [
     optional: false,
     why: () => t('quickstart.backupKeyWhy'),
     autoDone: () => false,
-    body: () => buildQuickStartBackupBody(),
-    // The footer is Back + Continue; saving the file is the plate in the body. NOTE this makes the backup
-    // pass-through-able, which the pending-backup nudge (markWalletKeyBackupPending -> quickStartBackupMode)
-    // is what catches — it re-opens the stepper on this step alone until the file has actually been saved.
-    run: async () => true,
+    body: () => { quickStartKeyFileSaved = false; return buildQuickStartBackupBody(); },
+    // EITHER proof gets you past: the typed SAVED for the words, or a key file actually written.
+    run: async () => {
+      const typed = quickStartStepBody?.querySelector('#seedBackupConfirm')?.value;
+      if (seedBackupConfirmAccepted(typed)) {
+        if (plathoWallet) markTelegramSeedBackupConfirmed(plathoWallet.address);
+        return true;
+      }
+      if (quickStartKeyFileSaved) return true;
+      return t('quickstart.backupNeedsOne');
+    },
   },
   {
     key: 'topup',
