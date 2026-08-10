@@ -3098,6 +3098,23 @@ describe('PWA runtime config guard', () => {
     expect(svg).toMatch(/viewBox="0 0 24 24"/);
     const coords = (svg.match(/[\d.]+/g) ?? []).map(Number).filter((n) => n >= 5 && n <= 19);
     expect(Math.min(...coords) + Math.max(...coords), 'ink must straddle 12').toBeCloseTo(24, 1);
+
+    // [OWNER 2026-08-09, second pass] "кнопка с крестиком слишком большая — сделай как кнопка синхронизации."
+    // It was the last .icon-button still at the generic 40px, sitting a few pixels from a 34px sync button in the
+    // same kind of header row. The fix reads the SAME token the sync indicator reads, which is what "same size as
+    // the sync button" has to mean if it is to stay true: move the token and both move together.
+    expect(css, 'the dialog ✕ must read the header-control token, not its own number')
+      .toMatch(/\.modal-backdrop header \.icon-button \{[^}]*width: var\(--header-button-size\);[^}]*height: var\(--header-button-size\);/);
+    expect(css, 'and the sync indicator must read that same token')
+      .toMatch(/\.global-sync-indicator \{[^}]*width: var\(--header-button-size\);/);
+    // Addressed by CONTAINER rather than by a list of dialog classes. MODALGEO-03 exists because a per-dialog list
+    // silently missed a newcomer once and its ✕ shipped broken; a container selector cannot have that hole.
+    expect(css, 'a per-dialog list would miss the next dialog — keep the container selector')
+      .not.toMatch(/\.(?:recipient|action|docs|install|activation-welcome|quick-start)-dialog header \.icon-button/);
+    // Counter-case: the generic .icon-button is still 40px. Without this the assertion above would stay green if
+    // the dialog rule were deleted and the default happened to match — it asserts the rule DOES something.
+    expect(css, 'the generic icon button is still 40px, so the dialog rule is real work')
+      .toMatch(/\.icon-button,\s*\.send-button \{[^}]*width: 40px;/);
   });
 
   it('PWA-CONFIG-02: production config passes only with mainnet and provider module configured', () => {
