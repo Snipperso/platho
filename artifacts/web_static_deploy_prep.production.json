@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-10T12:32:16.811Z",
+  "generatedAt": "2026-08-10T15:06:25.501Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -1175,6 +1175,7 @@
     ],
     "excludedWebFiles": [
       "CRYPTO_PROTOCOL.md",
+      "LICENSE",
       "NO_BACKEND_ARCHITECTURE.md",
       "preview-desktop.png",
       "preview-mobile.png",

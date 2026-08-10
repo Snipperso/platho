@@ -19,6 +19,20 @@ Third-party dependencies and vendored packages remain governed by their own
 licenses. Those licenses apply only to the third-party materials they cover and
 do not grant rights to the Platho project code.
 
-The code is experimental and pre-mainnet. No warranty is provided, including any
+No warranty is provided, including any
 implied warranty of merchantability, fitness for a particular purpose,
 non-infringement, correctness, security, or production suitability.
+
+--------------------------------------------------------------------------------
+EXCEPTION: THE WEB CLIENT IS APACHE-2.0
+
+Everything under web/ is licensed separately, under the Apache License 2.0 —
+see web/LICENSE. Fork it, change it, ship your own client.
+
+The split is deliberate. A forked CLIENT talks to these same contracts and the
+same people, so more clients make one network stronger. Forked CONTRACTS would
+be a second network wearing the same name, which helps nobody. Hence: the client
+is open, the contracts are readable.
+
+Apache-2.0 section 6 grants no trademark rights, and we rely on it: fork the
+client freely, but call it something other than Platho.
