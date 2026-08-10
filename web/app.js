@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=30';
+} from './public-channel-subscriptions.mjs?v=32';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=56';
+} from './i18n.mjs?v=58';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.1';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.2';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -25016,7 +25016,6 @@ const quickStartBeginButton = document.querySelector('#quickStartBeginButton');
 const quickStartImportButtonEl = document.querySelector('#quickStartImportButton');
 const quickStartCloseButton = document.querySelector('#quickStartCloseButton');
 const quickStartBackButton = document.querySelector('#quickStartBackButton');
-const quickStartSkipButton = document.querySelector('#quickStartSkipButton');
 const quickStartActionButton = document.querySelector('#quickStartActionButton');
 const quickStartProgress = document.querySelector('#quickStartProgress');
 const quickStartStepCounter = document.querySelector('#quickStartStepCounter');
@@ -25143,12 +25142,6 @@ async function quickStartRefreshWalletBalanceRaw() {
   } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
 }
 
-// Jump the stepper to a named step (used by "Back to Top up" on the activation step).
-function quickStartGoToStepByKey(key) {
-  quickStartStepIndex = quickStartStepIndexByKey(key);
-  renderQuickStartStep();
-}
-
 // Top-up step body: receive address + a LIVE balance line so a user who just sent GRAM from another wallet app
 // sees it arrive (auto-checked on entry + a manual "Check balance"). In-place text updates, never a re-render.
 function buildQuickStartTopUpBody() {
@@ -25180,7 +25173,9 @@ function buildQuickStartTopUpBody() {
   balanceLine.className = 'quick-start-balance-line';
   const check = document.createElement('button');
   check.type = 'button';
-  check.className = 'discovery-cta-action';
+  // Same full-width plate as the two steps before it (owner, 2026-08-10). The activate step builds its own
+  // check-balance button separately and is deliberately left alone here.
+  check.className = 'discovery-cta-action quick-start-key-cta';
   check.textContent = t('quickstart.checkBalance');
   const renderBalance = () => {
     const bal = quickStartWalletTonNanotons();
@@ -25200,66 +25195,117 @@ function buildQuickStartTopUpBody() {
 
 // Activation step body: shows balance vs the activation fee and GATES on funds — an underfunded wallet cannot
 // activate, so instead of letting the on-chain send fail, disable the action and offer "Back to Top up".
+/** Short of the activation fee, as far as we currently know. `null` balance means "not read yet", not "empty". */
+function quickStartActivationUnderfunded() {
+  const bal = quickStartWalletTonNanotons();
+  return bal !== null && bal < plathoAccountActivationFeeNanotons();
+}
+
 function buildQuickStartActivateBody() {
-  // Same stacking layout as the Top-up step (quick-start-key-body: grid + 12px gap) so the balance,
-  // hint and the two actions never glue together, and both actions use the shared plate-CTA class
-  // (.discovery-cta-action) so they read as buttons — the same "Add contact" look as the rest of the app.
+  // [OWNER 2026-08-10] TWO states, not one screen with four buttons.
+  //
+  //   funded  -> the balance line and ONE full-width "Activate account" plate. Footer: Back + Continue.
+  //   short   -> the balance line and a sentence saying activation cannot happen yet and where to do it later.
+  //              No action plate at all: offering a button that is going to refuse is the thing being removed.
+  //
+  // "Back to top up" is gone outright — it was a second copy of the footer's Back. "Check balance" is gone too:
+  // the balance refreshes when this body is built and again whenever the app returns to the foreground, so the
+  // button only ever restated something that already happens by itself.
   const wrap = document.createElement('div');
   wrap.className = 'quick-start-key-body';
   const summary = document.createElement('div');
   summary.className = 'quick-start-balance-line';
   const hint = document.createElement('div');
   hint.className = 'quick-start-step-hint';
-  const check = document.createElement('button');
-  check.type = 'button';
-  check.className = 'discovery-cta-action';
-  check.textContent = t('quickstart.checkBalance');
-  const backBtn = document.createElement('button');
-  backBtn.type = 'button';
-  backBtn.className = 'discovery-cta-action';
-  backBtn.textContent = t('quickstart.backToTopUp');
-  backBtn.addEventListener('click', () => { quickStartGoToStepByKey('topup'); });
+  const activate = document.createElement('button');
+  activate.type = 'button';
+  activate.className = 'discovery-cta-action quick-start-key-cta';
+  activate.textContent = t('quickstart.activateAction');
+  activate.addEventListener('click', async () => {
+    activate.disabled = true;
+    setText(quickStartStepStatus, t('quickstart.working'));
+    try {
+      await submitVaultRegisterMessagingKeys();
+      setText(quickStartStepStatus, t('quickstart.done'));
+    } catch (error) {
+      console.error(error);
+      setText(quickStartStepStatus, t('quickstart.couldNotCompleteLater'));
+    } finally {
+      activate.disabled = false;
+    }
+  });
   const applyGate = () => {
     const bal = quickStartWalletTonNanotons();
     const fee = plathoAccountActivationFeeNanotons();
     summary.textContent = bal === null
       ? t('quickstart.activationNeedsChecking', { fee: formatTonNanotons(fee) })
       : t('quickstart.balanceActivationNeeds', { balance: formatTonNanotons(bal), fee: formatTonNanotons(fee) });
-    const underfunded = bal !== null && bal < fee;
-    backBtn.hidden = !underfunded;
+    const underfunded = quickStartActivationUnderfunded();
+    activate.hidden = underfunded;
+    hint.hidden = !underfunded;
     hint.textContent = underfunded ? t('quickstart.notEnoughGramHint') : '';
     hint.classList.toggle('is-error', underfunded);
-    // Block the on-chain send when we KNOW the wallet is short; leave it enabled while the balance is unknown
-    // (run() double-checks and returns guidance instead of a doomed activation). renderQuickStartStep runs
-    // body() BEFORE it sets the action label, and setting textContent does not touch .disabled, so this sticks.
-    if (quickStartActionButton) quickStartActionButton.disabled = underfunded;
+    // The footer label follows the same fork (Continue when there is still something to do here, Done when there
+    // is not). Safe to set from here only because applyGate also runs AFTER the balance read resolves —
+    // renderQuickStartStep runs body() first and would overwrite this initial pass with the same value anyway.
+    if (quickStartActionButton) {
+      quickStartActionButton.disabled = false;
+      quickStartActionButton.textContent = underfunded ? t('common.done') : t('common.continue');
+    }
   };
   const refresh = async () => {
     await quickStartRefreshWalletBalanceRaw();
     applyGate();
   };
-  check.addEventListener('click', () => { refresh(); });
   applyGate();
   refresh();
-  wrap.append(summary, hint, check, backBtn);
+  wrap.append(summary, hint, activate);
+  return wrap;
+}
+
+// The backup step's body: one full-width plate that saves the encrypted key file, built the same way as the
+// get-a-key plate one step earlier (owner, 2026-08-10 — same style, its own row, stretched). Moving the real
+// action out of the footer leaves the footer doing one job: Back and Continue, which is all a stepper footer
+// should ever mean. Feedback goes to the step status line, mirroring what the footer action used to report.
+function buildQuickStartBackupBody() {
+  const wrap = document.createElement('div');
+  wrap.className = 'quick-start-key-body';
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'discovery-cta-action quick-start-key-cta';
+  save.textContent = t('quickstart.saveWalletKeyAction');
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    setText(quickStartStepStatus, t('quickstart.working'));
+    try {
+      const ok = await exportEncryptedWalletKeyFile();
+      setText(quickStartStepStatus, ok === false ? t('quickstart.notCompleted') : t('quickstart.done'));
+    } catch (error) {
+      console.error(error);
+      setText(quickStartStepStatus, t('quickstart.couldNotComplete', { reason: error?.message ?? t('quickstart.tryAgain') }));
+    } finally {
+      save.disabled = false;
+    }
+  });
+  wrap.append(save);
   return wrap;
 }
 
 const QUICK_START_STEPS = [
   {
-    title: t('quickstart.createWalletTitle'),
-    action: t('quickstart.createWalletAction'),
+    title: () => t('quickstart.createWalletTitle'),
+    action: () => t('quickstart.createWalletAction'),
     optional: false,
-    why: t('quickstart.createWalletWhy'),
+    why: () => t('quickstart.createWalletWhy'),
     autoDone: () => hasStoredPlathoWalletRecord(),
     body: () => null,
     run: () => runQuickStartCreateWallet(),
   },
   {
-    title: t('quickstart.addKeyTitle'),
-    action: t('quickstart.saveKeyAction'),
+    title: () => t('quickstart.addKeyTitle'),
+    action: () => t('common.continue'),
     optional: true,
-    why: t('quickstart.addKeyWhy'),
+    why: () => t('quickstart.addKeyWhy'),
     autoDone: () => false,
     body: () => {
       // Input FIRST, the get-a-key CTA below it with a clear gap (owner: the old order glued a
@@ -25276,7 +25322,9 @@ const QUICK_START_STEPS = [
       if (globalThis.plathoToncenterApiKey) input.value = globalThis.plathoToncenterApiKey;
       const getKey = document.createElement('button');
       getKey.type = 'button';
-      getKey.className = 'discovery-cta-action';
+      // The extra class widens THIS plate to the full body (owner: stretch it), leaving the shorter Check-balance
+      // plates on the top-up and activate steps hugging their text as before.
+      getKey.className = 'discovery-cta-action quick-start-key-cta';
       getKey.textContent = t('quickstart.getFreeKey');
       getKey.addEventListener('click', () => { openToncenterBotLink(); });
       wrap.append(input, getKey);
@@ -25285,7 +25333,10 @@ const QUICK_START_STEPS = [
     run: async () => {
       const value = quickStartStepBody?.querySelector('#quickStartKeyInput')?.value;
       const trimmed = String(value ?? '').trim();
-      if (!trimmed) return false;
+      // An empty field is a DECISION, not a failure: the step is optional and Platho works without a key. Returning
+      // false here is what made a Skip button necessary — the only way past an empty field was a second button.
+      // A previously stored key is deliberately left alone, so a blank field can never silently drop one.
+      if (!trimmed) return true;
       const result = await validateToncenterApiKey(trimmed);
       if (result.reason === 'invalid') return t('quickstart.keyRejected');
       applyToncenterApiKey(trimmed);
@@ -25294,20 +25345,23 @@ const QUICK_START_STEPS = [
   },
   {
     key: 'export',
-    title: t('quickstart.backupKeyTitle'),
-    action: t('quickstart.saveWalletKeyAction'),
+    title: () => t('quickstart.backupKeyTitle'),
+    action: () => t('common.continue'),
     optional: false,
-    why: t('quickstart.backupKeyWhy'),
+    why: () => t('quickstart.backupKeyWhy'),
     autoDone: () => false,
-    body: () => null,
-    run: () => exportEncryptedWalletKeyFile(),
+    body: () => buildQuickStartBackupBody(),
+    // The footer is Back + Continue; saving the file is the plate in the body. NOTE this makes the backup
+    // pass-through-able, which the pending-backup nudge (markWalletKeyBackupPending -> quickStartBackupMode)
+    // is what catches — it re-opens the stepper on this step alone until the file has actually been saved.
+    run: async () => true,
   },
   {
     key: 'topup',
-    title: t('quickstart.topUpTitle'),
-    action: t('common.continue'),
+    title: () => t('quickstart.topUpTitle'),
+    action: () => t('common.continue'),
     optional: true,
-    why: t('quickstart.topUpWhy'),
+    why: () => t('quickstart.topUpWhy'),
     autoDone: () => false,
     body: () => buildQuickStartTopUpBody(),
     // Plain Next. Copying lives on the address row where the thing being copied is.
@@ -25315,22 +25369,17 @@ const QUICK_START_STEPS = [
   },
   {
     key: 'activate',
-    title: t('quickstart.activateTitle'),
-    action: t('quickstart.activateAction'),
+    title: () => t('quickstart.activateTitle'),
+    // Last step, so this button ends the stepper either way — but it says WHY it is ending. "Continue" while
+    // there is still an activation to run here, "Done" when the wallet is short and the only honest next move is
+    // to come back later from the Profile tab.
+    action: () => (quickStartActivationUnderfunded() ? t('common.done') : t('common.continue')),
     optional: true,
-    why: t('quickstart.activateWhy'),
+    why: () => t('quickstart.activateWhy'),
     autoDone: () => hasActivePlathoAccount(),
     body: () => buildQuickStartActivateBody(),
-    run: async () => {
-      // Gate on funds so activation never fails on an empty wallet — send the user back to Top up instead.
-      const bal = quickStartWalletTonNanotons();
-      const fee = plathoAccountActivationFeeNanotons();
-      if (bal !== null && bal < fee) {
-        return t('quickstart.notEnoughToActivate', { balance: formatTonNanotons(bal), fee: formatTonNanotons(fee) });
-      }
-      await submitVaultRegisterMessagingKeys();
-      return true;
-    },
+    // Activation itself is the plate in the body; the footer only closes the wizard.
+    run: async () => true,
   },
 ];
 
@@ -25348,24 +25397,30 @@ function renderQuickStartProgress() {
   });
 }
 
-function renderQuickStartStep() {
+function renderQuickStartStep({ skipCompleted = true } = {}) {
   const step = QUICK_START_STEPS[quickStartStepIndex];
   if (!step) { finishQuickStart(); return; }
-  // A mandatory step that is already satisfied (e.g. a wallet already exists) is auto-skipped.
-  if (!step.optional && step.autoDone()) { quickStartAdvance(); return; }
+  // A mandatory step that is already satisfied (e.g. a wallet already exists) is auto-skipped — but ONLY when
+  // moving forward. [OWNER 2026-08-10] Back looked dead on the key step: it did fire and the index did
+  // move, onto step 1 (create wallet), whose autoDone() is true by then — which advanced straight forward again,
+  // so nothing ever appeared to happen. Going back is a request to LOOK at a step, not to complete it.
+  if (skipCompleted && !step.optional && step.autoDone()) { quickStartAdvance(); return; }
   renderQuickStartProgress();
   setText(quickStartStepCounter, t('quickstart.stepCounter', { n: quickStartStepIndex + 1, total: QUICK_START_STEPS.length }));
-  setText(quickStartStepTitle, step.title);
-  setText(quickStartStepWhy, step.why);
+  // title/why/action are FUNCTIONS, resolved on every render. [MEASURED 2026-08-10] They used to be plain strings
+  // built once when the module loaded, so `t()` had already run: switching language from the picker inside this very
+  // dialog re-translated the static heading and left the step's own title, explanation and button in the old
+  // language. The language row lives here, which makes the stepper the most likely place in the app to hit it.
+  setText(quickStartStepTitle, step.title());
+  setText(quickStartStepWhy, step.why());
   setText(quickStartStepStatus, '');
   if (quickStartStepBody) {
     quickStartStepBody.innerHTML = '';
     const body = step.body();
     if (body) quickStartStepBody.appendChild(body);
   }
-  if (quickStartActionButton) quickStartActionButton.textContent = step.action;
+  if (quickStartActionButton) quickStartActionButton.textContent = step.action();
   if (quickStartBackButton) quickStartBackButton.hidden = quickStartStepIndex === 0;
-  if (quickStartSkipButton) quickStartSkipButton.hidden = !step.optional;
   // Persist the active step so a reload / background auto-lock resumes here (NOT in backup-only mode, which
   // re-surfaces on its own via the pending-backup nudge).
   if (!quickStartBackupMode) saveQuickStartProgress(quickStartStepIndex);
@@ -25566,8 +25621,11 @@ quickStartBeginButton?.addEventListener('click', () => {
 });
 quickStartCloseButton?.addEventListener('click', () => closeQuickStart());
 quickStartImportButtonEl?.addEventListener('click', () => { closeQuickStart(); walletKeyBackupInput?.click(); });
-quickStartBackButton?.addEventListener('click', () => { if (quickStartStepIndex > 0) { quickStartStepIndex -= 1; renderQuickStartStep(); } });
-quickStartSkipButton?.addEventListener('click', () => quickStartAdvance());
+quickStartBackButton?.addEventListener('click', () => {
+  // skipCompleted:false — otherwise a finished mandatory step bounces the user straight back forward, which is
+  // exactly how this button spent its life looking broken.
+  if (quickStartStepIndex > 0) { quickStartStepIndex -= 1; renderQuickStartStep({ skipCompleted: false }); }
+});
 quickStartActionButton?.addEventListener('click', async () => {
   const step = QUICK_START_STEPS[quickStartStepIndex];
   if (!step || !quickStartActionButton) return;

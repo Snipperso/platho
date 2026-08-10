@@ -3849,11 +3849,12 @@ button.feed-item:hover {
   gap: 8px;
 }
 
-/* Footer row (Back / Skip / primary action). Flex-wrap, NOT a fixed `auto auto 1fr` grid: on a wide
-   screen Back + Skip stay content-sized on the left and the primary action fills the rest on the right
-   (same as before); on a narrow screen (phone / TG Mini App) where a long localized action label +
-   Back + Skip can't share one row, the action wraps to its own full-width row instead of overflowing
-   off-screen. The action keeps a single line (nowrap) at its fixed 42px height. */
+/* Footer row: Back + one primary, and nothing else since Skip was removed (owner, 2026-08-10). Both share the
+   row equally — `flex: 1 1 0` gives them the SAME width whatever their labels say, which is only possible now
+   that the row holds two buttons instead of three. Basis 0 (not 160px) is what makes them equal rather than
+   merely both-growing, and min-width:0 lets a long localized label shrink instead of pushing the dialog wider
+   than a phone viewport, which is the overflow QS-RESUME-05 exists to prevent. flex-wrap is kept as the last
+   resort for a viewport narrow enough that half a row cannot hold a word. */
 .quick-start-step-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3861,14 +3862,14 @@ button.feed-item:hover {
   align-items: center;
 }
 
-.quick-start-step-actions > .secondary-button {
-  flex: 0 0 auto;
-}
-
-.quick-start-step-actions > .recipient-submit {
-  flex: 1 1 160px;
+.quick-start-step-actions > button {
+  flex: 1 1 0;
   min-width: 0;
-  white-space: nowrap;
+  /* MEASURED, not decorative: with `flex-basis: 0` the horizontal padding still enters each item's base size, so
+     Back (0 16px) came out exactly 20px wider than the primary (the UA's 1px 6px) — 183 vs 163 in a 355px row.
+     Equal padding is what makes "equal halves" actually equal: 173.33 each. Height is untouched at 42px. */
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .quick-start-foot {
@@ -3934,6 +3935,13 @@ button.feed-item:hover {
 
 .quick-start-key-body > .discovery-cta-action {
   justify-self: start;
+}
+
+/* ...except the get-a-key plate, which the owner asked to span the body like the input above it (2026-08-10).
+   Must stay AFTER the rule above — same specificity, so source order is what decides. Scoped to this one plate on
+   purpose: the shorter Check-balance plates on the top-up and activate steps still hug their text. */
+.quick-start-key-body > .quick-start-key-cta {
+  justify-self: stretch;
 }
 
 .quick-start-step-body input[type="text"],
