@@ -71,4 +71,26 @@ describe('MODALGEO — every dialog is the same width because it reads the same 
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
+  it('MODALGEO-04: every disabled control dims by the SAME token', () => {
+    // [OWNER 2026-08-10] "все неактивные кнопки должны гаснуть одинаково — единый источник истины." They did not:
+    // 0.46, 0.55, 0.58 and 0.62 had drifted in across five rule blocks, plus three different cursors, so how
+    // "disabled" looked depended on which button you happened to be looking at. The measured trigger was the New
+    // chat submit — genuinely disabled during the lookup, but dimmed too little for anyone to notice.
+    const root = CSS.slice(0, CSS.indexOf('}'));
+    expect(root).toContain('--disabled-opacity: 0.46;');
+    // Every :disabled block that dims must read the token. :not(:disabled) is the ENABLED state and is exempt.
+    const offenders: string[] = [];
+    for (const match of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const [, selector, body] = match;
+      if (!selector.includes(':disabled') || selector.includes(':not(:disabled)')) continue;
+      const literal = /opacity:\s*[\d.]+;/.exec(body);
+      if (literal) offenders.push(`${selector.trim()} hardcodes ${literal[0]}`);
+    }
+    expect(offenders, `a disabled control that dims by its own number: ${offenders.join(' | ')}`).toEqual([]);
+    // Counter-case: the scan must actually be finding the blocks it claims to police.
+    const dimming = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, sel, body]) => sel.includes(':disabled') && !sel.includes(':not(:disabled)')
+        && body.includes('opacity: var(--disabled-opacity)'));
+    expect(dimming.length, 'the disabled-block scan came back empty').toBeGreaterThan(3);
+  });
 });
