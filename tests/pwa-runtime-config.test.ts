@@ -287,7 +287,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/class="app-shell" data-view="public"/);
     expect(html).toMatch(/class="rail-item is-active" type="button" data-tab="public"/);
     expect(html).toMatch(/class="content-pane public-pane view-panel is-active"/);
-    // The sidebar badge and the runtime const both show THE product version — one semantic number (1.0.0) a human
+    // The sidebar badge and the runtime const both show THE product version — one semantic number a human
     // decides on. They MUST be equal in any given bundle; they had silently drifted once (v672 vs v691).
     const versionLabel = html.match(/id="appVersionLabel">(\d+\.\d+\.\d+)<\/span>/)?.[1];
     const runtimeVersion = app.match(/const PLATHO_APP_RUNTIME_VERSION = '(\d+\.\d+\.\d+)'/)?.[1];

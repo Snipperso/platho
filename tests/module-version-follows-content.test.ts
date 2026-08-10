@@ -80,7 +80,7 @@ describe('MODCONTENT — a module version must move when the module does', () =>
     // [2026-08-09] The product version and the cache keys used to be the SAME `vNNN` counter, written by hand in
     // five places that had to agree. They are different jobs and now different things:
     //
-    //   VERSION — semantic, 1.0.0, moves when a human decides it does. PLATHO_APP_RUNTIME_VERSION + both badges.
+    //   VERSION — semantic, moves when a human decides it does. PLATHO_APP_RUNTIME_VERSION, both badges, package.json.
     //   BUILD ID — `./app.js?v=b<hash>`, moves on every byte of app.js. index.html + sw.js.
     //   CACHE ID — CACHE_NAME, moves on every byte of every precached asset. sw.js.
     //
