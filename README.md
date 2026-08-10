@@ -69,4 +69,9 @@ The production command is intentionally blocked until the readiness gates pass.
 
 ## License
 
-No project license is granted yet. The source is public for transparency, but all rights are reserved until a license is explicitly added.
+The repository is split on purpose:
+
+- **`web/` — the client — is Apache-2.0** ([web/LICENSE](web/LICENSE)). Fork it, change it, ship your own. A forked client speaks to the same contracts and the same people, so more clients make one network stronger.
+- **Everything else — contracts, scripts, tests — is Source Available** ([LICENSE](LICENSE)): readable and verifiable by anyone, not re-deployable as a competing "Platho".
+
+Apache-2.0 section 6 grants no trademark rights, and that is deliberate: fork the client freely, but call it something other than Platho.
