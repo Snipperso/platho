@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=32';
+} from './public-channel-subscriptions.mjs?v=34';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=58';
+} from './i18n.mjs?v=60';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.2';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.3';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -3018,7 +3018,9 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
       tone: 'error',
       cancellable: false,
       dismissOnBackdrop: false,
-      submitLabel: t('wallet.seedBackupSubmit'),
+      // [OWNER 2026-08-10] Plain "Continue", not "I wrote it down": the typed SAVED below is what confirms it,
+      // so a second claim on the button was one assertion too many. Reuses the shared Continue label.
+      submitLabel: t('common.continue'),
       fields: [
         {
           id: 'recoveryPhrase',
@@ -3031,7 +3033,10 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
         {
           id: 'seedBackupConfirm',
           name: 'confirmText',
-          label: 'Type SAVED to confirm',
+          // [OWNER 2026-08-10] This label shipped as a raw English literal in an otherwise localized dialog —
+          // seen on a Russian screen. The typed word stays the literal SAVED on purpose: the check compares
+          // against it, and a locale-dependent password would lock out anyone who switched language mid-flow.
+          label: t('wallet.seedBackupConfirmLabel'),
           type: 'text',
           placeholder: 'SAVED',
           autocomplete: 'off',
@@ -25201,6 +25206,19 @@ function quickStartActivationUnderfunded() {
   return bal !== null && bal < plathoAccountActivationFeeNanotons();
 }
 
+/**
+ * Anything that makes activation impossible RIGHT NOW, so the step can say so instead of offering a button.
+ *
+ * [MEASURED 2026-08-10] A locked wallet was the case nobody had covered: activation signs from the wallet, and
+ * locking clears localVaultDraft, so submitKeyShardRegisterDirect() threw 'Local messaging key draft is not ready'
+ * on its very first line. The user saw "could not complete — you can skip and do this later", which names the
+ * wrong problem and sends them away from one they could fix in seconds. The owner hit exactly this: the wallet
+ * auto-locked mid-onboarding, he dismissed the password dialog, and the step came back looking normal.
+ */
+function quickStartActivationBlocked() {
+  return !plathoWallet || quickStartActivationUnderfunded();
+}
+
 function buildQuickStartActivateBody() {
   // [OWNER 2026-08-10] TWO states, not one screen with four buttons.
   //
@@ -25240,17 +25258,21 @@ function buildQuickStartActivateBody() {
     summary.textContent = bal === null
       ? t('quickstart.activationNeedsChecking', { fee: formatTonNanotons(fee) })
       : t('quickstart.balanceActivationNeeds', { balance: formatTonNanotons(bal), fee: formatTonNanotons(fee) });
+    // Locked outranks short of funds: it blocks regardless of the balance, and unlike an empty wallet it is
+    // fixable on the spot. maybeResumeQuickStartAfterUnlock re-renders this step, so unlocking updates it.
+    const locked = !plathoWallet;
     const underfunded = quickStartActivationUnderfunded();
-    activate.hidden = underfunded;
-    hint.hidden = !underfunded;
-    hint.textContent = underfunded ? t('quickstart.notEnoughGramHint') : '';
-    hint.classList.toggle('is-error', underfunded);
+    const blocked = locked || underfunded;
+    activate.hidden = blocked;
+    hint.hidden = !blocked;
+    hint.textContent = locked ? t('quickstart.unlockToActivate') : (underfunded ? t('quickstart.notEnoughGramHint') : '');
+    hint.classList.toggle('is-error', blocked);
     // The footer label follows the same fork (Continue when there is still something to do here, Done when there
     // is not). Safe to set from here only because applyGate also runs AFTER the balance read resolves —
     // renderQuickStartStep runs body() first and would overwrite this initial pass with the same value anyway.
     if (quickStartActionButton) {
       quickStartActionButton.disabled = false;
-      quickStartActionButton.textContent = underfunded ? t('common.done') : t('common.continue');
+      quickStartActionButton.textContent = blocked ? t('common.done') : t('common.continue');
     }
   };
   const refresh = async () => {
@@ -25373,7 +25395,7 @@ const QUICK_START_STEPS = [
     // Last step, so this button ends the stepper either way — but it says WHY it is ending. "Continue" while
     // there is still an activation to run here, "Done" when the wallet is short and the only honest next move is
     // to come back later from the Profile tab.
-    action: () => (quickStartActivationUnderfunded() ? t('common.done') : t('common.continue')),
+    action: () => (quickStartActivationBlocked() ? t('common.done') : t('common.continue')),
     optional: true,
     why: () => t('quickstart.activateWhy'),
     autoDone: () => hasActivePlathoAccount(),
@@ -25618,6 +25640,11 @@ quickStartBeginButton?.addEventListener('click', () => {
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
   if (quickStartStepsView) quickStartStepsView.hidden = false;
   renderQuickStartStep();
+  // [OWNER 2026-08-10] "Why do I have to press Create wallet — just create it." Starting the wizard IS the
+  // decision to create a wallet, so step 1 begins on its own (the password dialog opens straight away). The step
+  // still renders behind it: cancel the password and the button is right there, which is the old screen exactly.
+  // Only when there is nothing yet — a stored wallet auto-completes step 1 and this never runs.
+  if (quickStartStepIndex === 0 && !hasStoredPlathoWalletRecord()) runQuickStartPrimaryAction();
 });
 quickStartCloseButton?.addEventListener('click', () => closeQuickStart());
 quickStartImportButtonEl?.addEventListener('click', () => { closeQuickStart(); walletKeyBackupInput?.click(); });
@@ -25626,7 +25653,9 @@ quickStartBackButton?.addEventListener('click', () => {
   // exactly how this button spent its life looking broken.
   if (quickStartStepIndex > 0) { quickStartStepIndex -= 1; renderQuickStartStep({ skipCompleted: false }); }
 });
-quickStartActionButton?.addEventListener('click', async () => {
+// The stepper's primary action, as a named function so the auto-start can take EXACTLY this path — same status
+// line, same failure wording, same advance rule. A second copy of it would drift.
+async function runQuickStartPrimaryAction() {
   const step = QUICK_START_STEPS[quickStartStepIndex];
   if (!step || !quickStartActionButton) return;
   quickStartActionButton.disabled = true;
@@ -25650,7 +25679,9 @@ quickStartActionButton?.addEventListener('click', async () => {
   } finally {
     quickStartActionButton.disabled = false;
   }
-});
+}
+
+quickStartActionButton?.addEventListener('click', () => { runQuickStartPrimaryAction(); });
 
 // ---- Emoji picker ----------------------------------------------------------------------------------------------
 // A self-contained unicode-emoji picker (NO external font/library — CSP style-src 'self'). ONE global fixed popover
