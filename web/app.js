@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.8';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.9';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -19243,7 +19243,7 @@ createWalletButton?.addEventListener('click', async () => {
     markWalletKeyBackupPending(walletDraft.address);
     // Inside Telegram, force a confirmed seed backup right after generation: the
     // WebView can evict localStorage and the seed is the only recovery path.
-    if (!deferSeedGate) await enforceTelegramSeedBackupGate(walletDraft, { force: true });
+    await enforceTelegramSeedBackupGate(walletDraft, { force: true });
     flashWalletIdentityStatus(t('wallet.walletReady'));
   } catch (error) {
     setText(walletAddressStatus, t('common.blocked'));
@@ -25150,7 +25150,8 @@ async function runQuickStartCreateWallet(collectedPassword = null, { deferSeedGa
   if (!password) return false;
   await setPlathoWallet(walletDraft, { password });
   markWalletKeyBackupPending(walletDraft.address);
-  await enforceTelegramSeedBackupGate(walletDraft, { force: true });
+  // The wizard shows the words as its own backup STEP; a hard dialog here would stack on the wizard card.
+  if (!deferSeedGate) await enforceTelegramSeedBackupGate(walletDraft, { force: true });
   flashWalletIdentityStatus(t('wallet.walletReady'));
   refreshMessagingControls();
   return true;
