@@ -43,6 +43,9 @@
   --header-height: 50px;
   --header-button-size: 34px;
   --header-button-inset: calc((var(--header-height) - var(--header-button-size)) / 2);
+  /* ONE dimming for every disabled control. Five different values had drifted in (0.46 / 0.55 /
+     0.58 / 0.62) plus three cursors, so "disabled" looked like a different state depending on which button. */
+  --disabled-opacity: 0.46;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -115,7 +118,7 @@ button:disabled,
 .action-grid button:disabled,
 .icon-button:disabled,
 .recipient-submit:disabled {
-  opacity: 0.46;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -1311,8 +1314,8 @@ a .avatar.has-image,
 }
 
 .message-actions button:disabled {
-  opacity: 0.58;
-  cursor: wait;
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
 }
 
 .payment-actions {
@@ -1590,7 +1593,7 @@ a .avatar.has-image,
 
 .composer-post-option:has(input:disabled) {
   cursor: not-allowed;
-  opacity: 0.62;
+  opacity: var(--disabled-opacity);
 }
 
 /* Keyboard focus only (matches the eye/send-privacy button): no ring on a plain mouse press. */
@@ -3001,8 +3004,8 @@ button.feed-item:hover {
 /* The discovery follow button reuses the shared .discovery-cta-action plate ("Add contact" look). Its only extra
    state is the post-click "following…" disabled look. */
 .discovery-cta-action:disabled {
-  opacity: 0.55;
-  cursor: default;
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
 }
 
 .discovery-status {
@@ -3199,7 +3202,7 @@ button.feed-item:hover {
   cursor: not-allowed;
   color: var(--muted);
   border-color: var(--line-soft);
-  opacity: 0.76;
+  opacity: var(--disabled-opacity);
 }
 
 .feed-actions button:disabled:hover {
@@ -3458,8 +3461,8 @@ button.feed-item:hover {
 }
 
 .identity-copy-button:disabled {
-  opacity: 0.42;
-  cursor: default;
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
 }
 
 .profile-sections {
