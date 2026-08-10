@@ -538,6 +538,16 @@ button:disabled,
   background: rgba(48, 213, 176, 0.1);
 }
 
+/* A dialog's ✕ is a header control too, and it was the ONLY one still at the generic 40px — visibly bigger than the
+   sync button sitting a few pixels away (owner, 2026-08-09). SIZE only: the dialog card keeps its own teal-tinted
+   .icon-button fill, which is a separate decision and not what was being compared. Addressed by CONTAINER for the
+   same reason as the rule above — every modal header is covered, including ones not written yet. A per-dialog list
+   has already failed here once: MODALGEO-03 exists because a new dialog was missed by exactly that shape of rule. */
+.modal-backdrop header .icon-button {
+  width: var(--header-button-size);
+  height: var(--header-button-size);
+}
+
 /* Global sync indicator: a green spinner while any sync is running, a green check when synced. Sits in the header
    corner (last in .header-actions) on every tab, so the sync state is visible everywhere — replacing the private
    dialog's text subtitle. Pure CSS (reuses rail-balance-spin); no new icon asset. A real <button>: in check mode
