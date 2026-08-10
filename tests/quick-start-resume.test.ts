@@ -134,7 +134,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/if \(password\.length < PLATHO_WALLET_PASSWORD_MIN_LENGTH\) \{[\s\S]{0,140}?t\('wallet\.passwordTooShort'/);
     expect(app).toMatch(/if \(password !== confirmPassword\) return \{ error: t\('wallet\.passwordsDoNotMatch'\) \};/);
     // The shared creator takes the already-collected password; every OTHER caller still gets the standalone prompt.
-    expect(app).toMatch(/async function runQuickStartCreateWallet\(collectedPassword = null\)/);
+    expect(app).toMatch(/async function runQuickStartCreateWallet\(collectedPassword = null, \{ deferSeedGate = false \} = \{\}\)/);
     expect(app).toMatch(/const password = collectedPassword \?\? await requestNewWalletStoragePassword\(/);
     // Counter-case: no dialog is opened from the wizard's own entry point any more.
     const begin = app.slice(
@@ -249,7 +249,7 @@ describe('quick-start resume + activation gate guard', () => {
     const createStep = app.slice(app.indexOf('const QUICK_START_STEPS = ['), app.indexOf("t('quickstart.addKeyTitle')"));
     expect(createStep.length, 'the create-wallet step slice must not collapse').toBeGreaterThan(200);
     expect(createStep).toMatch(/optional: false,/);
-    expect(createStep).toMatch(/return runQuickStartCreateWallet\(password\);/);
+    expect(createStep).toMatch(/return runQuickStartCreateWallet\(password, \{ deferSeedGate: true \}\);/);
     expect(app, 'a refused mandatory step still reports it').toMatch(/t\('quickstart\.notCompleted'\)/);
 
     // (2) The get-a-key plate spans the body. Same specificity as the hug-your-text rule it overrides, so SOURCE
@@ -290,8 +290,8 @@ describe('quick-start resume + activation gate guard', () => {
     const exportStep = app.slice(app.indexOf("key: 'export'"), app.indexOf("key: 'topup'"));
     expect(exportStep.length, 'the export step slice must not collapse').toBeGreaterThan(300);
     expect(exportStep).toMatch(/action: \(\) => t\('common\.next'\),/);
-    expect(exportStep).toMatch(/body: \(\) => buildQuickStartBackupBody\(\),/);
-    expect(exportStep).toMatch(/run: async \(\) => true,/);
+    expect(exportStep).toMatch(/body: \(\) => \{ quickStartKeyFileSaved = false; return buildQuickStartBackupBody\(\); \},/);
+    expect(exportStep).toMatch(/if \(quickStartKeyFileSaved\) return true;/);
     // The footer no longer runs the export, and that is the whole point — assert it moved rather than multiplied.
     expect(exportStep, 'the export must not ALSO hang off the footer action').not.toMatch(/exportEncryptedWalletKeyFile/);
     // Scoped count, not a guessed global one: inside the stepper the export is reachable from exactly ONE place.
