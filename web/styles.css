@@ -2991,6 +2991,11 @@ button.feed-item:hover {
 .discovery-card-actions {
   display: flex;
   justify-content: flex-end;
+  /* [OWNER 2026-08-10] The row had no gap at all, so "Open channel" and "Follow" rendered as one welded slab —
+     two destinations that look like a single control. flex-wrap so a narrow phone drops the second plate to its
+     own line instead of squeezing both. */
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* The discovery follow button reuses the shared .discovery-cta-action plate ("Add contact" look). Its only extra
@@ -3365,7 +3370,17 @@ button.feed-item:hover {
 .action-footnotes[hidden],
 /* Found by the completeness gate, not by eye: walletTonGroup.hidden = !plathoWallet, so with no wallet the
    Receive/Send GRAM pair was meant to disappear and did not. */
-.wallet-ton-group[hidden] {
+.wallet-ton-group[hidden],
+/* [OWNER 2026-08-10] The FOURTH offender, and the one that mattered most: .discovery-cta-action sets
+   display:inline-flex, so the quick-start activation plate stayed on screen with `hidden` set — right under the
+   red line saying the wallet has no GRAM for it. Pressing it then reported "Done" for something that never
+   happened. My own check had read the .hidden ATTRIBUTE and called it hidden; the attribute was set the whole
+   time. Verify with computed display, never with the property. */
+.discovery-cta-action[hidden],
+/* The FIFTH, and nobody had seen it yet because it needs an NFT with no inline art: `art.hidden = !nft.image` on a
+   block with width:100% and aspect-ratio:1 left a full-width grey square where the picture would be. Found by the
+   widened gate, not by eye — which is the entire argument for widening it. */
+.nft-card-art[hidden] {
   display: none;
 }
 
@@ -3942,6 +3957,11 @@ button.feed-item:hover {
    purpose: the shorter Check-balance plates on the top-up and activate steps still hug their text. */
 .quick-start-key-body > .quick-start-key-cta {
   justify-self: stretch;
+  /* The plate is an inline-flex with no justify-content, which is invisible while it hugs its text and became a
+     left-shoved label the moment it spanned the row (owner, 2026-08-10). Centring belongs on the STRETCHED
+     variant only — the content-sized plates elsewhere in the app are unaffected either way. */
+  justify-content: center;
+  text-align: center;
 }
 
 .quick-start-step-body input[type="text"],

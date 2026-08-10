@@ -3073,9 +3073,27 @@ describe('PWA runtime config guard', () => {
     for (const tag of html.match(/<[a-z]+[^>]*\shidden(?=[\s>/])[^>]*>/g) ?? []) {
       for (const cls of /\sclass="([^"]+)"/.exec(tag)?.[1]?.split(/\s+/) ?? []) if (cls) hiding.add(cls);
     }
-    // JS-toggled blocks the markup cannot reveal, named explicitly because that is how they were missed.
+    // [OWNER 2026-08-10] The markup scan alone has a hole, and it cost a real defect: elements BUILT IN JS never
+    // appear in index.html at all. The quick-start activation plate (.discovery-cta-action, display:inline-flex)
+    // set `hidden = true` on an empty wallet and stayed on screen anyway — directly under the red line explaining
+    // it could not be used. The old fix for that hole was a hand-written list of two class names, which is the
+    // "known members a newcomer silently misses" shape this project keeps paying for.
+    //
+    // So DERIVE it: pair every `x.className = '...'` with every `x.hidden = ...` in app.js by variable name. It
+    // over-approximates (names repeat across builders) and that is the safe direction for a completeness check.
+    const app = readFileSync('web/app.js', 'utf8');
+    const classesByVar = new Map<string, Set<string>>();
+    for (const [, name, classes] of app.matchAll(/(\w+)\.className = '([^']+)'/g)) {
+      if (!classesByVar.has(name)) classesByVar.set(name, new Set());
+      for (const cls of classes.split(/\s+/)) if (cls) classesByVar.get(name)!.add(cls);
+    }
+    for (const [, name] of app.matchAll(/(\w+)\.hidden = /g)) {
+      for (const cls of classesByVar.get(name) ?? []) hiding.add(cls);
+    }
+    // Element consts declared once at the top and toggled by name — the markup carries their class, not app.js.
     for (const cls of ['action-summary', 'action-footnotes']) hiding.add(cls);
     expect(hiding.size, 'the scan found nothing — the parser drifted, not the CSS').toBeGreaterThan(3);
+    expect(hiding, 'the JS-derived half must actually contribute').toContain('discovery-cta-action');
     const offenders: string[] = [];
     for (const cls of hiding) {
       const rule = new RegExp(`(^|[,}])\\s*\\.${cls}\\s*\\{([^}]*)\\}`, 'm').exec(css);
