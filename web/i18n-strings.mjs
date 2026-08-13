@@ -897,6 +897,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "The post is on chain, and anyone with a link can read it.",
     "public.channelNotListedSearchNeeds": "Channel search only lists channels that have a description or tags — yours has neither.",
     "public.channelNotListedWrite": "Write a description",
+    "public.openCommentsRiskDontShow": "Don't show this again",
   },
   ru: {
     "welcome.activatedTitle": "Аккаунт активирован",
@@ -1797,6 +1798,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "Пост на цепи, и любой, у кого есть ссылка, его прочитает.",
     "public.channelNotListedSearchNeeds": "В поиске каналов показываются только те, у кого есть описание или теги. У вашего нет ни того, ни другого.",
     "public.channelNotListedWrite": "Написать описание",
+    "public.openCommentsRiskDontShow": "Больше не показывать",
   },
   zh: {
     "welcome.activatedTitle": "账户已激活",
@@ -2667,6 +2669,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "帖子已上链，任何拿到链接的人都能阅读。",
     "public.channelNotListedSearchNeeds": "频道搜索只收录填写了简介或标签的频道，您的两者都没有。",
     "public.channelNotListedWrite": "填写简介",
+    "public.openCommentsRiskDontShow": "不再显示",
   },
   es: {
     "welcome.activatedTitle": "Cuenta activada",
@@ -3547,6 +3550,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "La publicación está en la cadena y cualquiera con el enlace puede leerla.",
     "public.channelNotListedSearchNeeds": "La búsqueda de canales solo lista canales con descripción o etiquetas; el tuyo no tiene ninguna.",
     "public.channelNotListedWrite": "Escribir una descripción",
+    "public.openCommentsRiskDontShow": "No volver a mostrar",
   },
   pt: {
     "welcome.activatedTitle": "Conta ativada",
@@ -4427,6 +4431,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "O post está na chain e qualquer pessoa com o link pode lê-lo.",
     "public.channelNotListedSearchNeeds": "A busca de canais só lista canais com descrição ou tags; o seu não tem nenhuma delas.",
     "public.channelNotListedWrite": "Escrever uma descrição",
+    "public.openCommentsRiskDontShow": "Não mostrar novamente",
   },
   fr: {
     "welcome.activatedTitle": "Compte activé",
@@ -5307,6 +5312,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "La publication est sur la chaîne et quiconque a le lien peut la lire.",
     "public.channelNotListedSearchNeeds": "La recherche de canaux ne liste que les canaux ayant une description ou des tags ; le vôtre n'a ni l'un ni l'autre.",
     "public.channelNotListedWrite": "Écrire une description",
+    "public.openCommentsRiskDontShow": "Ne plus afficher",
   },
   de: {
     "welcome.activatedTitle": "Konto aktiviert",
@@ -6187,6 +6193,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "Der Beitrag steht in der Chain, und jeder mit dem Link kann ihn lesen.",
     "public.channelNotListedSearchNeeds": "Die Kanalsuche listet nur Kanäle mit Beschreibung oder Tags — deiner hat beides nicht.",
     "public.channelNotListedWrite": "Beschreibung schreiben",
+    "public.openCommentsRiskDontShow": "Nicht mehr anzeigen",
   },
   hi: {
     "welcome.activatedTitle": "खाता सक्रिय हो गया",
@@ -7067,6 +7074,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "पोस्ट चेन पर है और लिंक रखने वाला कोई भी उसे पढ़ सकता है।",
     "public.channelNotListedSearchNeeds": "चैनल खोज में केवल वे चैनल दिखते हैं जिनका विवरण या टैग हो — आपके पास दोनों नहीं हैं।",
     "public.channelNotListedWrite": "विवरण लिखें",
+    "public.openCommentsRiskDontShow": "फिर से न दिखाएँ",
   },
   id: {
     "welcome.activatedTitle": "Akun diaktifkan",
@@ -7937,6 +7945,7 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "Kiriman ada di chain dan siapa pun yang punya tautannya bisa membacanya.",
     "public.channelNotListedSearchNeeds": "Pencarian kanal hanya menampilkan kanal yang punya deskripsi atau tag — milik Anda belum punya keduanya.",
     "public.channelNotListedWrite": "Tulis deskripsi",
+    "public.openCommentsRiskDontShow": "Jangan tampilkan lagi",
   },
   ja: {
     "welcome.activatedTitle": "アカウントを有効化しました",
@@ -8807,5 +8816,6 @@ export const I18N_STRINGS = {
     "public.channelNotListedPostsLive": "投稿はチェーン上にあり、リンクを知っていれば誰でも読めます。",
     "public.channelNotListedSearchNeeds": "チャンネル検索に載るのは説明かタグがあるチャンネルだけです。あなたのチャンネルにはどちらもありません。",
     "public.channelNotListedWrite": "説明を書く",
+    "public.openCommentsRiskDontShow": "今後は表示しない",
   },
 };
