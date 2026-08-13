@@ -82,11 +82,18 @@ export function createPublicLane({
   endpoint = null,
   apiKey = null,
   fetch: fetchImpl = null,
+  strict = false,
   now = () => Math.floor(Date.now() / 1000),
 } = {}) {
   if (typeof runGetMethod !== 'function') throw new Error('createPublicLane requires runGetMethod');
 
-  const rpc = { endpoint, apiKey, fetch: fetchImpl ?? undefined };
+  // `strict` DEFAULTS OFF, and must: in the app a rate-limited read has to degrade into a short feed rather than a
+  // thrown screen — the reader is a phone under a per-second limit and a missing row costs the user nothing but a
+  // refresh. An OFFLINE WALKER inherits the opposite requirement. shard-rpc returns an empty result when the pump
+  // drops a request, so for a walker whose output is a record of record, "nobody published" and "I could not ask"
+  // arrive as the same value — and the run that saw nothing looks exactly like the run where nothing happened.
+  // Passing strict makes the unasked question throw, which is the only form in which it can be noticed.
+  const rpc = { endpoint, apiKey, fetch: fetchImpl ?? undefined, strict };
   const statesRequest = createShardStatesRequest(rpc);
   // `opcode` keeps the 128-row window spent on real posts. A channel's shard address is publicly derivable
   // (partition key from the wallet + epoch tag), so anyone could send it 128 cheap messages and push every paid
