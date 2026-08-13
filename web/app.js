@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=41';
+} from './public-channel-subscriptions.mjs?v=42';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=67';
+} from './i18n.mjs?v=68';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.23';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.24';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -9299,13 +9299,43 @@ async function maybeWarnChannelNotDiscoverable() {
   if (result !== null) await openEditChannelProfileDialog().catch((error) => console.error(error));
 }
 
+// Per-DEVICE, not per-wallet: the person has read the warning, and they do not become unaware of it by switching
+// wallets. A write that fails (private mode, quota) leaves the notice appearing — the safe direction.
+const PUBLIC_COMMENTS_RISK_DISMISSED_KEY = 'platho.publicCommentsRisk.dismissed.v1';
+
+function publicCommentsRiskDismissed() {
+  try { return globalThis.localStorage?.getItem(PUBLIC_COMMENTS_RISK_DISMISSED_KEY) === '1'; }
+  catch { return false; }
+}
+
+function rememberPublicCommentsRiskDismissed() {
+  try { globalThis.localStorage?.setItem(PUBLIC_COMMENTS_RISK_DISMISSED_KEY, '1'); }
+  catch { /* unavailable: the warning keeps showing, which is the failure we can live with */ }
+}
+
+/**
+ * The open-comments warning, with a "don't show again" the author can tick once.
+ *
+ * Two things it must not do. It must not become a CONSENT gate: the checkbox is `required: false`, because dialog
+ * checkboxes are required BY DEFAULT here (createActionField), and an unticked one would have blocked publishing
+ * until the author agreed to stop being warned — exactly backwards.
+ *
+ * And it is remembered only on SUBMIT. Ticking the box and then closing the dialog means "I changed my mind about
+ * publishing", not "and also never warn me again".
+ */
 async function confirmPublicCommentsRisk() {
+  if (publicCommentsRiskDismissed()) return true;
   const result = await openActionDialog({
     title: t('public.openCommentsRiskTitle'),
     hint: t('public.openCommentsRiskHint'),
     tone: 'error',
     submitLabel: t('public.publishWithComments'),
-    fields: [],
+    fields: [{
+      id: 'dismissCommentsRisk',
+      type: 'checkbox',
+      required: false,
+      label: t('public.openCommentsRiskDontShow'),
+    }],
     summary: [
       t('public.openCommentsRiskAnyone'),
       t('public.openCommentsRiskModeration'),
@@ -9313,7 +9343,9 @@ async function confirmPublicCommentsRisk() {
       t('public.openCommentsRiskClose'),
     ],
   });
-  return result !== null;
+  if (result === null) return false;
+  if (result.dismissCommentsRisk === true) rememberPublicCommentsRiskDismissed();
+  return true;
 }
 
 
