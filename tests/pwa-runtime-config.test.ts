@@ -4699,11 +4699,43 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const awayFromNewest = publicFeed\.scrollTop > 80;/);
     expect(app).toMatch(/publicFeed\?\.scrollTo\?\.\(\{ top: 0, behavior: 'smooth' \}\)/);
     expect(app).not.toMatch(/publicFeed\?\.scrollTo\?\.\(\{ top: publicFeed\.scrollHeight/);
-    // The button chrome reflects the up direction + the renamed label key.
-    expect(html).toMatch(/id="publicJumpDownButton"[\s\S]*?icon-up[\s\S]*?data-i18n="public\.newest"/);
-    expect(I18N_STRINGS.en['public.newest']).toBe('Newest');
-    expect(I18N_STRINGS.ru['public.newest']).toBeTruthy();
+    // The button chrome reflects the up direction. [OWNER 2026-08-13] The visible label is GONE — "leave just the
+    // arrow, it is obvious" — so the button is the arrow alone. A deliberate exception to the labelled-actions
+    // rule, for one of the few glyphs that genuinely needs no words; the wording moves to aria-label/title, which
+    // is what a screen reader announces, so nothing is lost for anyone who cannot see it.
+    expect(html).toMatch(/id="publicJumpDownButton"[\s\S]*?icon-up/);
+    const jumpStart = html.indexOf('id="publicJumpDownButton"');
+    const jumpButton = html.slice(jumpStart, html.indexOf('</button>', jumpStart));
+    expect(jumpButton, 'no visible label').not.toMatch(/data-i18n="public\.newest"/);
+    expect(jumpButton, 'the icon is the whole button').toMatch(/<span class="icon icon-up"><\/span>\s*$/);
+    expect(html, 'but it is still announced').toMatch(/id="publicJumpDownButton"[^>]*data-i18n-aria-label="public\.jumpToNewest"/);
+    expect(I18N_STRINGS.en['public.jumpToNewest']).toBeTruthy();
+    expect(I18N_STRINGS.ru['public.jumpToNewest']).toBeTruthy();
     expect(I18N_STRINGS.en['public.down']).toBeUndefined(); // key was renamed, not duplicated
+
+    // WHERE it sits, which is the part that broke. [OWNER 2026-08-13, screenshot] It overlapped the composer's
+    // formatting toolbar, because it was placed by a hand-measured 134px from the bottom of the pane — a number
+    // that cannot know how tall the composer currently is (the toolbar adds 48px when it opens, and the cost line
+    // under the field wraps to two or three lines depending on language and discount text).
+    //
+    // It now shares the FEED's grid cell and pins to the bottom of it, so "above the composer" holds by
+    // construction. Both halves are pinned: the feed's row must be stated (auto-placement gave the button a row
+    // of its own and pushed the feed down — MEASURED, four rows became five), and the button must claim the same
+    // one. Changing either alone silently reintroduces the overlap.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const feedCell = css.slice(css.indexOf('.public-pane > .public-feed {'), css.indexOf('.public-pane > .public-feed {') + 120);
+    expect(feedCell, 'the feed states its row').toMatch(/grid-row: 3;/);
+    const jumpCss = css.slice(css.indexOf('\n.public-jump-down-button {', css.indexOf('.mini-action-button')), css.indexOf('.public-jump-down-button:hover'));
+    expect(jumpCss.length, 'the button rule slice must not collapse').toBeGreaterThan(200);
+    expect(jumpCss, 'the button claims the same cell').toMatch(/grid-row: 3;/);
+    expect(jumpCss).toMatch(/align-self: end;/);
+    expect(jumpCss, 'a hand-measured offset from the pane bottom is what caused the overlap')
+      .not.toMatch(/position: absolute|bottom: calc\(/);
+    // Round icon button: equal width/height and no padding, or the arrow sits off-centre in a pill.
+    expect(jumpCss).toMatch(/width: 38px;/);
+    expect(jumpCss).toMatch(/min-height: 38px;/);
+    expect(jumpCss).toMatch(/border-radius: 50%;/);
+    expect(jumpCss).toMatch(/justify-content: center;/);
   });
 
   it('PWA-PUBLIC-POST-COLLAPSE-01: long feed/channel posts render clamped with a "Show full post" expander; the detail screen and comments never clamp', () => {
