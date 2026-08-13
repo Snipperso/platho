@@ -78,7 +78,8 @@ describe('production web bundle is import-complete', () => {
 
   it('WEB-GRAPH-02: every <script src> in index.html ships in the production bundle', () => {
     const html = readFileSync(resolve(WEB_ROOT, 'index.html'), 'utf8');
-    const refs = [...html.matchAll(/<script[^>]*\ssrc="\.\/([^"?]+)(?:\?[^"]*)?"/g)].map((m) => m[1]);
+    // Either spelling: index.html loads root-absolute so a post permalink at /<name>/<post> still resolves it.
+    const refs = [...html.matchAll(/<script[^>]*\ssrc="\.?\/([^"?]+)(?:\?[^"]*)?"/g)].map((m) => m[1]);
 
     expect(refs).toContain('boot-guard.js');
     expect(refs).toContain('app.js');
