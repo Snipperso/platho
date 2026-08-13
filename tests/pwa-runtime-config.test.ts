@@ -4020,9 +4020,13 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function loadPublicPostCommentsFromShards'),
       app.indexOf('async function loadPublicPostComments('),
     );
-    // Missing parent coordinates -> genuinely zero comments (clean, not degraded).
-    expect(loaderSource).toMatch(/if \(item\?\.channelEpochTag == null \|\| item\?\.entryId == null \|\| !item\?\.authorWallet\) \{/);
+    // NOT PUBLISHED -> genuinely zero comments (clean, not degraded): with no entryId no thread CAN exist.
+    // Since 1.0.17 that is the ONLY case allowed to make the claim — a published post whose thread address we
+    // simply failed to compute is unknown, and saying parentExists:false there printed "no comments yet" over a
+    // thread nobody had read. See tests/public-comment-coordinates (COORDS-07).
+    expect(loaderSource).toMatch(/if \(item\?\.entryId === undefined \|\| item\?\.entryId === null\) \{/);
     expect(loaderSource).toMatch(/return \{ comments: \[\], degraded: false, parentExists: false, latestLink: '0', cursors: null, hasMore: false \};/);
+    expect(loaderSource).toMatch(/if \(!coords\) return \{ comments: \[\], degraded: true \};/);
     // The post-detail empties honestly: genuinely-empty (clean read, no index) vs not-loaded (failed read).
     expect(app).toMatch(/publicPostDetailParentExists === false/);
     // A rate-limited read returns degraded:true (the caller keeps "Loading" and retries; never caches a partial).
@@ -4809,14 +4813,15 @@ describe('PWA runtime config guard', () => {
     // Copy-to-clipboard target; My notes uses its pencil icon (setThreadAvatarNode), not the wallet-letter avatar.
     expect(app).toMatch(/function buildShareTargetRow\(\{ label, sublabel, avatarUrl, thread, icon, onChoose \}\)/);
     expect(app).toMatch(/if \(thread\) \{\s*setThreadAvatarNode\(avatar, thread\);/);
-    expect(app).toMatch(/\} else if \(icon === 'copy'\) \{[\s\S]*?avatar\.innerHTML = SHARE_COPY_ICON_SVG;/);
+    expect(app).toMatch(/\} else if \(icon === 'copy' \|\| icon === 'link'\) \{[\s\S]*?avatar\.innerHTML = icon === 'link' \? SHARE_LINK_ICON_SVG : SHARE_COPY_ICON_SVG;/);
     expect(app).toMatch(/function chooseShareCopyToClipboard\(\)/);
     expect(app).toMatch(/copyTextToClipboard\(text\)[\s\S]*?setPublicStatus\(t\('dialog\.shareCopied'\)\)/);
     expect(app).toMatch(/fullText, \/\/ untruncated/); // the copy target uses the untruncated body
-    const shareList = app.slice(app.indexOf('function renderSharePostList()'), app.indexOf('function renderSharePostList()') + 1700);
+    const shareList = app.slice(app.indexOf('function renderSharePostList()'), app.indexOf('function insertShareMarker('));
     expect(shareList).toMatch(/label: t\('dialog\.shareCopyToClipboard'\),\s*icon: 'copy',/);
-    // order: Copy row -> My notes (Saved, thread icon) -> own channel -> contacts by recency
-    expect(shareList).toMatch(/shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = visible/);
+    // order: external link -> Copy row -> My notes (Saved, thread icon) -> own channel -> contacts by recency.
+    // The permalink row leads: it is the only target that reaches someone who has no Platho account yet.
+    expect(shareList).toMatch(/icon: 'link',[\s\S]*?shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = visible/);
     const shareCss = readFileSync('web/styles.css', 'utf8');
     expect(shareCss).toMatch(/--modal-outline: rgba\(48, 213, 176, 0\.5\);/);
     expect(shareCss).toMatch(/\.recipient-dialog,\s*\.action-dialog,\s*\.docs-dialog,\s*\.install-dialog \{[\s\S]*?border: 1px solid var\(--modal-outline\);/);
@@ -5592,7 +5597,16 @@ describe('PWA runtime config guard', () => {
     // resolution paths carry the check: the cache hit compares, and the chain read PICKS BY it.
     expect(app).toContain('function normalizeBodyHashHex(value)');
     expect(app).toContain('if (cached && want && want === normalizeBodyHashHex(cached.bodyHash)) return Promise.resolve(cached);');
-    expect(app).toContain('.find((item) => normalizeBodyHashHex(item.bodyHash) === want) ?? null');
+    // The chain read PICKS BY the hash. Since the permalink feature the addressed read is a shared primitive
+    // (fetchPublicPostFromChain) that takes the "which post answers" rule from its caller — so the check must be
+    // asserted where the SHARE path supplies it, and a share read with NO expected hash must resolve to nothing
+    // rather than fall through to the first post in the window.
+    const shareFetch = app.slice(
+      app.indexOf('async function fetchSharedPostFromChain('),
+      app.indexOf('async function fetchPermalinkPostFromChain('),
+    );
+    expect(shareFetch).toContain('(item) => normalizeBodyHashHex(item.bodyHash) === want');
+    expect(shareFetch).toContain('if (!want) return null;');
     // buildSharedPostEmbed warms the picture onto the post object and then re-renders the body through the feed's
     // renderer, so the image lands where its author put it rather than at the end of the card.
     expect(app).toContain('await sharedPostImageUrlWarm(post);');
