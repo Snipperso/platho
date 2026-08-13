@@ -1,59 +1,123 @@
+# Platho production web server.
+#
+# THIS FILE IS THE LIVE CONFIG, not a proposal. It drifted once (2026-08-13: the checked-in copy was three
+# months behind the server and did not even contain the about.platho.app site), and a stale copy here is worse
+# than none — someone eventually "restores" it and deletes hardening nobody remembers adding.
+#
+# Apply with:  caddy validate --config <file> && sudo cp <file> /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# `reload` refuses a config that does not load, so a syntax error cannot take the site down.
 {
-  servers {
-    protocols h1 h2
-  }
+	servers {
+		protocols h1 h2
+	}
 }
 
-(platho_security_headers) {
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://tonapi.io https://mainnet-v4.tonhubapi.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors https://web.telegram.org; form-action 'none'; upgrade-insecure-requests"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "no-referrer"
-    Permissions-Policy "camera=(), microphone=(), geolocation=()"
-    Cross-Origin-Opener-Policy "same-origin"
-    Cross-Origin-Resource-Policy "same-origin"
-    -Server
-  }
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Alt-Svc "clear"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://toncenter.com https://*.toncenter.com https://tonapi.io https://mainnet-v4.tonhubapi.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors https://web.telegram.org; form-action 'none'; upgrade-insecure-requests"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "accelerometer=(), bluetooth=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		-Server
+	}
+}
+
+# `base-uri 'none'` above is LOAD-BEARING and deliberate: it blocks <base href>, which is why index.html
+# references every asset root-absolutely instead. Do not "fix" a future asset-path problem by adding <base>.
+
+www.platho.app {
+	import security_headers
+	redir https://platho.app{uri} permanent
 }
 
 platho.app {
-  import platho_security_headers
+	import security_headers
+	root * /srv/platho/current
 
-  encode zstd gzip
-  root * /srv/platho/current
+	# CACHE POLICY. Every module URL carries a content-derived token (?v=b<hash> on the entry, ?v=<n> elsewhere)
+	# and the service worker's CACHE_NAME moves with the bytes, so long caching is safe for anything versioned.
+	# The two things that carry NO token must never be held: the worker itself, and the app shell.
+	#
+	# The four matchers are DISJOINT by construction, with explicit `not` guards, so the result does not depend on
+	# which order Caddy applies them in. It bit exactly that way on 2026-08-13: `*.js` silently overwrote the
+	# worker's own no-store with max-age=3600 — the single header that most needs to be right.
+	#
+	# By EXTENSION, never by an enumerated module list: the list that used to live here had already fallen seven
+	# modules behind, and nothing would have reported it.
+	@service_worker path /sw.js
+	header @service_worker Cache-Control "no-cache, no-store, must-revalidate"
 
-  @service_worker path /sw.js
-  header @service_worker Cache-Control "no-cache, no-store, must-revalidate"
+	@immutable_assets {
+		path /assets/* /vendor/*
+		not path /sw.js
+	}
+	header @immutable_assets Cache-Control "public, max-age=86400"
 
-  @html path / /index.html
-  header @html Cache-Control "no-cache"
+	@versioned {
+		path *.js *.mjs *.css *.json *.wasm *.md
+		not path /sw.js
+		not path /assets/* /vendor/*
+	}
+	header @versioned Cache-Control "public, max-age=3600"
 
-  @manifest path /manifest.webmanifest
-  header @manifest Cache-Control "no-cache"
+	# THE SHELL, at "/" and at every client route (/moonly/689.0.0 …) — all of them are served the same
+	# index.html, and it is the one file that decides which build a device runs. A stale copy pins that device to
+	# an old bundle for as long as the heuristic cache holds it; MEASURED on the Telegram webview, which served an
+	# old shell for hours. The service worker forces revalidation for devices that already have it — this header
+	# is what protects the FIRST load, where there is no worker yet.
+	@shell {
+		not path /sw.js
+		not path /assets/* /vendor/*
+		not path *.js *.mjs *.css *.json *.wasm *.md *.svg *.png *.ico *.txt
+	}
+	header @shell Cache-Control "no-cache"
 
-  @runtime path /app.js /styles.css /platho-config.mjs /capsule-part-policy.mjs /message-pricing-policy.mjs /public-channel-subscriptions.mjs /recipient-identities.mjs /encrypted-message-store.mjs /platho-wallet.mjs /ton-mnemonic-wordlist.mjs /pwa-contract-transactions.mjs /ton-rpc-transport.mjs /ton-dns-provider.mjs /ath-ton-rpc-provider.mjs /profile-registry-ton-rpc-provider.mjs /username-ton-rpc-provider.mjs /replay-store.mjs /webp-encoder.mjs /qr-code.mjs /crypto/*
-  header @runtime Cache-Control "public, max-age=3600"
+	# ONE route, in written order. Splitting the checks away from the serving put them in a separate block that
+	# never ran, and /.env quietly stopped being refused (2026-08-13) — the checks must sit in front of the same
+	# chain that answers.
+	route {
+		@index_html path /index.html
+		redir @index_html / permanent
+		@disallowed_methods not method GET HEAD
+		respond @disallowed_methods 405
+		@sensitive_paths path /.git* /.env* /package*.json /tact.config.json /scripts/* /artifacts/* /server-status /backup* /config.json
+		respond @sensitive_paths 404
+		encode zstd gzip
 
-  @static path /assets/* /vendor/*
-  header @static Cache-Control "public, max-age=86400"
+		# A REQUEST FOR A FILE MUST FAIL AS A FILE. Everything else falls through to the shell — that is what makes
+		# post permalinks work — and without this a mistyped or missing asset answered 200 with HTML. A module that
+		# receives HTML dies on strict MIME checking with no clue why: MEASURED 2026-08-13, an asset-path bug read
+		# as a blank app instead of a 404.
+		@real_files path /sw.js *.css *.js *.mjs *.json *.md *.wasm *.svg *.png *.webmanifest *.ico *.txt
+		file_server @real_files
 
-  @strict_static path /sw.js /index.html /manifest.webmanifest *.css *.js *.mjs *.json *.md *.wasm *.svg *.png
-
-  handle @strict_static {
-    file_server
-  }
-
-  handle @static {
-    file_server
-  }
-
-  handle {
-    try_files {path} /index.html
-    file_server
-  }
+		# Everything else IS the app: /, /moonly/689.0.0, any future client route.
+		try_files {path} /index.html
+		file_server
+	}
 }
 
-www.platho.app {
-  redir https://platho.app{uri} permanent
+about.platho.app {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "accelerometer=(), bluetooth=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=()"
+	}
+	root * /srv/about/current
+	route {
+		@disallowed_methods not method GET HEAD
+		respond @disallowed_methods 405
+		@sensitive_paths path /.git* /.env* /scripts/* /artifacts/*
+		respond @sensitive_paths 404
+		encode zstd gzip
+		try_files {path} /index.html
+		file_server
+	}
 }

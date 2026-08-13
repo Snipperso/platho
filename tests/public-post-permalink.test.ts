@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 // Owner, 2026-08-13: "давай ссылку сделай так platho.app/юзернейм или адресс кошелька/пост".
 //
 // The link is the only way a post leaves Platho to someone who is not here yet, so the whole chain has to hold
-// at once: nginx must answer a two-segment path with the app shell, the shell must still find its assets from
+// at once: the server must answer a two-segment path with the app shell, the shell must still find its assets from
 // that path, the client must parse the path, resolve the name, and read the post — with NO account.
 //
 // Three of those halves live outside app.js, which is exactly why they are pinned here: a correct client on a
@@ -16,7 +16,10 @@ import { readFileSync } from 'node:fs';
 
 const app = readFileSync('web/app.js', 'utf8');
 const html = readFileSync('web/index.html', 'utf8');
-const nginx = readFileSync('deploy/nginx-platho.app.conf', 'utf8');
+// THE CONFIG THAT ACTUALLY SERVES. Until 2026-08-13 these guards read deploy/nginx-platho.app.conf, and nginx is
+// not running on that host at all — Caddy is, and the nginx file was a three-month-old fiction. A guard pointed at
+// a file nobody serves proves nothing while looking like proof.
+const caddy = readFileSync('deploy/Caddyfile', 'utf8');
 
 /** Lift the pure link functions out of app.js and RUN them, with the app-level helpers they touch stubbed. */
 function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: string }> = {}) {
@@ -54,19 +57,23 @@ describe('public post permalinks', () => {
     expect(link).not.toContain('alice');
   });
 
-  it('PERMA-02: a username colliding with an nginx-reserved prefix falls back to the address', () => {
-    // nginx hard-404s /assets/ and /vendor/ so a MISSING asset fails as an asset instead of answering with the
-    // app shell. A user really can register those names (4-16 of [a-z0-9_-]), and a link under one would be dead.
+  it('PERMA-02: a username colliding with a served path prefix falls back to the address', () => {
+    // A username really can be "assets" or "vendor" (4-16 of [a-z0-9_-]). A link under one still resolves — the
+    // shell answers any extensionless path — but it would be served with that prefix's ASSET cache policy (a day),
+    // so the shell for that post would be held stale on every reader's device. Cheaper to not mint the link.
     for (const reserved of ['assets', 'vendor']) {
       const fns = loadPermalinkFunctions({ [WALLET]: { verifiedUsername: `${reserved}.ath` } });
       expect(fns.publicPostPermalinkAuthorSegment(WALLET)).not.toBe(reserved);
       expect(fns.publicPostPermalinkAuthorSegment(WALLET)).toMatch(/^UQ/);
     }
-    // Every reserved segment named in the client is really hard-404ed by the server config, and vice versa.
+    // The client's list and the prefixes the server treats as assets are the SAME SET — derived from the config,
+    // not typed twice. A prefix added to one and forgotten in the other is exactly how this rots.
     const reservedInApp = /const PERMALINK_RESERVED_SEGMENTS = new Set\(\[([^\]]*)\]\)/.exec(app)?.[1] ?? '';
     const names = [...reservedInApp.matchAll(/'([a-z0-9_-]+)'/g)].map((m) => m[1]).sort();
-    const hard404 = /location ~ \^\/\(([a-z|]+)\)\/ \{\s*try_files \$uri =404;/.exec(nginx)?.[1] ?? '';
-    expect(names).toEqual(hard404.split('|').sort());
+    const assetPrefixes = /@immutable_assets \{\s*path ([^\n]+)/.exec(caddy)?.[1] ?? '';
+    const fromConfig = [...assetPrefixes.matchAll(/\/([a-z0-9_-]+)\/\*/g)].map((m) => m[1]).sort();
+    expect(fromConfig.length).toBeGreaterThan(0);
+    expect(names).toEqual(fromConfig);
   });
 
   it('PERMA-03: a post with no addressable row has no link (nothing to point at)', () => {
@@ -89,10 +96,14 @@ describe('public post permalinks', () => {
 
   it('PERMA-05: the server answers a permalink path with the app shell, and records nothing', () => {
     // Without this the whole feature is a 404 — and no client-side test could tell.
-    expect(nginx).toMatch(/location \/ \{\s*try_files \$uri \/index\.html;\s*\}/);
-    // The privacy claim the code comment makes: a PATH reaches the server (a #fragment would not), so the only
-    // reason it leaks nothing is that nothing is written down. If this ever flips, that comment becomes a lie.
-    expect(nginx).toMatch(/^\s*access_log off;/m);
+    expect(caddy).toMatch(/try_files \{path\} \/index\.html/);
+    // THE PRIVACY CLAIM the permalink comment in app.js makes. A path reaches the server (a #fragment never
+    // would), so the only reason it leaks nothing is that nothing is written down. Caddy logs no requests unless
+    // a `log` directive is present — VERIFIED against the live journal 2026-08-13, which carried reload and TLS
+    // lines and not one request. Adding `log` to the site silently turns the permalink into a record of who read
+    // what, so the absence is asserted here rather than remembered.
+    const siteBlocks = caddy.slice(caddy.indexOf('platho.app {'));
+    expect(siteBlocks).not.toMatch(/^\s*log\s*(\{|$)/m);
   });
 
   it('PERMA-06: every app-shell URL is ROOT-ABSOLUTE, because a document-relative one dies on a permalink path', () => {
@@ -105,7 +116,7 @@ describe('public post permalinks', () => {
     // against production 2026-08-13, after shipping it. No bundle-only test could have caught that, because the
     // directive lives in the server config; this one can, because it reads both.
     expect(html).not.toContain('<base');
-    expect(nginx).toContain("base-uri 'none'");
+    expect(caddy).toContain("base-uri 'none'");
     const relative = [...html.matchAll(/(?:src|href)="(\.\/[^"]*)"/g)].map((m) => m[1]);
     expect(relative, `document-relative URLs break at a permalink path: ${relative.join(', ')}`).toEqual([]);
     // Every one of them must still be same-origin absolute, not protocol-relative or external.
