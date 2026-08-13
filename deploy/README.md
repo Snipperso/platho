@@ -84,3 +84,37 @@ Point DNS `A` and `AAAA` records for `platho.app` at the server before expecting
 ```
 
 Install the config into `sites-available`, symlink it into `sites-enabled`, run `nginx -t`, then reload Nginx.
+
+## Release hashes (verifiable delivery)
+
+Platho has no backend, but it still arrives from one domain — and whoever controls that domain controls the code
+that holds the user's keys. This cannot be *solved* in a browser; it can be made **detectable**.
+
+Two hashes pin the whole executable surface, because the bundle is already content-addressed:
+
+- `index.html` names the entry point as `app.js?v=b<8 hex of sha256(app.js)>`, so it pins `app.js`;
+- `sw.js` carries `CACHE_NAME`, derived from every precached asset's URL **and** bytes, plus the list itself.
+
+`tests/sw-precache-covers-runtime` keeps that chain whole: every module reachable from `app.js` must be precached,
+or there are files nobody can verify. It was 46 modules short when the check was written.
+
+After a deploy:
+
+```bash
+node scripts/verify_released_bundle.mjs --announce
+```
+
+It measures what production actually serves (never the local package — an undeployed build describes nothing) and
+prints the announcement. Publish that from Platho itself, signed by a wallet that never touches the web server.
+
+Anyone can then check what they were served:
+
+```bash
+node scripts/verify_released_bundle.mjs --index <sha256> --sw <sha256>
+```
+
+Exit code 0 means the served bundle is the announced one, all the way down; 1 means it is not.
+
+**The check must never be built into the app.** A hostile server would simply serve a build whose check lies —
+self-verification is circular and proves nothing. It only means something performed by someone the server cannot
+edit.
