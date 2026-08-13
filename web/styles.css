@@ -4399,6 +4399,33 @@ button.feed-item:hover {
   cursor: pointer;
 }
 
+/* Two LABELLED ways out of a dialog, side by side and equal width. Equal padding is required, not decorative:
+   horizontal padding enters the flex base size, so `flex: 1 1 0` alone leaves the wider label's button wider
+   (measured 183 vs 163 on the quick-start row before the paddings were matched). */
+.action-dialog-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-dialog-actions > .recipient-submit {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* The dismiss reads as secondary: it is the way OUT, not the thing we are suggesting. */
+.action-dialog-dismiss {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--line);
+  font-weight: 700;
+}
+
+.action-dialog-dismiss[hidden] {
+  display: none;
+}
+
 .install-dialog > p {
   line-height: 1.55;
 }
