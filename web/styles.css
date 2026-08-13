@@ -4828,7 +4828,16 @@ button.feed-item:hover {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
     max-width: 100vw;
+    /* min-height MUST follow the keyboard, because min-height BEATS height. A bare `100svh` here is the screen
+       WITHOUT the keyboard, so when one opens and --app-viewport-height honestly drops, the min-height overrode
+       it and the shell stayed full-screen tall: its bottom (nav rail + composer) went under the keyboard, and iOS
+       let the user drag the visual viewport up to reach it. MEASURED on iPhone 2026-08-13 — the owner could scroll
+       the whole app above the keyboard while the maximized composer was open.
+       Android never showed it: `interactive-widget=resizes-content` shrinks the layout viewport there, and iOS
+       Safari ignores that hint (Chromium-only). The plain 100svh stays first as the fallback for engines with no
+       custom-property support; once JS sets the var, min-height and height agree and neither can override. */
     min-height: 100svh;
+    min-height: var(--app-viewport-height, 100svh);
     height: 100dvh;
     height: var(--app-viewport-height, 100dvh);
     overflow: hidden;
