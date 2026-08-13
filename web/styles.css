@@ -2241,6 +2241,14 @@ a .avatar.has-image,
   grid-row: 1;
 }
 
+/* The feed's row is stated rather than left to auto-placement, because the jump-to-newest button has to share it
+   (see .public-jump-down-button). Auto-placement would hand the button its own row and push the feed down —
+   MEASURED: the pane went from four rows to five and the feed dropped into row 4. */
+.public-pane > .public-feed {
+  grid-column: 1;
+  grid-row: 3;
+}
+
 .wallet-pane {
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
@@ -2369,17 +2377,36 @@ a .avatar.has-image,
   display: none;
 }
 
+/* [OWNER 2026-08-13, screenshot] It sat on top of the composer's formatting toolbar. It was placed by a
+   HAND-MEASURED 134px from the bottom of the pane, and nothing about that number can know how tall the composer
+   currently is: the toolbar adds 48px when it opens, and the cost line under the field wraps to two or three
+   lines depending on the language and the discount text. Any single number is wrong for most of those states.
+
+   So it is no longer measured from the pane at all. The pane is a grid whose third row IS the feed and whose
+   fourth is the composer; putting the button in the feed's own cell and pinning it to the bottom of that cell
+   makes "just above the composer" true BY CONSTRUCTION, whatever the composer is doing. It shares the cell with
+   the feed rather than taking a row of its own, so it overlays the posts exactly as before and the layout is
+   untouched.
+
+   Icon only (owner: "leave just the arrow, it is obvious"). The label lives on aria-label/title, so the button
+   is still announced — this is a deliberate exception to the labelled-actions rule, for a control whose meaning
+   is carried by one of the few genuinely universal glyphs. */
 .public-jump-down-button {
-  position: absolute;
-  right: 32px;
-  bottom: calc(134px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+  grid-column: 1;
+  grid-row: 3;
+  align-self: end;
+  justify-self: end;
+  position: relative;
+  margin: 0 8px 12px 0;
   z-index: 4;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 38px;
   min-height: 38px;
-  padding: 0 13px;
+  padding: 0;
   border: 1px solid rgba(48, 213, 176, 0.3);
+  border-radius: 50%;
   background: rgba(13, 16, 18, 0.92);
   box-shadow: 0 14px 34px var(--shadow);
   backdrop-filter: blur(12px);

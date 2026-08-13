@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=45';
+} from './public-channel-subscriptions.mjs?v=46';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=71';
+} from './i18n.mjs?v=72';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.26';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.27';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
