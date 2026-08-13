@@ -42,7 +42,7 @@ describe('public publish heal driver guard', () => {
   it('PWA-PUBLIC-HEAL-06: composer parity with private — instant clear, optimistic insert, live private-style status', () => {
     // The composer empties the moment send is pressed (BEFORE the await), and a user-cancel restores the draft.
     const handlerStart = app.indexOf("publicComposer?.addEventListener('submit'");
-    const handler = app.slice(handlerStart, handlerStart + 4000);
+    const handler = app.slice(handlerStart, app.indexOf("composer?.addEventListener('submit'", handlerStart));
     const clearIndex = handler.indexOf("publicMessageInput.value = '';");
     // The submit now goes through the shared outgoing-publish queue, so the await names the lane, not the helper.
     const awaitIndex = handler.indexOf('await enqueueOutgoingPublish(');

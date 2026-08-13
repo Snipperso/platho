@@ -53,10 +53,19 @@ describe('SHAREREF — a shared post resolves to its original', () => {
   });
 
   it('SHAREREF-03: only a body-authentic post may answer for the reference, and it replaces the snapshot one way', () => {
+    // Since permalinks (1.0.16) the addressed read is a SHARED primitive taking the "which post answers" rule from
+    // its caller, so the check is asserted where the SHARE path supplies it — and a share read with no expected
+    // hash must resolve to NOTHING rather than fall through to the first post in the window.
     const fetchBody = functionBody('async function fetchSharedPostFromChain(');
     // The read window holds neighbouring entries, and the SENDER chose the coordinates. The body hash is what makes
     // a reference a reference.
-    expect(fetchBody).toContain('.find((item) => normalizeBodyHashHex(item.bodyHash) === want) ?? null');
+    expect(fetchBody).toContain('(item) => normalizeBodyHashHex(item.bodyHash) === want');
+    expect(fetchBody).toContain('if (!want) return null;');
+    // The primitive itself must NOT carry a default rule: a caller that forgets the selector has to fail, not
+    // silently accept whatever the shard returned first.
+    const shared = functionBody('async function fetchPublicPostFromChain(');
+    expect(shared).toContain('.find((item) => selectPost(item)) ?? null');
+    expect(shared).not.toMatch(/selectPost\s*=/);
     // The snapshot is sender-authored and unverified; a post read back through the lane matched its body_commit and
     // its publisher tag. So the card upgrades snapshot -> chain and never the reverse: nothing writes block.snippet.
     const embed = functionBody('function buildSharedPostEmbed(');
@@ -85,7 +94,8 @@ describe('SHAREREF — a shared post resolves to its original', () => {
   });
 
   it('SHAREREF-04: the fetched post is CACHED — the second render, and every one after a reload, costs nothing', () => {
-    const fetchBody = functionBody('async function fetchSharedPostFromChain(');
+    // The caching lives in the shared addressed-read primitive, so it covers the permalink path too.
+    const fetchBody = functionBody('async function fetchPublicPostFromChain(');
     expect(fetchBody).toContain('upsertPublicChainPosts(existing, [post])');
     // commitPublicChannelFeedCache is the single choke point: text to localStorage, image media to IndexedDB. Without
     // it the read would repeat after every reload, which is exactly the cost this change exists to avoid.
@@ -95,7 +105,8 @@ describe('SHAREREF — a shared post resolves to its original', () => {
   });
 
   it('SHAREREF-05: following a reference must never turn into a follow', () => {
-    const fetchBody = functionBody('async function fetchSharedPostFromChain(');
+    // In the shared primitive, so opening a PERMALINK does not silently subscribe the reader either.
+    const fetchBody = functionBody('async function fetchPublicPostFromChain(');
     expect(fetchBody).toContain("ensurePublicChannelForAuthorWallet(wallet, { activate: false })");
     // Spelled as an exclusion as well: reading someone's post because a contact forwarded it is not subscribing to
     // them. That is the spam door the asymmetric conversation-follow rule exists to keep shut.

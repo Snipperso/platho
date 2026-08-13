@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=38';
+} from './public-channel-subscriptions.mjs?v=39';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=64';
+} from './i18n.mjs?v=65';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.16';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.17';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -6901,6 +6901,7 @@ function sharePayloadFromPublicItem(item) {
     title: String(item.title ?? ''),
     snippet,
     fullText, // untruncated — used by the "copy to clipboard" share target (the wire SHARE block still uses snippet)
+    permalink: publicPostPermalink(item), // the external link target; null when the post has no addressable row
     hasImage: blocks.some((block) => block?.type === 'image' && block.url) || Boolean(item.imageUrl),
     textTruncated: snippet.length < fullText.length,
   };
@@ -6935,6 +6936,22 @@ const SHARE_COPY_ICON_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
   + '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 
+// Chain-link glyph for the "share a link" target (same inline-SVG style as the copy glyph above).
+const SHARE_LINK_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>'
+  + '<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+
+/** True when the platform can hand a URL to its own share sheet (phones, most PWAs) rather than the clipboard. */
+function canSystemShareLink(url) {
+  if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+  // Some engines expose share() but refuse a url-only payload; canShare is the only honest way to ask.
+  if (typeof navigator.canShare === 'function') {
+    try { return navigator.canShare({ url }); } catch { return false; }
+  }
+  return true;
+}
+
 function buildShareTargetRow({ label, sublabel, avatarUrl, thread, icon, onChoose }) {
   const row = document.createElement('button');
   row.type = 'button';
@@ -6944,9 +6961,9 @@ function buildShareTargetRow({ label, sublabel, avatarUrl, thread, icon, onChoos
   avatar.setAttribute('aria-hidden', 'true');
   if (thread) {
     setThreadAvatarNode(avatar, thread); // Saved (My notes) -> its pencil icon, not the wallet-letter avatar
-  } else if (icon === 'copy') {
+  } else if (icon === 'copy' || icon === 'link') {
     avatar.classList.add('avatar-saved'); // reuse the icon-tinted avatar look
-    avatar.innerHTML = SHARE_COPY_ICON_SVG;
+    avatar.innerHTML = icon === 'link' ? SHARE_LINK_ICON_SVG : SHARE_COPY_ICON_SVG;
   } else {
     setAvatarNode(avatar, String(label ?? 'P').slice(0, 1), avatarUrl);
   }
@@ -6970,7 +6987,19 @@ function buildShareTargetRow({ label, sublabel, avatarUrl, thread, icon, onChoos
 function renderSharePostList() {
   if (!sharePostList) return;
   sharePostList.replaceChildren();
-  // Order (owner v793): Copy to clipboard, then My notes, then the own public channel, then private contacts by recency.
+  // Order: the two ways OUT of Platho first (link, then the text), then My notes, the own public channel, and
+  // private contacts by recency. The link leads because it is the only target that reaches someone who is not
+  // here yet — the others all need a Platho account on the other end.
+  const permalink = pendingSharePayload?.permalink ?? null;
+  if (permalink) {
+    sharePostList.append(buildShareTargetRow({
+      // Same row, honest label: a phone hands the URL to its share sheet, a desktop browser can only copy it.
+      label: canSystemShareLink(permalink) ? t('dialog.shareLink') : t('dialog.shareCopyLink'),
+      sublabel: permalink.replace(/^https?:\/\//, ''),
+      icon: 'link',
+      onChoose: () => chooseShareLink(),
+    }));
+  }
   sharePostList.append(buildShareTargetRow({
     label: t('dialog.shareCopyToClipboard'),
     icon: 'copy',
@@ -7044,6 +7073,31 @@ function chooseShareTargetOwnChannel() {
   setPublicShareDraft(share);
   insertShareMarker(publicMessageInput);
   if (publicMessageInput && !publicMessageInput.disabled) publicMessageInput.focus();
+}
+
+/**
+ * Share the post's permalink OUTSIDE Platho. The system share sheet when the platform has one (that is what
+ * "share" means on a phone), the clipboard otherwise. A dismissed sheet is the user changing their mind, not a
+ * failure, so it reports nothing.
+ */
+async function chooseShareLink() {
+  const share = pendingSharePayload;
+  closeSharePostDialog();
+  const url = share?.permalink;
+  if (!url) return;
+  const title = String(share.title ?? '').trim();
+  if (canSystemShareLink(url)) {
+    try {
+      await navigator.share(title ? { title, url } : { url });
+      return;
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      console.warn('[share] system share sheet failed, falling back to the clipboard', error);
+    }
+  }
+  copyTextToClipboard(url)
+    .then(() => setPublicStatus(t('dialog.shareLinkCopied')))
+    .catch((error) => { console.error(error); setPublicStatus(t('dialog.shareCopyFailed')); });
 }
 
 // Copy the shared post's text to the clipboard (title + the UNTRUNCATED body) — a plain "take it elsewhere" affordance.
@@ -7369,12 +7423,51 @@ function sharedPostShardCoordinates(entryId) {
   return { epochTag: parts[0], shardSeq: Number(parts[1]), shardEntryId: parts[2] };
 }
 
-async function fetchSharedPostFromChain(entryId, expectedBodyHash, authorWallet) {
+/**
+ * A public post's CHAIN COORDINATES — author wallet + channel epoch tag + channel shard seq + the RAW per-shard
+ * entry id. Both the comment READ and the comment WRITE fold exactly these into the post's thread address.
+ *
+ * DERIVED, NEVER CARRIED. The feed entryId IS `${epochTag}.${shardSeq}.${shardEntryId}`, so the coordinates are
+ * already inside it. They used to be read off separate item fields, and the copy did not survive: neither
+ * publicChannelFeedToThread nor publicChannelThreadsToFeedItems ever mapped them, and normalizeFeedPost (a strict
+ * whitelist) strips them from the cache. Only a post held in memory straight from the shard walk still had them,
+ * so commenting worked from a SHARE embed and NOWHERE ELSE — MEASURED 2026-08-13, the owner commented on a post
+ * found through channel search and got "parent is missing its channel coordinates" in the console while the code
+ * comment above the read claimed "the opened post carries channelEpochTag/authorWallet from the shard feed".
+ *
+ * Explicit fields still win when present, so a freshly-walked post behaves exactly as before.
+ */
+function publicPostChainCoordinates(item) {
+  const authorWallet = item?.authorWallet ?? null;
+  if (!authorWallet || item?.entryId === undefined || item?.entryId === null) return null;
+  const derived = sharedPostShardCoordinates(item.entryId);
+  const epochTag = item.channelEpochTag ?? derived?.epochTag ?? null;
+  const shardEntryId = item.shardEntryId ?? derived?.shardEntryId ?? null;
+  const shardSeq = item.channelShardSeq ?? derived?.shardSeq ?? null;
+  if (epochTag === null || shardEntryId === null || shardSeq === null) return null;
+  try {
+    return {
+      authorWallet,
+      epochTag: BigInt(epochTag),
+      shardSeq: Number(shardSeq),
+      shardEntryId: BigInt(shardEntryId),
+    };
+  } catch {
+    return null;   // a malformed id is not a thread address; the caller decides what to say about it
+  }
+}
+
+/**
+ * ONE addressed read of a public post, shared by both ways in: a SHARE block's reference and an external
+ * permalink. The caller supplies `selectPost` because the two have DIFFERENT notions of which post answers —
+ * see the two call sites — but everything around it (coordinates, shard read, assembly, cache write) is one
+ * mechanism, so a fix to it lands on both.
+ */
+async function fetchPublicPostFromChain(entryId, authorWallet, selectPost) {
   const lane = directPublicLaneReader();
   const wallet = rawWalletAddress(authorWallet);
   const coords = sharedPostShardCoordinates(entryId);
-  const want = normalizeBodyHashHex(expectedBodyHash);
-  if (!lane || !wallet || !coords || !want) return null;
+  if (!lane || !wallet || !coords) return null;
   // Registers the channel UNSUBSCRIBED — the same semantics discovery uses, so following a reference never turns
   // into a follow. The id is only needed to key the post in the feed cache.
   const channelId = ensurePublicChannelForAuthorWallet(wallet, { activate: false });
@@ -7382,9 +7475,7 @@ async function fetchSharedPostFromChain(entryId, expectedBodyHash, authorWallet)
   const shardPosts = await lane.readPostAt(wallet, coords.epochTag, coords.shardSeq, coords.shardEntryId);
   if (shardPosts.length === 0) return null;
   const parts = await publicPostPartsFromShardPosts(shardPosts, { id: channelId, authorWallet: wallet });
-  // CONTENT-AUTHENTIC OR NOTHING: the window holds the neighbouring entries too, and the sender chose these
-  // coordinates. Only the post whose body hashes to what the reference claims may answer for it.
-  const post = assemblePublicParts(parts).find((item) => normalizeBodyHashHex(item.bodyHash) === want) ?? null;
+  const post = assemblePublicParts(parts).find((item) => selectPost(item)) ?? null;
   if (!post) return null;
   const updatedAt = new Date().toISOString();
   const cachedFeed = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
@@ -7396,6 +7487,28 @@ async function fetchSharedPostFromChain(entryId, expectedBodyHash, authorWallet)
   };
   commitPublicChannelFeedCache();   // text -> localStorage, image media -> IndexedDB. Survives the reload.
   return post;
+}
+
+/**
+ * A SHARE block's original. CONTENT-AUTHENTIC OR NOTHING: the read window holds the neighbouring entries too, and
+ * the SENDER chose these coordinates — so only the post whose body hashes to what the reference claims may answer
+ * for it. Without that check a crafted reference could show an unrelated post under a trusted sender's quote.
+ */
+async function fetchSharedPostFromChain(entryId, expectedBodyHash, authorWallet) {
+  const want = normalizeBodyHashHex(expectedBodyHash);
+  if (!want) return null;
+  return fetchPublicPostFromChain(entryId, authorWallet, (item) => normalizeBodyHashHex(item.bodyHash) === want);
+}
+
+/**
+ * A PERMALINK's post. The author's wallet is in the link itself and the coordinates address one row of THAT
+ * author's own shard, so whatever they published there IS the post — there is no second candidate to confuse it
+ * with, and no body hash is needed (nor would it fit a readable URL). A forged link can only point at a post its
+ * author really published, under that author's own name.
+ */
+async function fetchPermalinkPostFromChain(entryId, authorWallet) {
+  const want = String(entryId ?? '');
+  return fetchPublicPostFromChain(entryId, authorWallet, (item) => String(item.entryId ?? '') === want);
 }
 
 /**
@@ -7425,6 +7538,107 @@ function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet) {
     sharedPostChainReads.delete(oldest.value);
   }
   return job;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// PERMALINKS — https://platho.app/<username|wallet>/<epochTag.shardSeq.entryId>
+//
+// The way a public post leaves Platho: a plain https URL that pastes into any chat, forum or tweet. nginx answers
+// EVERY path with the app shell (`location / { try_files $uri /index.html; }`), so no route table is needed on
+// the server side and no new infrastructure exists to run.
+//
+// NO ACCOUNT NEEDED TO OPEN ONE. The post is read straight from the author's PublicShard over a keyless RPC read,
+// so a stranger who has never touched Platho gets the post, not a sign-up wall. That is the whole point of a link.
+//
+// A PATH, NOT A #fragment (owner's choice, 2026-08-13): readable. The cost is that a path IS sent to the server
+// while a fragment never is — platho.app runs `access_log off`, so nothing records which post was opened. IF
+// ACCESS LOGGING IS EVER TURNED ON, this becomes a record of who read what and the choice must be revisited.
+//
+// THE NAME IN THE LINK is the author's .ath when it is registry-VERIFIED, else their wallet address. The two are
+// not equivalent over time: a .ath can be TRANSFERRED, and identity in Platho follows the WALLET, so an old link
+// carrying a since-transferred name resolves to the NEW owner's shard and stops finding the post. The address
+// form cannot rot. Verified name first anyway — a readable link is what was asked for.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// nginx hard-404s these prefixes (`location ~ ^/(assets|vendor)/ { try_files $uri =404; }`) so that a MISSING
+// asset fails as an asset instead of answering with the app shell. A username colliding with one could not be
+// linked at the root, so the builder falls back to the wallet address for them — which always resolves.
+const PERMALINK_RESERVED_SEGMENTS = new Set(['assets', 'vendor']);
+// Second segment is the feed entryId (epochTag.shardSeq.entryId) — all digits, so it can never be mistaken for a
+// username (which is [a-z0-9_-]{4,16}, no dots) and the two segments cannot swap places.
+const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:-]{4,80})\/(\d+\.\d+\.\d+)\/?$/;
+
+/** The author segment for a post's link: the registry-verified .ath if there is one, else the wallet address. */
+function publicPostPermalinkAuthorSegment(authorWallet) {
+  const wallet = rawWalletAddress(authorWallet);
+  if (!wallet) return null;
+  const verified = publicChannelProfileCache[channelProfileCacheKey(wallet)]?.verifiedUsername;
+  const name = verified ? canonicalUsernameDisplay(verified).toLowerCase() : '';
+  if (name && /^[a-z0-9_-]{4,16}$/.test(name) && !PERMALINK_RESERVED_SEGMENTS.has(name)) return name;
+  return displayWalletAddress(wallet) || null;
+}
+
+/** The absolute link to a public post, or null when the post has no chain coordinates yet (local-pending). */
+function publicPostPermalink(item) {
+  if (!item || item.entryId === undefined || item.entryId === null) return null;
+  if (!sharedPostShardCoordinates(item.entryId)) return null;   // a pre-shard v1 id has no addressable row
+  const segment = publicPostPermalinkAuthorSegment(item.authorWallet);
+  if (!segment) return null;
+  return `${location.origin}/${segment}/${item.entryId}`;
+}
+
+/** {author, entryId} for a permalink path, or null. Pure — resolution of `author` happens on chain. */
+function parsePublicPostPermalink(pathname) {
+  const match = PUBLIC_POST_PERMALINK_RE.exec(String(pathname ?? ''));
+  return match ? { author: decodeURIComponent(match[1]), entryId: match[2] } : null;
+}
+
+/**
+ * The author segment -> a wallet address. An address (raw or user-friendly) is taken as itself; anything else is
+ * a .ath name and is resolved through the registry, which is the only authority on who owns a name TODAY.
+ */
+async function resolvePermalinkAuthorWallet(author) {
+  const direct = rawWalletAddress(author);
+  if (direct) return direct;
+  const owner = await resolvePlathoUsernameOwner(author);
+  return rawWalletAddress(owner?.ownerWallet) ?? null;
+}
+
+/**
+ * Open the post a permalink names. Runs once at boot, off the address bar.
+ *
+ * The URL is LEFT IN PLACE on success: it is the post's permalink, and a reader who wants to pass it on must be
+ * able to copy it back out of the address bar. On failure it is cleared, so a reload lands in the normal app
+ * instead of retrying a link that cannot resolve.
+ */
+async function openPublicPostFromPermalink(link) {
+  if (!link) return false;
+  setView('public');
+  setPublicStatus(t('public.openingLink'));
+  try {
+    const wallet = await resolvePermalinkAuthorWallet(link.author);
+    if (!wallet) throw new Error('permalink author does not resolve to a wallet');
+    const post = await fetchPermalinkPostFromChain(link.entryId, wallet);
+    if (!post) throw new Error('permalink post not found on chain');
+    renderPublicSurface({ anchorUnread: false });   // the fetch cached the post; put it in the feed first
+    openPublicPostDetail(post);
+    setPublicStatus('feed');
+    return true;
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] permalink open failed', link, error);
+    setPublicStatus(error instanceof UsernameNotRegisteredError ? t('public.linkNoSuchName') : t('public.linkNotFound'));
+    clearPublicPostPermalinkFromAddressBar();
+    return false;
+  }
+}
+
+/** Drop the permalink path so a reload starts clean. Never touches the URL when there is nothing to drop. */
+function clearPublicPostPermalinkFromAddressBar() {
+  try {
+    if (parsePublicPostPermalink(location.pathname)) history.replaceState(null, '', '/');
+  } catch (error) {
+    console.warn('[public] could not clear the permalink path', error);
+  }
 }
 
 /** A public post's whole text, the way the share payload builder reads it — one definition, two callers. */
@@ -8770,13 +8984,18 @@ function buildDiscoveryCtaCard() {
 async function loadPublicPostCommentsFromShards(item, { olderThan = null } = {}) {
   const lane = directPublicLaneReader();
   if (!lane) return { comments: [], degraded: true };
-  if (item?.channelEpochTag == null || item?.entryId == null || !item?.authorWallet) {
+  // A post with no entryId has not been published yet, so no thread CAN exist — that is a real "no comments".
+  if (item?.entryId === undefined || item?.entryId === null) {
     return { comments: [], degraded: false, parentExists: false, latestLink: '0', cursors: null, hasMore: false };
   }
+  const coords = publicPostChainCoordinates(item);
+  // But a published post whose address we cannot compute is UNKNOWN, not empty. Reporting parentExists:false here
+  // printed "no comments yet" over a thread nobody had read — a claim we had no basis for.
+  if (!coords) return { comments: [], degraded: true };
   let read;
   try {
     // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
-    read = await lane.readThreadComments(item.authorWallet, BigInt(item.channelEpochTag), BigInt(item.shardEntryId ?? item.entryId), { channelShardSeq: item.channelShardSeq ?? 0, olderThan });
+    read = await lane.readThreadComments(coords.authorWallet, coords.epochTag, coords.shardEntryId, { channelShardSeq: coords.shardSeq, olderThan });
   } catch (error) {
     // Feed a 429 into the shared rate-limit tracker before degrading, or the app keeps hammering at the same
     // cadence while every read fails (the Hub loader did this; the shard loader silently did not).
@@ -19011,6 +19230,7 @@ publicComposer?.addEventListener('submit', async (event) => {
   const draftReplyTo = publicCommentReplyTo;
   const draftShare = publicShareDraft;
   const draftWasMaximized = publicComposer.classList.contains('is-maximized');
+  const recordsPlacedBefore = publicOptimisticRecordsPlaced;
   publicMessageInput.value = '';
   exitComposerMaximize(); // a send finishes the post — collapse the full-screen composer back to the feed
   publicImageAttachments = [];
@@ -19037,8 +19257,16 @@ publicComposer?.addEventListener('submit', async (event) => {
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     const cancelled = isPublishPriceChangeCancelled(error);
-    if (cancelled) {
-      // User-cancelled (price dialog): give the draft back instead of losing it (incl. the reply quote + files).
+    // THE DRAFT COMES BACK whenever the text is not already on screen — it used to come back only on a
+    // price-cancel, so every other refusal ATE what the user had written. MEASURED 2026-08-13: the owner
+    // commented on a post found through channel search, the submit threw on a guard before publishing anything,
+    // and his text was simply gone with a two-word status line as the only sign.
+    //
+    // Not unconditional, though: once the optimistic record is placed, the same text IS in the feed (as a red
+    // "failed" row that the heal driver may still resend), and restoring it as well would show it twice and
+    // invite a duplicate publish. The record counter is what distinguishes the two, and it moves in the two
+    // functions that place records rather than at each throw site, so a new throw is classified automatically.
+    if (publicOptimisticRecordsPlaced === recordsPlacedBefore) {
       publicMessageInput.value = text;
       publicImageAttachments = attachments;
       publicFileAttachments = fileAttachments;
@@ -19047,7 +19275,7 @@ publicComposer?.addEventListener('submit', async (event) => {
       updateImageAttachmentUi('public');
       updatePublicFileAttachmentUi();
       refreshComposerCostStatus();
-      // Nothing was published — put the user back in the full-screen editor they cancelled out of (not the 144px inline one).
+      // Nothing was published — put the user back in the full-screen editor they were in (not the 144px inline one).
       if (draftWasMaximized && !publicComposer.classList.contains('is-maximized')) {
         toggleComposerMaximize(publicComposer, publicComposer.querySelector('.composer-toolbar-maximize'));
       }
@@ -24101,7 +24329,19 @@ function resumePendingPublicPublishConfirmations() {
   }
 }
 
+/**
+ * How many optimistic public records (posts + comments) this tab has placed in the feed.
+ *
+ * It exists so a FAILED send can tell the composer whether the user's text is already on screen. A failure
+ * BEFORE the record is placed leaves the draft nowhere and it must come back; a failure AFTER it (the broadcast,
+ * the balance pre-check) leaves it in the feed as a red row, and giving it back too would show the same text
+ * twice. Counting at the two functions that place records is complete by construction — enumerating throw sites
+ * instead would miss the next one added.
+ */
+let publicOptimisticRecordsPlaced = 0;
+
 function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachment = null, options = {}) {
+  publicOptimisticRecordsPlaced += 1;
   const channelId = ensurePublicChannelForAuthorWallet(plathoWallet?.address, {
     activate: false,
   });
@@ -24146,6 +24386,7 @@ function rememberLocalPublicPost(text, bodyHash, commentsAllowed = true, attachm
 }
 
 function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, options = {}) {
+  publicOptimisticRecordsPlaced += 1;
   const channelId = parent.channelId ?? publicChannelSubscriptions?.activeChannelId ?? publicChannelRegistry[0]?.id ?? 'platho.app';
   const profilePointer = currentProfilePointerFields();
   const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
@@ -24459,7 +24700,8 @@ async function publishChannelProfile(description, tags) {
 async function submitPublicCommentDirect(parent, bodyText = null, draftAttachments = publicImageAttachments, draftFileAttachments = publicFileAttachments) {
   if (!plathoWallet?.address) throw new Error('Connect a wallet to comment on the public lane');
   if (parent?.entryId === undefined || parent?.entryId === null) throw new Error('Public comment parent is not synced from a shard');
-  if (parent?.channelEpochTag == null || !parent?.authorWallet) throw new Error('Public comment parent is missing its channel coordinates');
+  const parentCoords = publicPostChainCoordinates(parent);
+  if (!parentCoords) throw new Error('Public comment parent is missing its channel coordinates');
   if (parent.commentsAllowed === false) throw new Error('Comments are closed for this post');
   const text = bodyText?.trim() ?? publicMessageInput?.value?.trim() ?? '';
   const attachments = normalizePublicImageAttachments(draftAttachments);
@@ -24479,9 +24721,11 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   });
 
   // Derive the THREAD shard from the parent's coordinates. shardEntryId is the RAW per-shard entry_id post_uid
-  // folds (parent.entryId is the collision-safe composite the feed cache uses).
-  const channelPk = await publicChannelPartitionKey(publicWalletHash(parent.authorWallet), parent.channelShardSeq ?? 0);
-  const postUid = await publicPostUid(channelPk, BigInt(parent.channelEpochTag), BigInt(parent.shardEntryId ?? parent.entryId));
+  // folds (parent.entryId is the collision-safe composite the feed cache uses). shardSeq comes from the same
+  // source as the rest — defaulting it to 0 would address the wrong channel shard for an overflow-shard post,
+  // and its thread would never be found.
+  const channelPk = await publicChannelPartitionKey(publicWalletHash(parentCoords.authorWallet), parentCoords.shardSeq);
+  const postUid = await publicPostUid(channelPk, parentCoords.epochTag, parentCoords.shardEntryId);
   const threadPk = await publicThreadPartitionKey(postUid, 0);
   const threadEpochTag = publicEpochTag(1, publicEraOf(1, Math.floor(Date.now() / 1000)));
   const value = publicPublishValueForKind(1);
@@ -25937,5 +26181,14 @@ bootCrypto()
       // Nothing to unlock (no wallet, or already unlocked) — reveal the app.
       markBootAppReady();
     }
+  })
+  .then(() => {
+    // AN EXTERNAL PERMALINK is the only way into the app that is not a tap inside it. It runs AFTER the boot
+    // decision so the post lands on a live surface, and INDEPENDENTLY of which branch that decision took — a
+    // reader arriving from a link may have no wallet at all, which is exactly who a shared link is for. Its own
+    // failures are handled inside (status + a cleared address bar), so nothing here can break the boot chain.
+    const link = parsePublicPostPermalink(location.pathname);
+    if (!link) return undefined;
+    return openPublicPostFromPermalink(link).catch((error) => console.error(error));
   })
   .catch((error) => { setBootDebug(`boot-chain-err ${error?.message ?? error}`); console.error(error); });
