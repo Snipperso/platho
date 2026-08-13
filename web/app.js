@@ -7563,8 +7563,9 @@ function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet) {
 // so a stranger who has never touched Platho gets the post, not a sign-up wall. That is the whole point of a link.
 //
 // A PATH, NOT A #fragment (owner's choice, 2026-08-13): readable. The cost is that a path IS sent to the server
-// while a fragment never is — platho.app runs `access_log off`, so nothing records which post was opened. IF
-// ACCESS LOGGING IS EVER TURNED ON, this becomes a record of who read what and the choice must be revisited.
+// while a fragment never is. platho.app is served by Caddy, which logs no requests at all unless a `log`
+// directive is present, and there is none — VERIFIED on the live journal, not assumed. ADDING `log` TO THE SITE
+// TURNS THIS INTO A RECORD OF WHO READ WHAT, and the fragment form would have to be reconsidered.
 //
 // THE NAME IN THE LINK is the author's .ath when it is registry-VERIFIED, else their wallet address. The two are
 // not equivalent over time: a .ath can be TRANSFERRED, and identity in Platho follows the WALLET, so an old link
