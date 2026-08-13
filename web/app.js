@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.15';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.16';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1097,15 +1097,27 @@ let publicDiscoveryLoadToken = 0;
 let publicPostDetailItem = null;
 let publicPostDetailChainComments = [];
 let publicPostDetailLoadToken = 0;
-// Stale-while-revalidate cache of a post's loaded comments (assembled bodies + image data URLs), keyed by
-// `${channelId}:${entryId}`. Reopening a post shows the cached comments INSTANTLY (no re-download flash — the
-// owner saw ~32KB comment images re-fetch from chain on every open) while a background load silently refreshes.
-const publicPostCommentsCache = new Map();
-function publicPostCommentsCacheKey(item) {
+// A public post's IDENTITY: channel + entry. `entryId` ALONE IS NOT ONE — it is a per-channel shard sequence, so
+// two posts in different channels routinely carry the same one. MEASURED 2026-08-13: the owner pressed "Comments"
+// on his wife's post and the detail screen painted a DIFFERENT channel's post (his own book chapter, comments
+// disabled) while loading the wife's comments underneath it and aiming the composer at her post — a comment
+// published onto a post he could not see. Never compare entryId directly; compare identities.
+function publicPostIdentity(item) {
   return item && item.entryId !== undefined && item.entryId !== null
     ? `${item.channelId ?? ''}:${item.entryId}`
     : null;
 }
+/** Two feed items are the same post. Null identity (a local-pending post with no entryId yet) never matches. */
+function samePublicPost(left, right) {
+  const key = publicPostIdentity(left);
+  return Boolean(key && key === publicPostIdentity(right));
+}
+// Stale-while-revalidate cache of a post's loaded comments (assembled bodies + image data URLs), keyed by post
+// identity — the SAME function, so a cache hit and a "same post" check can never disagree. Reopening a post shows
+// the cached comments INSTANTLY (no re-download flash — the owner saw ~32KB comment images re-fetch from chain on
+// every open) while a background load silently refreshes.
+const publicPostCommentsCache = new Map();
+const publicPostCommentsCacheKey = publicPostIdentity;
 let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
 // How far back the open post's comment read has got, per thread shard, and whether anything older remains. A post
@@ -8021,12 +8033,10 @@ function publicDetailStatusNode(text, { retry = false } = {}) {
 
 function renderPublicPostDetail() {
   if (!publicPostDetailBody || !publicPostDetailItem) return;
-  // Re-find the current feed item by entryId so a display change (e.g. relabelling the author via the chevron)
-  // reflects here without re-opening; fall back to the captured item. Identity for comment loading stays the
-  // captured item.entryId (stable).
-  const fresh = publicFeedItemsChronological().find((it) => (
-    it.entryId !== undefined && String(it.entryId) === String(publicPostDetailItem.entryId)
-  ));
+  // Re-find the current feed item by IDENTITY (channel + entry) so a display change (e.g. relabelling the author
+  // via the chevron) reflects here without re-opening; fall back to the captured item. Matching on entryId alone
+  // painted a different channel's post over the opened one — see publicPostIdentity.
+  const fresh = publicFeedItemsChronological().find((it) => samePublicPost(it, publicPostDetailItem));
   const item = fresh ?? publicPostDetailItem;
   // Feed items carry the author NAME in meta[0] (= the channel/thread name) and the date as the last meta entry —
   // there is no item.author / item.createdAt. The header mirrors the private chat conversation header (avatar +
@@ -8141,8 +8151,7 @@ async function warmPublicPostCommentsCache(item) {
       publicPostCommentsCache.delete(publicPostCommentsCache.keys().next().value);
     }
     // If the user already has THIS post open and still empty (opened before the warm resolved), paint now.
-    if (publicPostDetailOpen && publicPostDetailItem
-      && String(publicPostDetailItem.entryId) === String(item.entryId)
+    if (publicPostDetailOpen && samePublicPost(publicPostDetailItem, item)
       && publicPostDetailChainComments.length === 0) {
       publicPostDetailChainComments = durable.comments;
       publicPostDetailParentExists = durable.parentExists === true;
