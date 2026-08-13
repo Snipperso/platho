@@ -118,7 +118,11 @@ describe('username dialogs: mint', () => {
     expect(dialog).toMatch(/if \(athBalance !== null\) \{/);
     expect(dialog, 'the direct-pay opt-out that silenced the whole line must be gone')
       .not.toMatch(/currentVaultUserSource\(\) && !privateLaneDirectPayEnabled\(\)/);
-    expect(dialog, 'and the dead Vault-user balance with it').not.toContain('currentAthBalanceAtomic()');
+    // The dead Vault-user reader went with it — everywhere, not just here. It answered 0n to every caller, so
+    // leaving it in the tree is leaving a trap for whoever reaches for "the ATH balance" next.
+    expect(codeOnly(app), 'the Vault-user ATH reader must be deleted, not merely unused')
+      .not.toContain('function currentAthBalanceAtomic(');
+    expect(codeOnly(app)).not.toContain('currentAthBalanceAtomic()');
     // (b) The up-front gate, on the same source, refusing only against a KNOWN shortfall.
     expect(dialog).toMatch(/if \(priceAtomic !== null && athBalance !== null && athBalance < priceAtomic\) \{/);
     expect(dialog).toMatch(/error\.code = 'PLATHO_ATH_REQUIRED';/);

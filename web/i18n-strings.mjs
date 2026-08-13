@@ -911,6 +911,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Could not check who owns {name} right now. Try again in a moment.",
     "username.linkNoNamesYet": "This wallet does not own any .ath name yet. Create one first — names are paid for in ATH.",
     "errors.buyAthHint": "You can buy ATH on the Profile tab.",
+    "composer.athDiscountChecking": "ATH protocol-fee discount — checking your ATH balance",
   },
   ru: {
     "welcome.activatedTitle": "Аккаунт активирован",
@@ -1825,6 +1826,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Сейчас не удалось проверить, кому принадлежит {name}. Попробуйте ещё раз через минуту.",
     "username.linkNoNamesYet": "У этого кошелька пока нет ни одного имени .ath. Сначала создайте имя — имена оплачиваются в ATH.",
     "errors.buyAthHint": "Купить ATH можно на вкладке «Профиль».",
+    "composer.athDiscountChecking": "Скидка на протокольную комиссию ATH — проверяем ваш баланс ATH",
   },
   zh: {
     "welcome.activatedTitle": "账户已激活",
@@ -2709,6 +2711,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "目前无法确认 {name} 的归属，请稍后再试。",
     "username.linkNoNamesYet": "该钱包还没有任何 .ath 名称。请先创建一个——名称用 ATH 支付。",
     "errors.buyAthHint": "你可以在“个人资料”标签页购买 ATH。",
+    "composer.athDiscountChecking": "ATH 协议费折扣——正在查询你的 ATH 余额",
   },
   es: {
     "welcome.activatedTitle": "Cuenta activada",
@@ -3603,6 +3606,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Ahora mismo no se pudo comprobar de quién es {name}. Inténtalo de nuevo en un momento.",
     "username.linkNoNamesYet": "Esta billetera aún no tiene ningún nombre .ath. Crea uno primero: los nombres se pagan en ATH.",
     "errors.buyAthHint": "Puedes comprar ATH en la pestaña Perfil.",
+    "composer.athDiscountChecking": "Descuento de comisión de protocolo ATH: comprobando tu saldo de ATH",
   },
   pt: {
     "welcome.activatedTitle": "Conta ativada",
@@ -4497,6 +4501,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Não foi possível verificar agora de quem é {name}. Tente novamente em instantes.",
     "username.linkNoNamesYet": "Esta carteira ainda não tem nenhum nome .ath. Crie um primeiro — os nomes são pagos em ATH.",
     "errors.buyAthHint": "Você pode comprar ATH na aba Perfil.",
+    "composer.athDiscountChecking": "Desconto na taxa de protocolo ATH — verificando seu saldo de ATH",
   },
   fr: {
     "welcome.activatedTitle": "Compte activé",
@@ -5391,6 +5396,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Impossible de vérifier pour l’instant à qui appartient {name}. Réessayez dans un moment.",
     "username.linkNoNamesYet": "Ce portefeuille ne possède encore aucun nom .ath. Créez-en un d’abord — les noms se paient en ATH.",
     "errors.buyAthHint": "Vous pouvez acheter des ATH dans l’onglet Profil.",
+    "composer.athDiscountChecking": "Remise sur les frais de protocole ATH — vérification de votre solde ATH",
   },
   de: {
     "welcome.activatedTitle": "Konto aktiviert",
@@ -6285,6 +6291,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Wem {name} gehört, ließ sich gerade nicht prüfen. Versuchen Sie es gleich noch einmal.",
     "username.linkNoNamesYet": "Diese Wallet besitzt noch keinen .ath-Namen. Legen Sie zuerst einen an — Namen werden in ATH bezahlt.",
     "errors.buyAthHint": "ATH können Sie im Tab „Profil“ kaufen.",
+    "composer.athDiscountChecking": "ATH-Protokollgebühren-Rabatt — Ihr ATH-Guthaben wird geprüft",
   },
   hi: {
     "welcome.activatedTitle": "खाता सक्रिय हो गया",
@@ -7179,6 +7186,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "अभी यह जाँच नहीं हो सकी कि {name} किसका है। कुछ देर बाद फिर कोशिश करें।",
     "username.linkNoNamesYet": "इस वॉलेट के पास अभी कोई .ath नाम नहीं है। पहले एक बनाएँ — नामों का भुगतान ATH में होता है।",
     "errors.buyAthHint": "आप ATH को प्रोफ़ाइल टैब से खरीद सकते हैं।",
+    "composer.athDiscountChecking": "ATH प्रोटोकॉल शुल्क छूट — आपका ATH बैलेंस जाँचा जा रहा है",
   },
   id: {
     "welcome.activatedTitle": "Akun diaktifkan",
@@ -8063,6 +8071,7 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "Saat ini tidak bisa memeriksa pemilik {name}. Coba lagi sebentar lagi.",
     "username.linkNoNamesYet": "Dompet ini belum punya nama .ath. Buat dulu satu — nama dibayar dengan ATH.",
     "errors.buyAthHint": "Anda bisa membeli ATH di tab Profil.",
+    "composer.athDiscountChecking": "Diskon biaya protokol ATH — memeriksa saldo ATH Anda",
   },
   ja: {
     "welcome.activatedTitle": "アカウントを有効化しました",
@@ -8947,5 +8956,6 @@ export const I18N_STRINGS = {
     "username.linkCouldNotVerify": "ただ今 {name} の所有者を確認できませんでした。少し経ってからお試しください。",
     "username.linkNoNamesYet": "このウォレットはまだ .ath 名を持っていません。まず作成してください——名前は ATH で支払います。",
     "errors.buyAthHint": "ATH は「プロフィール」タブで購入できます。",
+    "composer.athDiscountChecking": "ATH プロトコル手数料の割引——ATH 残高を確認しています",
   },
 };

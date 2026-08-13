@@ -561,7 +561,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop === false/);
     expect(app).toMatch(/actionCancelButton\.hidden = !cancellable/);
     expect(app).toMatch(/actionCancelButton\.disabled = !cancellable/);
-    expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop !== false\) closeActionDialog\(null\)/);
+    // Escape still refuses on dismissOnBackdrop:false; it now also RECORDS the dismissal first (2026-08-13), so
+    // that a ✕/Escape on the password dialog is the only thing able to park the unlock prompt.
+    expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop !== false\) \{ noteActionDialogUserDismissed\(\); closeActionDialog\(null\); \}/);
     expect(app).toMatch(/dismissOnBackdrop = false/);
     expect(app).toMatch(/dismissOnBackdrop,/);
     expect(app).toMatch(/formAutocomplete: 'on'/);
@@ -1899,7 +1901,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/actionCancelButton\?\.addEventListener\('click', \(\) => \{\s*if \(activeActionDialog\?\.cancellable === false\) return/);
     // backdrop click + Escape stay gated on dismissOnBackdrop, so dismissOnBackdrop:false blocks BOTH.
     expect(app).toMatch(/activeActionDialog\?\.dismissOnBackdrop === false\) return/);
-    expect(app).toMatch(/if \(activeActionDialog\?\.dismissOnBackdrop !== false\) closeActionDialog\(null\)/);
+    expect(app).toMatch(/if \(activeActionDialog\?\.dismissOnBackdrop !== false\) \{ noteActionDialogUserDismissed\(\); closeActionDialog\(null\); \}/);
     // the unlock flow opens its password dialog with dismissOnBackdrop:false + cancellable:true.
     const unlockSource = app.slice(
       app.indexOf('async function requestAndDecryptEncryptedWallet'),
@@ -3066,7 +3068,15 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function shouldOpenWalletUnlockPrompt()'),
     );
     expect(resumeSrc).toMatch(/walletUnlockPromptInterrupted = false;[\s\S]{0,80}?armWalletUnlockPrompt\(\);/);
-    // A deliberate dismissal must NOT be re-prompted on every app switch: the non-interrupted path is unchanged.
+    // A deliberate dismissal must NOT be re-prompted on every app switch — but that is now the DECLINED branch,
+    // and it is the only one allowed to fall through to the bare scheduler.
+    //
+    // [OWNER 2026-08-13] This line used to assert the bare `scheduleWalletUnlockPrompt()` as the whole
+    // non-interrupted path, which is precisely the silence he then reported: that function cannot raise
+    // walletUnlockPromptPending, so after ANY unlock attempt that ended without a wallet, no resume could ever
+    // ask again. The gate was green over the defect the entire time — which is why the real coverage for this is
+    // now the EXECUTABLE state machine in tests/wallet-unlock-resume-state, and this stays only as a shape pin.
+    expect(resumeSrc).toMatch(/if \(!walletUnlockPromptDeclined\) \{\s*armWalletUnlockPrompt\(\);/);
     expect(resumeSrc).toMatch(/scheduleWalletUnlockPrompt\(\);/);
     // And a successful unlock forgets the interruption, so it cannot fire a second prompt behind the first.
     expect(app).toMatch(/function markWalletUnlocked\(\) \{[\s\S]{0,200}?walletUnlockPromptInterrupted = false;/);
