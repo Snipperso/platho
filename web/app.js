@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=42';
+} from './public-channel-subscriptions.mjs?v=44';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=68';
+} from './i18n.mjs?v=70';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -1901,73 +1901,45 @@ function setInstallSteps(steps = []) {
   installSteps.hidden = false;
 }
 
-function refreshInstallButtons() {
-  if (isTelegramEnv()) {
-    // PWA install is meaningless inside Telegram; keep every install affordance hidden.
-    installButtons.forEach((button) => button.toggleAttribute('hidden', true));
-    return;
-  }
-  const state = installActionState();
-  const canInstall = state !== 'installed';
-  installButtons.forEach((button) => {
-    button.toggleAttribute('hidden', !canInstall);
-    const label = state === 'prompt'
+// EVERY word the install surfaces say, resolved from one state. [OWNER 2026-08-13] The install invitation became a
+// quick-start step as well as a modal, and a second surface writing its own copy is how two screens start disagreeing
+// about what "install" even means on this device. One definition, two readers — the dialog and the wizard step.
+function installCopyForState(state = installActionState()) {
+  return {
+    state,
+    buttonLabel: state === 'prompt'
       ? t('install.installPlatho')
       : state === 'open-in-app'
       ? t('install.openPlathoApp')
       : state === 'ios-instructions'
       ? t('install.howToInstallIphone')
-      : t('install.openOrInstall');
-    button.setAttribute('aria-label', label);
-    button.title = label;
-    const icon = button.querySelector('.icon');
-    icon?.classList.toggle('icon-install', state === 'prompt');
-    icon?.classList.toggle('icon-open-app', state !== 'prompt');
-  });
-  if (installTitle) {
-    installTitle.textContent = state === 'prompt'
+      : t('install.openOrInstall'),
+    title: state === 'prompt'
       ? t('install.installPlatho')
       : state === 'open-in-app'
       ? t('install.openPlathoApp')
       : state === 'ios-instructions'
       ? t('install.installOnIphone')
-      : t('install.openOrInstall');
-  }
-  if (installConfirmButton) {
-    installConfirmButton.textContent = state === 'prompt' ? t('install.install') : t('install.gotIt');
-  }
-  if (installDismissButton) {
-    installDismissButton.textContent = t('install.notNow');
-    installDismissButton.hidden = state !== 'prompt';
-  }
-  if (installLead) {
-    installLead.textContent = state === 'open-in-app'
+      : t('install.openOrInstall'),
+    action: state === 'prompt' ? t('install.install') : t('install.gotIt'),
+    lead: state === 'open-in-app'
       ? t('install.leadOpenInApp')
       : state === 'ios-instructions'
       ? t('install.leadIos')
       : state === 'instructions'
       ? t('install.leadInstructions')
-      : t('install.leadPrompt');
-  }
-  if (installBody) {
-    installBody.textContent = state === 'open-in-app'
+      : t('install.leadPrompt'),
+    body: state === 'open-in-app'
       ? t('install.bodyOpenInApp')
       : state === 'ios-instructions'
       ? t('install.bodyIos')
       : state === 'instructions'
       ? t('install.bodyInstructions')
-      : t('install.bodyPrompt');
-  }
-  setInstallSteps(state === 'ios-instructions'
-    ? [
-      t('install.iosStep1'),
-      t('install.iosStep2'),
-      t('install.iosStep3'),
-      t('install.iosStep4'),
-    ]
-    : []);
-  if (installHelp) {
-    installHelp.textContent = state === 'installed'
+      : t('install.bodyPrompt'),
+    steps: state === 'ios-instructions'
+      ? [t('install.iosStep1'), t('install.iosStep2'), t('install.iosStep3'), t('install.iosStep4')]
+      : [],
+    help: state === 'installed'
       ? t('install.helpInstalled')
       : state === 'open-in-app'
       ? t('install.helpOpenInApp')
@@ -1975,8 +1947,42 @@ function refreshInstallButtons() {
       ? t('install.helpIos')
       : state === 'prompt'
       ? t('install.helpPrompt')
-      : installHelpText();
+      : installHelpText(),
+  };
+}
+
+function refreshInstallButtons() {
+  if (isTelegramEnv()) {
+    // PWA install is meaningless inside Telegram; keep every install affordance hidden.
+    installButtons.forEach((button) => button.toggleAttribute('hidden', true));
+    return;
   }
+  const copy = installCopyForState();
+  const state = copy.state;
+  const canInstall = state !== 'installed';
+  installButtons.forEach((button) => {
+    button.toggleAttribute('hidden', !canInstall);
+    button.setAttribute('aria-label', copy.buttonLabel);
+    button.title = copy.buttonLabel;
+    const icon = button.querySelector('.icon');
+    icon?.classList.toggle('icon-install', state === 'prompt');
+    icon?.classList.toggle('icon-open-app', state !== 'prompt');
+  });
+  if (installTitle) installTitle.textContent = copy.title;
+  if (installConfirmButton) installConfirmButton.textContent = copy.action;
+  if (installDismissButton) {
+    installDismissButton.textContent = t('install.notNow');
+    installDismissButton.hidden = state !== 'prompt';
+  }
+  if (installLead) installLead.textContent = copy.lead;
+  if (installBody) installBody.textContent = copy.body;
+  setInstallSteps(copy.steps);
+  if (installHelp) installHelp.textContent = copy.help;
+  // NOT refreshQuickStartInstallStep() from here, however tempting. This function RUNS AT MODULE TOP LEVEL (the
+  // bootstrap call below the beforeinstallprompt listeners), and every piece of quick-start state it would touch —
+  // quickStartStepsView, QUICK_START_STEPS, quickStartStepIndex — is declared several hundred lines further down.
+  // Reading a `let`/`const` before its declaration is a TDZ ReferenceError at top level, which aborts the whole
+  // script and the app never boots. The two events that actually change the install state call it themselves.
 }
 
 function installPromptDismissed() {
@@ -2020,6 +2026,16 @@ function offerDeferredInstallPrompt() {
   if (!installPromptDeferred) return;
   installPromptDeferred = false;
   openInstallDialogIfUseful();
+}
+
+/**
+ * Forget a deferred invitation instead of releasing it. [OWNER 2026-08-13] The quick-start now ENDS on an install
+ * step of its own, so the modal that used to pop seconds after the wizard closed is the same invitation a second
+ * time — "the last step is a modal, not in the wizard's style" was the complaint, and answering it with a styled
+ * step plus the old modal would only have made it twice as loud.
+ */
+function dropDeferredInstallPrompt() {
+  installPromptDeferred = false;
 }
 
 function closeInstallDialog({ dismissed = true } = {}) {
@@ -3107,13 +3123,24 @@ async function promptInstallApp() {
     refreshInstallButtons();
     return;
   }
-  const promptEvent = deferredInstallPrompt;
-  deferredInstallPrompt = null;
   closeInstallDialog({ dismissed: true });
+  await firePendingInstallPrompt();
+}
+
+/**
+ * Open the browser's own install sheet. THE only place the deferred event is spent — it is single-use, so a second
+ * reader would find it already gone; the modal and the quick-start step both come through here.
+ * Returns true if the user accepted, false if they declined, null when there was no sheet to open.
+ */
+async function firePendingInstallPrompt() {
+  const promptEvent = deferredInstallPrompt;
+  if (!promptEvent) return null;
+  deferredInstallPrompt = null;
   refreshInstallButtons();
   try {
     await promptEvent.prompt();
-    await promptEvent.userChoice.catch(() => null);
+    const choice = await promptEvent.userChoice.catch(() => null);
+    return choice?.outcome === 'accepted';
   } finally {
     refreshInstallButtons();
   }
@@ -3808,7 +3835,13 @@ async function verifyWalletDisplayIdentity(mode, label, wallet = plathoWallet) {
   const owner = requireBasechainAddress(wallet?.address, 'Connected wallet');
   if (normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
     const identity = await resolvePlathoUsernameOwner(label);
-    if (!sameWalletAddress(identity.ownerWallet, owner)) throw new Error(`${identity.label} belongs to another wallet`);
+    if (!sameWalletAddress(identity.ownerWallet, owner)) {
+      // CODED, so the dialog can say it in the reader's language. The sentence itself stays English for the
+      // console: it is a diagnostic, and the screen no longer prints it — see usernameLinkErrorText.
+      const error = new Error(`${identity.label} belongs to another wallet`);
+      error.code = 'PLATHO_USERNAME_OTHER_WALLET';
+      throw error;
+    }
     return { mode: normalizedMode, label: identity.label, verified_at: Date.now() };
   }
   return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
@@ -8435,6 +8468,32 @@ function renderPublicPostDetail() {
       : publicDetailStatusNode(t('public.commentsNotLoadedYet'), { retry: true }));
   }
   publicPostDetailBody.append(section);
+  // Consumed by whichever render actually paints the new comment — the optimistic row, or the chain-confirmed one
+  // that replaces it — rather than by the submit handler, which cannot know which render wins.
+  if (publicPostDetailScrollToLatest) {
+    publicPostDetailScrollToLatest = false;
+    scrollPublicPostDetailToLatest();
+  }
+}
+
+// [OWNER 2026-08-13] "the thread should scroll when I write a public comment on a post — right now the new comment
+// shows up below the composer." Exactly: comments append at the bottom and the scroll position stayed put, so the
+// one comment the author is certain to want to see — their own, just written — landed below the fold.
+let publicPostDetailScrollToLatest = false;
+
+function scrollPublicPostDetailToLatest() {
+  if (!publicPostDetailBody) return;
+  const body = publicPostDetailBody;
+  const toBottom = () => { body.scrollTop = body.scrollHeight; };
+  // After layout: the row was appended THIS tick and scrollHeight is not final until the browser has laid it out.
+  requestAnimationFrame(toBottom);
+  // An image inside the new comment finishes loading a few frames later and grows the list under the scroll
+  // position, putting the row straight back under the fold. One re-scroll per pending image settles it.
+  for (const image of body.querySelectorAll('img')) {
+    if (image.complete) continue;
+    image.addEventListener('load', toBottom, { once: true });
+    image.addEventListener('error', toBottom, { once: true });
+  }
 }
 
 // Warm the durable comment cache (IndexedDB — WITH image data URLs) into the in-memory Map BEFORE the user opens
@@ -8495,6 +8554,9 @@ function openPublicPostDetail(item) {
   // Shared composer -> comment mode for this post; no auto-focus (the user opens to read first) and no inline
   // context bar (the screen itself is the context).
   setPublicCommentTarget(item, { focus: false, showContext: false });
+  // Opening a post starts at the TOP — the post itself is what was tapped. A jump-to-latest armed by a comment on
+  // the PREVIOUS post must not survive into this one.
+  publicPostDetailScrollToLatest = false;
   renderPublicPostDetail();
   if (publicPostDetailBody) publicPostDetailBody.scrollTop = 0;
   // DURABLE seed: after a full reload the in-memory Map is empty — pull the last-loaded comments (with images)
@@ -8517,6 +8579,7 @@ function closePublicPostDetail() {
   if (!publicPostDetailOpen && publicPane?.dataset?.postOpen !== 'true') return;
   publicPostDetailOpen = false;
   publicPostDetailItem = null;
+  publicPostDetailScrollToLatest = false;
   publicPostDetailChainComments = [];
   publicPostDetailLoadState = 'idle';
   publicPostDetailLoadToken += 1; // invalidate any in-flight comment load so a stale result can't render
@@ -8541,6 +8604,8 @@ async function openPublicDiscovery() {
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     publicDiscoveryResults = results;
     renderPublicDiscovery({ loading: false });
+    // Faces arrive AFTER the cards, never before them: the list must not wait on a profile read per wallet.
+    void hydratePublicDiscoveryAvatars(results, token);
   } catch (error) {
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     noteTonRpcRateLimit(error);
@@ -8786,6 +8851,7 @@ async function refreshPublicDiscovery() {
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     publicDiscoveryResults = results;
     renderPublicDiscovery({ loading: false });
+    void hydratePublicDiscoveryAvatars(results, token);
   } catch (error) {
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     noteTonRpcRateLimit(error);
@@ -10973,35 +11039,58 @@ function publicAvatarUrlForWallet(walletAddress, memo = null) {
   return url;
 }
 
-// Load profile avatars for subscribed wallet channels straight from the ProfileRegistry (no public
-// post required), keyed by wallet. Only successful loads are cached; a faceless wallet OR a wallet
-// whose provider was momentarily unavailable stays uncached so a later sync retries it (no stuck
-// "no avatar" once the user sets one or the provider recovers).
+// Load profile avatars for a set of wallets straight from the ProfileRegistry (no public post required), keyed by
+// wallet. Only successful loads are cached; a faceless wallet OR a wallet whose provider was momentarily
+// unavailable stays uncached so a later pass retries it (no stuck "no avatar" once the user sets one or the
+// provider recovers).
+//
+// ONE loader, several callers. Every surface that shows a face has needed the same three lines, and each time a new
+// surface grew its own copy the set it covered drifted from the set the user was looking at — twice in one day
+// (2026-08-13: the channel view, then channel search). Callers supply the wallets; this owns the cache.
+async function hydrateProfileAvatarsForWallets(walletAddresses, { limit = 24 } = {}) {
+  let changed = false;
+  for (const walletAddress of (walletAddresses ?? []).slice(0, limit)) {
+    const raw = rawWalletAddress(walletAddress);
+    if (!raw || publicChannelAvatarUrlByWallet.get(raw)) continue;
+    let imageUrl = null;
+    try {
+      imageUrl = await loadProfileAvatarImage(walletAddress);
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) console.error(error);
+      continue; // transient: leave uncached so a later pass retries
+    }
+    if (!imageUrl) continue;
+    publicChannelAvatarUrlByWallet.set(raw, imageUrl);
+    changed = true;
+  }
+  return changed;
+}
+
 async function hydratePublicChannelAvatars() {
   // THE SAME CHANNEL SET THE SYNC WALKS — subscribed, plus the user's own, plus a channel open in the channel
   // view but not followed. It used to be the subscribed list alone, so a channel found through search showed a
   // letter tile while its posts loaded fine: the sync had already fetched that channel, and only the avatar was
   // left out. MEASURED 2026-08-13 (owner, "moonly" opened from channel search).
   //
-  // It costs nothing extra: those channels are being read this cycle anyway, and the per-wallet cache below means
+  // It costs nothing extra: those channels are being read this cycle anyway, and the per-wallet cache means
   // one profile read per wallet for the life of the tab.
-  const channels = feedSourcePublicChannels().filter((channel) => channel.authorWallet);
-  let changed = false;
-  for (const channel of channels.slice(0, 24)) {
-    const raw = rawWalletAddress(channel.authorWallet);
-    if (!raw || publicChannelAvatarUrlByWallet.get(raw)) continue;
-    let imageUrl = null;
-    try {
-      imageUrl = await loadProfileAvatarImage(channel.authorWallet);
-    } catch (error) {
-      if (!noteTonRpcRateLimit(error)) console.error(error);
-      continue; // transient: leave uncached so a later sync retries
-    }
-    if (!imageUrl) continue;
-    publicChannelAvatarUrlByWallet.set(raw, imageUrl);
-    changed = true;
-  }
+  const wallets = feedSourcePublicChannels().map((channel) => channel.authorWallet).filter(Boolean);
+  const changed = await hydrateProfileAvatarsForWallets(wallets);
   if (changed) renderPublicSurface({ anchorUnread: false });
+  return changed;
+}
+
+// [OWNER 2026-08-13] "avatars do not load in the Find channels screen. Open the channel and they do." Exactly so: a
+// discovery result is NOT a feed source — it is a wallet the beacon sweep just named, with no registry channel and
+// no posts pulled — so the sweep above never covered it, and the face only appeared once opening the channel made
+// it a preview source. Discovery is precisely where a face carries the most information, since the name and one
+// line of description are all the rest a stranger has to go on.
+async function hydratePublicDiscoveryAvatars(results, token) {
+  const changed = await hydrateProfileAvatarsForWallets((results ?? []).map((entry) => entry.authorWallet).filter(Boolean));
+  // Same staleness guard the results themselves take: a closed or re-run discovery must not be repainted by a pass
+  // that belongs to the previous sweep.
+  if (!changed || token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return changed;
+  renderPublicDiscovery({ loading: false });
   return changed;
 }
 
@@ -14111,6 +14200,64 @@ function hasActivePlathoAccount() {
   return hasActiveVaultMessagingKeys();
 }
 
+// ── ACTIVATION IN FLIGHT, ACROSS A RELOAD ───────────────────────────────────────────────────────────────────────
+//
+// [OWNER 2026-08-13] He activated during the quick-start, the step said "Done", and the Profile tab went on
+// offering to activate — with the fee still on the balance. The external HAD been accepted and did land minutes
+// later, so nothing was lost; what the app got wrong was claiming a settled fact it had not read.
+//
+// plathoAccountActivationPending already covers that window, but it lives in memory alone: a reload — or a phone
+// killing the tab — drops it, and the Profile tab returns to offering a registration that is already paid for and
+// on its way. Pressing it again is a SECOND fee for one registration. So the marker is written down, scoped to the
+// wallet that sent it, and expires on the same horizon the in-memory poll uses, so a reload can never claim a
+// longer in-flight window than a tab that stayed open.
+const PLATHO_ACTIVATION_IN_FLIGHT_KEY = 'platho.accountActivation.inFlight.v1';
+const PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS = 95_000;
+
+function rememberPlathoActivationInFlight(walletAddress) {
+  const raw = rawWalletAddress(walletAddress);
+  if (!raw) return;
+  try {
+    localStorageOrNull()?.setItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY, JSON.stringify({ wallet: raw, at: Date.now() }));
+  } catch { /* private mode / quota: the in-memory flag still covers this tab */ }
+}
+
+function forgetPlathoActivationInFlight() {
+  try { localStorageOrNull()?.removeItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY); } catch { /* ignore */ }
+}
+
+/** In flight for THIS wallet and inside the horizon. An expired or foreign marker is not in flight, and is dropped. */
+function plathoActivationInFlightForCurrentWallet() {
+  const raw = rawWalletAddress(plathoWallet?.address);
+  if (!raw) return false;
+  let record = null;
+  try { record = JSON.parse(localStorageOrNull()?.getItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY) ?? 'null'); }
+  catch { return false; }
+  if (!record || record.wallet !== raw) return false;
+  const age = Date.now() - Number(record.at ?? 0);
+  // A negative age means the clock moved backwards; treat it as unusable rather than as an eternal lock.
+  if (!(age >= 0 && age < PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS)) { forgetPlathoActivationInFlight(); return false; }
+  return true;
+}
+
+// Poll the user's OWN KeyShard until the account reads active, or the horizon runs out. Rising delays: the first
+// read is cheap and often enough, and a register that has not settled in ten seconds will not settle in eleven.
+// The delays sum to PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS on purpose — ONE horizon, read by everything that waits.
+const PLATHO_ACTIVATION_CONFIRM_DELAYS_MS = [0, 4_000, 6_000, 8_000, 12_000, 15_000, 20_000, 30_000];
+
+async function waitForPlathoAccountActivation(stillWanted = () => true) {
+  for (const delayMs of PLATHO_ACTIVATION_CONFIRM_DELAYS_MS) {
+    if (hasActivePlathoAccount()) return true;
+    if (!stillWanted()) return false;
+    if (delayMs > 0) await delay(delayMs);
+    if (!stillWanted()) return hasActivePlathoAccount();
+    // A failed read is a read that learned nothing, not an answer: refreshVaultActivationStatus preserves the
+    // binding on a transient failure, so keep waiting rather than returning a verdict a bad replica handed us.
+    try { await refreshVaultActivationStatus(); } catch { /* transient */ }
+  }
+  return hasActivePlathoAccount();
+}
+
 function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
   // clean-17 direct-pay: a KeyShard register is a fixed wallet send of KEYSHARD_REGISTER_VALUE (the shard reserves its
   // rent and refunds the surplus), NOT a Vault-estimated external. Gate so every fee-display site is correct at cutover.
@@ -14225,6 +14372,20 @@ function currentAthBalanceAtomic() {
   const source = currentVaultUserSource();
   if (!source || typeof source !== 'object') return 0n;
   return nonNegativeBigInt(source.ath_balance ?? source.athBalance ?? source.ath);
+}
+
+/**
+ * The CONNECTED WALLET's ATH, as last read — the balance that actually pays for a mint or an avatar under
+ * direct pay, and the same figure the nav corner shows.
+ *
+ * `null` means NOT READ YET, and callers must treat it as unknown rather than as zero: claiming "not enough"
+ * against a balance nobody has looked at is how the old Vault-user reading went wrong in the opposite direction
+ * (it returned 0n for everyone, so every affordability line said "not enough" and the whole block had to be
+ * switched off under direct pay — leaving the mint dialog silent about ATH entirely).
+ */
+function connectedWalletAthBalanceAtomic() {
+  const raw = vaultPocketState?.wallet?.ath_balance;
+  return raw === null || raw === undefined ? null : nonNegativeBigInt(raw);
 }
 
 function vaultTonBalanceNanotons(user = currentVaultUserSource()) {
@@ -17242,8 +17403,12 @@ function refreshMessagingControls() {
   // the button looks like it ignored the first press and the user re-clicks.
   // queueVaultPostTransactionRefresh clears the flag once activation confirms or its
   // poll horizon elapses; a wallet change resets it.
-  if (accountActive) plathoAccountActivationPending = false;
-  const activationPending = plathoAccountActivationPending && !accountActive && Boolean(plathoWallet) && !appShellReloadPending;
+  if (accountActive) { plathoAccountActivationPending = false; forgetPlathoActivationInFlight(); }
+  // The written-down marker is ORed in, not substituted: it is what survives a reload, while the in-memory flag is
+  // what covers a tab whose storage is unavailable. Either one means an external is on its way and the row must not
+  // invite a second one.
+  const activationInFlight = plathoAccountActivationPending || plathoActivationInFlightForCurrentWallet();
+  const activationPending = activationInFlight && !accountActive && Boolean(plathoWallet) && !appShellReloadPending;
   if (registerVaultKeysButton) {
     registerVaultKeysButton.disabled = !plathoWallet || accountActive || appShellReloadPending || activationPending;
     // Only show the Activate row while activation is actionable or in progress (wallet unlocked AND the
@@ -19441,6 +19606,8 @@ publicComposer?.addEventListener('submit', async (event) => {
     // Same lane as private sends: a burst of posts or comments overlaps exactly like a burst of messages, and they
     // share one wallet, one seqno and one RPC budget.
     if (draftCommentTarget) {
+      // Armed BEFORE the publish: the optimistic row is painted while this await is still running.
+      if (publicPostDetailOpen) publicPostDetailScrollToLatest = true;
       await enqueueOutgoingPublish(() => submitPublicCommentDirect(draftCommentTarget, text, attachments, fileAttachments));
     } else {
       await enqueueOutgoingPublish(() => submitPublicPostDirect({
@@ -20189,7 +20356,15 @@ function usernameMintPricePreview(input) {
 
 function usernameMintStatusText(error) {
   const message = shortUiErrorText(error, 'username blocked');
-  if (/not enough vault ath|not enough vault ton|activate platho account|usernameregistry rejected/i.test(message)) {
+  // A funds shortfall is ACTIONABLE and already carries the exact numbers in the reader's language — show it as it
+  // is, never wrapped in a "blocked" that reads as the app refusing.
+  //
+  // [OWNER 2026-08-13] This used to be a SUBSTRING test for "not enough vault ath" / "not enough vault ton" —
+  // Vault-era English, from before the sentence became t('errors.notEnoughAth'). It could not match the current
+  // wording in ANY language, so the one message worth reading arrived wrapped in "blocked". The avatar lane
+  // had already been moved onto the code; this one was left behind. Keyed on what the thrower actually sets.
+  if (error?.code === 'PLATHO_ATH_REQUIRED' || error?.code === 'PLATHO_WALLET_GRAM_REQUIRED') return message;
+  if (/activate platho account|usernameregistry rejected/i.test(message)) {
     return message;
   }
   if (/verification unavailable/i.test(message)) return t('username.rpcVerificationUnavailable');
@@ -20453,6 +20628,27 @@ async function importEncryptedWalletKeyFile(file) {
   return restored;
 }
 
+/**
+ * What the LINK dialog says when a name cannot be verified.
+ *
+ * [OWNER 2026-08-13] A user pressed "Link username" when they meant "Create", owning no names at all, and got a
+ * string of messages he could make nothing of. They were the raw internals of resolvePlathoUsernameOwner —
+ * "<name>.ath is not registered", "belongs to another wallet", "ownership is not authoritative" — printed straight
+ * into the dialog hint. English sentences on a Russian screen, naming a contract concept rather than a next step.
+ *
+ * Every OTHER caller of that resolver already classified UsernameNotRegisteredError into a localized line (the new
+ * chat, the public link, the feed lookups). This dialog was the one that did not — the same one-lane-fixed shape
+ * twice more today. Three outcomes, three sentences, and the third one is honest about not knowing.
+ */
+function usernameLinkErrorText(error, chosen) {
+  const name = canonicalUsernameDisplay(String(chosen ?? '').trim());
+  if (error instanceof UsernameNotRegisteredError) return t('username.linkNoSuchName', { name });
+  if (error?.code === 'PLATHO_USERNAME_OTHER_WALLET') return t('username.linkOtherWallet', { name });
+  // Anything else is a read we could not finish — a provider that is not configured, a rate limit, an
+  // inconclusive ownership proof. None of those mean the name is bad, so none of them may say so.
+  return t('username.linkCouldNotVerify', { name });
+}
+
 async function requestWalletDisplayIdentity(mode) {
   const normalizedMode = normalizeWalletDisplayMode(mode);
   if (normalizedMode === WALLET_DISPLAY_MODES.ADDRESS) return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
@@ -20506,6 +20702,13 @@ async function requestWalletDisplayIdentity(mode) {
       value,
     });
   }
+  // [OWNER 2026-08-13] A wallet that owns NO names opened onto a bare text field with nothing saying there was
+  // nothing to type — which is exactly how someone ends up here when they meant "Create username". Say it, and say
+  // what to do instead. `ownedNames !== null` is load-bearing: null means the CHAIN READ FAILED, and "you own no
+  // names" is then a claim we have not earned. In that case the original hint stands and submit re-verifies.
+  if (normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT && ownedNames !== null && knownNames.length === 0) {
+    feedback = t('username.linkNoNamesYet');
+  }
   // The name is verified IN-PLACE on submit (validateSubmit): the dialog stays open and shows the error inline if
   // the name is not registered / not owned, instead of closing and immediately re-opening (the flicker the owner
   // reported). It only closes once the name passes verification.
@@ -20529,7 +20732,9 @@ async function requestWalletDisplayIdentity(mode) {
         }
         return { ok: true, result };
       } catch (error) {
-        return { ok: false, error: error?.message || t('username.useVerifiedName', { suffix }) };
+        // NOT error.message: that is the contract's own English, and this line is the whole answer the user gets.
+        console.error(error);
+        return { ok: false, error: usernameLinkErrorText(error, chosen) };
       }
     },
   });
@@ -20540,6 +20745,11 @@ async function requestUsernameMintName() {
   let feedback = t('username.mintHint');
   let tone = 'muted';
   let usernameValue = '';
+  // The number this whole dialog turns on, read BEFORE the first paint. The summary is synchronous (it re-runs on
+  // every keystroke), so it can only show what is already cached — and a dialog that opened on a stale or absent
+  // balance is what let a user with no ATH get all the way to the mint. One read, fail-open: an unreadable balance
+  // stays null and the affordability line is simply omitted.
+  await refreshVaultNavBalanceInBackground().catch(() => null);
   while (true) {
     const result = await openActionDialog({
       title: t('username.mintPlathoName'),
@@ -20559,15 +20769,18 @@ async function requestUsernameMintName() {
           { label: t('username.display'), value: canonicalUsernameDisplay(raw) },
           { label: t('username.athPrice'), value: usernameMintPricePreview(raw) },
         ];
-        // Show the live ATH balance + an affordability flag — but only when the Vault user (hence the balance)
-        // is actually loaded, so we never claim "not enough" against an unknown balance.
-        // Under direct-pay the ATH lives in the wallet jetton, not the (synthesized) Vault user — the Vault-user ATH
-        // reads 0 here and would falsely say "not enough". Skip this preview; submitUsernameMintDirect checks the real
-        // wallet ATH balance authoritatively. [deletion scout: mint ATH gate live-wrong under direct-pay]
-        if (currentVaultUserSource() && !privateLaneDirectPayEnabled()) {
+        // The live ATH balance + an affordability flag, read from the WALLET jetton — the thing that pays.
+        //
+        // [OWNER 2026-08-13] This block was skipped outright whenever direct pay was on, because it read the
+        // SYNTHESIZED Vault user, whose ATH is always 0 and would have told everyone "not enough". Skipping it
+        // meant the dialog said nothing about ATH at all: a user with none typed a name, pressed Create, and found
+        // out only after three chain reads. Pointing it at the real balance brings the line back for everyone.
+        //
+        // A null balance is UNKNOWN, not zero — the line is omitted rather than guessed.
+        const athBalance = connectedWalletAthBalanceAtomic();
+        if (athBalance !== null) {
           let priceAtomic = null;
           try { priceAtomic = localUsernameMintPriceAtomic(normalizeUsernameInput(raw)); } catch { priceAtomic = null; }
-          const athBalance = currentAthBalanceAtomic();
           const short = priceAtomic !== null && athBalance < priceAtomic;
           lines.push({ label: t('username.yourAth'), value: short ? t('username.athBalanceNotEnough', { amount: formatAthAtomic(athBalance) }) : t('username.athBalance', { amount: formatAthAtomic(athBalance) }) });
         }
@@ -20583,21 +20796,28 @@ async function requestUsernameMintName() {
     usernameValue = result.username;
     try {
       const username = normalizeUsernameInput(result.username);
-      // Up-front ATH affordability gate: don't let the user proceed to review/mint a name they can't pay for
-      // (price is by length: 6+ chars = 100 ATH, 5 = 1000, 4 = 10000; <4 already rejected above). Only enforced
-      // when the Vault user/balance is loaded; otherwise defer to the authoritative mint-time check.
-      // Up-front gate only on the Vault path — the synthesized direct-pay user carries no ATH balance (it reads 0), so
-      // this pre-check is skipped under direct-pay and submitUsernameMintDirect's wallet-ATH check is authoritative.
+      // Up-front ATH affordability gate: don't let the user walk into a mint they cannot pay for (price is by
+      // length: 6+ chars = 100 ATH, 5 = 1000, 4 = 10000; <4 already rejected above). Only when the balance is
+      // KNOWN — submitUsernameMintDirect re-reads the jetton wallet and stays the authority; this exists to spare
+      // the user three chain reads and a status line, not to replace it.
+      //
+      // The sentence is t('errors.notEnoughAth'), the SAME one the authoritative check raises, so one condition
+      // has one wording. The old line here was a hand-built English string that also said "top up ATH in Vault" —
+      // and the Vault was removed with clean-17, so it named a place that does not exist.
       const priceAtomic = localUsernameMintPriceAtomic(username);
-      if (priceAtomic !== null && currentVaultUserSource() && !privateLaneDirectPayEnabled()) {
-        const athBalance = currentAthBalanceAtomic();
-        if (athBalance < priceAtomic) {
-          throw new Error(`Insufficient ATH: ${username} costs ${formatAthAtomic(priceAtomic)} ATH, you have ${formatAthAtomic(athBalance)} — top up ATH in Vault`);
-        }
+      const athBalance = connectedWalletAthBalanceAtomic();
+      if (priceAtomic !== null && athBalance !== null && athBalance < priceAtomic) {
+        const error = new Error(t('errors.notEnoughAth', { need: formatAthAtomic(priceAtomic), have: formatAthAtomic(athBalance) }));
+        error.code = 'PLATHO_ATH_REQUIRED';
+        throw error;
       }
       return username;
     } catch (error) {
-      feedback = error.message;
+      // A shortfall gets the one thing the sentence cannot carry: where to get ATH. Every other failure here is
+      // about the NAME itself and needs no such pointer.
+      feedback = error?.code === 'PLATHO_ATH_REQUIRED'
+        ? `${error.message} ${t('errors.buyAthHint')}`
+        : error.message;
       tone = 'error';
     }
   }
@@ -21772,8 +21992,14 @@ async function submitBuyAth(amountAtomic) {
       lastTerminalQueryId: ready.lastTerminalQueryId,
     });
     setText(buyAthStatus, t('profile.buyAthSent'));
-    // The ATH lands when the seller forwards it, a hop later — re-read both sides rather than claim a balance.
-    window.setTimeout(() => { refreshAthProtocolStats().catch(() => {}); }, 8000);
+    // The ATH lands when the seller forwards it, a hop later — re-read rather than claim a balance.
+    //
+    // [OWNER 2026-08-13] "bought it, and nothing updated in the balance." The claim lane was cured of exactly this on
+    // 2026-08-03 and the BUY lane kept its own one-shot: a single 8s call to refreshAthProtocolStats, which reads
+    // PROTOCOL figures (supply, multiplier) and never touches the wallet's ATH balance — the number the user is
+    // actually watching is fed by refreshVaultNavBalanceInBackground. So the balance waited for a background tick
+    // that could be three minutes away. Both lanes now queue the same ladder.
+    queueAthPostTransactionRefresh();
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[market] buy failed', error);
     setText(buyAthStatus, t('profile.buyAthFailed'));
@@ -21932,6 +22158,7 @@ function queueVaultPostTransactionRefresh(options = {}) {
     setTimeout(() => {
       if (plathoAccountActivationPending && !hasActivePlathoAccount()) {
         plathoAccountActivationPending = false;
+        forgetPlathoActivationInFlight();   // one release, both markers — a stale write must not outlive the poll
         refreshMessagingControls();
       }
     }, releaseDelayMs);
@@ -21942,6 +22169,8 @@ function queueVaultRefreshAfterWalletChange() {
   // A pending activation belongs to the previous wallet; never carry the in-flight
   // lock across a wallet switch (the new wallet's activation state is read fresh).
   plathoAccountActivationPending = false;
+  // The WRITTEN marker is deliberately left alone: it names the wallet that sent the external, so it cannot bleed
+  // onto the new one, and switching back inside the horizon must still find its activation protected.
   markNavVaultBalancePending('wallet changed', {
     resetRetry: true,
     retry: true,
@@ -22771,6 +23000,8 @@ async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
     keyRecord: localVaultDraft.message, value: KEYSHARD_REGISTER_VALUE,
   });
   plathoAccountActivationPending = true;
+  // ...and written down, so a reload inside the settling window does not offer to pay the fee a second time.
+  rememberPlathoActivationInFlight(ownerWallet);
   vaultDraftStatus.textContent = t('vault.activationSent');
   queueVaultPostTransactionRefresh({ pollActivation: true });
   return result;
@@ -25373,11 +25604,16 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
     .catch(() => {});
 }
 
+// The install state changes in exactly two places, and BOTH are event handlers — they can only fire after this
+// module has finished evaluating, which is why the quick-start step refresh is safe here and not inside
+// refreshInstallButtons (see the note there: that one also runs at top level, where the wizard's state is still in
+// its temporal dead zone). The step is what the user is looking at when a sheet becomes available mid-onboarding.
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
   installedRelatedPwaDetected = false;
   refreshInstallButtons();
+  refreshQuickStartInstallStep();
   openInstallDialogIfUseful();
 });
 window.addEventListener('appinstalled', () => {
@@ -25386,6 +25622,7 @@ window.addEventListener('appinstalled', () => {
   markInstallPromptDismissed();
   closeInstallDialog({ dismissed: false });
   refreshInstallButtons();
+  refreshQuickStartInstallStep();
 });
 window.matchMedia?.('(display-mode: standalone)')?.addEventListener?.('change', refreshInstallButtons);
 refreshInstallButtons();
@@ -25716,23 +25953,31 @@ function quickStartActivationUnderfunded() {
   return bal !== null && bal < plathoAccountActivationFeeNanotons();
 }
 
-/**
- * Anything that makes activation impossible RIGHT NOW, so the step can say so instead of offering a button.
- *
- * [MEASURED 2026-08-10] A locked wallet was the case nobody had covered: activation signs from the wallet, and
- * locking clears localVaultDraft, so submitKeyShardRegisterDirect() threw 'Local messaging key draft is not ready'
- * on its very first line. The user saw "could not complete — you can skip and do this later", which names the
- * wrong problem and sends them away from one they could fix in seconds. The owner hit exactly this: the wallet
- * auto-locked mid-onboarding, he dismissed the password dialog, and the step came back looking normal.
- */
-function quickStartActivationBlocked() {
-  return !plathoWallet || quickStartActivationUnderfunded();
-}
+// The activation-is-impossible predicate lived here and is GONE with its only caller: the footer label used to fork
+// on it ("Done" when activation could not run, "Continue" when it could) because this was the last step. Installing
+// the app is the last step now, so the footer is plainly Next and the fork had nothing left to decide. The two
+// states it combined are still read INSIDE applyGate, where they say which of the plate and the hint is on screen:
+//
+//   locked      — [MEASURED 2026-08-10] activation signs from the wallet, and locking clears localVaultDraft, so
+//                 submitKeyShardRegisterDirect() threw on its first line and the user was told "could not complete,
+//                 you can skip this" — the wrong problem, and it walks them away from a five-second fix.
+//   underfunded — a button that is going to refuse reads as broken, which is the complaint that started this pass.
 
+// CONFIRMED BY THE CHAIN, never by the broadcast. [OWNER 2026-08-13] The step reported "Done" the instant the
+// external was accepted, and the Profile tab — which reads the shard — went on offering activation. Two surfaces
+// disagreeing about one account, both seen within a minute. The transaction did land later, so this is not a lost
+// send; it is the app stating a settled fact it had not read. Same rule the public lane was cured of this week.
 let quickStartActivationDone = false;
+// Sent and not yet settled. Hides the plate (re-pressing pays the fee twice) without claiming the account is active.
+let quickStartActivationInFlight = false;
+// Every rebuild of this step invalidates the confirmation wait belonging to the previous one, so a loop that
+// outlives its body — the user went back a step, closed the wizard, or the wallet auto-locked — writes nothing.
+let quickStartActivationGeneration = 0;
 
 function buildQuickStartActivateBody() {
+  quickStartActivationGeneration += 1;
   quickStartActivationDone = false;
+  quickStartActivationInFlight = plathoActivationInFlightForCurrentWallet();
   // [OWNER 2026-08-10] TWO states, not one screen with four buttons.
   //
   //   funded  -> the balance line and ONE full-width "Activate account" plate. Footer: Back + Continue.
@@ -25753,20 +25998,32 @@ function buildQuickStartActivateBody() {
   activate.className = 'discovery-cta-action quick-start-key-cta';
   activate.textContent = t('quickstart.activateAction');
   activate.addEventListener('click', async () => {
+    const generation = quickStartActivationGeneration;
+    const mine = () => generation === quickStartActivationGeneration;
     activate.disabled = true;
     setText(quickStartStepStatus, t('quickstart.working'));
     try {
-      await submitVaultRegisterMessagingKeys({ preConfirmed: true });
-      // [OWNER 2026-08-10] The plate stayed live after a successful activation, offering to do again a thing that
-      // costs GRAM and is already done. applyGate re-reads this, so a later balance refresh cannot bring it back.
-      quickStartActivationDone = true;
-      applyGate();
-      setText(quickStartStepStatus, t('quickstart.done'));
+      const published = await submitVaultRegisterMessagingKeys({ preConfirmed: true });
+      if (!mine()) return;
+      // A null result means the shard ALREADY holds these keys and nothing was sent. Both paths fall through to the
+      // same chain read below — "nothing to do" and "sent" differ only in what the step says while it waits.
+      if (published !== null) {
+        // [OWNER 2026-08-10] The plate stayed live after a successful activation, offering to do again a thing that
+        // costs GRAM and is already done. applyGate re-reads this, so a later balance refresh cannot bring it back.
+        quickStartActivationInFlight = true;
+        applyGate();
+        setText(quickStartStepStatus, t('quickstart.activationSent'));
+      }
+      await confirmActivation(generation);
     } catch (error) {
       console.error(error);
+      if (!mine()) return;
+      // The send itself failed — nothing is in flight, so the plate comes back for a retry.
+      quickStartActivationInFlight = false;
+      applyGate();
       setText(quickStartStepStatus, t('quickstart.couldNotCompleteLater'));
     } finally {
-      activate.disabled = false;
+      if (mine()) activate.disabled = false;
     }
   });
   const applyGate = () => {
@@ -25780,18 +26037,41 @@ function buildQuickStartActivateBody() {
     const locked = !plathoWallet;
     const underfunded = quickStartActivationUnderfunded();
     const done = quickStartActivationDone || hasActivePlathoAccount();
+    const inFlight = quickStartActivationInFlight && !done;
     const blocked = locked || underfunded;
-    activate.hidden = blocked || done;
-    hint.hidden = !blocked || done;
-    hint.textContent = locked ? t('quickstart.unlockToActivate') : (underfunded ? t('quickstart.notEnoughGramHint') : '');
-    hint.classList.toggle('is-error', blocked);
-    // The footer label follows the same fork (Continue when there is still something to do here, Done when there
-    // is not). Safe to set from here only because applyGate also runs AFTER the balance read resolves —
-    // renderQuickStartStep runs body() first and would overwrite this initial pass with the same value anyway.
-    if (quickStartActionButton) {
-      quickStartActionButton.disabled = false;
-      quickStartActionButton.textContent = blocked && !done ? t('common.done') : t('common.next');
+    // The plate disappears once the fee is COMMITTED — settled or merely sent. Offering it during the settling
+    // window is offering to pay a second time for one registration.
+    activate.hidden = blocked || done || inFlight;
+    hint.hidden = done || !(blocked || inFlight);
+    hint.textContent = inFlight
+      ? t('quickstart.activationSentHint')
+      : locked
+      ? t('quickstart.unlockToActivate')
+      : underfunded
+      ? t('quickstart.notEnoughGramHint')
+      : '';
+    // Waiting is not an error: nothing has gone wrong, so the line stays in the ordinary tone.
+    hint.classList.toggle('is-error', blocked && !inFlight);
+    // The footer label is NOT set from here any more. This step no longer ends the wizard — installing the app
+    // does — so it is plainly "Next", which the step's own action() already says on every render.
+  };
+  // Watch the chain until this wallet's keys are registered, then — and only then — call it done. Shared by the
+  // press and by a step that is REBUILT inside the settling window, so both surfaces resolve the same way.
+  const confirmActivation = async (generation) => {
+    const mine = () => generation === quickStartActivationGeneration;
+    const confirmed = await waitForPlathoAccountActivation(mine);
+    if (!mine()) return;
+    if (confirmed) {
+      quickStartActivationDone = true;
+      quickStartActivationInFlight = false;
+      applyGate();
+      setText(quickStartStepStatus, t('quickstart.activationConfirmed'));
+      return;
     }
+    // Past the horizon and still not on chain. NOT a failure and NOT a reason to offer the plate again: the
+    // external is out there, the Profile tab keeps watching, and the wizard says exactly that.
+    applyGate();
+    setText(quickStartStepStatus, t('quickstart.activationStillConfirming'));
   };
   const refresh = async () => {
     await quickStartRefreshWalletBalanceRaw();
@@ -25799,6 +26079,13 @@ function buildQuickStartActivateBody() {
   };
   applyGate();
   refresh();
+  // Rebuilt INTO the settling window — a reload, a language switch, or walking back to this step while an external
+  // is still on its way. Nothing else is watching for this step (the previous body's wait died with its
+  // generation), so it would sit on "sent, confirming" until some unrelated background refresh happened to land.
+  if (quickStartActivationInFlight) {
+    setText(quickStartStepStatus, t('quickstart.activationSent'));
+    void confirmActivation(quickStartActivationGeneration);
+  }
   wrap.append(summary, hint, activate);
   return wrap;
 }
@@ -25877,6 +26164,99 @@ function quickStartCreateWalletPassword() {
   }
   if (password !== confirmPassword) return { error: t('wallet.passwordsDoNotMatch') };
   return { password };
+}
+
+// ── INSTALL, AS A STEP RATHER THAN AN AFTERTHOUGHT ────────────────────────────────────────────────────────────
+//
+// [OWNER 2026-08-13] "the last step offered to install the app. That part is fine, but the last step is a modal,
+// not in the wizard's style. Fold it into the wizard's steps and dress it properly. And the step before it should
+// say Next, not Finish." Exactly: the wizard finished, and a modal in a different visual language arrived on top of
+// it to ask for one more thing. So the ask moves INTO the wizard as its final step — same header, same counter,
+// same footer — and the modal is dropped for anyone who saw the step (dropDeferredInstallPrompt).
+//
+// The copy comes from installCopyForState, the same definition the modal reads, so the two can never drift.
+let quickStartInstallStepShown = false;
+// Set while the step's own button is driving the browser's install sheet. refreshInstallButtons fires during that
+// (the deferred event is spent the moment it is used), and re-rendering the step would pull the button out from
+// under the tap that is still running.
+let quickStartInstallPromptRunning = false;
+
+function quickStartInstallCopy() {
+  return installCopyForState();
+}
+
+/** Repaint the install step when the browser's install sheet becomes available — or stops being. */
+function refreshQuickStartInstallStep() {
+  if (quickStartInstallPromptRunning) return;
+  if (!quickStartStepsView || quickStartStepsView.hidden) return;
+  const step = QUICK_START_STEPS[quickStartStepIndex];
+  // A step that has just become inapplicable (the app went standalone mid-step) is LEFT on screen: the footer's
+  // Done still ends the wizard, which is the right ending, whereas re-running the skip logic would jump the user.
+  if (step?.key !== 'install' || step.skip?.()) return;
+  renderQuickStartStep({ skipCompleted: false });
+}
+
+function buildQuickStartInstallBody() {
+  quickStartInstallStepShown = true;
+  const copy = quickStartInstallCopy();
+  const wrap = document.createElement('div');
+  wrap.className = 'quick-start-key-body';
+  const lead = document.createElement('div');
+  lead.className = 'quick-start-step-hint';
+  lead.textContent = copy.lead;
+  wrap.append(lead);
+  // ONE state has a button behind it: 'prompt', where the browser is holding an install sheet this tap can open.
+  // The others are instructions — there is nothing to press, and a plate whose only effect was to reopen a modal
+  // repeating these very words is the duplication this step exists to remove.
+  if (copy.state === 'prompt') {
+    const install = document.createElement('button');
+    install.type = 'button';
+    install.className = 'discovery-cta-action quick-start-key-cta';
+    install.textContent = copy.action;
+    install.addEventListener('click', async () => {
+      install.disabled = true;
+      quickStartInstallPromptRunning = true;
+      setText(quickStartStepStatus, t('quickstart.working'));
+      let message = '';
+      try {
+        const accepted = await firePendingInstallPrompt();
+        // Declining is a DECISION, not a failure — the step is optional and Platho runs perfectly in a tab.
+        message = accepted === true ? t('quickstart.installStarted') : t('quickstart.installNotNow');
+      } catch (error) {
+        console.error(error);
+        message = t('quickstart.installUseBrowserMenu');
+      } finally {
+        quickStartInstallPromptRunning = false;
+        install.disabled = false;
+        // REPAINT FIRST, then speak. The sheet has been spent, so the step must fall back to its instructions —
+        // and renderQuickStartStep blanks the status line on the way, which silently ate this message when it was
+        // written before the repaint. [MEASURED 2026-08-13 in the preview: the tap left an empty status line.]
+        refreshQuickStartInstallStep();
+        setText(quickStartStepStatus, message);
+      }
+    });
+    wrap.append(install);
+  }
+  if (copy.steps.length > 0) {
+    const list = document.createElement('ol');
+    list.className = 'install-steps';
+    for (const text of copy.steps) {
+      const item = document.createElement('li');
+      item.textContent = text;
+      list.append(item);
+    }
+    wrap.append(list);
+  }
+  const summary = document.createElement('div');
+  summary.className = 'quick-start-step-summary';
+  for (const line of [copy.body, copy.help]) {
+    if (!line) continue;
+    const row = document.createElement('div');
+    row.textContent = line;
+    summary.append(row);
+  }
+  wrap.append(summary);
+  return wrap;
 }
 
 const QUICK_START_STEPS = [
@@ -25962,29 +26342,51 @@ const QUICK_START_STEPS = [
   {
     key: 'activate',
     title: () => t('quickstart.activateTitle'),
-    // Last step, so this button ends the stepper either way — but it says WHY it is ending. "Continue" while
-    // there is still an activation to run here, "Done" when the wallet is short and the only honest next move is
-    // to come back later from the Profile tab.
-    action: () => (quickStartActivationBlocked() ? t('common.done') : t('common.next')),
+    // [OWNER 2026-08-13] Plainly "Next". This used to be the last step and said "Done", which is why the install
+    // invitation had to arrive afterwards as a modal in nobody's style; now installing IS the last step and this
+    // one only moves on, whether the activation ran, is settling, or has to wait for funds.
+    action: () => t('common.next'),
     optional: true,
     why: () => t('quickstart.activateWhy'),
     autoDone: () => hasActivePlathoAccount(),
     body: () => buildQuickStartActivateBody(),
-    // Activation itself is the plate in the body; the footer only closes the wizard.
+    // Activation itself is the plate in the body; the footer only moves on.
+    run: async () => true,
+  },
+  {
+    key: 'install',
+    title: () => quickStartInstallCopy().title,
+    action: () => t('common.done'),
+    optional: true,
+    why: () => t('quickstart.installWhy'),
+    autoDone: () => false,
+    // Nothing to offer: inside Telegram the PWA is meaningless, and an app already running standalone is already
+    // installed. `skip` (not `autoDone`) because this is about the DEVICE, not about work the user has finished —
+    // and unlike a satisfied step it must be stepped over going backwards too.
+    skip: () => isTelegramEnv() || isStandaloneApp(),
+    body: () => buildQuickStartInstallBody(),
     run: async () => true,
   },
 ];
 
 let quickStartStepIndex = 0;
 
+// The steps that exist ON THIS DEVICE. A skipped step must not leave a dot nobody can reach or make the counter
+// promise a sixth screen that never arrives — the count the user is shown has to be the count they will walk.
+function applicableQuickStartSteps() {
+  return QUICK_START_STEPS.filter((step) => !step.skip?.());
+}
+
 function renderQuickStartProgress() {
   if (!quickStartProgress) return;
   quickStartProgress.innerHTML = '';
-  QUICK_START_STEPS.forEach((_, i) => {
+  const applicable = applicableQuickStartSteps();
+  const currentIndex = applicable.indexOf(QUICK_START_STEPS[quickStartStepIndex]);
+  applicable.forEach((_, i) => {
     const dot = document.createElement('span');
     dot.className = 'quick-start-progress-dot';
-    if (i < quickStartStepIndex) dot.classList.add('is-done');
-    else if (i === quickStartStepIndex) dot.classList.add('is-current');
+    if (currentIndex >= 0 && i < currentIndex) dot.classList.add('is-done');
+    else if (i === currentIndex) dot.classList.add('is-current');
     quickStartProgress.appendChild(dot);
   });
 }
@@ -25996,9 +26398,19 @@ function renderQuickStartStep({ skipCompleted = true } = {}) {
   // moving forward. [OWNER 2026-08-10] Back looked dead on the key step: it did fire and the index did
   // move, onto step 1 (create wallet), whose autoDone() is true by then — which advanced straight forward again,
   // so nothing ever appeared to happen. Going back is a request to LOOK at a step, not to complete it.
+  // A step that does not apply to THIS DEVICE at all — the install step inside Telegram, or in an app already
+  // running standalone — is stepped over in BOTH directions. That is what separates skip() from autoDone(): a
+  // satisfied step is worth looking back at, a step that was never on this device's path is not.
+  if (step.skip?.()) {
+    if (skipCompleted) { quickStartAdvance(); return; }
+    if (quickStartStepIndex > 0) { quickStartStepIndex -= 1; renderQuickStartStep({ skipCompleted: false }); return; }
+    finishQuickStart();
+    return;
+  }
   if (skipCompleted && !step.optional && step.autoDone()) { quickStartAdvance(); return; }
   renderQuickStartProgress();
-  setText(quickStartStepCounter, t('quickstart.stepCounter', { n: quickStartStepIndex + 1, total: QUICK_START_STEPS.length }));
+  const applicable = applicableQuickStartSteps();
+  setText(quickStartStepCounter, t('quickstart.stepCounter', { n: applicable.indexOf(step) + 1, total: applicable.length }));
   // title/why/action are FUNCTIONS, resolved on every render. [MEASURED 2026-08-10] They used to be plain strings
   // built once when the module loaded, so `t()` had already run: switching language from the picker inside this very
   // dialog re-translated the static heading and left the step's own title, explanation and button in the old
@@ -26036,7 +26448,12 @@ function closeQuickStart() {
   flushPendingActivationWelcome();
   // ...and only THEN the install card. If the line above just opened the welcome, this defers again and fires when
   // that closes — which is the order the owner asked for: "activated" first, "install Platho" after.
-  offerDeferredInstallPrompt();
+  //
+  // Unless the wizard ALREADY asked. The install invitation is now a step of its own, so releasing the modal here
+  // would put the same question on screen twice, the second time in the style the owner objected to.
+  if (quickStartInstallStepShown) dropDeferredInstallPrompt();
+  else offerDeferredInstallPrompt();
+  quickStartInstallStepShown = false;
   if (!quickStartBackupMode) {
     // Explicit dismissal (X / Skip-out): stop onboarding for good AND drop the in-progress resume marker.
     try { globalThis.localStorage?.setItem(QUICK_START_DISMISSED_KEY, '1'); } catch { /* ignore */ }

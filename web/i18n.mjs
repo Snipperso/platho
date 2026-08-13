@@ -1,7 +1,7 @@
 // Platho i18n engine. All translated CONTENT lives in i18n-strings.mjs (the single file allowed to carry
 // non-English text — see OPSEC-LOCALE-01: every locale ships with identical key coverage, so no dictionary
 // stands out); this module is pure logic and must stay English-only.
-import { I18N_STRINGS, I18N_LOCALES } from './i18n-strings.mjs?v=70';
+import { I18N_STRINGS, I18N_LOCALES } from './i18n-strings.mjs?v=72';
 
 const I18N_STORAGE_KEY = 'platho.locale.v1';
 const DEFAULT_LOCALE = 'en';

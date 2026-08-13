@@ -52,23 +52,24 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/if \(!preConfirmed\) \{[\s\S]{0,260}?confirmPlathoAccountActivation/);
     expect(app).toMatch(/if \(needsKeyBackup\) \{ await downloadEncryptedWalletKeyBackup\(\); \}/);
     // The fork itself: exactly one of the plate and the explanation is on screen.
-    expect(activateBody).toMatch(/activate\.hidden = blocked \|\| done;/);
     // [OWNER 2026-08-10] A THIRD reason to hide it: already activated. The plate stayed live after success,
     // offering to repeat a thing that costs GRAM. applyGate re-reads the flag, so a later balance refresh
-    // cannot resurrect it.
+    // cannot resurrect it. [OWNER 2026-08-13] And a FOURTH: sent-but-not-yet-settled — see QS-ACTIVATE-CHAIN.
+    expect(activateBody).toMatch(/activate\.hidden = blocked \|\| done \|\| inFlight;/);
     expect(activateBody).toMatch(/const done = quickStartActivationDone \|\| hasActivePlathoAccount\(\);/);
-    expect(activateBody).toMatch(/quickStartActivationDone = true;\s*applyGate\(\);/);
-    expect(activateBody).toMatch(/hint\.hidden = !blocked \|\| done;/);
+    expect(activateBody).toMatch(/hint\.hidden = done \|\| !\(blocked \|\| inFlight\);/);
     // [MEASURED 2026-08-10, owner's report] A LOCKED wallet is the third state, and it used to be invisible: the
     // plate showed, the click reached submitKeyShardRegisterDirect, and that throws on its first line because
     // locking clears localVaultDraft. What the user saw was "could not complete — you can skip and do this later",
     // which names the wrong problem and walks them away from a five-second fix. Locked outranks underfunded.
     expect(activateBody).toMatch(/const locked = !plathoWallet;/);
     expect(activateBody).toMatch(/const blocked = locked \|\| underfunded;/);
-    expect(activateBody).toMatch(/hint\.textContent = locked \? t\('quickstart\.unlockToActivate'\)/);
+    expect(activateBody).toMatch(/\? t\('quickstart\.unlockToActivate'\)/);
     expect(I18N_STRINGS.en['quickstart.unlockToActivate']).toMatch(/locked/i);
-    expect(app).toMatch(/function quickStartActivationBlocked\(\)/);
-    expect(app).toMatch(/return !plathoWallet \|\| quickStartActivationUnderfunded\(\);/);
+    // [OWNER 2026-08-13] quickStartActivationBlocked is DELETED with its only caller — the footer fork. Installing
+    // the app is the last step now, so this footer is plainly Next and had nothing left to decide. A predicate kept
+    // "just in case" is the kind of thing a later edit re-wires into a decision it was never checked for.
+    expect(app, 'the retired footer predicate must be gone, not merely unused').not.toMatch(/quickStartActivationBlocked/);
     // Unlocking while the step is open must refresh it, or the fix would not show until a manual re-entry.
     expect(app).toMatch(/function maybeResumeQuickStartAfterUnlock\(\)[\s\S]{0,400}?quickStartRefreshCurrentBalanceStep\(\);/);
     // Both retired controls are GONE, not merely hidden — "Back to top up" duplicated the footer's Back, and
@@ -80,10 +81,10 @@ describe('quick-start resume + activation gate guard', () => {
     // The underfunded copy names where to finish the job, and that place must be the tab the row now lives on.
     expect(I18N_STRINGS.en['quickstart.notEnoughGramHint']).toMatch(/Profile tab/);
     expect(I18N_STRINGS.en['quickstart.notEnoughGramHint']).toMatch(/Activate Platho account/);
-    // The footer says which of the two states it is ending, and never blocks — nothing here can fail any more.
-    const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf('let quickStartStepIndex = 0;'));
+    // The footer only moves on, and never blocks — nothing here can fail any more.
+    const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf("key: 'install'"));
     expect(activateStep.length, 'the activate step slice must not collapse').toBeGreaterThan(300);
-    expect(activateStep).toMatch(/action: \(\) => \(quickStartActivationBlocked\(\) \? t\('common\.done'\) : t\('common\.next'\)\)/);
+    expect(activateStep).toMatch(/action: \(\) => t\('common\.next'\),/);
     expect(activateStep).toMatch(/run: async \(\) => true,/);
     expect(activateStep, 'the doomed-activation guidance string went with the gate').not.toMatch(/notEnoughToActivate/);
     expect(I18N_STRINGS.en['quickstart.notEnoughToActivate']).toBeUndefined();
@@ -116,7 +117,9 @@ describe('quick-start resume + activation gate guard', () => {
       const lazy = (table.match(new RegExp(`\\n    ${field}: \\(\\) =>`, 'g')) ?? []).length;
       const eager = (table.match(new RegExp(`\\n    ${field}: t\\(`, 'g')) ?? []).length;
       expect(eager, `${field} must never be resolved at module load`).toBe(0);
-      expect(lazy, `every step must supply ${field} lazily`).toBe(5);
+      // SIX steps since 2026-08-13 — installing the app became the last one. Counting rather than sampling is the
+      // point: a new step that forgets a lazy field would otherwise ship a label frozen in the boot language.
+      expect(lazy, `every step must supply ${field} lazily`).toBe(6);
     }
     // (c) [OWNER 2026-08-10] "a modal on top of a modal". Step 1 IS the password form now — no dialog opens over
     // the wizard at all. Two earlier attempts moved the stack around instead of removing it: auto-firing the prompt
@@ -220,10 +223,192 @@ describe('quick-start resume + activation gate guard', () => {
     // welcome FIRST, so if that opens, this defers again and fires when the welcome closes — which is the order
     // the owner asked for: "activated" first, "install Platho" after.
     expect(app).toMatch(/function closeActivationWelcomeDialog\(\) \{[\s\S]{0,240}?offerDeferredInstallPrompt\(\);/);
-    expect(app).toMatch(/flushPendingActivationWelcome\(\);[\s\S]{0,300}?offerDeferredInstallPrompt\(\);/);
-    const closeQs = app.slice(app.indexOf('function closeQuickStart()'), app.indexOf('function closeQuickStart()') + 900);
+    const closeQs = app.slice(app.indexOf('function closeQuickStart()'), app.indexOf('function finishQuickStart()'));
+    expect(closeQs.length, 'the close-handler slice must not collapse').toBeGreaterThan(400);
     expect(closeQs.indexOf('flushPendingActivationWelcome()'), 'the welcome must be released before the invitation')
       .toBeLessThan(closeQs.indexOf('offerDeferredInstallPrompt()'));
+    // [OWNER 2026-08-13] ...unless the wizard already asked, because installing is now a STEP. Releasing the modal
+    // as well would put the same question on screen twice, the second time in the style he objected to. Dropped,
+    // not merely skipped: a deferred flag left standing would fire at the next dialog close instead.
+    expect(closeQs).toMatch(/if \(quickStartInstallStepShown\) dropDeferredInstallPrompt\(\);\s*else offerDeferredInstallPrompt\(\);/);
+    expect(app).toMatch(/function dropDeferredInstallPrompt\(\) \{\s*installPromptDeferred = false;\s*\}/);
+    // Counter-case: the flag must be armed by the step actually RENDERING, not by the step merely existing — a
+    // wizard that skipped the install step (Telegram, already standalone) has asked nothing and must still release.
+    expect(app).toMatch(/function buildQuickStartInstallBody\(\) \{\s*quickStartInstallStepShown = true;/);
+    expect(closeQs).toMatch(/quickStartInstallStepShown = false;/);
+  });
+
+  it('QS-ACTIVATE-CHAIN: the wizard says "done" only when the CHAIN says so', () => {
+    // [OWNER 2026-08-13] "Я нажал, потом увидел 'Готово'. Но когда в итоге завершил квикстарт, то на балансе был
+    // 1 грам и предложение активировать аккаунт в профиле." — and then, minutes later, "мне сообщает приложение,
+    // что акк активирован и баланс уменьшился."
+    //
+    // So the external was NOT lost: it landed. What was wrong is that the step reported a settled fact it had never
+    // read, while the Profile tab — which does read the shard — went on offering activation. Two surfaces
+    // disagreeing about one account. Same rule the public lane was cured of this week: green means the chain.
+    const activateBody = app.slice(
+      app.indexOf('function buildQuickStartActivateBody()'),
+      app.indexOf('function buildQuickStartBackupBody'),
+    );
+    expect(activateBody.length, 'the slice must not collapse or run away').toBeGreaterThan(800);
+    // (a) The ONLY assignment of the done flag is guarded by a confirmed chain read.
+    expect(activateBody).toMatch(/const confirmed = await waitForPlathoAccountActivation\(mine\);/);
+    expect(activateBody).toMatch(/if \(confirmed\) \{\s*quickStartActivationDone = true;/);
+    expect(
+      (activateBody.match(/quickStartActivationDone = true/g) ?? []).length,
+      'exactly one place may declare the activation done',
+    ).toBe(1);
+    // Counter-case: it must NOT be set from the mere return of the submit, which is what shipped.
+    expect(activateBody, 'a broadcast is not a confirmation')
+      .not.toMatch(/await submitVaultRegisterMessagingKeys\([^)]*\);\s*quickStartActivationDone = true/);
+    // (b) The three outcomes are three DIFFERENT sentences. "Sent, confirming" is not "done", and running past the
+    // horizon is not a failure — the external is still out there.
+    for (const key of ['quickstart.activationSent', 'quickstart.activationSentHint',
+      'quickstart.activationConfirmed', 'quickstart.activationStillConfirming']) {
+      expect(Object.keys(I18N_STRINGS).every((code) => Boolean(I18N_STRINGS[code][key])), `${key} in every locale`).toBe(true);
+    }
+    expect(activateBody).toMatch(/t\('quickstart\.activationSent'\)/);
+    expect(activateBody).toMatch(/t\('quickstart\.activationConfirmed'\)/);
+    expect(activateBody).toMatch(/t\('quickstart\.activationStillConfirming'\)/);
+    // (c) The waiter polls the shard rather than sleeping and hoping, treats a failed read as "learned nothing",
+    // and its ladder sums to the SAME horizon the in-flight marker expires on — one horizon, not three guesses.
+    const waiter = app.slice(
+      app.indexOf('async function waitForPlathoAccountActivation('),
+      app.indexOf('function plathoAccountActivationFeeNanotons('),
+    );
+    expect(waiter.length, 'the waiter slice must not collapse').toBeGreaterThan(200);
+    expect(waiter).toMatch(/await refreshVaultActivationStatus\(\);/);
+    expect(waiter).toMatch(/if \(hasActivePlathoAccount\(\)\) return true;/);
+    const delays = /const PLATHO_ACTIVATION_CONFIRM_DELAYS_MS = \[([^\]]+)\]/.exec(app)?.[1] ?? '';
+    const total = delays.split(',').map((n) => Number(n.replace(/_/g, '').trim())).reduce((a, b) => a + b, 0);
+    const ttl = Number(/const PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS = ([0-9_]+)/.exec(app)?.[1].replace(/_/g, '') ?? 0);
+    expect(total, 'the poll ladder and the in-flight horizon must be the same number').toBe(ttl);
+    // (d) A RELOAD inside that window must not re-offer a registration that is already paid for and in flight —
+    // pressing it again is a second fee for one registration. The in-memory flag alone could not survive a reload.
+    expect(app).toMatch(/rememberPlathoActivationInFlight\(ownerWallet\);/);
+    expect(app).toMatch(/const activationInFlight = plathoAccountActivationPending \|\| plathoActivationInFlightForCurrentWallet\(\);/);
+    // Wallet-scoped, so it can never lock a DIFFERENT wallet out of activating.
+    const inFlight = app.slice(
+      app.indexOf('function plathoActivationInFlightForCurrentWallet()'),
+      app.indexOf('const PLATHO_ACTIVATION_CONFIRM_DELAYS_MS'),
+    );
+    expect(inFlight).toMatch(/if \(!record \|\| record\.wallet !== raw\) return false;/);
+    expect(inFlight).toMatch(/PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS/);
+    // ...and released the moment the chain confirms, so it can never outlive what it is standing in for.
+    expect(app).toMatch(/if \(accountActive\) \{ plathoAccountActivationPending = false; forgetPlathoActivationInFlight\(\); \}/);
+    // (e) A wait belonging to a step the user has left writes nothing.
+    expect(activateBody).toMatch(/const generation = quickStartActivationGeneration;/);
+    expect(activateBody).toMatch(/const mine = \(\) => generation === quickStartActivationGeneration;/);
+    expect(app).toMatch(/function buildQuickStartActivateBody\(\) \{\s*quickStartActivationGeneration \+= 1;/);
+
+    // (f) A step REBUILT inside the settling window watches too. The previous body's wait died with its
+    // generation, so without this the step would sit on "sent, confirming" until an unrelated background refresh
+    // happened to land — the same "waiting for something that is not running" shape as the original bug.
+    expect(activateBody).toMatch(/quickStartActivationInFlight = plathoActivationInFlightForCurrentWallet\(\);/);
+    expect(activateBody).toMatch(/if \(quickStartActivationInFlight\) \{\s*setText\(quickStartStepStatus, t\('quickstart\.activationSent'\)\);\s*void confirmActivation\(quickStartActivationGeneration\);/);
+    // ONE resolver, both entries — press and rebuild must not drift into two ideas of what "confirmed" means.
+    expect(
+      (activateBody.match(/await waitForPlathoAccountActivation\(/g) ?? []).length,
+      'one waiter, shared by the press and the rebuild',
+    ).toBe(1);
+    // The status is set BEFORE the async watcher starts, and renderQuickStartStep blanks the status line before it
+    // calls body() — so a line written here survives, unlike one written after the render.
+    const render = app.slice(app.indexOf('function renderQuickStartStep({'), app.indexOf('function quickStartAdvance()'));
+    expect(
+      render.indexOf("setText(quickStartStepStatus, '')"),
+      'the status must be cleared BEFORE the body is built, or the body could never leave a message',
+    ).toBeLessThan(render.indexOf('const body = step.body();'));
+  });
+
+  it('QS-INSTALL-STEP: installing is a STEP, in the wizard\'s own clothes, and it can be absent', () => {
+    // [OWNER 2026-08-13] "последним шагом мне предложили установить приложение. Тут всё оке, но сам последний шаг —
+    // модалка не в стиле квикстарта. Надо бы её включить в шаги квикстарта и оформить как положено. Ну и предыдущий
+    // шаг получается не 'завершить', а 'Далее'."
+    const installStep = app.slice(app.indexOf("key: 'install'"), app.indexOf('let quickStartStepIndex = 0;'));
+    expect(installStep.length, 'the install step slice must not collapse').toBeGreaterThan(200);
+    expect(installStep).toMatch(/action: \(\) => t\('common\.done'\),/);
+    expect(installStep).toMatch(/body: \(\) => buildQuickStartInstallBody\(\),/);
+    // It carries no work of its own to fail at, exactly like the top-up and activate steps before it.
+    expect(installStep).toMatch(/run: async \(\) => true,/);
+
+    // (a) ONE definition of the copy, two readers. A second surface writing its own wording is how two screens
+    // start disagreeing about what "install" even means on this device.
+    expect(app).toMatch(/function installCopyForState\(state = installActionState\(\)\)/);
+    const refresh = app.slice(app.indexOf('function refreshInstallButtons()'), app.indexOf('function installPromptDismissed()'));
+    expect(refresh.length, 'the refresh slice must not collapse').toBeGreaterThan(300);
+    expect(refresh).toMatch(/const copy = installCopyForState\(\);/);
+    expect(refresh, 'the modal must not restate the copy it now shares').not.toMatch(/t\('install\.leadIos'\)/);
+    const body = app.slice(app.indexOf('function buildQuickStartInstallBody()'), app.indexOf('const QUICK_START_STEPS = ['));
+    expect(body.length, 'the install-body slice must not collapse').toBeGreaterThan(400);
+    expect(body).toMatch(/const copy = quickStartInstallCopy\(\);/);
+    expect(body, 'the step must not restate the copy either').not.toMatch(/t\('install\.body/);
+    // ...in the wizard's own classes, which is the whole complaint.
+    expect(body).toMatch(/wrap\.className = 'quick-start-key-body';/);
+    expect(body).toMatch(/install\.className = 'discovery-cta-action quick-start-key-cta';/);
+
+    // (b) A button ONLY where there is something to press. The other states are instructions, and a plate whose
+    // only effect was to reopen a modal repeating these very words is the duplication being removed.
+    expect(body).toMatch(/if \(copy\.state === 'prompt'\) \{/);
+    expect(body, 'the step must never open the modal it replaced').not.toMatch(/installDialog|promptInstallApp/);
+    // The deferred event is single-use: ONE function spends it, or the second reader finds it gone.
+    expect(app).toMatch(/async function firePendingInstallPrompt\(\)/);
+    expect(
+      (app.match(/deferredInstallPrompt = null/g) ?? []).length,
+      'the declaration, firePendingInstallPrompt and the appinstalled handler — nobody else may clear it',
+    ).toBe(3);
+    expect(app).toMatch(/async function promptInstallApp\(\)[\s\S]{0,900}?await firePendingInstallPrompt\(\);/);
+
+    // (c) It can be ABSENT. Inside Telegram the PWA is meaningless and an app already running standalone is
+    // already installed — skip(), not autoDone(), because this is about the device, not about finished work.
+    expect(installStep).toMatch(/skip: \(\) => isTelegramEnv\(\) \|\| isStandaloneApp\(\),/);
+    expect(app).toMatch(/if \(step\.skip\?\.\(\)\) \{/);
+    // Stepped over in BOTH directions — a satisfied step is worth looking back at, a step that was never on this
+    // device's path is not, and Back would otherwise land on a screen with nothing in it.
+    const render = app.slice(app.indexOf('function renderQuickStartStep({'), app.indexOf('function quickStartAdvance()'));
+    expect(render).toMatch(/if \(skipCompleted\) \{ quickStartAdvance\(\); return; \}/);
+    expect(render).toMatch(/if \(quickStartStepIndex > 0\) \{ quickStartStepIndex -= 1; renderQuickStartStep\(\{ skipCompleted: false \}\); return; \}/);
+    // ...and the counter counts what the user will actually walk, not what the array happens to hold.
+    expect(app).toMatch(/function applicableQuickStartSteps\(\)/);
+    expect(render).toMatch(/n: applicable\.indexOf\(step\) \+ 1, total: applicable\.length/);
+    expect(render, 'a skipped step must not be counted').not.toMatch(/total: QUICK_START_STEPS\.length/);
+
+    // (e) THE BOOT ORDER. refreshInstallButtons runs at MODULE TOP LEVEL, and every piece of quick-start state is
+    // declared hundreds of lines below it. Reading a let/const before its declaration is a TDZ ReferenceError at
+    // top level — which aborts the whole script, so the app does not boot at all. Caught here before it shipped
+    // (2026-08-13); the step refresh belongs on the two EVENTS, which can only fire after evaluation.
+    const bootCall = app.indexOf('\nrefreshInstallButtons();');
+    const stepState = app.indexOf('let quickStartInstallPromptRunning');
+    expect(bootCall, 'the bootstrap call must exist').toBeGreaterThan(-1);
+    expect(stepState, 'the step state must exist').toBeGreaterThan(bootCall);
+    // Comments stripped: the note explaining WHY it must not names the very identifiers it must not read.
+    const refreshCode = refresh.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+    expect(refreshCode, 'the top-level refresher must not touch quick-start state').not.toMatch(/quickStart/);
+    for (const handler of ["window.addEventListener('beforeinstallprompt'", "window.addEventListener('appinstalled'"]) {
+      // Terminator at LINE START: an inner call like closeInstallDialog({ dismissed: false }); ends in "});" too,
+      // and slicing there cut the handler in half — a gate that reads half a function passes on half the truth.
+      const fn = app.slice(app.indexOf(handler), app.indexOf('\n});', app.indexOf(handler)));
+      expect(fn.length, `${handler} slice must not collapse`).toBeGreaterThan(80);
+      expect(fn, `${handler} must repaint the step`).toContain('refreshQuickStartInstallStep();');
+    }
+    // And the refresher itself must never re-render a step that is mid-tap: refreshInstallButtons fires while the
+    // browser sheet is opening (the deferred event is spent the moment it is used), and rebuilding the body would
+    // pull the button out from under the click that is still running.
+    const stepRefresh = app.slice(app.indexOf('function refreshQuickStartInstallStep()'), app.indexOf('function buildQuickStartInstallBody()'));
+    expect(stepRefresh).toMatch(/if \(quickStartInstallPromptRunning\) return;/);
+
+    // (d) Every string it says ships in every locale.
+    for (const key of ['quickstart.installWhy', 'quickstart.installStarted', 'quickstart.installNotNow',
+      'quickstart.installUseBrowserMenu']) {
+      expect(Object.keys(I18N_STRINGS).every((code) => Boolean(I18N_STRINGS[code][key])), `${key} in every locale`).toBe(true);
+    }
+    // Declining is a DECISION, not a failure: the step is optional and Platho runs perfectly in a browser tab.
+    expect(I18N_STRINGS.en['quickstart.installNotNow']).not.toMatch(/fail|error|could not/i);
+    // ...and they must actually be READABLE. [MEASURED 2026-08-13 in the preview] The tap left an EMPTY status
+    // line: the message was written inside the try, and the repaint in the finally — which blanks the status on
+    // its way — ran straight over it. Repaint first, speak second; a message set before the repaint is dead code.
+    expect(body).toMatch(/refreshQuickStartInstallStep\(\);\s*setText\(quickStartStepStatus, message\);/);
+    expect(body, 'nothing may write the status before the repaint that clears it')
+      .not.toMatch(/setText\(quickStartStepStatus, t\('quickstart\.install/);
   });
 
   it('QS-RESUME-07: Back actually goes back, and the key step has ONE way forward', () => {

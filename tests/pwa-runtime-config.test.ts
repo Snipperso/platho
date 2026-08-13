@@ -2239,11 +2239,17 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function avatarCompressionOptions'),
     );
     // Up-front affordability gate: compare the length-based price to the live ATH balance and block before review,
-    // only when the Vault user/balance is loaded (no false "not enough" against an unknown balance).
+    // only when that balance is KNOWN (no false "not enough" against a balance nobody has read).
+    //
+    // [OWNER 2026-08-13] The source moved. This used to pin `currentVaultUserSource()`, and that source returns 0n
+    // for everyone under direct pay — which is why the whole check had been switched off behind a lane flag, and
+    // why the dialog then said nothing about ATH at all. It now reads the connected wallet's jetton balance, the
+    // same figure the nav corner shows. The full behaviour lives in tests/username-dialog-errors.
     expect(mintSource).toMatch(/const priceAtomic = localUsernameMintPriceAtomic\(username\)/);
-    expect(mintSource).toMatch(/priceAtomic !== null && currentVaultUserSource\(\)/);
-    expect(mintSource).toMatch(/athBalance < priceAtomic/);
-    expect(mintSource).toMatch(/Insufficient ATH/);
+    expect(mintSource).toMatch(/priceAtomic !== null && athBalance !== null && athBalance < priceAtomic/);
+    expect(mintSource).toMatch(/const athBalance = connectedWalletAthBalanceAtomic\(\);/);
+    expect(mintSource, 'the shortfall is one localized sentence, shared with the mint-time check')
+      .toMatch(/t\('errors\.notEnoughAth'/);
     // The summary surfaces the live ATH balance with a "not enough" flag.
     expect(mintSource).toMatch(/label: t\('username\.yourAth'\)/);
     expect(EN_STRINGS['username.yourAth']).toBe('Your ATH');
@@ -2575,8 +2581,14 @@ describe('PWA runtime config guard', () => {
     // While pending and not yet active, the row stays disabled and shows progress
     // instead of reverting to the clickable "Activate / fee" resting state — the bug
     // where the button looked like it ignored the first press.
-    expect(controls).toMatch(/if \(accountActive\) plathoAccountActivationPending = false;/);
-    expect(controls).toMatch(/const activationPending = plathoAccountActivationPending && !accountActive/);
+    expect(controls).toMatch(/if \(accountActive\) \{ plathoAccountActivationPending = false; forgetPlathoActivationInFlight\(\); \}/);
+    // [OWNER 2026-08-13] The lock now has a WRITTEN half as well. The in-memory flag dies with the tab, so a reload
+    // inside the settling window put the row back to "Activate" for a registration that was already paid for and on
+    // its way — pressing it again is a second fee for one registration. ORed, not substituted: the marker survives a
+    // reload, the flag covers a tab whose storage is unavailable.
+    expect(controls).toMatch(/const activationInFlight = plathoAccountActivationPending \|\| plathoActivationInFlightForCurrentWallet\(\);/);
+    expect(controls).toMatch(/const activationPending = activationInFlight && !accountActive/);
+    expect(submitActivation).toMatch(/rememberPlathoActivationInFlight\(ownerWallet\);/);
     expect(controls).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending \|\| activationPending/);
     expect(controls).toMatch(/activationPending\s*\?\s*t\('vault\.statusActivating'\)/);
     expect(EN_STRINGS['vault.statusActivating']).toBe('activating');
