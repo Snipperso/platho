@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.19';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.20';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -7809,6 +7809,24 @@ function buildSharedPostEmbed(block, embedDepth = 0) {
   return embed;
 }
 
+/**
+ * The author label for a feed item — ONE precedence, shared with the channel header and the post detail:
+ * an explicit "Display as" choice, then the chain-VERIFIED .ath, then whatever the item carries, then the
+ * channel name from its meta line.
+ *
+ * It resolves from the WALLET, not from a copied name field, because the copy does not survive: the chain walk
+ * writes `author` onto the post, and neither publicChannelFeedToThread nor publicChannelThreadsToFeedItems maps
+ * it onward — the same two functions that dropped the channel coordinates (see publicPostChainCoordinates).
+ */
+function publicFeedItemAuthorLabel(item) {
+  const wallet = item?.authorWallet ?? null;
+  return (wallet ? resolveWalletChannelDisplay(wallet)?.name : null)
+    || (wallet ? publicAuthorLabel(wallet) : null)
+    || item?.author
+    || (item?.meta ?? []).flat().filter(Boolean)[0]
+    || t('public.postTitleFallback');
+}
+
 // Build one feed <article> (chrome + content) for an item. Extracted so renderPublicFeed can REUSE an article whose
 // publicFeedItemRenderSignature is unchanged instead of rebuilding it every render.
 function buildPublicFeedArticle(item, avatarUrlMemo) {
@@ -7823,7 +7841,11 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
   const authorAvatar = document.createElement('div');
   authorAvatar.className = 'avatar feed-avatar';
   authorAvatar.setAttribute('aria-hidden', 'true');
-  setAvatarNode(authorAvatar, String(item.author ?? item.title ?? 'P').slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet, avatarUrlMemo));
+  // The letter comes from the AUTHOR, resolved from the wallet exactly as the channel header resolves it. It used
+  // to read item.author — a field publicChannelThreadsToFeedItems never carries — then item.title, which a post
+  // without a title does not have either, so it landed on the literal 'P'. MEASURED 2026-08-13: the owner opened a
+  // channel found through search and saw "M moonly" in the header and "P MOONLY" one row below, same channel.
+  setAvatarNode(authorAvatar, String(publicFeedItemAuthorLabel(item)).slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet, avatarUrlMemo));
   const meta = document.createElement('div');
   meta.className = 'feed-meta';
   for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null].filter(Boolean)) {
@@ -8316,7 +8338,10 @@ function renderPublicPostDetail() {
   // name + a short subtitle), so the body below can show just the post content + comments without repeating the
   // author on every row.
   const flatMeta = (item.meta ?? []).flat().filter(Boolean);
-  const authorName = item.author || flatMeta[0] || item.title || t('public.postTitleFallback');
+  // Same precedence as the feed row and the channel header — resolved from the WALLET. Reading item.author first
+  // put the registry's channel name here (often upper-case) while the header showed the verified .ath, so one
+  // channel rendered two ways on two screens.
+  const authorName = publicFeedItemAuthorLabel(item);
   const dateLabel = flatMeta.length > 1 ? String(flatMeta[flatMeta.length - 1]) : '';
   // Title carries the author's identity tone (e.g. the teal ".ath" colour) — parity with the private chat header
   // (renderConversationIdentity). The date is NOT shown here; it moves into the post card below (like the feed),
