@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.18';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.19';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -6942,9 +6942,21 @@ const SHARE_LINK_ICON_SVG =
   + '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>'
   + '<path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
 
-/** True when the platform can hand a URL to its own share sheet (phones, most PWAs) rather than the clipboard. */
+/**
+ * Should this platform hand the URL to its own share sheet instead of the clipboard?
+ *
+ * TOUCH ONLY. On a phone the sheet is the whole point — the real messengers are there. On Windows it is a
+ * different dialog entirely: it lists Microsoft Store apps that registered a share handler, offers to INSTALL
+ * ones that are not present, and cannot see desktop Telegram at all (a classic desktop app registers no share
+ * target). MEASURED 2026-08-13 — the owner was offered "Telegram for Windows (Unigram)" with an install button
+ * and asked, reasonably, what that was. Nothing on the page can improve that list, so desktop copies instead.
+ *
+ * `(pointer: coarse)` is the primary-pointer query: true on phones and tablets, false on a desktop, and false on
+ * a touch laptop being used with its trackpad — which is the right answer for all three.
+ */
 function canSystemShareLink(url) {
   if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+  if (typeof matchMedia === 'function' && !matchMedia('(pointer: coarse)').matches) return false;
   // Some engines expose share() but refuse a url-only payload; canShare is the only honest way to ask.
   if (typeof navigator.canShare === 'function') {
     try { return navigator.canShare({ url }); } catch { return false; }
@@ -8201,15 +8213,62 @@ function replySnippetFromContent(item) {
 // comments so the detail can fall back to local data when a fresh chain read returns fewer (or none), and so an
 // own just-published comment shows instantly. Note the cache is per-account, so a comment seen under another
 // account is not here.
+/**
+ * Is this cached feed post the one `item` names? Used ONLY against a single channel's post list, where entryId is
+ * unique — the cache is keyed by channel, so the channel half of the identity is the list you are searching. The
+ * body-hash cross-check guards a re-used id. (Across channels, use samePublicPost.)
+ */
+function sameCachedPublicPost(cachedPost, item) {
+  return String(cachedPost?.entryId ?? cachedPost?.id) === String(item?.entryId ?? item?.id)
+    && (!item?.bodyHash || !cachedPost?.bodyHash
+      || String(cachedPost.bodyHash).toLowerCase() === String(item.bodyHash).toLowerCase());
+}
+
 function cachedCommentsForPost(item) {
   if (!item) return [];
   const channelId = item.channelId ?? 'platho.app';
   const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId] ?? null;
-  const post = (cached?.posts ?? []).find((entry) => (
-    String(entry.entryId ?? entry.id) === String(item.entryId ?? item.id)
-    && (!item.bodyHash || !entry.bodyHash || String(entry.bodyHash).toLowerCase() === String(item.bodyHash).toLowerCase())
-  ));
+  const post = (cached?.posts ?? []).find((entry) => sameCachedPublicPost(entry, item));
   return post?.comments ?? [];
+}
+
+/**
+ * Retire the local "sending/confirming" copy of every comment whose CHAIN twin is now in hand.
+ *
+ * Nothing else could do it. mergeLocalPendingPublicFeed retires a pending record when the chain twin with the same
+ * body hash turns up in the sync — but the channel walk reads the CHANNEL shard, and comments live in the post's
+ * THREAD shard, so its comment list is always empty and a pending COMMENT matched nothing, ever. MEASURED
+ * 2026-08-13 (owner): the badge sat at "comment published, confirming" with a silent console, and past the
+ * no-progress deadline resumePendingPublicPublishConfirmations would have turned it RED for a comment that was on
+ * chain the whole time. The post detail already dropped it from the DISPLAY; this makes the fact stick.
+ */
+function retireConfirmedLocalPublicComments(item, chainComments) {
+  const channelId = item?.channelId ?? null;
+  if (!channelId || !Array.isArray(chainComments) || chainComments.length === 0) return false;
+  const entry = publicChannelFeedCache?.[channelId] ?? null;
+  const cached = entry?.feed ?? entry ?? null;
+  const posts = Array.isArray(cached?.posts) ? cached.posts : [];
+  let changed = false;
+  const nextPosts = posts.map((post) => {
+    if (!sameCachedPublicPost(post, item)) return post;
+    const comments = post.comments ?? [];
+    const kept = comments.filter((comment) => !(
+      isPendingPublicFeedItem(comment) && chainComments.some((chainComment) => samePublicBodyHash(comment, chainComment))
+    ));
+    if (kept.length === comments.length) return post;
+    changed = true;
+    return { ...post, comments: kept };
+  });
+  if (!changed) return false;
+  publicChannelFeedCache = {
+    ...publicChannelFeedCache,
+    [channelId]: {
+      ...(entry ?? {}),
+      feed: { version: 1, channelId, updatedAt: new Date().toISOString(), posts: nextPosts },
+    },
+  };
+  commitPublicChannelFeedCache();
+  return true;
 }
 
 function publicPostDetailMergedComments() {
@@ -9136,6 +9195,10 @@ async function refreshPublicPostDetailComments() {
         // Durable layer (survives a full reload; localStorage can't hold the image data URLs): IndexedDB.
         writeCachedPublicComments(cacheKey, result.comments, result.parentExists, result.latestLink);
       }
+      // A CLEAN read is the only proof a comment reached the chain that this app ever gets — the channel walk
+      // cannot see thread comments. Spend it: retire the local pending twin for good, here, or it stays
+      // "confirming" in the cache forever and eventually goes red.
+      retireConfirmedLocalPublicComments(item, result.comments);
       renderPublicPostDetail();
       return;
     }
@@ -24238,6 +24301,18 @@ function cancelPublicPublishVisibilityChecks() {
   publicVisibilityTimers.clear();
 }
 
+/**
+ * Is the post on screen carrying a comment of OUR OWN that has not been confirmed on chain yet?
+ *
+ * The bound on the only comment read that is not started by a user action. Both halves matter: the detail must be
+ * OPEN (so this is the thread the user is looking at, never a walk over the feed), and something must actually be
+ * pending (so a quiet screen reads nothing at all).
+ */
+function openPublicPostHasPendingComment() {
+  if (!publicPostDetailOpen || !publicPostDetailItem) return false;
+  return cachedCommentsForPost(publicPostDetailItem).some((comment) => isPendingPublicFeedItem(comment));
+}
+
 function anyPendingPublicFeedItem() {
   for (const entry of Object.values(publicChannelFeedCache ?? {})) {
     for (const post of entry?.feed?.posts ?? entry?.posts ?? []) {
@@ -24262,6 +24337,17 @@ function schedulePublicPublishVisibilityChecks(attempt = 0) {
     // reads proving something already proven.
     if (!anyPendingPublicFeedItem()) return;
     try { await syncPublicChannels(); } catch (error) { noteTonRpcRateLimit(error); }
+    // The channel walk proves a POST landed. It says nothing about a COMMENT — those live in the post's THREAD
+    // shard, which only this read touches. Without it a just-published comment kept its "confirming" badge until
+    // the user closed and reopened the post (owner-reported 2026-08-13: the status freezes at "confirming").
+    //
+    // THE ONE EXCEPTION TO "comments load only on thread open" (PWA-PUBLIC-COMMENTS-BACKGROUND-FREE). That rule
+    // exists for scale: no walker may read comments for posts nobody is looking at. This read is the opposite of
+    // a walker — it is the OPEN post, and only while a comment THIS USER just published is still unconfirmed. It
+    // stops the moment the record retires, which is what the whole ladder is waiting for anyway.
+    if (openPublicPostHasPendingComment()) {
+      try { await refreshPublicPostDetailComments(); } catch (error) { noteTonRpcRateLimit(error); }
+    }
     // Re-broadcast a retained external and pronounce the verdict past the deadline. Both used to happen only when
     // the window lost and regained focus.
     resumePendingPublicPublishConfirmations();
@@ -24393,10 +24479,7 @@ function rememberLocalPublicComment(parent, text, bodyHash, attachment = null, o
   const feed = cached?.version === 1 && cached?.channelId === channelId
     ? { ...cached, posts: [...(cached.posts ?? [])] }
     : { version: 1, channelId, updatedAt: null, posts: [] };
-  const index = feed.posts.findIndex((post) => (
-    String(post.entryId ?? post.id) === String(parent.entryId ?? parent.id)
-    && (!parent.bodyHash || !post.bodyHash || String(post.bodyHash).toLowerCase() === String(parent.bodyHash).toLowerCase())
-  ));
+  const index = feed.posts.findIndex((post) => sameCachedPublicPost(post, parent));
   const commentLocalId = `local-comment-${Date.now()}`;
   if (index >= 0) {
     const post = { ...feed.posts[index], comments: [...(feed.posts[index].comments ?? [])] };

@@ -3826,8 +3826,24 @@ describe('PWA runtime config guard', () => {
       return /function\s+([A-Za-z0-9_$]+)/.exec(app.slice(start, match.index))?.[1] ?? '<anonymous>';
     });
     expect(callers.sort()).toEqual(['loadEarlierPublicPostComments', 'refreshPublicPostDetailComments']);
-    // refreshPublicPostDetailComments fires only on user actions: opening the post detail + the retry button.
-    expect(app.match(/refreshPublicPostDetailComments\(\);/g)?.length ?? 0).toBe(2);
+    // refreshPublicPostDetailComments fires on user actions — opening the post detail + the retry button — plus
+    // ONE bounded exception added 1.0.19: the post-publish confirm ladder. The rule being protected is about
+    // SCALE ("no walker may read comments for posts nobody is looking at"), and that read is its opposite: the
+    // post is OPEN, and only while a comment THIS USER just published is still unconfirmed. Without it the badge
+    // stayed at "confirming" until the user closed and reopened the post, because the channel walk cannot see
+    // thread comments at all. The bound is asserted, not assumed:
+    expect(app.match(/refreshPublicPostDetailComments\(\);/g)?.length ?? 0).toBe(3);
+    expect(app).toMatch(/if \(openPublicPostHasPendingComment\(\)\) \{\s*try \{ await refreshPublicPostDetailComments\(\);/);
+    const bound = app.slice(
+      app.indexOf('function openPublicPostHasPendingComment('),
+      app.indexOf('function anyPendingPublicFeedItem('),
+    );
+    // BOTH halves of the bound, or it degrades into exactly the walker the rule forbids: the detail must be open
+    // (this thread, not a sweep) AND something must be pending (a quiet screen reads nothing).
+    expect(bound).toContain('if (!publicPostDetailOpen || !publicPostDetailItem) return false;');
+    expect(bound).toMatch(/cachedCommentsForPost\(publicPostDetailItem\)\.some\(\(comment\) => isPendingPublicFeedItem\(comment\)\)/);
+    // And it is reachable ONLY from the confirm ladder — never from a sync pass or a plain timer.
+    expect(app.match(/openPublicPostHasPendingComment\(\)/g)?.length ?? 0).toBe(2);
     // ...and the earlier-page read fires only from its button, never a timer or a sync pass.
     expect(app.match(/loadEarlierPublicPostComments\(\);/g)?.length ?? 0).toBe(1);
     expect(app).toContain("earlier.addEventListener('click', () => { loadEarlierPublicPostComments(); });");
@@ -7020,7 +7036,9 @@ describe('PWA runtime config guard', () => {
 
     // The visibility loop keeps a tail cadence and drives the resume itself.
     expect(app).toMatch(/const delayMs = PUBLIC_VISIBILITY_SCHEDULE_MS\[attempt\] \?\? PUBLIC_VISIBILITY_TAIL_MS;/);
-    expect(app).toMatch(/try \{ await syncPublicChannels\(\); \}[\s\S]{0,260}?resumePendingPublicPublishConfirmations\(\);/);
+    // Same tick: the channel walk, the open thread's re-read (1.0.19), then the resume. The window is generous
+    // because what matters is the ORDER and the shared tick, not the byte distance between them.
+    expect(app).toMatch(/try \{ await syncPublicChannels\(\); \}[\s\S]{0,1400}?resumePendingPublicPublishConfirmations\(\);/);
 
     // ...and it STOPS. A terminaled record keeps a truthy publishStatus (that flag marks the local copy the merge
     // must carry), so re-arming on "anything pending" would spin forever.
@@ -7168,7 +7186,10 @@ describe('PWA runtime config guard', () => {
     expect(app.match(/schedulePublicPublishVisibilityChecks\(\);/g)?.length, 'post AND comment').toBe(2);
     // It reuses the existing merge (which already retires a pending record when the chain twin appears) rather
     // than growing a second confirm driver.
-    const sched = app.slice(app.indexOf('function schedulePublicPublishVisibilityChecks('), app.indexOf('function schedulePublicPublishVisibilityChecks(') + 1600);
+    const sched = app.slice(
+      app.indexOf('function schedulePublicPublishVisibilityChecks('),
+      app.indexOf('function anyPublicPublishStillResolving('),
+    );
     expect(sched).toMatch(/if \(!anyPendingPublicFeedItem\(\)\) return;/);
     expect(sched).toMatch(/await syncPublicChannels\(\);/);
     // It stops — no standing timer. The re-arm gate is STRICTER than "anything pending": a record that already
