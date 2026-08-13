@@ -21,13 +21,26 @@
  * So two announced numbers, fetched and checked here, pin the entire executable surface. tests/sw-precache-covers-
  * runtime keeps that true: every module reachable from app.js must be in the precache list, or the chain has holes.
  *
+ * THE EXPECTED VALUES COME FROM THIS CHECKOUT, and that is the whole point: the build is DETERMINISTIC — the
+ * deploy step copies files, it does not compile or minify anything — so `web/index.html` and `web/sw.js` at a
+ * release tag are byte-for-byte what production serves. Checking out a tag IS the announcement, and it lives in
+ * public git history rather than in a record someone has to remember to publish. Announced hashes still work
+ * (--index/--sw) for anyone comparing without a clone.
+ *
+ *   git checkout v1.0.22 && node scripts/verify_released_bundle.mjs     # expected values from this tree
  *   node scripts/verify_released_bundle.mjs --index <sha256> --sw <sha256>
- *   node scripts/verify_released_bundle.mjs                  # no expected hashes: prints what is being served
  *   node scripts/verify_released_bundle.mjs --origin https://platho.app
+ *
+ * WHAT IT DOES NOT CATCH, so nobody mistakes it for more than it is: a TARGETED swap (bad bundle served to one
+ * address while everyone else, including whoever runs this, gets a clean one), and a malicious release that was
+ * built and tagged honestly. It catches a sustained substitution of the published build — and makes it permanent
+ * once someone notices.
  *
  * Exit code 0 = everything checked passed. Non-zero = something did not, and the message says which.
  */
 import { createHash } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { appBuildId, cacheIdFromEntries, precacheAssetUrls } from './web_cache_ids.mjs';
 
 const arg = (name, fallback = null) => {
@@ -36,8 +49,26 @@ const arg = (name, fallback = null) => {
 };
 
 const ORIGIN = (arg('--origin', 'https://platho.app')).replace(/\/+$/, '');
-const EXPECT_INDEX = arg('--index');
-const EXPECT_SW = arg('--sw');
+
+const sha256File = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+
+/**
+ * Expected hashes: the ones given on the command line, else this checkout's own web/index.html and web/sw.js.
+ * Falling back to the tree is what makes `git checkout <tag> && verify` the whole ritual — nothing to announce,
+ * nothing to transcribe, and the reference is public git history instead of a post someone must remember to make.
+ */
+function expectedFromTree() {
+  if (!existsSync('web/index.html') || !existsSync('web/sw.js')) return null;
+  let describe = '(not a git checkout)';
+  try {
+    describe = execFileSync('git', ['describe', '--tags', '--always', '--dirty'], { encoding: 'utf8' }).trim();
+  } catch { /* not a repo, or no git — the hashes are still valid, only the label is missing */ }
+  return { index: sha256File('web/index.html'), sw: sha256File('web/sw.js'), describe };
+}
+
+const fromTree = (arg('--index') || arg('--sw')) ? null : expectedFromTree();
+const EXPECT_INDEX = arg('--index') ?? fromTree?.index ?? null;
+const EXPECT_SW = arg('--sw') ?? fromTree?.sw ?? null;
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const failures = [];
@@ -53,7 +84,10 @@ async function fetchBytes(path) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-console.log(`verifying ${ORIGIN}\n`);
+console.log(`verifying ${ORIGIN}`);
+console.log(fromTree
+  ? `expected values from this checkout: ${fromTree.describe}\n`
+  : (EXPECT_INDEX || EXPECT_SW ? 'expected values given on the command line\n' : ''));
 
 // ---- 1. The two announced files -------------------------------------------------------------------------------
 const indexBytes = await fetchBytes('/index.html');
@@ -64,13 +98,14 @@ const swHash = sha256(swBytes);
 console.log(`  index.html  sha256=${indexHash}`);
 console.log(`  sw.js       sha256=${swHash}\n`);
 
+const against = fromTree ? 'this checkout' : 'the announced hash';
 if (EXPECT_INDEX || EXPECT_SW) {
-  note(!EXPECT_INDEX || EXPECT_INDEX === indexHash, 'index.html matches the announced hash',
-    EXPECT_INDEX === indexHash ? null : `announced ${EXPECT_INDEX}`);
-  note(!EXPECT_SW || EXPECT_SW === swHash, 'sw.js matches the announced hash',
-    EXPECT_SW === swHash ? null : `announced ${EXPECT_SW}`);
+  note(!EXPECT_INDEX || EXPECT_INDEX === indexHash, `index.html matches ${against}`,
+    EXPECT_INDEX === indexHash ? null : `expected ${EXPECT_INDEX}`);
+  note(!EXPECT_SW || EXPECT_SW === swHash, `sw.js matches ${against}`,
+    EXPECT_SW === swHash ? null : `expected ${EXPECT_SW}`);
 } else {
-  console.log('  (no --index/--sw given: nothing is being CHECKED, only reported)\n');
+  console.log('  (no expected values: nothing is being CHECKED, only reported)\n');
 }
 
 // ---- 2. index.html pins the entry point by content ------------------------------------------------------------
@@ -133,4 +168,6 @@ if (!EXPECT_INDEX && !EXPECT_SW) {
   console.log('Self-consistent, but UNVERIFIED: no announced hashes were supplied to check against.');
   process.exit(0);
 }
-console.log('VERIFIED — the served bundle is the announced release, all the way down.');
+console.log(fromTree
+  ? `VERIFIED — ${ORIGIN} is serving exactly ${fromTree.describe}, all the way down.`
+  : 'VERIFIED — the served bundle is the announced release, all the way down.');
