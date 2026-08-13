@@ -203,6 +203,14 @@ export const BUCKETS = [
     struct: 'ProfileRegistryGlobalView',
     contract: 'ProfileRegistry.tact',
     rows: [
+      // PEOPLE, and the only per-person figure the protocol exposes. Platho keeps no server and no analytics by
+      // construction, so "did anything we did bring anyone" can only be answered from the chain.
+      //
+      // The label says avatars rather than profiles because that is what the counter is: it rises only on
+      // `msg.version == 1`, a FIRST avatar purchase, so it counts wallets that have bought one at least once and
+      // never counts the same wallet twice. Calling it "профилей создано" cost an evening — put next to the
+      // airdrop's payout counter it read as a funnel, and the two measure different KINDS of thing.
+      { field: 'profile_count', at: 8, label: 'Кошельков купили аватар', unit: null },
       { field: 'treasury_due_ath', at: 11, label: 'ATH казначейству', unit: UNIT.ath, primary: true },
       { field: 'burn_due_ath', at: 12, label: 'ATH на сжигание', unit: UNIT.ath, primary: true },
     ],
@@ -235,6 +243,14 @@ export const BUCKETS = [
     struct: 'AirdropGlobalView',
     contract: 'AirdropPool.tact',
     rows: [
+      // PAYOUTS, NOT PEOPLE, and the difference is the whole reason this row is labelled the way it is.
+      //
+      // claim_count rises once per delivered payout (AirdropPool line 433), and a payout fires whenever credits
+      // accrue — one capsule is one credit is 10 ATH. So one active person publishing all week shows up here many
+      // times over, and this number can and does exceed the number of humans who have ever opened the app. Read as
+      // "people" it flatters activity into adoption, which is the single most expensive thing a growth figure can
+      // quietly do. Divide distributed_total by 10 ATH for the credits behind these payouts.
+      { field: 'claim_count', at: 13, label: 'Выплат эйрдропа (не людей)', unit: null },
       { field: 'remaining_budget', at: 11, label: 'Остаток к раздаче', unit: UNIT.ath, primary: true },
       { field: 'distributed_total', at: 12, label: 'Уже роздано', unit: UNIT.ath },
       { field: 'total_pool', at: 9, label: 'Пул целиком', unit: UNIT.ath },
