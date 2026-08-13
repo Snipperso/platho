@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=39';
+} from './public-channel-subscriptions.mjs?v=40';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=65';
+} from './i18n.mjs?v=66';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.20';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.21';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -10879,10 +10879,14 @@ function publicAvatarUrlForWallet(walletAddress, memo = null) {
 // whose provider was momentarily unavailable stays uncached so a later sync retries it (no stuck
 // "no avatar" once the user sets one or the provider recovers).
 async function hydratePublicChannelAvatars() {
-  // Includes the official channel so its post-style placeholder can show the platho.ath profile
-  // avatar (falls back to the letter tile if that wallet has none).
-  const channels = subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-    .filter((channel) => channel.authorWallet);
+  // THE SAME CHANNEL SET THE SYNC WALKS — subscribed, plus the user's own, plus a channel open in the channel
+  // view but not followed. It used to be the subscribed list alone, so a channel found through search showed a
+  // letter tile while its posts loaded fine: the sync had already fetched that channel, and only the avatar was
+  // left out. MEASURED 2026-08-13 (owner, "moonly" opened from channel search).
+  //
+  // It costs nothing extra: those channels are being read this cycle anyway, and the per-wallet cache below means
+  // one profile read per wallet for the life of the tab.
+  const channels = feedSourcePublicChannels().filter((channel) => channel.authorWallet);
   let changed = false;
   for (const channel of channels.slice(0, 24)) {
     const raw = rawWalletAddress(channel.authorWallet);
