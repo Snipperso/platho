@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.17';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.18';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -25144,7 +25144,9 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
     serviceWorkerRefreshing = true;
     handleServiceWorkerControllerChange();
   });
-  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+  // ROOT-ABSOLUTE, not './sw.js': a permalink is served at /<name>/<post>, and a document-relative path would
+  // register /<name>/sw.js — a 404 (or, on this server, the app shell) and no service worker at all.
+  navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
     .then((registration) => registration.update().catch(() => null))
     .catch(() => {});
 }

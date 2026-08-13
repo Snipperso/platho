@@ -111,7 +111,9 @@ describe('MODCONTENT — a module version must move when the module does', () =>
     // remember what the previous one was.
     const buildId = appBuildId();
     expect(buildId, 'the build id must not look like a counter').toMatch(/^b[0-9a-f]{8}$/);
-    expect(html, 'index.html loads an app.js build that is not the one in the tree').toContain(`./app.js?v=${buildId}"`);
+    // Root-absolute in index.html (a permalink is served at /<name>/<post>), `./` in the worker (resolved against
+    // the worker's own scope). Two spellings, one token.
+    expect(html, 'index.html loads an app.js build that is not the one in the tree').toContain(`/app.js?v=${buildId}"`);
     expect(sw, 'the service worker precaches an app.js build that is not the one in the tree')
       .toContain(`'./app.js?v=${buildId}'`);
 

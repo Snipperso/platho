@@ -2,12 +2,6 @@
 <html lang="en" translate="no">
   <head>
     <meta charset="utf-8">
-    <!-- LOAD-BEARING for post permalinks (platho.app/<name>/<post>). Every asset below is referenced relatively
-         ("./app.js"), which a browser resolves against the DOCUMENT's URL — so on a two-segment permalink path it
-         would ask for /<name>/app.js and nginx answers 404 for a missing .js, leaving a blank app. The app is
-         always served from the origin root (both preview and production land in /srv/platho/current), so pinning
-         resolution to "/" is exact, not a guess. Must stay FIRST: <base> only affects URLs that come after it. -->
-    <base href="/">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="theme-color" content="#0b0d0f">
     <meta name="color-scheme" content="dark">
@@ -15,27 +9,27 @@
          UI. Opt out (translate="no" on <html> + the Google-specific meta). -->
     <meta name="google" content="notranslate">
     <title>Platho</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=3">
-    <link rel="icon" href="./assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
-    <link rel="apple-touch-icon" href="./assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="./styles.css?v=314">
+    <link rel="manifest" href="/manifest.webmanifest?v=3">
+    <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="/assets/platho-icon-192.png?v=3">
+    <link rel="stylesheet" href="/styles.css?v=314">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
          not tied to import-map support (Safari 16.4). -->
-    <script src="./boot-guard.js?v=6"></script>
+    <script src="/boot-guard.js?v=6"></script>
   </head>
   <body>
     <div class="app-shell" data-view="public">
       <aside class="sidebar" aria-label="Navigation" data-i18n-aria-label="nav.navigation">
         <div class="brand">
-          <img class="brand-mark" src="./assets/platho-icon-192.png?v=3" alt="" width="34" height="34">
+          <img class="brand-mark" src="/assets/platho-icon-192.png?v=3" alt="" width="34" height="34">
           <div>
             <div class="brand-name">Platho</div>
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">1.0.17</span>
+              <span class="app-version-label" id="appVersionLabel">1.0.18</span>
             </div>
           </div>
         </div>
@@ -437,7 +431,7 @@
                    text, and still carries the click handler that copies the private-lane diagnostic; removing
                    `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
                    the element would also break PWA-CONFIG-01B. -->
-              <span class="app-version-label" id="profileVersionLabel" hidden>1.0.17</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.0.18</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -797,7 +791,7 @@
     <!-- Telegram Mini App SDK (self-hosted to keep script-src 'self'). In an
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
-    <script src="./vendor/telegram-web-app.js?v=1"></script>
-    <script src="./app.js?v=bc16c6aeb" type="module"></script>
+    <script src="/vendor/telegram-web-app.js?v=1"></script>
+    <script src="/app.js?v=ba4d830da" type="module"></script>
   </body>
 </html>
