@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=44';
+} from './public-channel-subscriptions.mjs?v=45';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=70';
+} from './i18n.mjs?v=71';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.25';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.26';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1256,6 +1256,24 @@ let walletUnlockPromise = null;
 // a deliberate dismissal. A user who closes the dialog to browse the public feed locked is not asked again; a user
 // whose dialog was taken away by the OS is.
 let walletUnlockPromptInterrupted = false;
+// [OWNER 2026-08-13, with a screenshot] "The app is being dumb and does not show the unlock modal after I bring it
+// back." It was: the fix above only covers a dialog that was ON SCREEN when the app went away —
+// noteWalletUnlockInterruptedByBackground raises its flag only `if (walletUnlockPromise)`. An unlock attempt that
+// had already FINISHED without a wallet (the ✕ on the cold-start password dialog, or on a resume prompt) leaves
+//
+//     plathoWallet === null   +   walletUnlockPromptPending === false   +   interrupted === false
+//
+// and that state is ABSORBING. The only thing that raises pending is armWalletUnlockPrompt, and the resume path
+// reaches it solely through lockPlathoWallet, which returns on its first line because the wallet is already
+// locked. Every later background→foreground cycle then runs scheduleWalletUnlockPrompt, fails the very first
+// conjunct of shouldOpenWalletUnlockPrompt, and returns in silence — no dialog, no overlay, forever, which is
+// exactly the screenshot: the locked app with "wallet required" under a dead composer.
+//
+// So the intent has to be remembered on BOTH sides. `interrupted` means "the OS took the dialog away"; this one
+// means the opposite — "the user themselves said not now" — and it is what makes the resume path able to tell a
+// deliberate dismissal from a wallet nobody has been asked about yet. It is cleared when the app leaves the
+// foreground, because coming back is a new arrival rather than the same session going on.
+let walletUnlockPromptDeclined = false;
 let walletAutoLockTimer = null;
 let walletUnlockPromptPending = false;
 let walletUnlockPromptTimer = null;
@@ -4171,6 +4189,8 @@ function markWalletUnlocked() {
   lastWalletUnlockAt = Date.now();
   walletUnlockPromptPending = false;
   walletUnlockPromptInterrupted = false;
+  // A wallet in hand settles the question the flag was holding open.
+  walletUnlockPromptDeclined = false;
   clearWalletUnlockPromptTimer();
   clearTelegramBackgroundLockTimer();
 }
@@ -4327,15 +4347,34 @@ function lockPlathoWalletForBackground() {
   lockPlathoWallet(t('wallet.locked'), { transient: true });
 }
 
-/** An unlock was on screen when the app went away — the dialog may not survive, so the intent has to. */
+/**
+ * An unlock was on screen when the app went away — the dialog may not survive, so the intent has to.
+ *
+ * This is ALSO the one place that knows the app has left the foreground at all (both exit doors, visibilitychange
+ * and pagehide, come through here), which is why the declined flag is dropped here: "not now" was an answer about
+ * the session the user was in, and going away ends it. Coming back is a new arrival.
+ */
 function noteWalletUnlockInterruptedByBackground() {
   if (walletUnlockPromise) walletUnlockPromptInterrupted = true;
+  walletUnlockPromptDeclined = false;
 }
 
 /**
- * Coming back to the foreground. An INTERRUPTED unlock is re-armed (armWalletUnlockPrompt sets the pending flag
- * that lockPlathoWallet could not, because the wallet was already locked); anything else keeps the old behaviour,
- * so a dialog the user closed on purpose does not come back on every app switch.
+ * Coming back to the foreground, and the only place that can put the intent back: lockPlathoWallet — the other
+ * caller of armWalletUnlockPrompt — returns on its first line when the wallet is already locked, which it always
+ * is by the time we get here.
+ *
+ * Three cases, and the middle one is the [OWNER 2026-08-13] fix:
+ *   interrupted  — the OS took the dialog away mid-unlock. Re-arm.
+ *   neither      — locked, a stored wallet exists, and nobody has declined in this foreground session. ASK. This
+ *                  used to fall to scheduleWalletUnlockPrompt, which cannot raise the pending flag and therefore
+ *                  did nothing at all whenever a previous attempt had ended without a wallet.
+ *   declined     — the user closed the dialog on purpose. Do NOT re-open it on every app switch; just re-schedule,
+ *                  which is a no-op unless something else armed it. This is the case the old code was protecting,
+ *                  and it is the only one that should have been getting that treatment.
+ *
+ * armWalletUnlockPrompt is idempotent and self-guarding (it refuses on a live wallet or with no stored record), so
+ * calling it here cannot open a dialog over an unlocked app.
  */
 function resumeWalletUnlockPrompt() {
   if (walletUnlockPromptInterrupted) {
@@ -4343,7 +4382,33 @@ function resumeWalletUnlockPrompt() {
     armWalletUnlockPrompt();
     return;
   }
+  if (!walletUnlockPromptDeclined) {
+    armWalletUnlockPrompt();
+    return;
+  }
   scheduleWalletUnlockPrompt();
+}
+
+/**
+ * The user closed a dialog themselves (the ✕, the labelled dismiss, a tap outside a dismissible one, Escape).
+ *
+ * Only that may park the unlock prompt — and it is recorded HERE, at the tap, rather than at the `if (!wallet)`
+ * branch downstream, because by the time the code gets there THREE different things look identical:
+ *
+ *   1. the user closed the password dialog  — a real decision;
+ *   2. another dialog SUPERSEDED it (openActionDialog closes whatever is open, resolving it to null) — nobody
+ *      decided anything, and this needs asking again;
+ *   3. readStoredPlathoWallet caught an exception and returned null (its catch swallows everything) — likewise.
+ *
+ * Reading "declined" off the null would have marked all three as a decision, which is exactly the complaint:
+ * [OWNER 2026-08-13] "I never pressed the ✕." He did not have to. Cases 2 and 3 need no user at all.
+ *
+ * walletUnlockPromise is live exactly while an unlock is being awaited, so it identifies the password dialog
+ * without the dialog machinery needing to know anything about wallets — the same signal
+ * noteWalletUnlockInterruptedByBackground uses.
+ */
+function noteActionDialogUserDismissed() {
+  if (walletUnlockPromise) walletUnlockPromptDeclined = true;
 }
 
 function shouldOpenWalletUnlockPrompt() {
@@ -4375,7 +4440,9 @@ function scheduleWalletUnlockPrompt(delayMs = 180) {
     try {
       const wallet = await loadPlathoWallet();
       if (!wallet) {
-        // Unlock declined/cancelled — reveal the app in its locked state (public feed still works).
+        // No wallet — reveal the app in its locked state (public feed still works). NOT recorded as a decline
+        // here: this null covers a real dismissal, a dialog superseded by another, and a swallowed decryption
+        // error alike. Whether it was a decision was decided at the tap, in noteActionDialogUserDismissed.
         markBootAppReady();
         renderWalletIdentity();
         refreshMessagingControls();
@@ -5893,7 +5960,21 @@ function closeActionDialog(result = null) {
   if (actionSubmitButton) actionSubmitButton.disabled = false;
   if (actionDismissButton) actionDismissButton.hidden = true;   // opt-in per dialog; never leaks to the next one
   resolve(result);
-  scheduleWalletUnlockPrompt();
+  // A dialog just left the screen, so an unlock prompt that was waiting for the way to clear may go ahead.
+  //
+  // [MEASURED 2026-08-13] The line here used to be a bare `scheduleWalletUnlockPrompt()`, and it could NEVER fire
+  // — twice over. That function cannot raise walletUnlockPromptPending, which the prompt body consumes before it
+  // awaits; and `resolve` above is synchronous while loadPlathoWallet clears walletUnlockPromise in a `finally`,
+  // a microtask later, so the predicate's `!walletUnlockPromise` was still false at this point regardless. A
+  // compensator that has never once run is worse than none: it is why the dialog being superseded looked handled.
+  //
+  // setTimeout(0), not queueMicrotask: it has to land after the await chain in loadPlathoWallet unwinds. Safe to
+  // ARM now because the decline is recorded at the tap (noteActionDialogUserDismissed) rather than inferred from
+  // the null further down, so this cannot re-open a dialog the user just closed on purpose.
+  setTimeout(() => {
+    if (activeActionDialog) return;   // something else opened in the meantime; it owns the screen now
+    resumeWalletUnlockPrompt();
+  }, 0);
 }
 
 async function openActionDialog(config = {}) {
@@ -14368,11 +14449,11 @@ function nonNegativeBigInt(value, fallback = 0n) {
   return fallback;
 }
 
-function currentAthBalanceAtomic() {
-  const source = currentVaultUserSource();
-  if (!source || typeof source !== 'object') return 0n;
-  return nonNegativeBigInt(source.ath_balance ?? source.athBalance ?? source.ath);
-}
+// currentAthBalanceAtomic() stood here and is DELETED. It read the ATH balance off currentVaultUserSource() — the
+// clean-17 Vault user, which is synthesized from a KeyShard read and has no such field — so it returned 0n for
+// every user, always. Both of its callers were found wrong on 2026-08-13 (the mint dialog, where the whole
+// affordability block had been switched off to hide it; the message discount, which was merely dormant), and a
+// function that silently answers "zero" to everyone is a trap for whoever reaches for it next.
 
 /**
  * The CONNECTED WALLET's ATH, as last read — the balance that actually pays for a mint or an avatar under
@@ -14546,9 +14627,19 @@ function messageDiscountUnlocked() {
   return nonNegativeBigInt(remaining) <= VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC;
 }
 
+// The discount scales with how much ATH the sender HOLDS — so it has to read the balance that actually exists.
+//
+// [FOUND 2026-08-13, while fixing the username dialog] This read the balance off the SYNTHESIZED clean-17 Vault
+// user, which is built from a KeyShard read and carries no ath_balance at all. It therefore returned 0n for every
+// user, always. Nothing was visibly wrong only because messageDiscountUnlocked() keeps this
+// whole branch asleep until the activity airdrop is fully distributed — the day it empties, the discount switches
+// on and computes 0% for everyone, including wallets holding the full amount, and nothing breaks loudly enough to
+// notice. Same defect, same day, as the mint dialog: a reader left pointing at a removed data source.
 function athDiscountBps() {
   if (!messageDiscountUnlocked()) return 0n;
-  const athBalance = currentAthBalanceAtomic();
+  // An unread balance is NOT zero — but this function owes its callers a number, so the honest "we do not know
+  // yet" is expressed one level up, in formatAthDiscountLabel, which is the only thing a user ever sees.
+  const athBalance = connectedWalletAthBalanceAtomic() ?? 0n;
   if (athBalance >= ATH_FULL_DISCOUNT_AMOUNT_ATOMIC) return 10_000n;
   return (athBalance * 10_000n) / ATH_FULL_DISCOUNT_AMOUNT_ATOMIC;
 }
@@ -14561,6 +14652,11 @@ function formatDiscountPercent(bps = athDiscountBps()) {
 function formatAthDiscountLabel() {
   if (!messageDiscountUnlocked()) {
     return t('composer.athDiscountLocked');
+  }
+  // Balance not read yet. Saying "0%" here would be a claim about the user's holdings made without looking, and
+  // it is the exact shape of the bug above — a figure that is really "unknown" rendered as a real number.
+  if (connectedWalletAthBalanceAtomic() === null) {
+    return t('composer.athDiscountChecking');
   }
   const bps = athDiscountBps();
   if (bps >= 10_000n) {
@@ -18233,6 +18329,9 @@ newChatForm?.addEventListener('submit', async (event) => {
 });
 actionCancelButton?.addEventListener('click', () => {
   if (activeActionDialog?.cancellable === false) return;
+  // Recorded BEFORE the close: this is the tap that means "not now", and it is the only thing allowed to park the
+  // unlock prompt. See noteActionDialogUserDismissed for why it cannot be inferred downstream.
+  noteActionDialogUserDismissed();
   closeActionDialog(null);
 });
 
@@ -18241,9 +18340,10 @@ actionCancelButton?.addEventListener('click', () => {
 // forces a decision simply never asks for this button.
 actionDismissButton?.addEventListener('click', () => {
   if (activeActionDialog?.cancellable === false) return;
+  noteActionDialogUserDismissed();
   closeActionDialog(null);
 });
-closeOnBackdropClick(actionDialog, () => closeActionDialog(null));
+closeOnBackdropClick(actionDialog, () => { noteActionDialogUserDismissed(); closeActionDialog(null); });
 imageLightboxCloseButton?.addEventListener('click', closeImageLightbox);
 imageLightboxDownloadButton?.addEventListener('click', downloadImageLightboxImage);
 // The image lightbox is a fullscreen viewer (not a data dialog): keep the universal tap-outside-to-dismiss gesture.
@@ -18683,7 +18783,7 @@ document.addEventListener('keydown', (event) => {
   // v794: dialogs are X-only — Escape no longer dismisses newChat / docs / install (nor an action dialog,
   // unless it opted into dismissOnBackdrop:true). The image lightbox (a viewer, handled above) and the
   // identity popover keep Escape; publicDiscovery is a full screen, so Escape acts as Back.
-  if (activeActionDialog?.dismissOnBackdrop !== false) closeActionDialog(null);
+  if (activeActionDialog?.dismissOnBackdrop !== false) { noteActionDialogUserDismissed(); closeActionDialog(null); }
   closePublicDiscovery();
 });
 
@@ -25435,6 +25535,10 @@ async function runBootScreenUnlock() {
   try {
     setBootDebug('unlock:open');
     const wallet = await loadPlathoWallet();
+    // Same rule as the resume path: this null is not evidence of a decision. Unlike that path it never had the
+    // pending flag set in the first place (promptStoredWalletUnlockOnStartup runs only on the quick-start branch),
+    // so before the resume path learned to arm, a cold start that lost its dialog for ANY reason was silent from
+    // then until a manual unlock or a reload.
     if (!wallet) { setBootDebug('unlock:cancel'); markBootAppReady(); return; }
     // loadPlathoWallet already switched the overlay to the spinner phase on success.
     setBootDebug('unlock:ok');
@@ -25683,6 +25787,11 @@ window.addEventListener('focus', () => {
   clearTelegramBackgroundLockTimer();
   resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
+  // THE THIRD RETURN DOOR, and it was the only one not asking. This handler is otherwise a line-for-line copy of
+  // pageshow above; the omission meant a return that fires focus without visibilitychange or pageshow — which on
+  // Android happens routinely, e.g. dismissing a system sheet or the app switcher over a still-visible page — came
+  // back to a locked app in silence. Same call, same place in the sequence, so the three doors cannot drift again.
+  resumeWalletUnlockPrompt();
   scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
     refreshVaultNow({ includeActivation: true }).catch((error) => {
