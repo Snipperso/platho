@@ -299,12 +299,14 @@ describe('PWA runtime config guard', () => {
     // nothing able to dislodge it. Same token in index.html and in the service worker's precache list, or the
     // worker warms a URL nothing requests. MODCONTENT-03 owns the harder half — that the token equals the hash of
     // web/app.js — which no amount of agreement between these two files can show.
-    const buildId = html.match(/<script src="\.\/app\.js\?v=(b[0-9a-f]{8})" type="module">/)?.[1];
+    // ROOT-ABSOLUTE (`/app.js`), not `./app.js`: a post permalink is served at /<name>/<post>, where a
+    // document-relative entry point resolves to /<name>/app.js. See PERMA-06.
+    const buildId = html.match(/<script src="\/app\.js\?v=(b[0-9a-f]{8})" type="module">/)?.[1];
     expect(buildId, 'index.html must load app.js at a content-derived build id').toBeTruthy();
     expect(readFileSync('web/sw.js', 'utf8')).toContain(`./app.js?v=${buildId}`);
     // Version-agnostic on purpose: MODCONTENT-01 owns "the ?v= tracks the content". A literal number here reddened
     // on every unrelated stylesheet change, which teaches people to edit tests until they go green.
-    expect(html).toMatch(/<link rel="stylesheet" href="\.\/styles\.css\?v=\d+">/);
+    expect(html).toMatch(/<link rel="stylesheet" href="\/styles\.css\?v=\d+">/);
     // The Profile pane mirrors the build badge (the rail is hidden on the narrow mobile / TMA layout, and TMA
     // webviews cache hard — this is the on-device way to verify which build a device runs).
     expect(html).toMatch(/id="profileVersionLabel"/);
@@ -6569,7 +6571,7 @@ describe('PWA runtime config guard', () => {
     // the one a release left behind, and it means the precache warms a URL nothing ever requests. Every copy that
     // can be derived, is.
     const swBuildId = String(readFileSync('web/index.html', 'utf8')
-      .match(/\.\/app\.js\?v=(b[0-9a-f]{8})"/)?.[1] ?? '');
+      .match(/\/app\.js\?v=(b[0-9a-f]{8})"/)?.[1] ?? '');
     expect(swBuildId).toBeTruthy();
     expect(sw).toContain(`./app.js?v=${swBuildId}`);
     // [SPLIT 2026-08-02] MEMBERSHIP ONLY below — the `?v=` literals are gone from these assertions.
@@ -6679,7 +6681,7 @@ describe('PWA runtime config guard', () => {
     // modules use relative imports instead so older iOS can still boot.
     expect(html).not.toMatch(/type="importmap"/);
     expect(html).not.toMatch(/<script(?![^>]*src=)[^>]*>/);
-    expect(html).toMatch(/<script src="\.\/boot-guard\.js\?v=\d+"><\/script>/);
+    expect(html).toMatch(/<script src="\/boot-guard\.js\?v=\d+"><\/script>/);
     expect(sw).toMatch(/\.\/boot-guard\.js\?v=\d+/);
 
     // No reachable vendor module may keep a bare @noble specifier.

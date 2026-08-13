@@ -95,15 +95,27 @@ describe('public post permalinks', () => {
     expect(nginx).toMatch(/^\s*access_log off;/m);
   });
 
-  it('PERMA-06: the app shell still finds its assets from a two-segment path', () => {
-    // index.html references everything relatively ("./app.js"), which resolves against the DOCUMENT url — so on
-    // /alice/441.0.0 the browser would ask for /alice/app.js and get a 404 from the .js location block. <base>
-    // pins resolution to the origin root, and must precede the first URL-bearing tag to affect it at all.
-    expect(html).toContain('<base href="/">');
-    const firstUrlTag = Math.min(...['<link', '<script'].map((tag) => html.indexOf(tag)).filter((i) => i > -1));
-    expect(html.indexOf('<base href="/">')).toBeLessThan(firstUrlTag);
-    // And the reason a wrong asset path would be FATAL rather than merely odd: nginx 404s them, never falls back.
-    expect(nginx).toMatch(/location ~ \\\.\(html\|webmanifest\|css\|js\|mjs\|json\|md\|wasm\|svg\|png\)\$ \{\s*try_files \$uri =404;/);
+  it('PERMA-06: every app-shell URL is ROOT-ABSOLUTE, because a document-relative one dies on a permalink path', () => {
+    // A document-relative "./app.js" resolves against the DOCUMENT url, so at /alice/441.0.0 the browser asks for
+    // /alice/app.js. On this server that answers with the app shell (200, text/html), strict MIME checking refuses
+    // it as a module, and the reader gets a blank screen.
+    //
+    // <base href="/"> was tried first and is NOT usable: the CSP below carries `base-uri 'none'`, so the browser
+    // BLOCKS the tag outright ("Setting the document's base URI ... violates ... base-uri 'none'") — MEASURED
+    // against production 2026-08-13, after shipping it. No bundle-only test could have caught that, because the
+    // directive lives in the server config; this one can, because it reads both.
+    expect(html).not.toContain('<base');
+    expect(nginx).toContain("base-uri 'none'");
+    const relative = [...html.matchAll(/(?:src|href)="(\.\/[^"]*)"/g)].map((m) => m[1]);
+    expect(relative, `document-relative URLs break at a permalink path: ${relative.join(', ')}`).toEqual([]);
+    // Every one of them must still be same-origin absolute, not protocol-relative or external.
+    const urls = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) expect(url, url).toMatch(/^\/[^/]/);
+    // The service worker registration is the same trap one layer down: './sw.js' would register /<name>/sw.js.
+    expect(app).toContain("navigator.serviceWorker.register('/sw.js'");
+    // sw.js keeps its own './' — those resolve against the WORKER's scope, not the document, so they are correct.
+    expect(readFileSync('web/sw.js', 'utf8')).toContain("'./index.html'");
   });
 
   it('PERMA-07: opening a link needs no account, and never silently follows the channel', () => {

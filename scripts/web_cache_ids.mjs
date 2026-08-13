@@ -21,8 +21,10 @@ export const SERVICE_WORKER = 'web/sw.js';
 /** Both places the app entry point's `?v=` is written. */
 export const APP_TOKEN_SITES = ['web/index.html', SERVICE_WORKER];
 
-/* A fresh RegExp per call — a shared global one carries `lastIndex` between callers. */
-export const appTokenPattern = () => /(\.\/app\.js\?v=)([A-Za-z0-9]+)/g;
+/* A fresh RegExp per call — a shared global one carries `lastIndex` between callers.
+ * Both spellings: index.html loads the entry ROOT-ABSOLUTE (`/app.js`) so a post permalink served at
+ * /<name>/<post> still resolves it, while sw.js keeps `./app.js` (resolved against the worker's own scope). */
+export const appTokenPattern = () => /((?:\.\/|\/)app\.js\?v=)([A-Za-z0-9]+)/g;
 export const cacheNamePattern = () => /(const CACHE_NAME = 'platho-pwa-)([A-Za-z0-9-]+)(';)/;
 
 export function sha256(bytes) {
