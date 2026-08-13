@@ -86,6 +86,32 @@ describe('buy ATH from the reserve', () => {
     expect(app).toMatch(/if \(state\.exists\) marketStabilityState = state;/);
   });
 
+  it('BUYATH-06B: a completed buy re-reads the BALANCE, not just the protocol figures', () => {
+    // [OWNER 2026-08-13] "я купил себе 200 атх. Был статус отправляется... типа купил, но в балансе ничего не
+    // обновилось."
+    //
+    // The CLAIM lane was cured of exactly this on 2026-08-03 and queueAthPostTransactionRefresh was written for it.
+    // The BUY lane kept a one-shot of its own: a single 8s call to refreshAthProtocolStats, which reads PROTOCOL
+    // figures (supply, multiplier) and never touches the wallet's ATH balance — the number the user is watching is
+    // fed by refreshVaultNavBalanceInBackground. So the balance waited for a background tick up to three minutes
+    // away. One lane fixed, its twin missed: both now queue the same ladder.
+    const submit = app.slice(app.indexOf('async function submitBuyAth(amountAtomic)'), app.indexOf('async function refreshAthProtocolStatsRun()'));
+    expect(submit.length, 'the submit slice must not collapse').toBeGreaterThan(400);
+    expect(submit).toMatch(/setText\(buyAthStatus, t\('profile\.buyAthSent'\)\);[\s\S]{0,700}?queueAthPostTransactionRefresh\(\);/);
+    expect(submit, 'the private one-shot that only refreshed protocol stats must be gone')
+      .not.toMatch(/setTimeout\([\s\S]{0,80}?refreshAthProtocolStats/);
+    // The shared ladder is what makes the fix real: it refreshes BOTH sides, and starts before the user looks away.
+    const queue = app.slice(app.indexOf('function queueAthPostTransactionRefresh()'), app.indexOf('function isVaultViewActive()'));
+    expect(queue).toContain('refreshAthProtocolStats().catch(() => {});');
+    expect(queue).toContain('refreshVaultNavBalanceInBackground().catch(() => {});');
+    expect(queue).toMatch(/for \(const delayMs of ATH_POST_TRANSACTION_REFRESH_DELAYS_MS\) setTimeout\(tick, delayMs\);/);
+    // Counter-case: both money lanes must go through it, or the next one drifts the same way.
+    expect(
+      (app.match(/queueAthPostTransactionRefresh\(\)/g) ?? []).length,
+      'every lane that moves ATH queues the shared refresh (definition + claim + buy)',
+    ).toBeGreaterThanOrEqual(3);
+  });
+
   it('BUYATH-07: every user-visible string goes through t(), in all ten locales', async () => {
     const { I18N_STRINGS } = await import('../web/i18n-strings.mjs');
     const keys = [
