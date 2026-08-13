@@ -85,36 +85,39 @@ Point DNS `A` and `AAAA` records for `platho.app` at the server before expecting
 
 Install the config into `sites-available`, symlink it into `sites-enabled`, run `nginx -t`, then reload Nginx.
 
-## Release hashes (verifiable delivery)
+## Verifiable delivery (release tags)
 
-Platho has no backend, but it still arrives from one domain — and whoever controls that domain controls the code
-that holds the user's keys. This cannot be *solved* in a browser; it can be made **detectable**.
+Platho has no backend, but the app still arrives from one domain — and whoever controls that domain controls the
+code that holds the user's keys. That cannot be *solved* in a browser. What it can be is **detectable**.
 
-Two hashes pin the whole executable surface, because the bundle is already content-addressed:
+The build is deterministic: the deploy step copies files, it never compiles or minifies. So `web/` at a release tag
+is byte-for-byte what production serves, and **the tag is the announcement** — public git history, no post anyone
+has to remember to publish, nothing in any user's feed.
 
-- `index.html` names the entry point as `app.js?v=b<8 hex of sha256(app.js)>`, so it pins `app.js`;
-- `sw.js` carries `CACHE_NAME`, derived from every precached asset's URL **and** bytes, plus the list itself.
-
-`tests/sw-precache-covers-runtime` keeps that chain whole: every module reachable from `app.js` must be precached,
-or there are files nobody can verify. It was 46 modules short when the check was written.
-
-After a deploy:
+Release ritual: after deploying, tag the release commit.
 
 ```bash
-node scripts/verify_released_bundle.mjs --announce
+git tag -a v1.0.22 -m "1.0.22 — what shipped"
 ```
-
-It measures what production actually serves (never the local package — an undeployed build describes nothing) and
-prints the announcement. Publish that from Platho itself, signed by a wallet that never touches the web server.
 
 Anyone can then check what they were served:
 
 ```bash
-node scripts/verify_released_bundle.mjs --index <sha256> --sw <sha256>
+git checkout v1.0.22
+node scripts/verify_released_bundle.mjs
 ```
 
-Exit code 0 means the served bundle is the announced one, all the way down; 1 means it is not.
+It fetches `index.html` and `sw.js`, compares them to the checkout, then follows the content-addressing already in
+the bundle: `index.html` names the entry as `app.js?v=b<sha256 of app.js>`, and `sw.js` carries `CACHE_NAME` derived
+from every precached asset's URL and bytes plus the list itself. Two files pin all 158. Exit 0 = match.
 
-**The check must never be built into the app.** A hostile server would simply serve a build whose check lies —
-self-verification is circular and proves nothing. It only means something performed by someone the server cannot
-edit.
+`tests/sw-precache-covers-runtime` keeps that chain whole — every module reachable from `app.js` must be precached,
+or files ship that nothing pins. It was 46 modules short when the check was written.
+
+**What this does NOT catch**, so nobody sells it as more than it is: a TARGETED swap (bad bundle to one address
+while every verifier elsewhere sees a clean one), and a malicious release built and tagged honestly. It catches a
+sustained substitution of the published build. The real answer to a single-domain chokepoint is that the client is
+Apache-2.0 and forkable — anyone who distrusts our delivery can serve their own.
+
+**Never build the check into the app.** A swapped build ships a swapped check that reports success. Verification
+only counts performed by someone the server cannot edit.
