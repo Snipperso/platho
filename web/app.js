@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=40';
+} from './public-channel-subscriptions.mjs?v=41';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -243,7 +243,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=66';
+} from './i18n.mjs?v=67';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -412,6 +412,7 @@ const actionHint = document.querySelector('#actionHint');
 const actionFields = document.querySelector('#actionFields');
 const actionSummary = document.querySelector('#actionSummary');
 const actionCancelButton = document.querySelector('#actionCancelButton');
+const actionDismissButton = document.querySelector('#actionDismissButton');
 const actionSubmitButton = document.querySelector('#actionSubmitButton');
 const actionFootnotes = document.querySelector('#actionFootnotes');
 const imageLightboxDialog = document.querySelector('#imageLightboxDialog');
@@ -5857,6 +5858,7 @@ function closeActionDialog(result = null) {
     actionCancelButton.disabled = false;
   }
   if (actionSubmitButton) actionSubmitButton.disabled = false;
+  if (actionDismissButton) actionDismissButton.hidden = true;   // opt-in per dialog; never leaks to the next one
   resolve(result);
   scheduleWalletUnlockPrompt();
 }
@@ -5901,6 +5903,14 @@ async function openActionDialog(config = {}) {
     }
     actionSubmitButton.textContent = config.submitLabel ?? t('common.continue');
     actionSubmitButton.disabled = false;
+    // OPT-IN second, LABELLED way out. Most dialogs ask for a decision and close via the ✕; an INFORMATIONAL one
+    // needs a named dismiss, because a lone action button beside a bare ✕ reads as "you have to do this". Resolves
+    // exactly like the ✕ (null = the user declined), so callers keep one meaning for "no".
+    if (actionDismissButton) {
+      actionDismissButton.hidden = !config.cancelLabel;
+      actionDismissButton.disabled = false;
+      if (config.cancelLabel) actionDismissButton.textContent = config.cancelLabel;
+    }
     actionFields.replaceChildren(...(config.fields ?? []).map(createActionField));
     renderActionSummary(config.summary, collectActionDialogValues());
     renderActionFootnotes(config.footnotes);
@@ -9250,6 +9260,45 @@ async function refreshPublicPostDetailComments() {
   renderPublicPostDetail();
 }
 
+// Shown at most once per session: a burst of posts must not turn into a burst of dialogs, and the author who
+// dismissed it has heard us. It returns next session, because the channel is still not listed.
+let channelDiscoverabilityNoticeShown = false;
+
+/**
+ * After a post is published, tell the author if their channel is still absent from CHANNEL SEARCH.
+ *
+ * The gap this closes (owner, 2026-08-13): you can publish for weeks and wonder why nobody reads you. The posts
+ * ARE on chain and open to anyone with the link — what is missing is the channel from the discovery list, because
+ * that list only suggests channels that describe themselves (publicChannelIsDiscoverable). Nothing in the app
+ * said so, and there is no way to notice it from the inside.
+ *
+ * The wording must stay honest about that difference: the posts are not hidden, the CHANNEL is not listed.
+ *
+ * A channel with no cached profile counts as not listed, and that is correct rather than a guess: discovery skips
+ * a wallet whose beacon card is not a profile document at all. The one false alarm possible is a profile that
+ * exists on chain but has not been read on this device yet; the cost is one dismissable notice.
+ */
+async function maybeWarnChannelNotDiscoverable() {
+  if (channelDiscoverabilityNoticeShown) return;
+  const wallet = rawWalletAddress(plathoWallet?.address ?? storedPlathoWalletRecord()?.address);
+  if (!wallet) return;
+  if (publicChannelIsDiscoverable(cachedChannelProfile(wallet))) return;
+  channelDiscoverabilityNoticeShown = true;
+  const result = await openActionDialog({
+    title: t('public.channelNotListedTitle'),
+    hint: t('public.channelNotListedHint'),
+    tone: 'warn',
+    fields: [],
+    summary: [
+      t('public.channelNotListedPostsLive'),
+      t('public.channelNotListedSearchNeeds'),
+    ],
+    cancelLabel: t('common.ok'),
+    submitLabel: t('public.channelNotListedWrite'),
+  }).catch((error) => { console.error(error); return null; });
+  if (result !== null) await openEditChannelProfileDialog().catch((error) => console.error(error));
+}
+
 async function confirmPublicCommentsRisk() {
   const result = await openActionDialog({
     title: t('public.openCommentsRiskTitle'),
@@ -10062,6 +10111,23 @@ function scheduleDiscoveryLabelRefresh() {
   });
 }
 
+/**
+ * Does this profile carry enough for the channel to APPEAR IN CHANNEL SEARCH? Discovery only suggests channels
+ * that describe themselves — a list of nameless wallets helps nobody find anything.
+ *
+ * ONE definition, TWO readers: the sweep that enforces it, and the notice that tells an author their channel is
+ * not listed yet. They must not drift into disagreeing about whether a given channel is findable.
+ *
+ * Note the rule is description OR tags — either alone is enough. This is NOT the same question as
+ * channelProfileHasContent, which also counts a published-but-empty profile (entryId) and answers "is there a
+ * profile record at all".
+ */
+function publicChannelIsDiscoverable(profile) {
+  const description = String(profile?.description ?? '').trim();
+  const tags = (profile?.tags ?? []).filter(Boolean);
+  return Boolean(description) || tags.length > 0;
+}
+
 function channelProfileHasContent(profile) {
   return Boolean(profile && (profile.description || (profile.tags && profile.tags.length > 0) || profile.entryId));
 }
@@ -10201,7 +10267,7 @@ async function discoverChannelsFromBeacon() {
     if (!profileDoc?.profileBlock) continue;
     const description = String(profileDoc.profileBlock.description ?? '').trim();
     const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
-    if (!description && tags.length === 0) continue;                  // discovery suggests DESCRIBED channels
+    if (!publicChannelIsDiscoverable(profileDoc.profileBlock)) continue;   // discovery suggests DESCRIBED channels
     seen.add(wallet);
     // Warm the profile cache (also queues .ath verification) so render-time publicAuthorLabel resolves the name.
     setChannelProfileFromWalk(wallet, profileDoc.profileBlock, null, Number(item.announcedAt ?? 0n));
@@ -17972,6 +18038,14 @@ actionCancelButton?.addEventListener('click', () => {
   if (activeActionDialog?.cancellable === false) return;
   closeActionDialog(null);
 });
+
+// The labelled dismiss (opt-in via cancelLabel) means the SAME thing as the ✕ — one meaning for "no", so a caller
+// never has to tell them apart. It ignores `cancellable:false` for the same reason the ✕ does: a dialog that
+// forces a decision simply never asks for this button.
+actionDismissButton?.addEventListener('click', () => {
+  if (activeActionDialog?.cancellable === false) return;
+  closeActionDialog(null);
+});
 closeOnBackdropClick(actionDialog, () => closeActionDialog(null));
 imageLightboxCloseButton?.addEventListener('click', closeImageLightbox);
 imageLightboxDownloadButton?.addEventListener('click', downloadImageLightboxImage);
@@ -19343,6 +19417,9 @@ publicComposer?.addEventListener('submit', async (event) => {
         fileAttachments,
         commentsAllowed,
       }));
+      // Only after a post that actually went out, and only for POSTS: a comment lands in someone else's thread
+      // and says nothing about whether this author's channel is listed.
+      void maybeWarnChannelNotDiscoverable();
     }
     // On the post detail screen the composer stays in comment mode for the SAME post (so a follow-up message is
     // another comment, not a public post). Only the inline/feed flow resets the target.
