@@ -102,7 +102,7 @@ describe('public publish heal driver guard', () => {
     expect(persist).toMatch(/if \(!media\) return; \/\/ no image yet — leave the key unmarked so a later sync persists it/);
     expect(persist).toMatch(/await store\.put\(key, JSON\.stringify\(media\)\);/);
     // A degraded detail load still persists the assembled snapshot (accumulate-never-wipe) with latestLink=null.
-    const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 3600);
+    const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('function schedulePublicPublishVisibilityChecks('));
     expect(refresh).toMatch(/writeCachedPublicComments\(cacheKey, durablePartial, publicPostDetailParentExists === true, null\)/);
     // The detail unions BOTH real comment sources: feed-sync (author-indexed legacy comments — chain forensics
     // 2026-07-02: every pre-fix comment has parent_link=0, invisible to get_public_parent_index forever) and the
