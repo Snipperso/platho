@@ -544,14 +544,26 @@ describe('quick-start resume + activation gate guard', () => {
     // moved it, so anything positioned from an event handler is a frame behind the finger — the shudder the owner
     // reported. It must be scoped to that one state, or it is a permanent rAF loop for nothing.
     expect(app).toMatch(/function keepViewportVarsLiveWhileComposerIsOpen\(\)/);
-    const live = app.slice(app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'), app.indexOf('function syncViewportCssVars()'));
+    const live = app.slice(app.indexOf('function viewportVarsLoopWanted()'), app.indexOf('function syncViewportCssVars()'));
+    // The condition is "the keyboard is up", not "a maximized composer exists" — the shell follows the visible
+    // area too, so the ordinary composer shudders for the same reason. Scoping it to maximized was too narrow.
+    expect(live).toMatch(/window\.innerHeight - viewport\.height - viewport\.offsetTop\) > 0/);
     expect(live).toContain("document.querySelector('.composer.is-maximized')");
-    expect(live, 'it stops itself when the composer closes').toMatch(/cancelAnimationFrame\(viewportVarsFrame\)/);
+    expect(live, 'it stops itself when the keyboard goes down').toMatch(/cancelAnimationFrame\(viewportVarsFrame\)/);
     expect(live, 'and writes only when the number moved').toMatch(/if \(gap !== viewportVarsLastGap\)/);
 
     // The FLIP measures its target AFTER re-reading the viewport, or it animates to a rectangle that is already
     // stale — the composer flying somewhere wrong and then jumping into place.
     expect(app).toMatch(/syncViewportCssVars\(\);\s*const full = form\.getBoundingClientRect\(\);/);
+    // ...and it animates the SAME EDGE the CSS pins. Driving `top` over-constrains the rule (top + bottom +
+    // height ⇒ bottom ignored), so the composer animated to a top-anchored rectangle and only snapped into place
+    // when the inline values were cleared. That snap is what the owner saw at the end of every expand.
+    const setGeo = app.slice(app.indexOf('const setGeo = (r) => {'), app.indexOf('const finish = () => {'));
+    expect(setGeo).toContain("form.style.top = 'auto';");
+    expect(setGeo).toMatch(/form\.style\.bottom = `\$\{Math\.round\(window\.innerHeight - \(r\.top \+ r\.height\)\)\}px`;/);
+    expect(app, 'the transition must name the property that actually changes').toMatch(/transition = `bottom 0\.5s/);
+    expect(app, 'and the cleanup must drop it, or a stale inline bottom outlives the flip')
+      .toMatch(/\['transition', 'top', 'bottom', 'left', 'right', 'width', 'height'\]/);
     // The document must NOT be scrollable, and this half is kept — it is not part of the compensation machinery.
     // [MEASURED on the owner's iPhone] window.scrollY reached 586: the page really was being dragged, because
     // `body { overflow: hidden }` alone does not cover it (iOS scrolls the ROOT) and html had no overflow at all.
