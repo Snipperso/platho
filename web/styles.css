@@ -90,6 +90,17 @@
 html,
 body {
   min-height: 100%;
+  /* THE DOCUMENT ITSELF NEVER SCROLLS. Every scroller in this app is inside the shell — the feed, the message
+     strip, the panes — so a scrollable document is pure surface for a finger to drag the whole app around.
+     [MEASURED on the owner's iPhone 2026-08-14] It was being dragged: window.scrollY reached 586. `body` had
+     overflow:hidden already, but iOS scrolls the ROOT element, and html had min-height:100% and no overflow at
+     all — so the page was 755 tall with roughly a third of it visible, and Safari happily scrolled the rest.
+     overscroll-behavior also stops the rubber-band that bounces a finished drag.
+     What this canNOT stop is iOS sliding the VISIBLE AREA itself while the keyboard is up — that is a system
+     gesture, it happens on every site, and it springs back on release. Nothing in the page can refuse it. */
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   /* No browser zoom anywhere (owner request): pan tokens only — no pinch-zoom, no double-tap zoom. iOS
      ignores user-scalable=no in the viewport meta, but honors touch-action. The image lightbox is NOT
      affected: its viewport is touch-action:none and its zoom is its own pointer/transform implementation. */
@@ -1721,7 +1732,16 @@ a .avatar.has-image,
    but BELOW every dialog/picker/lightbox (>=40), so Insert-link / emoji / attachments still open on top. */
 .composer.is-maximized {
   position: fixed;
-  top: 0;
+  /* PINNED TO THE BOTTOM OF THE VISIBLE AREA, not to the top of the page.
+     `top: 0` + a height was the arithmetic error. A fixed element is placed against the LAYOUT viewport, which on
+     iOS neither shrinks nor moves for the keyboard; the VISIBLE area does both. Anchoring the top and giving it a
+     height that comes from the visible area leaves exactly the gap the owner saw — the composer ends where the
+     visible area does, and everything between that and the keyboard shows the app underneath.
+     The bottom edge is what has to line up, so that is what is pinned. --app-viewport-bottom-gap is the distance
+     from the bottom of the layout viewport to the bottom of the visible one (innerHeight − height − offsetTop),
+     which is the keyboard plus anything else in the way. On Android and desktop it is 0 and nothing changes. */
+  top: auto;
+  bottom: var(--app-viewport-bottom-gap, 0px);
   left: 0;
   right: 0;
   margin: 0; /* the public composer bleeds to the pane edges with margin: 0 -24px — reset it so left/right:0 = viewport */
