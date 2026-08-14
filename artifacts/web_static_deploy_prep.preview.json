@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-14T19:19:16.441Z",
+  "generatedAt": "2026-08-14T19:34:23.174Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 232,
-    "totalBytes": 5788807,
-    "bundleSha256": "6ca168ec93531303fb203489c55dc1af0e871f4e4099d953bc35a85f9f8fabd1",
+    "totalBytes": 5790587,
+    "bundleSha256": "9adeca3094603ea8a54c42db51482b67c9e940ddd5112a4b8a78d9ee317379e0",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -24,8 +24,8 @@
       },
       {
         "path": "app.js",
-        "bytes": 1414636,
-        "sha256": "ec99bb9630f871543b0c186f89d96fd60e041f1de8baab8e05e67f87bd6d03b6"
+        "bytes": 1416314,
+        "sha256": "dc60284297870f90b2501c4082797163f21b37854454976a426c26eab2d4711b"
       },
       {
         "path": "assets/icons/about.svg",
@@ -525,7 +525,7 @@
       {
         "path": "index.html",
         "bytes": 66114,
-        "sha256": "3b25a8e491f2101c388f1ca386b981ad2e928625d866feae48c3d1ad071a03de"
+        "sha256": "7d262752a853f364f7ee471692a68ba5c46d24c869e021a8b3e5c17face24286"
       },
       {
         "path": "intro-bucket.mjs",
@@ -764,13 +764,13 @@
       },
       {
         "path": "styles.css",
-        "bytes": 148576,
-        "sha256": "dba8a2914b0e13d6e7178f01ce64da2132602b5f8010cfcb50f1757d108a4d25"
+        "bytes": 148678,
+        "sha256": "1393c766584d5e351b6101971683128841adeb10af3ba463d80267b88549d1fb"
       },
       {
         "path": "sw.js",
         "bytes": 10086,
-        "sha256": "0514752cdc08d8580f494f9b3fdcf0f4553aba90e976c57af418af51430c3e38"
+        "sha256": "81bf05a14c8dc84bd918240e77bb9619947600a41e850a899b2e474883e641d1"
       },
       {
         "path": "ton-dns-provider.mjs",

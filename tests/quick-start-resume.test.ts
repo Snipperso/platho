@@ -546,8 +546,19 @@ describe('quick-start resume + activation gate guard', () => {
     // "it kept jumping to where it thought it was, and the app kept shoving it back".
     const maximizedRaw = css.slice(css.indexOf('.composer.is-maximized {'), css.indexOf('\n}', css.indexOf('.composer.is-maximized {')));
     const maximized = maximizedRaw.split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');
-    expect(maximized).toContain('top: 0;');
-    expect(maximized, 'the browser positions it; we only size it').not.toMatch(/bottom: var\(--app-viewport-bottom-gap/);
+    // ...and the THIRD number, which both earlier anchors were missing: the visible area SLIDES down the page
+    // (measured: offsetTop 523) while a fixed element stays in page coordinates. Height says how tall it is,
+    // offsetTop says where it begins, and a box that must sit inside it needs both. Anchoring the top to the page
+    // and anchoring the bottom to the keyboard gap both omit this term, and both flew upward by exactly it.
+    expect(maximized).toContain('top: var(--app-viewport-offset-top, 0px);');
+    expect(maximized, 'the keyboard gap alone was never enough').not.toMatch(/bottom: var\(--app-viewport-bottom-gap/);
+    expect(app).toMatch(/function writeVisibleOffsetTop\(\)/);
+    // The slide is a POSITION: followed every frame, because one frame stale is a visible stutter. The SIZES stay
+    // latched — they are a constant while the keyboard is up, and chasing their noise was the earlier shudder.
+    expect(app).toMatch(/writeVisibleOffsetTop\(\);\s*\/\/ The SIZES are recomputed only when the latch moved/);
+    // COUNTER-CASE, and the reason 1.0.29 failed: the SHELL must NOT get this correction. The browser scrolls and
+    // drags the shell itself, so correcting it means two things move it and they disagree once per frame.
+    expect(shellRule, 'the shell is carried by the browser, not corrected by us').not.toMatch(/--app-viewport-offset-top/);
     expect(maximized, 'the height is what keeps the send button off the keyboard')
       .toContain('height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh));');
     // HEIGHT ONLY. [OWNER 2026-08-14] Subtracting offsetTop made the composer chase the finger with a SECOND
@@ -598,7 +609,7 @@ describe('quick-start resume + activation gate guard', () => {
 
     // The compensation machinery that fought the viewport instead of following it must not come back.
     expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
-    expect(app, 'the offsetTop variable it was replaced with').not.toMatch(/--app-viewport-offset-top/);
+    // (--app-viewport-offset-top is BACK, but scoped: the maximized composer only, never the shell. See below.)
 
     // A frame loop while the composer is full screen: the browser reports a viewport change AFTER the frame that
     // moved it, so anything positioned from an event handler is a frame behind the finger — the shudder the owner
