@@ -4875,20 +4875,20 @@ button.feed-item:hover {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
     max-width: 100vw;
-    /* THE FLOOR IS THE KEYBOARD-LESS SCREEN, ON PURPOSE — and `min-height` beats `height`, so this line is what
-       decides the outcome whenever the visible area shrinks.
-       `height` below still follows --app-viewport-height; that half predates 1.0 and is untouched, as is the
-       maximized composer's own --app-viewport-height-exact. What this floor changes is only how far the SHELL may
-       shrink. On Android nothing changes at all: `interactive-widget=resizes-content` shrinks the LAYOUT viewport,
-       so 100svh is already the shrunken screen and floor and height agree. On iOS, which ignores that hint, the
-       floor keeps the shell full-screen tall and lets Safari handle the caret — which is exactly how the app
-       behaved from before 1.0 until 1.0.25, without a single complaint.
-       [OWNER 2026-08-14] Letting min-height follow the variable (1.0.25) is what started the damage: the shell
-       became short, Safari kept sliding the visible area under it, and both attempts to compensate made it worse
-       — undoing the scroll produced a snap-back on release, and driving `top` from visualViewport.offsetTop made
-       the whole interface flicker on every scroll frame and pulled the maximized composer apart.
-       DO NOT re-add a var() to THIS property without an iPhone to measure on. */
-    min-height: 100svh;
+    /* PINNED BY ITS BOTTOM, exactly like the maximized composer — the same arithmetic, and it works for the same
+       reason. A fixed element's `top` is measured against the LAYOUT viewport, which iOS neither shrinks nor moves
+       for the keyboard; anchoring the top and sizing from the VISIBLE area therefore puts a correctly-sized box in
+       the wrong place, and the difference falls off the bottom of the screen. [OWNER 2026-08-14] Which is what the
+       tab bar was doing — "exactly half of it hangs below the bottom edge", keyboard or no keyboard.
+       The bottom edge is the one that must line up, so it is the one that is pinned. --app-viewport-bottom-gap is
+       0 on Android and desktop, where the two viewports already agree, so nothing changes there.
+       `min-height: 0` is load-bearing: min-height BEATS height, so any floor above the visible area would push the
+       shell's bottom back off the screen and undo this. That floor (1.0.25 made it follow the variable, 1.0.31 put
+       it back to 100svh) is what the previous four attempts were fighting over — with the bottom pinned there is
+       nothing left for it to decide. */
+    top: auto;
+    bottom: var(--app-viewport-bottom-gap, 0px);
+    min-height: 0;
     height: 100dvh;
     height: var(--app-viewport-height, 100dvh);
     overflow: hidden;
