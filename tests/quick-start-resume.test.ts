@@ -613,7 +613,16 @@ describe('quick-start resume + activation gate guard', () => {
     expect(present, 'and a real keyboard is far bigger than this').toBeLessThan(250);
 
     // The compensation machinery that fought the viewport instead of following it must not come back.
-    expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
+    // The 1.0.28 hack — a scroll listener that fought EVERY scroll and snapped back on release — must not return.
+    expect(app, 'the scroll-fighting hack').not.toMatch(/keepDocumentPinnedToTop/);
+    expect(app, 'and it must not be reattached to the scroll event').not.toMatch(/addEventListener\('scroll',[^)]*scrollTo/);
+    // What IS allowed, and is a different thing: undoing the keyboard's own stale scroll, exactly once, at the
+    // moment the measured height changes. [MEASURED in the installed app: MAX scroll 386, off 386, shell up 386 —
+    // all three the keyboard's height, all three one event.] At focus the shell is still full height, so the
+    // composer sits where the keyboard is about to be; iOS scrolls the page to lift it, we then shrink the shell,
+    // and the scroll it was given is left behind. Gated on a height CHANGE, so a drag — which changes no size —
+    // is never touched. Once per keyboard, not once per frame.
+    expect(app).toMatch(/if \(rounded !== viewportHeightLastWritten\) \{[\s\S]{0,220}?window\.scrollTo\(0, 0\);/);
     // (--app-viewport-offset-top is BACK, but scoped: the maximized composer only, never the shell. See below.)
 
     // A frame loop while the composer is full screen: the browser reports a viewport change AFTER the frame that
@@ -648,9 +657,22 @@ describe('quick-start resume + activation gate guard', () => {
     // field takes focus iOS MUST bring the caret into view and scrolls the document regardless. The only refusal
     // is having no scrollable document, which position:fixed gives.
     const rootStart = css.indexOf('html,\nbody {');
-    const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart));
-    expect(rootRule, 'out of flow: nothing to scroll').toContain('position: fixed;');
-    expect(rootRule).toContain('inset: 0;');
+    // Declarations only — the note inside this rule names the shapes it forbids, and a raw scan trips on its own
+    // explanation. Fourth time this pattern has bitten in this file.
+    const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart))
+      .split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');
+    // THE PAGE IS AS TALL AS WHAT CAN BE SEEN — the one thing that removes the slack.
+    // [OWNER 2026-08-14, who diagnosed it before any measurement did] "The page size does not change when the
+    // keyboard appears, the interface redraws into the smaller area, and underneath is a black band I can scroll
+    // out from behind the keyboard." Exactly: screen 894, visible 508, and 386px of page left over — the
+    // keyboard's height, which is why his drag measured it to the pixel.
+    // Two earlier shapes failed to close it: `min-height: 100%` + `overflow: hidden` left the page the height of
+    // the SCREEN (and overflow cannot help — a focused field makes iOS scroll regardless), and `position: fixed`
+    // + `inset: 0` took the root out of flow but still stretched it to the screen.
+    expect(rootRule).toContain('height: var(--app-viewport-height, 100dvh);');
+    expect(rootRule, 'and capped, so content can never push it taller again')
+      .toContain('max-height: var(--app-viewport-height, 100dvh);');
+    expect(rootRule, 'stretching to the screen restores the slack').not.toContain('inset: 0;');
     expect(rootRule, 'a content-driven height brings the scrollable page back').not.toMatch(/min-height: 100%/);
     expect(rootRule).toContain('overflow: hidden;');
     expect(rootRule, 'and no rubber-band bounce at the end of a drag').toContain('overscroll-behavior: none;');
