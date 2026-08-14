@@ -73,6 +73,14 @@ const ROOT_RUNTIME_FILES = new Set([
   'bench-scan.html',
   'bench-scan.js',
   'bench-scan.css',
+  // The same idea for LAYOUT. [OWNER 2026-08-14] Four attempts at the iOS keyboard behaviour were made from the
+  // code alone and three of them shipped something worse, because the only machine that reproduces it is the
+  // owner's iPhone and every number that decides the fix — visualViewport height/offsetTop against innerHeight,
+  // svh/dvh/lvh, the safe-area insets, and where iOS actually puts a position:fixed box — can only be read there.
+  // A viewport-probe page stood here on 2026-08-14 and is gone, its question answered — see the iOS keyboard note
+  // on .app-shell in styles.css for what it measured. If another one is ever needed: THREE files, never one with
+  // the CSS and JS inline, because production's CSP (script-src/style-src 'self') drops inline blocks in silence.
+  // The first attempt shipped a page with no numbers and no styling and looked, on the phone, like a broken page.
   // clean-17 direct-pay lanes. These modules are imported (transitively) by app.js and MUST ship in the bundle —
   // WEB-GRAPH-01 walks the import graph from app.js and a module missing here 404s in production and bricks boot.
   // The private conversation lane (CONV), first-contact INTRO, RECOVERY, the public/avatar lane (PUBLIC), and the
