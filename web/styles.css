@@ -90,6 +90,13 @@
 html,
 body {
   min-height: 100%;
+  /* NOTHING may scroll the document itself. The app is a fixed shell with its own scrollers inside; a scrollable
+     document is pure surface for iOS to drag the whole app around when a field takes focus (see
+     keepDocumentPinnedToTop). `body { overflow: hidden }` below is NOT enough on its own — iOS Safari scrolls the
+     ROOT element, and html was left with min-height:100% and no overflow at all. */
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   /* No browser zoom anywhere (owner request): pan tokens only — no pinch-zoom, no double-tap zoom. iOS
      ignores user-scalable=no in the viewport meta, but honors touch-action. The image lightbox is NOT
      affected: its viewport is touch-action:none and its zoom is its own pointer/transform implementation. */

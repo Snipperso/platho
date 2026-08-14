@@ -500,6 +500,46 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/quickStartBackupMode = true/);
   });
 
+  it('IOS-KEYBOARD-01: nothing may scroll the document, and anything that does is undone', () => {
+    // [OWNER 2026-08-13, iPhone screenshot] Tapping the composer sent the whole interface flying upward until only
+    // the tab bar was left, black underneath. Three facts that are each fine alone:
+    //   1. iOS Safari does not shrink the LAYOUT viewport for the keyboard (interactive-widget is Chromium-only).
+    //   2. .app-shell is position:fixed, so it is laid out against that unshrunk layout viewport.
+    //   3. Focusing a field near the bottom makes Safari scroll the document to lift the caret above the keyboard.
+    // Together: the shell is dragged off the screen. The 1.0.25 height fix was necessary and did not address this
+    // — it only changed a full-height shell being dragged into a short one being dragged clean out of view.
+    //
+    // Every scroller in this app lives INSIDE the shell, so a scrolled document is always the system's doing.
+    // Sliced, not regex-matched across the block: the explanation inside it quotes `body { overflow: hidden }`,
+    // and a [^}] scan stops dead on that brace — the gate would fail on its own comment.
+    const rootStart = css.indexOf('html,\nbody {');
+    expect(rootStart, 'the root rule must exist').toBeGreaterThan(-1);
+    const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart));
+    expect(rootRule).toContain('overflow: hidden;');
+    expect(rootRule).toContain('overscroll-behavior: none;');
+    // body's own overflow:hidden was already there and is NOT enough: iOS scrolls the ROOT element.
+    expect(rootRule, 'html must be pinned too, not just body').toContain('height: 100%;');
+
+    expect(app).toMatch(/function keepDocumentPinnedToTop\(\) \{/);
+    const pin = app.slice(app.indexOf('function keepDocumentPinnedToTop() {'), app.indexOf('function syncViewportCssVars()'));
+    expect(pin).toMatch(/window\.scrollTo\(0, 0\);/);
+    expect(pin, 'a smooth scroll would show the app jumping away and back').not.toMatch(/behavior: 'smooth'/);
+    expect(pin, 'reading three offsets covers the engines that disagree').toMatch(/window\.scrollY \|\| window\.pageYOffset \|\| document\.documentElement\.scrollTop/);
+
+    // THE SET OF DOORS. Each covers a case the others miss, so dropping any one leaves a live path back to the bug:
+    // the document can scroll without the visual viewport moving, and Safari does it AFTER the focus handler returns.
+    expect(app).toMatch(/function syncViewportCssVars\(\) \{[\s\S]{0,400}?keepDocumentPinnedToTop\(\);/);
+    expect(app).toMatch(/window\.addEventListener\('scroll', keepDocumentPinnedToTop, \{ passive: true \}\);/);
+    const focusin = app.slice(app.indexOf("document.addEventListener('focusin'"), app.indexOf("document.addEventListener('focusin'") + 300);
+    expect(focusin, 'focusin bubbles, so one listener covers every field').toContain('keepDocumentPinnedToTop();');
+    expect(focusin, 'the scroll lands a frame later, so an immediate undo alone undoes nothing')
+      .toContain('requestAnimationFrame(keepDocumentPinnedToTop);');
+
+    // ...and the 1.0.25 half stays: the shell must still follow the keyboard, or its bottom goes under it again.
+    expect(css).toMatch(/min-height: var\(--app-viewport-height, 100svh\);/);
+    expect(css).toMatch(/height: var\(--app-viewport-height, 100dvh\);/);
+  });
+
   it('QS-RESUME-05: the stepper fits a narrow phone/TG-Mini-App screen (no horizontal overflow)', () => {
     // Owner reported the step-5 activation card spilling off the right edge on an iPhone. Root causes were
     // (1) nested grid items with the default min-width:auto letting a long localized paragraph's max-content
