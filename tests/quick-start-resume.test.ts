@@ -546,19 +546,20 @@ describe('quick-start resume + activation gate guard', () => {
     // "it kept jumping to where it thought it was, and the app kept shoving it back".
     const maximizedRaw = css.slice(css.indexOf('.composer.is-maximized {'), css.indexOf('\n}', css.indexOf('.composer.is-maximized {')));
     const maximized = maximizedRaw.split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');
-    // ...and the THIRD number, which both earlier anchors were missing: the visible area SLIDES down the page
-    // (measured: offsetTop 523) while a fixed element stays in page coordinates. Height says how tall it is,
-    // offsetTop says where it begins, and a box that must sit inside it needs both. Anchoring the top to the page
-    // and anchoring the bottom to the keyboard gap both omit this term, and both flew upward by exactly it.
-    expect(maximized).toContain('top: var(--app-viewport-offset-top, 0px);');
-    expect(maximized, 'the keyboard gap alone was never enough').not.toMatch(/bottom: var\(--app-viewport-bottom-gap/);
-    expect(app).toMatch(/function writeVisibleOffsetTop\(\)/);
-    // The slide is a POSITION: followed every frame, because one frame stale is a visible stutter. The SIZES stay
-    // latched — they are a constant while the keyboard is up, and chasing their noise was the earlier shudder.
-    expect(app).toMatch(/writeVisibleOffsetTop\(\);\s*\/\/ The SIZES are recomputed only when the latch moved/);
-    // COUNTER-CASE, and the reason 1.0.29 failed: the SHELL must NOT get this correction. The browser scrolls and
-    // drags the shell itself, so correcting it means two things move it and they disagree once per frame.
-    expect(shellRule, 'the shell is carried by the browser, not corrected by us').not.toMatch(/--app-viewport-offset-top/);
+    // NO POSITION CORRECTION AT ALL — the conclusion of the whole exercise, and the only part of it backed by a
+    // reading taken with the keyboard actually OPEN: innerHeight 755, visible height 438, keyboard 317,
+    // offsetTop 0, scrollY 0, and a top-anchored fixed element sitting at 0, exactly where it belongs.
+    //
+    // The visible area does not slide for the keyboard. It shrinks from the bottom. So a top-anchored fixed
+    // element is ALREADY correct, and each correction tried here — bottom pinned to the keyboard gap, top driven
+    // from offsetTop, the document scrolled back to zero — displaced the composer by exactly the amount it
+    // "corrected". Twelve attempts, all made without that one reading.
+    expect(maximized).toContain('top: 0;');
+    expect(maximized, 'the keyboard gap moved a box that was not out of place')
+      .not.toMatch(/bottom: var\(--app-viewport-bottom-gap/);
+    expect(app, 'and neither may the slide come back').not.toMatch(/--app-viewport-offset-top|writeVisibleOffsetTop/);
+    // What IS needed: the height. That is the whole of it.
+    expect(maximized).toContain('height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh));');
     expect(maximized, 'the height is what keeps the send button off the keyboard')
       .toContain('height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh));');
     // HEIGHT ONLY. [OWNER 2026-08-14] Subtracting offsetTop made the composer chase the finger with a SECOND

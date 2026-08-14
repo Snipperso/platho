@@ -1735,15 +1735,16 @@ a .avatar.has-image,
   /* TOP-ANCHORED, and the keyboard is left to the browser.
      [OWNER 2026-08-14] He worked this out from the behaviour alone: "it thought it was at the top of the screen,
      and you were just yanking it down by hand... every frame it jumped back to where it believed it was, and the
-     app shoved it back again." The missing piece turned out to be a THIRD number.
-     [MEASURED on his iPhone] The visible area does not merely shrink for the keyboard, it SLIDES down the page —
-     offsetTop reached 523 — while a fixed element stays in page coordinates. So anchoring the composer's top to
-     the page put it above the visible area by exactly that slide; anchoring its bottom to the keyboard gap missed
-     the same term and failed the same way. Both were tried, both flew upward, and that is what identifies it.
-     Height says how TALL the visible area is, offsetTop says WHERE it begins; a box that must sit inside it needs
-     both. The shell deliberately does NOT do this — the browser scrolls and drags that one itself, and correcting
-     something the browser is already moving is what made 1.0.29 shudder. This overlay nothing else positions. */
-  top: var(--app-viewport-offset-top, 0px);
+     app shoved it back again." He was right, and the measurement that finally settled it says the correction
+     itself was never needed.
+     [MEASURED on his iPhone with the keyboard OPEN, which no earlier reading had captured: innerHeight 755,
+     visible height 438, keyboard 317, offsetTop 0, scrollY 0, and a fixed strip anchored exactly like this one
+     sitting at 0 — precisely where it belongs.] The visible area does NOT slide when the keyboard opens; it only
+     shrinks, from the bottom, and a top-anchored fixed element is already in the right place. Every correction
+     tried here — bottom pinned to the keyboard gap, top driven from offsetTop — was moving something that was
+     not out of position, which is why each one flew upward by the amount it "corrected".
+     So the composer needs exactly one thing from us: to be as TALL as the visible area. Nothing else. */
+  top: 0;
   left: 0;
   right: 0;
   margin: 0; /* the public composer bleeds to the pane edges with margin: 0 -24px — reset it so left/right:0 = viewport */
