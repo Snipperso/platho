@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.29';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.30';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2090,7 +2090,39 @@ function composerHandleKeyboardVisibility() {
   composerKeyboardWasOpen = nowOpen;
 }
 
+/**
+ * Put the document back at the top whenever anything has scrolled it.
+ *
+ * [OWNER 2026-08-13, iPhone screenshot] Tapping the composer sent the whole interface flying upward until only the
+ * tab bar was left on screen with black underneath. The chain, and no link of it is wrong on its own:
+ *
+ *   1. iOS Safari does NOT shrink the LAYOUT viewport for the keyboard — `interactive-widget=resizes-content` is
+ *      a Chromium hint and Safari ignores it. Only the VISUAL viewport shrinks.
+ *   2. `.app-shell` is `position: fixed`, and a fixed element is laid out against the LAYOUT viewport. So it stays
+ *      where it was while the visible area became the top ~40% of the screen.
+ *   3. Focusing a field near the bottom makes Safari scroll the document (and shift the visual viewport) to lift
+ *      the caret above the keyboard — dragging the fixed shell up and off the screen with it.
+ *
+ * The 1.0.25 fix made the shell follow the keyboard's height, which was right and necessary, but it only changed
+ * WHAT was dragged away: before, a full-height shell was dragged and the user could push it back; after, a
+ * short shell was dragged clean out of view and left the page background behind it.
+ *
+ * Nothing in this app ever wants a scrolled document: html/body are overflow:hidden and every scroller is inside
+ * the shell. So a non-zero scroll offset is always the system's doing, and putting it back is the whole fix.
+ * Cheap enough to call on every viewport event — it reads two numbers and usually returns.
+ */
+function keepDocumentPinnedToTop() {
+  const offset = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+  if (offset === 0) return;
+  // No smooth behaviour: this must land in the SAME frame Safari scrolled in, or the user sees the app jump away
+  // and come back.
+  window.scrollTo(0, 0);
+}
+
 function syncViewportCssVars() {
+  // FIRST, before any measurement: a shifted document makes every number below describe a layout the user is not
+  // looking at.
+  keepDocumentPinnedToTop();
   // Inside Telegram the WebView height is governed by the client (viewportStableHeight),
   // not window.visualViewport — using the latter alone clips content under Telegram's header.
   const telegramHeight = telegramViewportHeight();
@@ -2120,23 +2152,6 @@ function syncViewportCssVars() {
   composerHandleKeyboardVisibility(); // blur the composer if the soft keyboard was just dismissed (kills the re-pop at its source)
   const rounded = Math.max(0, Math.round(height));
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, rounded)}px`);
-  // WHERE the visible area currently STARTS, which is the other half of describing it — the height above says how
-  // tall it is, this says how far down the page it begins.
-  //
-  // [OWNER 2026-08-13/14, iPhone] It begins somewhere other than zero more often than one would think. iOS does
-  // not shrink the LAYOUT viewport for the keyboard (`interactive-widget=resizes-content` is a Chromium hint that
-  // Safari ignores), it shrinks the VISUAL one and slides it — when a field takes focus, and again whenever the
-  // user drags. `.app-shell` is `position: fixed`, and fixed is resolved against the LAYOUT viewport, so every one
-  // of those slides carried the whole app off the top of the screen.
-  //
-  // The first attempt fought the slide: notice a scroll offset, scroll back to zero. That is the hack the owner
-  // named on sight — "I drag it and it jumps back when I let go" — because undoing a drag is exactly what it did.
-  //
-  // A fixed element cannot be told to follow the visual viewport, but it CAN be told where to start, and that is
-  // the documented technique: read offsetTop and drive the element's `top` from it. The shell then travels WITH
-  // the visible area, so a drag moves nothing on screen and there is nothing to spring back.
-  const offsetTop = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
-  document.documentElement.style.setProperty('--app-viewport-offset-top', `${offsetTop}px`);
   // Unclamped variant (no 320px floor) for the full-screen maximized composer only: on a short viewport (landscape or
   // a small/old device with the keyboard up) the floored value is taller than the visible area, so the overlay's
   // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
@@ -25822,10 +25837,20 @@ window.addEventListener('focus', () => {
 syncViewportCssVars();
 window.addEventListener('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('resize', syncViewportCssVars, { passive: true });
-// THE ONE THAT MATTERS FOR THE DRAG. `resize` fires when the keyboard changes the visible area's HEIGHT; `scroll`
-// fires when it changes the visible area's POSITION, which is what a finger dragging the page does on iOS. Without
-// this listener the shell would follow the keyboard but not the drag.
 window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passive: true });
+// The document's OWN scroll event, which the visual-viewport listeners above do not cover: Safari can scroll the
+// document without the visual viewport moving at all, and that alone drags the fixed shell out of view.
+window.addEventListener('scroll', keepDocumentPinnedToTop, { passive: true });
+// ...and at the moment of focus, which is when Safari decides to do it. `focusin` (not `focus`) because it
+// bubbles, so one listener covers every field in the app — including the two composers, which sit at the very
+// bottom edge and are therefore the ones Safari always wants to scroll to.
+//
+// requestAnimationFrame: the scroll happens AFTER the focus handler returns, so undoing it synchronously here
+// would undo nothing. One frame later is the earliest the correction can land.
+document.addEventListener('focusin', () => {
+  keepDocumentPinnedToTop();
+  requestAnimationFrame(keepDocumentPinnedToTop);
+}, { passive: true });
 
 // Composer textareas auto-size on input, but a window/pane resize re-wraps EXISTING text (a one-liner
 // becomes two lines when the window narrows) with no input event — so refit both fields on resize too.

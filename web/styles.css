@@ -4859,12 +4859,6 @@ button.feed-item:hover {
   .app-shell {
     position: fixed;
     inset: 0;
-    /* AFTER `inset`, deliberately, so it wins. A fixed element is positioned against the LAYOUT viewport, which
-       iOS does not shrink or move for the keyboard — but the VISIBLE area does both. Driving `top` from
-       visualViewport.offsetTop is the documented way to make a fixed element travel with what the user can
-       actually see: drag the page and the shell moves the same distance, so nothing appears to move at all.
-       0px when the two viewports agree, which is every desktop and every phone with the keyboard down. */
-    top: var(--app-viewport-offset-top, 0px);
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
     max-width: 100vw;
