@@ -1735,15 +1735,15 @@ a .avatar.has-image,
   /* TOP-ANCHORED, and the keyboard is left to the browser.
      [OWNER 2026-08-14] He worked this out from the behaviour alone: "it thought it was at the top of the screen,
      and you were just yanking it down by hand... every frame it jumped back to where it believed it was, and the
-     app shoved it back again." Exactly right, and it names a DOUBLE COUNT. Safari already lifts fixed
-     elements clear of the keyboard by itself; pinning the bottom to --app-viewport-bottom-gap applied that lift a
-     SECOND time. The two positions disagreed by the height of the keyboard and fought once per frame — which is
-     the shudder — and it settled the moment a drag happened to bring them into agreement, then started again in
-     the other direction. With the shell no longer adding its own movement, the leftover double count is plainly
-     visible: the composer sits a whole keyboard too high.
-     So: anchor the top, take the height from the visible area, and let the browser place it. The height is what
-     keeps the send button off the keyboard; the position is not ours to compute. */
-  top: 0;
+     app shoved it back again." The missing piece turned out to be a THIRD number.
+     [MEASURED on his iPhone] The visible area does not merely shrink for the keyboard, it SLIDES down the page —
+     offsetTop reached 523 — while a fixed element stays in page coordinates. So anchoring the composer's top to
+     the page put it above the visible area by exactly that slide; anchoring its bottom to the keyboard gap missed
+     the same term and failed the same way. Both were tried, both flew upward, and that is what identifies it.
+     Height says how TALL the visible area is, offsetTop says WHERE it begins; a box that must sit inside it needs
+     both. The shell deliberately does NOT do this — the browser scrolls and drags that one itself, and correcting
+     something the browser is already moving is what made 1.0.29 shudder. This overlay nothing else positions. */
+  top: var(--app-viewport-offset-top, 0px);
   left: 0;
   right: 0;
   margin: 0; /* the public composer bleeds to the pane edges with margin: 0 -24px — reset it so left/right:0 = viewport */

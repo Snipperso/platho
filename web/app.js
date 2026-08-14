@@ -2166,6 +2166,32 @@ function writeVisibleBottomGap() {
   return true;   // the sizes derived from it are now stale — see the frame loop and syncViewportCssVars
 }
 
+/**
+ * WHERE the visible area starts, for the ONE element that has to sit inside it exactly: the full-screen composer.
+ *
+ * [MEASURED on the owner's iPhone] The visible area does not only shrink for the keyboard, it SLIDES — offsetTop
+ * reached 523 — while a fixed element stays in page coordinates. So a composer anchored at the top of the page is
+ * above the visible area by exactly that slide, and one anchored to its bottom is out by the same amount for the
+ * same reason. Both were tried and both flew upward, which is the observation that finally pins the cause: the
+ * missing term is the slide, and neither anchor included it.
+ *
+ * Why this is safe where 1.0.29 was not: that version applied the correction to the whole SHELL, which is also
+ * what the browser scrolls and drags, so two things moved it and they disagreed once per frame. The maximized
+ * composer is a single overlay that nothing else positions — correcting it fights no one.
+ *
+ * Written from the frame loop rather than an event handler, because an event lands after the frame that moved
+ * things and one frame of lag is visible as a stutter.
+ */
+let viewportOffsetTopWritten = -1;
+
+function writeVisibleOffsetTop() {
+  const viewport = window.visualViewport;
+  const offset = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
+  if (offset === viewportOffsetTopWritten) return;
+  viewportOffsetTopWritten = offset;
+  document.documentElement.style.setProperty('--app-viewport-offset-top', `${offset}px`);
+}
+
 function keepViewportVarsLiveWhileComposerIsOpen() {
   if (!viewportVarsLoopWanted()) {
     if (viewportVarsFrame) { cancelAnimationFrame(viewportVarsFrame); viewportVarsFrame = 0; }
@@ -2174,9 +2200,11 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   if (viewportVarsFrame) return;
   const tick = () => {
     if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
-    // Only when the latch actually moved — i.e. the keyboard appeared, left, or changed into a different one.
-    // Every other frame does nothing but the comparison, which is the point: a keyboard that is simply OPEN must
-    // produce no writes at all, or the sizes breathe with the noise and that IS the shudder.
+    // The SLIDE is followed every frame — it is a position, and a position one frame stale is a stutter.
+    writeVisibleOffsetTop();
+    // The SIZES are recomputed only when the latch moved — i.e. the keyboard appeared, left, or changed into a
+    // different one. Every other frame does nothing but the comparison, which is the point: a keyboard that is
+    // simply OPEN must produce no size writes at all, or they breathe with the noise and that IS the shudder.
     if (writeVisibleBottomGap()) syncViewportCssVars();
     viewportVarsFrame = requestAnimationFrame(tick);
   };
@@ -2232,6 +2260,7 @@ function syncViewportCssVars() {
   // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
   // for --app-viewport-height because other layouts rely on it.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
+  writeVisibleOffsetTop();
   keepViewportVarsLiveWhileComposerIsOpen();
 }
 
