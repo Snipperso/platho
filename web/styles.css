@@ -90,13 +90,6 @@
 html,
 body {
   min-height: 100%;
-  /* NOTHING may scroll the document itself. The app is a fixed shell with its own scrollers inside; a scrollable
-     document is pure surface for iOS to drag the whole app around when a field takes focus (see
-     keepDocumentPinnedToTop). `body { overflow: hidden }` below is NOT enough on its own — iOS Safari scrolls the
-     ROOT element, and html was left with min-height:100% and no overflow at all. */
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
   /* No browser zoom anywhere (owner request): pan tokens only — no pinch-zoom, no double-tap zoom. iOS
      ignores user-scalable=no in the viewport meta, but honors touch-action. The image lightbox is NOT
      affected: its viewport is touch-action:none and its zoom is its own pointer/transform implementation. */
@@ -4862,16 +4855,20 @@ button.feed-item:hover {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
     max-width: 100vw;
-    /* min-height MUST follow the keyboard, because min-height BEATS height. A bare `100svh` here is the screen
-       WITHOUT the keyboard, so when one opens and --app-viewport-height honestly drops, the min-height overrode
-       it and the shell stayed full-screen tall: its bottom (nav rail + composer) went under the keyboard, and iOS
-       let the user drag the visual viewport up to reach it. MEASURED on iPhone 2026-08-13 — the owner could scroll
-       the whole app above the keyboard while the maximized composer was open.
-       Android never showed it: `interactive-widget=resizes-content` shrinks the layout viewport there, and iOS
-       Safari ignores that hint (Chromium-only). The plain 100svh stays first as the fallback for engines with no
-       custom-property support; once JS sets the var, min-height and height agree and neither can override. */
+    /* THE FLOOR IS THE KEYBOARD-LESS SCREEN, ON PURPOSE — and `min-height` beats `height`, so this line is what
+       decides the outcome whenever the visible area shrinks.
+       `height` below still follows --app-viewport-height; that half predates 1.0 and is untouched, as is the
+       maximized composer's own --app-viewport-height-exact. What this floor changes is only how far the SHELL may
+       shrink. On Android nothing changes at all: `interactive-widget=resizes-content` shrinks the LAYOUT viewport,
+       so 100svh is already the shrunken screen and floor and height agree. On iOS, which ignores that hint, the
+       floor keeps the shell full-screen tall and lets Safari handle the caret — which is exactly how the app
+       behaved from before 1.0 until 1.0.25, without a single complaint.
+       [OWNER 2026-08-14] Letting min-height follow the variable (1.0.25) is what started the damage: the shell
+       became short, Safari kept sliding the visible area under it, and both attempts to compensate made it worse
+       — undoing the scroll produced a snap-back on release, and driving `top` from visualViewport.offsetTop made
+       the whole interface flicker on every scroll frame and pulled the maximized composer apart.
+       DO NOT re-add a var() to THIS property without an iPhone to measure on. */
     min-height: 100svh;
-    min-height: var(--app-viewport-height, 100svh);
     height: 100dvh;
     height: var(--app-viewport-height, 100dvh);
     overflow: hidden;
