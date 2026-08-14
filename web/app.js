@@ -2238,6 +2238,22 @@ function syncViewportCssVars() {
   // Telegram keeps its own authority: its client-reported height still caps the result.
   const rounded = Math.max(0, Math.round(telegramHeight > 0 ? Math.min(telegramHeight, height || telegramHeight) : height));
   document.documentElement.style.setProperty('--app-viewport-height', `${rounded}px`);
+  // THE KEYBOARD'S SCROLL IS STALE THE MOMENT WE RESIZE, so undo it — once, here, and nowhere else.
+  //
+  // [MEASURED in the installed app] MAX scroll 386, off 386, shell up 386 — all three equal to the keyboard's
+  // height, all three the same event. The ORDER is what makes it happen: at the moment of focus the shell is
+  // still full height, so the composer is sitting exactly where the keyboard is about to appear. iOS sees a field
+  // under the incoming keyboard and scrolls the page to lift it. Then the keyboard finishes, we shrink the shell
+  // to the visible height, the composer is now near the top — and the scroll it was given stays. The system's
+  // decision was correct when it was made and wrong one frame later; nothing was undoing it.
+  //
+  // This is NOT the 1.0.28 hack that fought every scroll and snapped back on release. It fires only when the
+  // measured height actually CHANGES — i.e. the keyboard arrived or left — so a finger dragging the page (which
+  // changes no size) is never touched. Once per keyboard, not once per frame.
+  if (rounded !== viewportHeightLastWritten) {
+    viewportHeightLastWritten = rounded;
+    if ((window.scrollY || document.documentElement.scrollTop || 0) !== 0) window.scrollTo(0, 0);
+  }
   // Identical to the above now that the floor is gone. Kept as a separate name only because the stylesheet refers
   // to it in several places; both are simply "the visible height", with nothing added to either.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
@@ -2257,6 +2273,10 @@ function syncViewportCssVars() {
  * a diagnostic that cannot be turned on there is no diagnostic. It renders nothing at all without the parameter.
  */
 let viewportDebugNode = null;
+const viewportDebugPeak = { scrollY: 0, offset: 0, shellUp: 0 };
+// Last height written to CSS. Only a CHANGE means the keyboard arrived or left; anything else is a drag, and a
+// drag must not be interfered with — that distinction is what separates this from the 1.0.28 scroll-fighting hack.
+let viewportHeightLastWritten = -1;
 
 // Turned on INSIDE the app, by triple-tapping the version number, and remembered.
 //
@@ -2311,11 +2331,19 @@ function renderViewportDebugOverlay() {
     return `${Math.round(box.top)}..${Math.round(box.bottom)}`;
   };
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '-';
+  // PEAKS, because the interesting moment is never the moment of the screenshot: by the time anyone can take one
+  // the page has been dragged back and every live number reads zero again. These remember the worst seen.
+  const scrolled = Math.round(window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
+  const shellTop = shell ? Math.round(shell.getBoundingClientRect().top) : 0;
+  viewportDebugPeak.scrollY = Math.max(viewportDebugPeak.scrollY, Math.abs(scrolled));
+  viewportDebugPeak.offset = Math.max(viewportDebugPeak.offset, Math.round(viewport?.offsetTop ?? 0));
+  viewportDebugPeak.shellUp = Math.max(viewportDebugPeak.shellUp, -shellTop);
   viewportDebugNode.textContent = [
     `inner ${Math.round(window.innerHeight)}  vv ${Math.round(viewport?.height ?? 0)}  off ${Math.round(viewport?.offsetTop ?? 0)}`,
-    `scrollY ${Math.round(window.scrollY || 0)}  latch ${keyboardGapLatched}`,
+    `scrollY ${scrolled}  latch ${keyboardGapLatched}`,
     `--height ${cssVar('--app-viewport-height')}  --exact ${cssVar('--app-viewport-height-exact')}`,
     `shell ${rect(shell)}  composer ${rect(composer)}`,
+    `MAX scroll ${viewportDebugPeak.scrollY}  off ${viewportDebugPeak.offset}  shell up ${viewportDebugPeak.shellUp}`,
   ].join('\n');
 }
 
