@@ -89,16 +89,21 @@
 
 html,
 body {
-  min-height: 100%;
-  /* THE DOCUMENT ITSELF NEVER SCROLLS. Every scroller in this app is inside the shell — the feed, the message
-     strip, the panes — so a scrollable document is pure surface for a finger to drag the whole app around.
-     [MEASURED on the owner's iPhone 2026-08-14] It was being dragged: window.scrollY reached 586. `body` had
-     overflow:hidden already, but iOS scrolls the ROOT element, and html had min-height:100% and no overflow at
-     all — so the page was 755 tall with roughly a third of it visible, and Safari happily scrolled the rest.
-     overscroll-behavior also stops the rubber-band that bounces a finished drag.
-     What this canNOT stop is iOS sliding the VISIBLE AREA itself while the keyboard is up — that is a system
-     gesture, it happens on every site, and it springs back on release. Nothing in the page can refuse it. */
-  height: 100%;
+  /* THE PAGE IS TAKEN OUT OF FLOW SO THERE IS PHYSICALLY NOTHING TO SCROLL.
+     [MEASURED in the owner's installed app 2026-08-14, and this is the decisive observation of the whole hunt]
+     He tapped the composer, the interface flew off the top, and he was able to SCROLL IT BACK DOWN — including
+     the fixed diagnostic strip, which is pinned to the viewport and therefore cannot move unless the document
+     itself moves. So the document was moving, and everything in it went along: that, not any layout arithmetic,
+     is what "flies into the stratosphere" means.
+     `overflow: hidden` was already here and did not stop it. It cannot: when a field takes focus iOS MUST bring
+     the caret into view and will scroll the document to do it, overflow or no overflow. The only thing that
+     refuses is having no scrollable document at all — position:fixed takes the page out of flow, its height stops
+     being content-driven, and there is nowhere to scroll to. The app is a fixed shell with its own scrollers
+     inside, so it loses nothing by this.
+     What it still cannot stop is iOS sliding the VISIBLE AREA while the keyboard is up — a system gesture that
+     exists on every site and springs back on release. That one is not ours to refuse. */
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   overscroll-behavior: none;
   /* No browser zoom anywhere (owner request): pan tokens only — no pinch-zoom, no double-tap zoom. iOS
