@@ -19408,15 +19408,12 @@ function composerRunMaximizeGeo(form, growing) {
   const full = form.getBoundingClientRect(); // form currently has .is-maximized -> its full-screen rect
   if (!inlineRect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
   const fullRect = { top: full.top, left: full.left, width: full.width, height: full.height };
-  // BY THE BOTTOM EDGE, to match the CSS. [OWNER 2026-08-14] "After expanding it jumps into the right place."
-  // That jump was the hand-off: the animation drove `top`, which over-constrains the rule (top + bottom + height
-  // means bottom is ignored), so the composer animated to a top-anchored rectangle — above the screen while the
-  // keyboard is up — and only landed correctly once these inline values were cleared and the CSS `bottom` took
-  // over again. Animating the same edge the CSS pins means the end state IS the CSS state, and there is nothing
-  // left to jump to.
+  // BY THE TOP EDGE, matching the CSS again now that the composer is top-anchored. The rule is the same either
+  // way: the flip must drive the SAME edge the stylesheet pins, or clearing the inline values at the end hands the
+  // box to a different position and the user sees it jump.
   const setGeo = (r) => {
-    form.style.top = 'auto';
-    form.style.bottom = `${Math.round(window.innerHeight - (r.top + r.height))}px`;
+    form.style.bottom = 'auto';
+    form.style.top = `${Math.round(r.top)}px`;
     form.style.left = `${r.left}px`; form.style.right = 'auto';
     form.style.width = `${r.width}px`; form.style.height = `${r.height}px`;
   };
@@ -19432,9 +19429,9 @@ function composerRunMaximizeGeo(form, growing) {
   setGeo(growing ? inlineRect : fullRect); // start state
   void form.offsetWidth; // reflow so the next geometry transitions
   const ease = growing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)';
-  // `bottom`, not `top` — the property setGeo now drives. Transitioning a property nothing animates would make the
-  // growth instant and, worse, never fire the transitionend that finishes the flip.
-  form.style.transition = `bottom 0.5s ${ease}, left 0.5s ${ease}, width 0.5s ${ease}, height 0.5s ${ease}`;
+  // Must name the property setGeo actually drives, or the growth is instant and — worse — the transitionend that
+  // finishes the flip never fires.
+  form.style.transition = `top 0.5s ${ease}, left 0.5s ${ease}, width 0.5s ${ease}, height 0.5s ${ease}`;
   setGeo(growing ? fullRect : inlineRect); // end state -> the box grows/shrinks and the content re-lays-out
   form.addEventListener('transitionend', onEnd);
   form.__maxFlip = { timer: setTimeout(finish, 700), onEnd }; // fallback so a missed transitionend can't strand mid-animation

@@ -539,9 +539,17 @@ describe('quick-start resume + activation gate guard', () => {
     expect(shellRule, 'a fixed element chasing offsetTop flickers once per scroll frame')
       .not.toMatch(/top: var\(--app-viewport-offset-top/);
     expect(shellRule).toContain('height: var(--app-viewport-height, 100dvh);');
-    const maximized = css.slice(css.indexOf('.composer.is-maximized {'), css.indexOf('\n}', css.indexOf('.composer.is-maximized {')));
-    expect(maximized, 'the composer is pinned the same way').toContain('bottom: var(--app-viewport-bottom-gap, 0px);');
-    expect(maximized).toContain('top: auto;');
+    // THE COMPOSER IS TOP-ANCHORED TOO, and the keyboard is the browser's job. [OWNER 2026-08-14] Pinning its
+    // bottom to the gap applied a lift Safari ALREADY applies to fixed elements — a double count. The two
+    // positions disagreed by a whole keyboard and fought once per frame (the shudder), settling whenever a drag
+    // brought them into agreement and restarting in the other direction. He diagnosed it from the behaviour:
+    // "it kept jumping to where it thought it was, and the app kept shoving it back".
+    const maximizedRaw = css.slice(css.indexOf('.composer.is-maximized {'), css.indexOf('\n}', css.indexOf('.composer.is-maximized {')));
+    const maximized = maximizedRaw.split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');
+    expect(maximized).toContain('top: 0;');
+    expect(maximized, 'the browser positions it; we only size it').not.toMatch(/bottom: var\(--app-viewport-bottom-gap/);
+    expect(maximized, 'the height is what keeps the send button off the keyboard')
+      .toContain('height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh));');
     // HEIGHT ONLY. [OWNER 2026-08-14] Subtracting offsetTop made the composer chase the finger with a SECOND
     // movement on top of the one Safari already applies to fixed elements — the two fight for a frame, which is
     // the shudder, and once the offset reaches its limit the same drag repeated is smooth. He diagnosed it from
@@ -607,13 +615,14 @@ describe('quick-start resume + activation gate guard', () => {
     // The FLIP measures its target AFTER re-reading the viewport, or it animates to a rectangle that is already
     // stale — the composer flying somewhere wrong and then jumping into place.
     expect(app).toMatch(/syncViewportCssVars\(\);\s*const full = form\.getBoundingClientRect\(\);/);
-    // ...and it animates the SAME EDGE the CSS pins. Driving `top` over-constrains the rule (top + bottom +
-    // height ⇒ bottom ignored), so the composer animated to a top-anchored rectangle and only snapped into place
-    // when the inline values were cleared. That snap is what the owner saw at the end of every expand.
+    // ...and it animates the SAME EDGE the CSS pins — whichever that is. Specifying both edges plus a height
+    // over-constrains the rule, so one of them is silently dropped and the flip ends somewhere the stylesheet
+    // does not agree with; clearing the inline values then hands the box to that other position, which the user
+    // sees as a jump. The composer is top-anchored now, so the flip drives `top`.
     const setGeo = app.slice(app.indexOf('const setGeo = (r) => {'), app.indexOf('const finish = () => {'));
-    expect(setGeo).toContain("form.style.top = 'auto';");
-    expect(setGeo).toMatch(/form\.style\.bottom = `\$\{Math\.round\(window\.innerHeight - \(r\.top \+ r\.height\)\)\}px`;/);
-    expect(app, 'the transition must name the property that actually changes').toMatch(/transition = `bottom 0\.5s/);
+    expect(setGeo).toContain("form.style.bottom = 'auto';");
+    expect(setGeo).toMatch(/form\.style\.top = `\$\{Math\.round\(r\.top\)\}px`;/);
+    expect(app, 'the transition must name the property that actually changes').toMatch(/transition = `top 0\.5s/);
     expect(app, 'and the cleanup must drop it, or a stale inline bottom outlives the flip')
       .toMatch(/\['transition', 'top', 'bottom', 'left', 'right', 'width', 'height'\]/);
     // The document must NOT be scrollable, and this half is kept — it is not part of the compensation machinery.
