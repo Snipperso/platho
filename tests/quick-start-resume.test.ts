@@ -542,7 +542,7 @@ describe('quick-start resume + activation gate guard', () => {
     // keyboard opens or closes and holds still through every drag in between.
     const gapWriter = app.slice(app.indexOf('function writeVisibleBottomGap()'), app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'));
     expect(gapWriter.length, 'the gap writer must not collapse').toBeGreaterThan(200);
-    expect(gapWriter).toMatch(/const gap = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\)\)\);/);
+    expect(gapWriter).toMatch(/const raw = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\)\)\);/);
     expect(app, 'no viewport expression may subtract offsetTop again').not.toMatch(/window\.innerHeight - \(?viewport(\?)?\.height[^\n]*offsetTop/);
     // ONE writer. Two copies of this arithmetic would drift on the threshold below, which is where a
     // one-pixel difference is visible as motion.
@@ -551,14 +551,26 @@ describe('quick-start resume + activation gate guard', () => {
       'only writeVisibleBottomGap may write the gap',
     ).toBe(1);
 
-    // AND A THRESHOLD. [OWNER 2026-08-14, after the offsetTop term went] "Дёрганье стало меньше и мельче, но
-    // характер такой же." iOS does not hold the visible height still during a drag — it wobbles a few pixels per
-    // frame — and answering every wobble moves the shell, which is the same shudder in miniature. A keyboard moves
-    // this number by hundreds; a wobble by single digits. Zero always lands, because settling flush matters more.
-    expect(gapWriter).toMatch(/const settled = gap === 0 \|\| viewportGapWritten < 0 \|\| Math\.abs\(gap - viewportGapWritten\) >= VIEWPORT_GAP_SETTLE_PX;/);
-    const threshold = Number(/const VIEWPORT_GAP_SETTLE_PX = (\d+);/.exec(app)?.[1] ?? 0);
-    expect(threshold, 'big enough to ignore a wobble').toBeGreaterThanOrEqual(16);
-    expect(threshold, 'small enough that no real keyboard is missed').toBeLessThan(120);
+    // LATCHED, NOT TRACKED — and NOT thresholded, which is a different thing that fails differently.
+    //
+    // [OWNER 2026-08-14] Two attempts failed here. Answering every frame gave a fine shudder; a 32px threshold
+    // turned it into rare lurches that ALTERNATED BY DIRECTION, because a threshold does not smooth, it
+    // accumulates: the difference creeps up unseen and then lands at once, and reversing starts the climb again.
+    // He read the mechanism straight off the behaviour — "drag down, it shudders, then stops and never shudders
+    // downward again; now it shudders upward instead".
+    //
+    // A keyboard is open or it is not. While open its height is a CONSTANT, so variation in the reading is noise
+    // about a fixed thing and there is nothing to follow. Latch on open, release on close, re-latch only for a
+    // change too large to be noise.
+    expect(gapWriter, 'the accumulating threshold must not come back').not.toMatch(/VIEWPORT_GAP_SETTLE_PX|settled/);
+    expect(gapWriter).toMatch(/if \(raw < KEYBOARD_PRESENT_PX\) \{/);
+    expect(gapWriter).toMatch(/\} else if \(keyboardGapLatched === 0\) \{/);
+    expect(gapWriter).toMatch(/\} else if \(Math\.abs\(raw - keyboardGapLatched\) >= KEYBOARD_RESIZE_PX\) \{/);
+    // Counter-case: while the keyboard is up and its size unchanged, NOTHING is written — that is the whole fix.
+    expect(gapWriter).toMatch(/if \(next === keyboardGapLatched\) return;/);
+    const present = Number(/const KEYBOARD_PRESENT_PX = (\d+);/.exec(app)?.[1] ?? 0);
+    expect(present, 'browser chrome insets are far smaller than a keyboard').toBeGreaterThanOrEqual(80);
+    expect(present, 'and a real keyboard is far bigger than this').toBeLessThan(250);
 
     // The compensation machinery that fought the viewport instead of following it must not come back.
     expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);

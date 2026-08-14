@@ -2127,28 +2127,42 @@ function viewportVarsLoopWanted() {
 }
 
 /**
- * How much of the page the keyboard covers, written to CSS — and the ONE place that writes it, so the loop below
- * and syncViewportCssVars cannot drift apart on the arithmetic or on the threshold.
+ * How much of the page the keyboard covers, written to CSS — and the ONE place that writes it.
  *
- * THE THRESHOLD IS THE POINT. [OWNER 2026-08-14, after the offsetTop term was removed] "The shudder got smaller
- * and finer, but it is the same shudder — now small and fast." The remaining source is that iOS does not hold the
- * visible height perfectly still during a drag — it wobbles by a few pixels, frame to frame — and answering every
- * wobble moves the shell, which is a shudder by another name.
+ * THE VALUE IS LATCHED, NOT TRACKED. The keyboard's height is read ONCE, when it appears, and held until it goes
+ * away. Nothing in between changes it.
  *
- * A keyboard changes this figure by hundreds of pixels; a wobble by single digits. So a change is acted on only
- * when it is big enough to BE a keyboard, and 0 (keyboard fully gone) always lands, because settling back to
- * exactly flush matters more than the threshold.
+ * [OWNER 2026-08-14] Two attempts got this wrong in the same way, and his description of the second named the
+ * mechanism exactly: "drag down and it shudders, then stops, and no matter how far down you drag it never shudders
+ * again — but now it shudders upward." That is a THRESHOLD, and it was mine. iOS wobbles the visible height by a few
+ * per frame during a drag; answering every wobble was the first shudder, so a 32px threshold was added — which
+ * did not smooth anything, it ACCUMULATED. The difference crept up under the threshold in silence and then landed
+ * all at once as a jump, and reversing direction started the same climb over again. Fine shudder became rare
+ * lurches, alternating by direction, which is precisely what he saw.
+ *
+ * There is nothing to track. A keyboard is open or it is not; while it is open its height is a constant, and any
+ * frame-to-frame variation in the reading is noise about a fixed thing. So: latch on open, release on close, and
+ * re-latch only for a change far too large to be noise (switching to the emoji keyboard, a language with a
+ * suggestion strip) — a jump there is correct, because the keyboard really did change size.
  */
-const VIEWPORT_GAP_SETTLE_PX = 32;
-let viewportGapWritten = -1;
+const KEYBOARD_PRESENT_PX = 120;   // below this the visible area is merely inset (browser chrome), not covered
+const KEYBOARD_RESIZE_PX = 60;     // a real change of keyboard, not the reading wobbling about one
+let keyboardGapLatched = 0;
 
 function writeVisibleBottomGap() {
   const viewport = window.visualViewport;
-  const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
-  const settled = gap === 0 || viewportGapWritten < 0 || Math.abs(gap - viewportGapWritten) >= VIEWPORT_GAP_SETTLE_PX;
-  if (!settled || gap === viewportGapWritten) return;
-  viewportGapWritten = gap;
-  document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${gap}px`);
+  const raw = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
+  let next = keyboardGapLatched;
+  if (raw < KEYBOARD_PRESENT_PX) {
+    next = 0;                                             // gone: sit flush again
+  } else if (keyboardGapLatched === 0) {
+    next = raw;                                           // just appeared: take its height once
+  } else if (Math.abs(raw - keyboardGapLatched) >= KEYBOARD_RESIZE_PX) {
+    next = raw;                                           // genuinely a different keyboard
+  }
+  if (next === keyboardGapLatched) return;
+  keyboardGapLatched = next;
+  document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${next}px`);
 }
 
 function keepViewportVarsLiveWhileComposerIsOpen() {
