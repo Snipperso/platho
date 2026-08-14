@@ -500,44 +500,39 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app).toMatch(/quickStartBackupMode = true/);
   });
 
-  it('IOS-KEYBOARD-01: nothing may scroll the document, and anything that does is undone', () => {
-    // [OWNER 2026-08-13, iPhone screenshot] Tapping the composer sent the whole interface flying upward until only
-    // the tab bar was left, black underneath. Three facts that are each fine alone:
-    //   1. iOS Safari does not shrink the LAYOUT viewport for the keyboard (interactive-widget is Chromium-only).
-    //   2. .app-shell is position:fixed, so it is laid out against that unshrunk layout viewport.
-    //   3. Focusing a field near the bottom makes Safari scroll the document to lift the caret above the keyboard.
-    // Together: the shell is dragged off the screen. The 1.0.25 height fix was necessary and did not address this
-    // — it only changed a full-height shell being dragged into a short one being dragged clean out of view.
+  it('IOS-KEYBOARD-01: the shell floor stays the keyboard-less screen, and no compensation code returns', () => {
+    // FOUR DAYS OF DAMAGE FROM ONE LINE, kept here so nobody re-derives it.
     //
-    // Every scroller in this app lives INSIDE the shell, so a scrolled document is always the system's doing.
-    // Sliced, not regex-matched across the block: the explanation inside it quotes `body { overflow: hidden }`,
-    // and a [^}] scan stops dead on that brace — the gate would fail on its own comment.
+    // The keyboard-aware height predates 1.0 and is not in question: `height` follows --app-viewport-height, the
+    // maximized composer follows --app-viewport-height-exact, and on Android the whole thing works because
+    // `interactive-widget=resizes-content` shrinks the LAYOUT viewport there.
+    //
+    // 1.0.25 changed ONE property: it let `min-height` follow the variable too. min-height beats height, so that
+    // floor was the only thing keeping the shell full-screen tall on iOS — which ignores that hint and shrinks
+    // only the VISIBLE area. With the floor gone the shell became short, Safari kept sliding the visible area
+    // under it, and two attempts to compensate each shipped something worse:
+    //   1.0.28 — undo the scroll (window.scrollTo(0,0)). Owner: "I drag it and it jumps back when I let go."
+    //   1.0.29 — drive `top` from visualViewport.offsetTop. offsetTop changes every scroll frame while `top` is
+    //            recomputed from an event handler, so the interface shook and the maximized composer came apart.
+    //
+    // Reverted to the pre-1.0.25 line. This gate exists so the "obvious improvement" is not made a fourth time.
+    const shellRule = css.slice(css.indexOf('  .app-shell {'), css.indexOf('overflow: hidden;', css.indexOf('  .app-shell {')));
+    expect(shellRule.length, 'the mobile shell rule must not collapse').toBeGreaterThan(300);
+    expect(shellRule, 'the floor is the keyboard-less screen').toContain('min-height: 100svh;');
+    expect(shellRule, 'and it must NOT follow the variable').not.toMatch(/min-height: var\(/);
+    expect(shellRule, 'a fixed element chasing offsetTop flickers once per scroll frame')
+      .not.toMatch(/top: var\(--app-viewport-offset-top/);
+    // The half that predates 1.0 is untouched — this gate must never be read as "the keyboard is ignored".
+    expect(shellRule).toContain('height: var(--app-viewport-height, 100dvh);');
+    expect(app).toMatch(/--app-viewport-height-exact/);
+
+    // None of the compensation machinery may come back, in the file OR in the shipped listeners.
+    expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
+    expect(app, 'the offsetTop variable it was replaced with').not.toMatch(/--app-viewport-offset-top/);
     const rootStart = css.indexOf('html,\nbody {');
-    expect(rootStart, 'the root rule must exist').toBeGreaterThan(-1);
     const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart));
-    expect(rootRule).toContain('overflow: hidden;');
-    expect(rootRule).toContain('overscroll-behavior: none;');
-    // body's own overflow:hidden was already there and is NOT enough: iOS scrolls the ROOT element.
-    expect(rootRule, 'html must be pinned too, not just body').toContain('height: 100%;');
-
-    expect(app).toMatch(/function keepDocumentPinnedToTop\(\) \{/);
-    const pin = app.slice(app.indexOf('function keepDocumentPinnedToTop() {'), app.indexOf('function syncViewportCssVars()'));
-    expect(pin).toMatch(/window\.scrollTo\(0, 0\);/);
-    expect(pin, 'a smooth scroll would show the app jumping away and back').not.toMatch(/behavior: 'smooth'/);
-    expect(pin, 'reading three offsets covers the engines that disagree').toMatch(/window\.scrollY \|\| window\.pageYOffset \|\| document\.documentElement\.scrollTop/);
-
-    // THE SET OF DOORS. Each covers a case the others miss, so dropping any one leaves a live path back to the bug:
-    // the document can scroll without the visual viewport moving, and Safari does it AFTER the focus handler returns.
-    expect(app).toMatch(/function syncViewportCssVars\(\) \{[\s\S]{0,400}?keepDocumentPinnedToTop\(\);/);
-    expect(app).toMatch(/window\.addEventListener\('scroll', keepDocumentPinnedToTop, \{ passive: true \}\);/);
-    const focusin = app.slice(app.indexOf("document.addEventListener('focusin'"), app.indexOf("document.addEventListener('focusin'") + 300);
-    expect(focusin, 'focusin bubbles, so one listener covers every field').toContain('keepDocumentPinnedToTop();');
-    expect(focusin, 'the scroll lands a frame later, so an immediate undo alone undoes nothing')
-      .toContain('requestAnimationFrame(keepDocumentPinnedToTop);');
-
-    // ...and the 1.0.25 half stays: the shell must still follow the keyboard, or its bottom goes under it again.
-    expect(css).toMatch(/min-height: var\(--app-viewport-height, 100svh\);/);
-    expect(css).toMatch(/height: var\(--app-viewport-height, 100dvh\);/);
+    expect(rootRule, 'html was given overflow/height only to support the undo hack').not.toContain('overscroll-behavior');
+    expect(rootRule).not.toContain('overflow: hidden;');
   });
 
   it('QS-RESUME-05: the stepper fits a narrow phone/TG-Mini-App screen (no horizontal overflow)', () => {
