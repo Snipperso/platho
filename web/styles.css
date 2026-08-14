@@ -5540,3 +5540,21 @@ button.feed-item:hover {
   height: 36px;
   flex: 0 0 auto;
 }
+
+/* Diagnostic numbers overlay for the iOS keyboard problem. Rendered only when the URL carries ?vp=1 — see
+   renderViewportDebugOverlay. Highest z-index in the file so it survives whatever the layout is doing, and
+   pointer-events:none so it can never intercept a tap. Delete with the overlay once the question is settled. */
+#viewportDebugOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  margin: 0;
+  padding: 4px 6px;
+  background: rgba(242, 201, 76, 0.94);
+  color: #05100c;
+  font: 700 11px/1.25 ui-monospace, monospace;
+  white-space: pre;
+  pointer-events: none;
+}
