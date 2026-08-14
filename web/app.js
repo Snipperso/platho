@@ -2113,15 +2113,25 @@ function composerHandleKeyboardVisibility() {
 let viewportVarsFrame = 0;
 let viewportVarsLastGap = -1;
 
+function viewportVarsLoopWanted() {
+  // [OWNER 2026-08-14] Scoping this to the MAXIMIZED composer was too narrow — the shudder is there with the
+  // ordinary one too, because it is the whole shell that follows the visible area now. The real condition is
+  // simply "the visible area is not the whole page", i.e. the keyboard is up. Off the rest of the time, which is
+  // every desktop, every Android, and every phone with the keyboard down.
+  const viewport = window.visualViewport;
+  if (!viewport) return false;
+  return Math.round(window.innerHeight - viewport.height - viewport.offsetTop) > 0
+    || Boolean(document.querySelector('.composer.is-maximized'));
+}
+
 function keepViewportVarsLiveWhileComposerIsOpen() {
-  const wanted = Boolean(document.querySelector('.composer.is-maximized'));
-  if (!wanted) {
+  if (!viewportVarsLoopWanted()) {
     if (viewportVarsFrame) { cancelAnimationFrame(viewportVarsFrame); viewportVarsFrame = 0; }
     return;
   }
   if (viewportVarsFrame) return;
   const tick = () => {
-    if (!document.querySelector('.composer.is-maximized')) { viewportVarsFrame = 0; return; }
+    if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
     const viewport = window.visualViewport;
     const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0)));
     if (gap !== viewportVarsLastGap) {
@@ -19303,7 +19313,9 @@ function composerMaximizeButtonLabel(button, on) {
 // stays at natural size and RE-LAYS-OUT as the box changes (NOT a transform:scale, which squished the content and made
 // the real composer JERK into place on collapse). NOT persisted.
 function composerClearMaxAnimStyles(form) {
-  for (const prop of ['transition', 'top', 'left', 'right', 'width', 'height']) form.style[prop] = '';
+  // `bottom` belongs in this list now that the flip drives it — a leftover inline bottom would outlive the
+  // animation and pin the resting composer to wherever the flip happened to end.
+  for (const prop of ['transition', 'top', 'bottom', 'left', 'right', 'width', 'height']) form.style[prop] = '';
 }
 // Cancel an in-flight maximize animation (its transitionend listener + fallback timer + inline geometry). MUST run
 // before exit (send/nav) or a re-toggle mutates the state, or a stale timer/listener would fire on a changed composer.
@@ -19357,8 +19369,16 @@ function composerRunMaximizeGeo(form, growing) {
   const full = form.getBoundingClientRect(); // form currently has .is-maximized -> its full-screen rect
   if (!inlineRect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
   const fullRect = { top: full.top, left: full.left, width: full.width, height: full.height };
+  // BY THE BOTTOM EDGE, to match the CSS. [OWNER 2026-08-14] "After expanding it jumps into the right place."
+  // That jump was the hand-off: the animation drove `top`, which over-constrains the rule (top + bottom + height
+  // means bottom is ignored), so the composer animated to a top-anchored rectangle — above the screen while the
+  // keyboard is up — and only landed correctly once these inline values were cleared and the CSS `bottom` took
+  // over again. Animating the same edge the CSS pins means the end state IS the CSS state, and there is nothing
+  // left to jump to.
   const setGeo = (r) => {
-    form.style.top = `${r.top}px`; form.style.left = `${r.left}px`; form.style.right = 'auto';
+    form.style.top = 'auto';
+    form.style.bottom = `${Math.round(window.innerHeight - (r.top + r.height))}px`;
+    form.style.left = `${r.left}px`; form.style.right = 'auto';
     form.style.width = `${r.width}px`; form.style.height = `${r.height}px`;
   };
   const finish = () => {
@@ -19373,7 +19393,9 @@ function composerRunMaximizeGeo(form, growing) {
   setGeo(growing ? inlineRect : fullRect); // start state
   void form.offsetWidth; // reflow so the next geometry transitions
   const ease = growing ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)';
-  form.style.transition = `top 0.5s ${ease}, left 0.5s ${ease}, width 0.5s ${ease}, height 0.5s ${ease}`;
+  // `bottom`, not `top` — the property setGeo now drives. Transitioning a property nothing animates would make the
+  // growth instant and, worse, never fire the transitionend that finishes the flip.
+  form.style.transition = `bottom 0.5s ${ease}, left 0.5s ${ease}, width 0.5s ${ease}, height 0.5s ${ease}`;
   setGeo(growing ? fullRect : inlineRect); // end state -> the box grows/shrinks and the content re-lays-out
   form.addEventListener('transitionend', onEnd);
   form.__maxFlip = { timer: setTimeout(finish, 700), onEnd }; // fallback so a missed transitionend can't strand mid-animation
