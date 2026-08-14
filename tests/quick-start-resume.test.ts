@@ -567,7 +567,15 @@ describe('quick-start resume + activation gate guard', () => {
     expect(gapWriter).toMatch(/\} else if \(keyboardGapLatched === 0\) \{/);
     expect(gapWriter).toMatch(/\} else if \(Math\.abs\(raw - keyboardGapLatched\) >= KEYBOARD_RESIZE_PX\) \{/);
     // Counter-case: while the keyboard is up and its size unchanged, NOTHING is written — that is the whole fix.
-    expect(gapWriter).toMatch(/if \(next === keyboardGapLatched\) return;/);
+    expect(gapWriter).toMatch(/if \(next === keyboardGapLatched\) return false;/);
+    // EVERY size is derived from the latch, not from the live reading. Pinning only the bottom edge to a latched
+    // value while the heights still tracked the raw number left the shudder untouched — the bottom held still and
+    // the TOP breathed with the noise, which looks exactly the same. [OWNER 2026-08-14: "всё равно дёргается"]
+    expect(app).toMatch(/const derived = Math\.max\(0, Math\.round\(window\.innerHeight - keyboardGapLatched\)\);/);
+    expect(app, 'the heights must not be read straight off the viewport again')
+      .not.toMatch(/setProperty\('--app-viewport-height(-exact)?', `\$\{(visual|Math\.round\(viewport)/);
+    // ...and the loop recomputes them only when the latch moved, so an open, unchanged keyboard writes nothing.
+    expect(app).toMatch(/if \(writeVisibleBottomGap\(\)\) syncViewportCssVars\(\);/);
     const present = Number(/const KEYBOARD_PRESENT_PX = (\d+);/.exec(app)?.[1] ?? 0);
     expect(present, 'browser chrome insets are far smaller than a keyboard').toBeGreaterThanOrEqual(80);
     expect(present, 'and a real keyboard is far bigger than this').toBeLessThan(250);
@@ -586,7 +594,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(live).toMatch(/window\.innerHeight - viewport\.height\) > 0/);
     expect(live).toContain("document.querySelector('.composer.is-maximized')");
     expect(live, 'it stops itself when the keyboard goes down').toMatch(/cancelAnimationFrame\(viewportVarsFrame\)/);
-    expect(live, 'and defers the arithmetic to the single writer').toContain('writeVisibleBottomGap();');
+    expect(live, 'and defers the arithmetic to the single writer').toContain('writeVisibleBottomGap()');
 
     // The FLIP measures its target AFTER re-reading the viewport, or it animates to a rectangle that is already
     // stale — the composer flying somewhere wrong and then jumping into place.
