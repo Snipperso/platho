@@ -2177,6 +2177,69 @@ function writeVisibleBottomGap() {
 // document scrolled back — was moving something that was not out of place, so each one displaced the composer by
 // exactly the amount it "corrected". The only number the layout needs is the visible HEIGHT.
 
+/**
+ * Refuse the drag that carries the whole app off the top of the screen while the keyboard is up.
+ *
+ * THIS IS NOT A WORKAROUND FOR A BUG OF OURS. It is one of the two known ways around an open WebKit defect, and
+ * the owner was right to make me go and check which. What the sources say, so nobody re-litigates it:
+ *
+ *   - WebKit bug 191204, "position:fixed and viewport units are unusable while the software keyboard is up",
+ *     filed 2018-11-02 and STILL OPEN (activity through 2025). When the keyboard appears, Safari does not resize
+ *     the layout viewport the way Chrome on Android does; it adds a separate scrollable layer over the page. In
+ *     that state position:fixed stops being fixed and rides up with the drag.
+ *   - `interactive-widget=resizes-content` — the viewport-meta switch that makes Android shrink the LAYOUT
+ *     viewport, which is the whole reason this works there — is Chrome 108+ and Firefox 132+, and WebKit has not
+ *     shipped it (standards-positions issue 65 is still open as of iOS 26).
+ *
+ * Which is why "just make the page shorter" could not work, and did not: the layer being scrolled is not the
+ * document, so no height on html/body has any authority over it. He asked the right question anyway, because the
+ * measurement I answered it with was wrong — see the overlay for what clientHeight really reports on <html>.
+ *
+ * A scroll listener that puts the offset back cannot work either, and was tried: iOS scrolls off the main thread,
+ * so the correction lands only after the finger lifts — exactly the "drag it up, let go, it jumps back" he saw.
+ *
+ * Of the two published cures — refuse the gesture, or make sure the inner scroller always has slack so iOS never
+ * escalates the gesture to the page — the second buys its result with a screenful of dead space inside the text
+ * field, which is a visible lie about how much you have written. So: refuse it. Only while the keyboard is up,
+ * and only for gestures that start outside a real scroller, so every list, feed and message strip is untouched.
+ *
+ * THE DECISION IS MADE ONCE PER GESTURE, at touchstart. Deciding it per touchmove meant a getComputedStyle for
+ * every ancestor of the target sixty times a second, and this app already has one device that freezes when the
+ * main thread is asked for too much (iPhone SE2). touchmove then does nothing but honour the flag.
+ */
+let pageDragRefusalArmed = false;
+
+function armPageDragRefusal(event) {
+  pageDragRefusalArmed = false;
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  if (Math.round(window.innerHeight - viewport.height) < KEYBOARD_PRESENT_PX) return;   // no keyboard, no lock
+  if (event.touches && event.touches.length > 1) return;                                // pinch is not ours
+  // Walk up looking for something that can actually consume this gesture. A scroller that is ALREADY at its limit
+  // still counts: letting the browser rubber-band a list is fine, it is the PAGE that must not move.
+  for (let node = event.target instanceof Element ? event.target : null; node && node !== document.body; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    const scrollable = /(auto|scroll)/.test(`${style.overflowY} ${style.overflow}`);
+    if (scrollable && node.scrollHeight > node.clientHeight) return;
+    // NO BLANKET EXEMPTION FOR TEXT FIELDS. [OWNER 2026-08-15] "You can still pull the page out by the text
+    // field. Dragging anywhere else and it does not move." One line here used to wave through anything editable, on
+    // the theory that a drag there belongs to the caret — and the composer IS an editable, so the one surface the
+    // keyboard is open for was the one still handing the gesture to the browser. That is also textbook for the
+    // WebKit defect above: the escalation happens precisely when the element under the finger has nothing to
+    // scroll, which is what an editable holding one line of text is.
+    // Editables are covered by the same rule as everything else: a field with more text than fits scrolls (the
+    // check above sees it), and one that fits has nothing to scroll and must not move the page instead. Selection
+    // on iOS starts from a long press, not a drag, so nothing is taken away.
+  }
+  pageDragRefusalArmed = true;
+}
+
+function refusePageDragWhileKeyboardIsUp(event) {
+  if (!pageDragRefusalArmed) return;
+  if (event.touches && event.touches.length > 1) { pageDragRefusalArmed = false; return; }   // became a pinch
+  event.preventDefault();
+}
+
 function keepViewportVarsLiveWhileComposerIsOpen() {
   if (!viewportVarsLoopWanted()) {
     if (viewportVarsFrame) { cancelAnimationFrame(viewportVarsFrame); viewportVarsFrame = 0; }
@@ -2344,6 +2407,17 @@ function renderViewportDebugOverlay() {
     `--height ${cssVar('--app-viewport-height')}  --exact ${cssVar('--app-viewport-height-exact')}`,
     `shell ${rect(shell)}  composer ${rect(composer)}`,
     `MAX scroll ${viewportDebugPeak.scrollY}  off ${viewportDebugPeak.offset}  shell up ${viewportDebugPeak.shellUp}`,
+    // [OWNER 2026-08-15] "I don't believe Safari ignores the page height if you physically shrink it." He was
+    // right, and the reading that appeared to prove him wrong was a bug in the READING.
+    //
+    // On the ROOT element, clientHeight and scrollHeight are DEFINED to report the viewport rather than the
+    // element (CSSOM View; MDN states it outright: "When clientHeight is used on the root element (the <html>
+    // element) ... the viewport's height is returned"). So the earlier `doc 894/894` never described <html> at
+    // all — it was the window, restated. It could not have shown anything else, whatever the CSS did.
+    //
+    // getBoundingClientRect DOES describe the element. These two are the honest measurement.
+    `html ${Math.round(document.documentElement.getBoundingClientRect().height)}`
+      + `  body ${Math.round(document.body.getBoundingClientRect().height)}  css ${cssVar('--app-viewport-height')}`,
   ].join('\n');
 }
 
@@ -26050,6 +26124,10 @@ syncViewportCssVars();
 window.addEventListener('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('resize', syncViewportCssVars, { passive: true });
 window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passive: true });
+// touchstart decides (passive: it never refuses anything), touchmove enforces (NOT passive: refusing the gesture
+// is the entire point). See refusePageDragWhileKeyboardIsUp for why this exists at all — WebKit 191204.
+document.addEventListener('touchstart', armPageDragRefusal, { passive: true });
+document.addEventListener('touchmove', refusePageDragWhileKeyboardIsUp, { passive: false });
 
 // Composer textareas auto-size on input, but a window/pane resize re-wraps EXISTING text (a one-liner
 // becomes two lines when the window narrows) with no input event — so refit both fields on resize too.

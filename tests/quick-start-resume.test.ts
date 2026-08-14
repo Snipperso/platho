@@ -678,6 +678,50 @@ describe('quick-start resume + activation gate guard', () => {
     expect(rootRule, 'and no rubber-band bounce at the end of a drag').toContain('overscroll-behavior: none;');
   });
 
+  it('IOS-KEYBOARD-02: the page height is never measured through the root element, and the refusal costs one decision per gesture', () => {
+    // THE MEASUREMENT THAT SENT THE WHOLE HUNT SIDEWAYS.
+    //
+    // [OWNER 2026-08-15] "I don't believe Safari ignores the page height if you physically shrink it." The reading
+    // offered against him was `doc 894/894` from document.documentElement.scrollHeight/clientHeight, and it could
+    // not have said anything else: CSSOM View defines both to report the VIEWPORT when the element is the root.
+    // MDN: "When clientHeight is used on the root element (the <html> element) ... the viewport's height
+    // (excluding any scrollbar) is returned." So the number described the window, was mistaken for the document,
+    // and produced a confident conclusion about CSS that the CSS had no part in.
+    //
+    // The one legitimate use of that special case is what it was designed for — asking for the viewport height —
+    // and it survives here as exactly one fallback inside syncViewportCssVars. Any second appearance is a
+    // measurement of the document, and is wrong before it is read.
+    expect(
+      (app.match(/documentElement\.scrollHeight/g) ?? []).length,
+      'the root element cannot report the document height — it reports the viewport',
+    ).toBe(0);
+    const rootClientHeight = app.match(/documentElement\.clientHeight/g) ?? [];
+    expect(rootClientHeight.length, 'one use only: the viewport-height fallback').toBe(1);
+    expect(app, 'and that use must be the fallback, not a document measurement')
+      .toMatch(/window\.innerHeight \?\? document\.documentElement\.clientHeight/);
+    // An element's own height comes from getBoundingClientRect, which has no root-element special case.
+    expect(app).toMatch(/document\.documentElement\.getBoundingClientRect\(\)\.height/);
+
+    // ONE DECISION PER GESTURE. The refusal has to walk the ancestor chain calling getComputedStyle to find out
+    // whether anything can consume the drag; doing that per touchmove is that walk sixty times a second, and this
+    // app has a device on record that freezes when the main thread is oversubscribed (iPhone SE2). touchstart
+    // decides and may be passive; touchmove only honours the flag and must NOT be, or preventDefault is ignored.
+    expect(app).toMatch(/document\.addEventListener\('touchstart', armPageDragRefusal, \{ passive: true \}\);/);
+    expect(app).toMatch(/document\.addEventListener\('touchmove', refusePageDragWhileKeyboardIsUp, \{ passive: false \}\);/);
+    const armer = app.slice(app.indexOf('function armPageDragRefusal('), app.indexOf('function refusePageDragWhileKeyboardIsUp('));
+    expect(armer.length, 'the armer must not collapse').toBeGreaterThan(200);
+    expect(armer, 'the keyboard is the gate: no keyboard, no lock').toContain('KEYBOARD_PRESENT_PX');
+    expect(armer, 'a real scroller keeps its gesture').toMatch(/node\.scrollHeight > node\.clientHeight\) return;/);
+    // NO EXEMPTION FOR EDITABLES. [OWNER 2026-08-15] "You can still pull the page out by the text field." That is
+    // the WebKit defect exactly — iOS escalates the gesture to the page when the element under the finger has
+    // nothing to scroll, and a composer holding one line of text is that element.
+    expect(armer, 'the editable exemption was the hole').not.toMatch(/isContentEditable|closest\('input/);
+    const refusal = app.slice(app.indexOf('function refusePageDragWhileKeyboardIsUp('), app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'));
+    expect(refusal.length, 'the refusal must not collapse').toBeGreaterThan(80);
+    expect(refusal, 'per-frame style resolution is what this test exists to prevent').not.toContain('getComputedStyle');
+    expect(refusal, 'and it must still be able to refuse').toContain('event.preventDefault();');
+  });
+
   it('QS-RESUME-05: the stepper fits a narrow phone/TG-Mini-App screen (no horizontal overflow)', () => {
     // Owner reported the step-5 activation card spilling off the right edge on an iPhone. Root causes were
     // (1) nested grid items with the default min-width:auto letting a long localized paragraph's max-content
