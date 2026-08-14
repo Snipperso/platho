@@ -2160,9 +2160,10 @@ function writeVisibleBottomGap() {
   } else if (Math.abs(raw - keyboardGapLatched) >= KEYBOARD_RESIZE_PX) {
     next = raw;                                           // genuinely a different keyboard
   }
-  if (next === keyboardGapLatched) return;
+  if (next === keyboardGapLatched) return false;
   keyboardGapLatched = next;
   document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${next}px`);
+  return true;   // the sizes derived from it are now stale — see the frame loop and syncViewportCssVars
 }
 
 function keepViewportVarsLiveWhileComposerIsOpen() {
@@ -2173,7 +2174,10 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   if (viewportVarsFrame) return;
   const tick = () => {
     if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
-    writeVisibleBottomGap();
+    // Only when the latch actually moved — i.e. the keyboard appeared, left, or changed into a different one.
+    // Every other frame does nothing but the comparison, which is the point: a keyboard that is simply OPEN must
+    // produce no writes at all, or the sizes breathe with the noise and that IS the shudder.
+    if (writeVisibleBottomGap()) syncViewportCssVars();
     viewportVarsFrame = requestAnimationFrame(tick);
   };
   viewportVarsFrame = requestAnimationFrame(tick);
@@ -2207,17 +2211,27 @@ function syncViewportCssVars() {
     }
   }
   composerHandleKeyboardVisibility(); // blur the composer if the soft keyboard was just dismissed (kills the re-pop at its source)
-  const rounded = Math.max(0, Math.round(height));
+  // Latch the keyboard's height BEFORE the sizes below, because they are derived from it.
+  writeVisibleBottomGap();
+  // EVERY size comes off the latched figure, not off the live reading.
+  //
+  // [OWNER 2026-08-14] Pinning the bottom edge to a latched value while these two still tracked the raw height
+  // left the shudder exactly as it was: the bottom was steady and the TOP edge breathed with the noise, which
+  // looks identical. The visible height is innerHeight minus what the keyboard covers, and that second term is
+  // now a constant for as long as the keyboard is up — so this is a constant too, and nothing moves between the
+  // keyboard arriving and leaving.
+  //
+  // Telegram keeps its own authority: its client-reported height still caps the result, and off iOS the latched
+  // gap equals the live one anyway, so neither platform sees a change.
+  const derived = Math.max(0, Math.round(window.innerHeight - keyboardGapLatched));
+  const stable = telegramHeight > 0 ? Math.min(telegramHeight, derived || telegramHeight) : derived;
+  const rounded = Math.max(0, Math.round(stable || height));
   document.documentElement.style.setProperty('--app-viewport-height', `${Math.max(320, rounded)}px`);
   // Unclamped variant (no 320px floor) for the full-screen maximized composer only: on a short viewport (landscape or
   // a small/old device with the keyboard up) the floored value is taller than the visible area, so the overlay's
   // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
   // for --app-viewport-height because other layouts rely on it.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
-  // HOW FAR THE BOTTOM OF THE VISIBLE AREA IS FROM THE BOTTOM OF THE PAGE — the keyboard, in one number. Both the
-  // shell and the maximized composer are pinned by it; see writeVisibleBottomGap, which owns the arithmetic, the
-  // threshold, and the reasons for both.
-  writeVisibleBottomGap();
   keepViewportVarsLiveWhileComposerIsOpen();
 }
 
