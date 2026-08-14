@@ -521,12 +521,20 @@ describe('quick-start resume + activation gate guard', () => {
     // VISIBLE area sits above the bottom of the page. Anchoring the top instead — which is what every earlier
     // attempt did — puts a correctly-sized box in the wrong place, and the difference falls off the screen: the
     // tab bar was half below the edge, and the maximized composer left a band of app showing under it.
-    const shellRule = css.slice(css.indexOf('  .app-shell {'), css.indexOf('overflow: hidden;', css.indexOf('  .app-shell {')));
-    expect(shellRule.length, 'the mobile shell rule must not collapse').toBeGreaterThan(300);
-    expect(shellRule).toContain('bottom: var(--app-viewport-bottom-gap, 0px);');
-    expect(shellRule).toContain('top: auto;');
-    // min-height BEATS height, so any floor above the visible area pushes the pinned bottom back off screen.
-    expect(shellRule, 'a floor would undo the pinning').toContain('min-height: 0;');
+    const shellRuleRaw = css.slice(css.indexOf('  .app-shell {'), css.indexOf('overflow: hidden;', css.indexOf('  .app-shell {')));
+    expect(shellRuleRaw.length, 'the mobile shell rule must not collapse').toBeGreaterThan(300);
+    // Declarations only. The note inside this rule QUOTES the declarations it forbids — a scan over the raw text
+    // fails on its own explanation, which has now cost three rounds across this file.
+    const shellRule = shellRuleRaw.split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');
+    // THE FLOOR was what put half the tab bar below the screen edge — min-height BEATS height, so 100svh held the
+    // shell at full screen height while `height` tried to follow the visible area. Dropping it is the fix.
+    expect(shellRule, 'no floor may outrank the height again').toContain('min-height: 0;');
+    // ...and the shell is TOP-anchored. Pinning its bottom (as the composer still is) made iOS re-resolve it on
+    // every slide of the visible area, so dragging shuddered the whole interface — alternating by direction,
+    // because each direction settles once and then the other one starts. Top-anchored it is simply carried along.
+    // [OWNER 2026-08-14, decisive test] Other sites do not shudder, so this was ours, not Safari's.
+    expect(shellRule, 'the shell must not be bottom-pinned').not.toMatch(/bottom: var\(--app-viewport-bottom-gap/);
+    expect(shellRule, 'and must not chase the offset either').not.toMatch(/top: (auto|var\()/);
     expect(shellRule, 'and it must never follow a viewport variable again').not.toMatch(/min-height: var\(|min-height: 100svh/);
     expect(shellRule, 'a fixed element chasing offsetTop flickers once per scroll frame')
       .not.toMatch(/top: var\(--app-viewport-offset-top/);

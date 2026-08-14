@@ -4875,19 +4875,17 @@ button.feed-item:hover {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
     max-width: 100vw;
-    /* PINNED BY ITS BOTTOM, exactly like the maximized composer — the same arithmetic, and it works for the same
-       reason. A fixed element's `top` is measured against the LAYOUT viewport, which iOS neither shrinks nor moves
-       for the keyboard; anchoring the top and sizing from the VISIBLE area therefore puts a correctly-sized box in
-       the wrong place, and the difference falls off the bottom of the screen. [OWNER 2026-08-14] Which is what the
-       tab bar was doing — "exactly half of it hangs below the bottom edge", keyboard or no keyboard.
-       The bottom edge is the one that must line up, so it is the one that is pinned. --app-viewport-bottom-gap is
-       0 on Android and desktop, where the two viewports already agree, so nothing changes there.
-       `min-height: 0` is load-bearing: min-height BEATS height, so any floor above the visible area would push the
-       shell's bottom back off the screen and undo this. That floor (1.0.25 made it follow the variable, 1.0.31 put
-       it back to 100svh) is what the previous four attempts were fighting over — with the bottom pinned there is
-       nothing left for it to decide. */
-    top: auto;
-    bottom: var(--app-viewport-bottom-gap, 0px);
+    /* TOP-ANCHORED, and `min-height: 0` is the whole fix for the tab bar.
+       [OWNER 2026-08-14] Half the tab bar hung below the screen edge. The cause was the FLOOR, not the anchor:
+       min-height BEATS height, so `min-height: 100svh` held the shell at full screen height while `height` tried
+       to follow the visible area — a box taller than what can be seen, with its bottom row off the edge. Dropping
+       the floor lets the height do its job, and the tab bar fits.
+       The bottom edge was briefly pinned here too (--app-viewport-bottom-gap, as the maximized composer still is)
+       and that had to be undone: on iOS a bottom-anchored fixed element is re-resolved every time the visible area
+       slides, so dragging the page made the whole shell shudder, over and over, in whichever direction had not
+       shuddered last. Anchored at the top it is simply carried along, which is what every other site does and why
+       none of them shudder. The composer keeps its bottom pin because it is a single box that must clear the
+       keyboard exactly; the shell only needs to be the right SIZE. */
     min-height: 0;
     height: 100dvh;
     height: var(--app-viewport-height, 100dvh);
