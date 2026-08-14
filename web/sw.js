@@ -1,12 +1,12 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-351870dd3f91';
+const CACHE_NAME = 'platho-pwa-18e2bb9c60a5';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=328',
-  './app.js?v=bdc602842',
+  './styles.css?v=329',
+  './app.js?v=b055a4aa1',
   './i18n.mjs?v=72',
   './i18n-strings.mjs?v=74',
   './boot-signal-field.mjs?v=1',
