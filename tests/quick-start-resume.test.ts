@@ -529,10 +529,15 @@ describe('quick-start resume + activation gate guard', () => {
     // None of the compensation machinery may come back, in the file OR in the shipped listeners.
     expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
     expect(app, 'the offsetTop variable it was replaced with').not.toMatch(/--app-viewport-offset-top/);
+    // The document must NOT be scrollable, and this half is kept — it is not part of the compensation machinery.
+    // [MEASURED on the owner's iPhone] window.scrollY reached 586: the page really was being dragged, because
+    // `body { overflow: hidden }` alone does not cover it (iOS scrolls the ROOT) and html had no overflow at all.
+    // Every scroller in the app lives inside the shell, so a scrollable document has no purpose but to be dragged.
     const rootStart = css.indexOf('html,\nbody {');
     const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart));
-    expect(rootRule, 'html was given overflow/height only to support the undo hack').not.toContain('overscroll-behavior');
-    expect(rootRule).not.toContain('overflow: hidden;');
+    expect(rootRule, 'iOS scrolls the ROOT element, so html needs the height too').toContain('height: 100%;');
+    expect(rootRule).toContain('overflow: hidden;');
+    expect(rootRule, 'and no rubber-band bounce at the end of a drag').toContain('overscroll-behavior: none;');
   });
 
   it('QS-RESUME-05: the stepper fits a narrow phone/TG-Mini-App screen (no horizontal overflow)', () => {

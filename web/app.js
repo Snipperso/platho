@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.31';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.32';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2134,6 +2134,19 @@ function syncViewportCssVars() {
   // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
   // for --app-viewport-height because other layouts rely on it.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
+  // HOW FAR THE BOTTOM OF THE VISIBLE AREA IS FROM THE BOTTOM OF THE PAGE — the keyboard, in one number, plus
+  // anything else in the way.
+  //
+  // [OWNER 2026-08-14, iPhone] The maximized composer ended well above the keyboard with a band of the app
+  // showing through the gap. That was an arithmetic error of mine: it was anchored by its TOP with a height taken
+  // from the visible area, and a fixed element's top is measured against the LAYOUT viewport — which iOS does not
+  // shrink for the keyboard. So the composer was the right height in the wrong place, and the difference was the
+  // gap. What has to line up is the BOTTOM edge, so this is the number that puts it there.
+  //
+  // innerHeight − height − offsetTop is the standard expression for it. Zero on Android and desktop, where the
+  // two viewports already agree, so nothing there changes.
+  const visibleBottomGap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0)));
+  document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${visibleBottomGap}px`);
 }
 
 // ---- Telegram Mini App adapter --------------------------------------------
