@@ -2166,31 +2166,16 @@ function writeVisibleBottomGap() {
   return true;   // the sizes derived from it are now stale — see the frame loop and syncViewportCssVars
 }
 
-/**
- * WHERE the visible area starts, for the ONE element that has to sit inside it exactly: the full-screen composer.
- *
- * [MEASURED on the owner's iPhone] The visible area does not only shrink for the keyboard, it SLIDES — offsetTop
- * reached 523 — while a fixed element stays in page coordinates. So a composer anchored at the top of the page is
- * above the visible area by exactly that slide, and one anchored to its bottom is out by the same amount for the
- * same reason. Both were tried and both flew upward, which is the observation that finally pins the cause: the
- * missing term is the slide, and neither anchor included it.
- *
- * Why this is safe where 1.0.29 was not: that version applied the correction to the whole SHELL, which is also
- * what the browser scrolls and drags, so two things moved it and they disagreed once per frame. The maximized
- * composer is a single overlay that nothing else positions — correcting it fights no one.
- *
- * Written from the frame loop rather than an event handler, because an event lands after the frame that moved
- * things and one frame of lag is visible as a stutter.
- */
-let viewportOffsetTopWritten = -1;
-
-function writeVisibleOffsetTop() {
-  const viewport = window.visualViewport;
-  const offset = Math.max(0, Math.round(viewport?.offsetTop ?? 0));
-  if (offset === viewportOffsetTopWritten) return;
-  viewportOffsetTopWritten = offset;
-  document.documentElement.style.setProperty('--app-viewport-offset-top', `${offset}px`);
-}
+// NOTHING HERE CORRECTS A POSITION, and that is the conclusion of the whole exercise.
+//
+// [MEASURED on the owner's iPhone, keyboard OPEN — the reading twelve attempts were made without] innerHeight 755,
+// visible height 438, keyboard 317, offsetTop 0, scrollY 0, and a fixed element anchored at the top of the page
+// sitting at 0: exactly where it belongs. The visible area does not slide when the keyboard opens. It shrinks from
+// the bottom, and a top-anchored fixed element is already correct.
+//
+// Every correction attempted here — the bottom pinned to the keyboard gap, `top` driven from offsetTop, the
+// document scrolled back — was moving something that was not out of place, so each one displaced the composer by
+// exactly the amount it "corrected". The only number the layout needs is the visible HEIGHT.
 
 function keepViewportVarsLiveWhileComposerIsOpen() {
   if (!viewportVarsLoopWanted()) {
@@ -2200,8 +2185,6 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   if (viewportVarsFrame) return;
   const tick = () => {
     if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
-    // The SLIDE is followed every frame — it is a position, and a position one frame stale is a stutter.
-    writeVisibleOffsetTop();
     // The SIZES are recomputed only when the latch moved — i.e. the keyboard appeared, left, or changed into a
     // different one. Every other frame does nothing but the comparison, which is the point: a keyboard that is
     // simply OPEN must produce no size writes at all, or they breathe with the noise and that IS the shudder.
@@ -2260,7 +2243,6 @@ function syncViewportCssVars() {
   // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
   // for --app-viewport-height because other layouts rely on it.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
-  writeVisibleOffsetTop();
   keepViewportVarsLiveWhileComposerIsOpen();
 }
 
