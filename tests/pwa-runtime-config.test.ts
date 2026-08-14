@@ -5528,8 +5528,8 @@ describe('PWA runtime config guard', () => {
     // screen while the keyboard is up — and snapped into place only when the inline values were cleared and the
     // CSS `bottom` took over. Animating the edge the CSS pins makes the end state the CSS state. Full reasoning
     // and the counter-cases live in tests/quick-start-resume IOS-KEYBOARD-01.
-    expect(app).toMatch(/form\.style\.bottom = `\$\{Math\.round\(window\.innerHeight - \(r\.top \+ r\.height\)\)\}px`;\s*form\.style\.left = `\$\{r\.left\}px`/); // setGeo
-    expect(app).toMatch(/form\.style\.transition = `bottom 0\.5s \$\{ease\}, left 0\.5s \$\{ease\}, width 0\.5s \$\{ease\}, height 0\.5s \$\{ease\}`/);
+    expect(app).toMatch(/form\.style\.top = `\$\{Math\.round\(r\.top\)\}px`;\s*form\.style\.left = `\$\{r\.left\}px`/); // setGeo
+    expect(app).toMatch(/form\.style\.transition = `top 0\.5s \$\{ease\}, left 0\.5s \$\{ease\}, width 0\.5s \$\{ease\}, height 0\.5s \$\{ease\}`/);
     expect(app).toMatch(/form\.__inlineRect = \{ left: r\.left/); // inline footprint captured at maximize time
     expect(app).toMatch(/if \(isMax && isRestoring\) return; \/\/ mid-shrink/);
     // exit/re-toggle CANCEL an in-flight animation so a stale timer/listener can't fire on a changed composer.

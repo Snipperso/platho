@@ -1732,16 +1732,18 @@ a .avatar.has-image,
    but BELOW every dialog/picker/lightbox (>=40), so Insert-link / emoji / attachments still open on top. */
 .composer.is-maximized {
   position: fixed;
-  /* PINNED TO THE BOTTOM OF THE VISIBLE AREA, not to the top of the page.
-     `top: 0` + a height was the arithmetic error. A fixed element is placed against the LAYOUT viewport, which on
-     iOS neither shrinks nor moves for the keyboard; the VISIBLE area does both. Anchoring the top and giving it a
-     height that comes from the visible area leaves exactly the gap the owner saw — the composer ends where the
-     visible area does, and everything between that and the keyboard shows the app underneath.
-     The bottom edge is what has to line up, so that is what is pinned. --app-viewport-bottom-gap is the distance
-     from the bottom of the layout viewport to the bottom of the visible one (innerHeight − height − offsetTop),
-     which is the keyboard plus anything else in the way. On Android and desktop it is 0 and nothing changes. */
-  top: auto;
-  bottom: var(--app-viewport-bottom-gap, 0px);
+  /* TOP-ANCHORED, and the keyboard is left to the browser.
+     [OWNER 2026-08-14] He worked this out from the behaviour alone: "it thought it was at the top of the screen,
+     and you were just yanking it down by hand... every frame it jumped back to where it believed it was, and the
+     app shoved it back again." Exactly right, and it names a DOUBLE COUNT. Safari already lifts fixed
+     elements clear of the keyboard by itself; pinning the bottom to --app-viewport-bottom-gap applied that lift a
+     SECOND time. The two positions disagreed by the height of the keyboard and fought once per frame — which is
+     the shudder — and it settled the moment a drag happened to bring them into agreement, then started again in
+     the other direction. With the shell no longer adding its own movement, the leftover double count is plainly
+     visible: the composer sits a whole keyboard too high.
+     So: anchor the top, take the height from the visible area, and let the browser place it. The height is what
+     keeps the send button off the keyboard; the position is not ours to compute. */
+  top: 0;
   left: 0;
   right: 0;
   margin: 0; /* the public composer bleeds to the pane edges with margin: 0 -24px — reset it so left/right:0 = viewport */
