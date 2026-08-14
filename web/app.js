@@ -2120,7 +2120,9 @@ function viewportVarsLoopWanted() {
   // every desktop, every Android, and every phone with the keyboard down.
   const viewport = window.visualViewport;
   if (!viewport) return false;
-  return Math.round(window.innerHeight - viewport.height - viewport.offsetTop) > 0
+  // Height only, matching the gap it exists to keep fresh: with offsetTop in here the loop would also switch on
+  // for a plain drag, which is exactly the state it must NOT react to.
+  return Math.round(window.innerHeight - viewport.height) > 0
     || Boolean(document.querySelector('.composer.is-maximized'));
 }
 
@@ -2133,7 +2135,9 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   const tick = () => {
     if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
     const viewport = window.visualViewport;
-    const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0)));
+    // Same expression as syncViewportCssVars, offsetTop deliberately absent — see the note there. This loop is the
+    // one place where including it would be MOST visible, since it runs on every frame of a drag.
+    const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
     if (gap !== viewportVarsLastGap) {
       viewportVarsLastGap = gap;
       document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${gap}px`);
@@ -2189,9 +2193,20 @@ function syncViewportCssVars() {
   // shrink for the keyboard. So the composer was the right height in the wrong place, and the difference was the
   // gap. What has to line up is the BOTTOM edge, so this is the number that puts it there.
   //
-  // innerHeight − height − offsetTop is the standard expression for it. Zero on Android and desktop, where the
-  // two viewports already agree, so nothing there changes.
-  const visibleBottomGap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0)));
+  // Zero on Android and desktop, where the two viewports already agree, so nothing there changes.
+  // HEIGHT ONLY — offsetTop is deliberately NOT subtracted.
+  //
+  // [OWNER 2026-08-14] "I drag down, the composer starts moving down, then up. The second drag down is smooth."
+  // His reading was right: something climbs to a limit and then stops. That something was
+  // offsetTop. Dragging changes ONLY the offset, so subtracting it made the composer chase the finger with a
+  // SECOND movement on top of the one Safari is already applying — the two fight for a frame, which is the
+  // shudder; and once the offset hits its limit the term stops changing, so the same drag repeated is smooth.
+  //
+  // Nothing needs that term. A fixed element is already carried by Safari when the visible area slides, so
+  // following the slide ourselves is double-counting. What the composer actually has to clear is the KEYBOARD,
+  // and that is innerHeight − visible height: how much of the page the keyboard covers. It changes when the
+  // keyboard opens or closes and stays put through every drag in between.
+  const visibleBottomGap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
   document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${visibleBottomGap}px`);
   keepViewportVarsLiveWhileComposerIsOpen();
 }

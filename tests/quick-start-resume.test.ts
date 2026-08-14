@@ -534,7 +534,14 @@ describe('quick-start resume + activation gate guard', () => {
     const maximized = css.slice(css.indexOf('.composer.is-maximized {'), css.indexOf('\n}', css.indexOf('.composer.is-maximized {')));
     expect(maximized, 'the composer is pinned the same way').toContain('bottom: var(--app-viewport-bottom-gap, 0px);');
     expect(maximized).toContain('top: auto;');
-    expect(app).toMatch(/const visibleBottomGap = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\) - \(viewport\?\.offsetTop \?\? 0\)\)\);/);
+    // HEIGHT ONLY. [OWNER 2026-08-14] Subtracting offsetTop made the composer chase the finger with a SECOND
+    // movement on top of the one Safari already applies to fixed elements — the two fight for a frame, which is
+    // the shudder, and once the offset reaches its limit the same drag repeated is smooth. He diagnosed it from
+    // the behaviour alone — "as if some variable shudders until it reaches a limit, then goes the other way".
+    // What the composer must clear is the KEYBOARD, and that is innerHeight − visible height. It changes when the
+    // keyboard opens or closes and holds still through every drag in between.
+    expect(app).toMatch(/const visibleBottomGap = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\)\)\);/);
+    expect(app, 'no viewport expression may subtract offsetTop again').not.toMatch(/window\.innerHeight - \(?viewport(\?)?\.height[^\n]*offsetTop/);
 
     // The compensation machinery that fought the viewport instead of following it must not come back.
     expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
@@ -547,7 +554,7 @@ describe('quick-start resume + activation gate guard', () => {
     const live = app.slice(app.indexOf('function viewportVarsLoopWanted()'), app.indexOf('function syncViewportCssVars()'));
     // The condition is "the keyboard is up", not "a maximized composer exists" — the shell follows the visible
     // area too, so the ordinary composer shudders for the same reason. Scoping it to maximized was too narrow.
-    expect(live).toMatch(/window\.innerHeight - viewport\.height - viewport\.offsetTop\) > 0/);
+    expect(live).toMatch(/window\.innerHeight - viewport\.height\) > 0/);
     expect(live).toContain("document.querySelector('.composer.is-maximized')");
     expect(live, 'it stops itself when the keyboard goes down').toMatch(/cancelAnimationFrame\(viewportVarsFrame\)/);
     expect(live, 'and writes only when the number moved').toMatch(/if \(gap !== viewportVarsLastGap\)/);
