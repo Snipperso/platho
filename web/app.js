@@ -2126,6 +2126,31 @@ function viewportVarsLoopWanted() {
     || Boolean(document.querySelector('.composer.is-maximized'));
 }
 
+/**
+ * How much of the page the keyboard covers, written to CSS — and the ONE place that writes it, so the loop below
+ * and syncViewportCssVars cannot drift apart on the arithmetic or on the threshold.
+ *
+ * THE THRESHOLD IS THE POINT. [OWNER 2026-08-14, after the offsetTop term was removed] "The shudder got smaller
+ * and finer, but it is the same shudder — now small and fast." The remaining source is that iOS does not hold the
+ * visible height perfectly still during a drag — it wobbles by a few pixels, frame to frame — and answering every
+ * wobble moves the shell, which is a shudder by another name.
+ *
+ * A keyboard changes this figure by hundreds of pixels; a wobble by single digits. So a change is acted on only
+ * when it is big enough to BE a keyboard, and 0 (keyboard fully gone) always lands, because settling back to
+ * exactly flush matters more than the threshold.
+ */
+const VIEWPORT_GAP_SETTLE_PX = 32;
+let viewportGapWritten = -1;
+
+function writeVisibleBottomGap() {
+  const viewport = window.visualViewport;
+  const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
+  const settled = gap === 0 || viewportGapWritten < 0 || Math.abs(gap - viewportGapWritten) >= VIEWPORT_GAP_SETTLE_PX;
+  if (!settled || gap === viewportGapWritten) return;
+  viewportGapWritten = gap;
+  document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${gap}px`);
+}
+
 function keepViewportVarsLiveWhileComposerIsOpen() {
   if (!viewportVarsLoopWanted()) {
     if (viewportVarsFrame) { cancelAnimationFrame(viewportVarsFrame); viewportVarsFrame = 0; }
@@ -2134,16 +2159,7 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   if (viewportVarsFrame) return;
   const tick = () => {
     if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
-    const viewport = window.visualViewport;
-    // Same expression as syncViewportCssVars, offsetTop deliberately absent — see the note there. This loop is the
-    // one place where including it would be MOST visible, since it runs on every frame of a drag.
-    const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
-    if (gap !== viewportVarsLastGap) {
-      viewportVarsLastGap = gap;
-      document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${gap}px`);
-      const exact = Math.max(0, Math.round(viewport?.height ?? window.innerHeight));
-      if (exact > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${exact}px`);
-    }
+    writeVisibleBottomGap();
     viewportVarsFrame = requestAnimationFrame(tick);
   };
   viewportVarsFrame = requestAnimationFrame(tick);
@@ -2184,30 +2200,10 @@ function syncViewportCssVars() {
   // bottom-pinned send button (and a docked-below restore button) would hide behind the keyboard. The floor is kept
   // for --app-viewport-height because other layouts rely on it.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
-  // HOW FAR THE BOTTOM OF THE VISIBLE AREA IS FROM THE BOTTOM OF THE PAGE — the keyboard, in one number, plus
-  // anything else in the way.
-  //
-  // [OWNER 2026-08-14, iPhone] The maximized composer ended well above the keyboard with a band of the app
-  // showing through the gap. That was an arithmetic error of mine: it was anchored by its TOP with a height taken
-  // from the visible area, and a fixed element's top is measured against the LAYOUT viewport — which iOS does not
-  // shrink for the keyboard. So the composer was the right height in the wrong place, and the difference was the
-  // gap. What has to line up is the BOTTOM edge, so this is the number that puts it there.
-  //
-  // Zero on Android and desktop, where the two viewports already agree, so nothing there changes.
-  // HEIGHT ONLY — offsetTop is deliberately NOT subtracted.
-  //
-  // [OWNER 2026-08-14] "I drag down, the composer starts moving down, then up. The second drag down is smooth."
-  // His reading was right: something climbs to a limit and then stops. That something was
-  // offsetTop. Dragging changes ONLY the offset, so subtracting it made the composer chase the finger with a
-  // SECOND movement on top of the one Safari is already applying — the two fight for a frame, which is the
-  // shudder; and once the offset hits its limit the term stops changing, so the same drag repeated is smooth.
-  //
-  // Nothing needs that term. A fixed element is already carried by Safari when the visible area slides, so
-  // following the slide ourselves is double-counting. What the composer actually has to clear is the KEYBOARD,
-  // and that is innerHeight − visible height: how much of the page the keyboard covers. It changes when the
-  // keyboard opens or closes and stays put through every drag in between.
-  const visibleBottomGap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight)));
-  document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${visibleBottomGap}px`);
+  // HOW FAR THE BOTTOM OF THE VISIBLE AREA IS FROM THE BOTTOM OF THE PAGE — the keyboard, in one number. Both the
+  // shell and the maximized composer are pinned by it; see writeVisibleBottomGap, which owns the arithmetic, the
+  // threshold, and the reasons for both.
+  writeVisibleBottomGap();
   keepViewportVarsLiveWhileComposerIsOpen();
 }
 
