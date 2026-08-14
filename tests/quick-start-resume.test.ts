@@ -540,8 +540,25 @@ describe('quick-start resume + activation gate guard', () => {
     // the behaviour alone — "as if some variable shudders until it reaches a limit, then goes the other way".
     // What the composer must clear is the KEYBOARD, and that is innerHeight − visible height. It changes when the
     // keyboard opens or closes and holds still through every drag in between.
-    expect(app).toMatch(/const visibleBottomGap = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\)\)\);/);
+    const gapWriter = app.slice(app.indexOf('function writeVisibleBottomGap()'), app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'));
+    expect(gapWriter.length, 'the gap writer must not collapse').toBeGreaterThan(200);
+    expect(gapWriter).toMatch(/const gap = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\)\)\);/);
     expect(app, 'no viewport expression may subtract offsetTop again').not.toMatch(/window\.innerHeight - \(?viewport(\?)?\.height[^\n]*offsetTop/);
+    // ONE writer. Two copies of this arithmetic would drift on the threshold below, which is where a
+    // one-pixel difference is visible as motion.
+    expect(
+      (app.match(/setProperty\('--app-viewport-bottom-gap'/g) ?? []).length,
+      'only writeVisibleBottomGap may write the gap',
+    ).toBe(1);
+
+    // AND A THRESHOLD. [OWNER 2026-08-14, after the offsetTop term went] "Дёрганье стало меньше и мельче, но
+    // характер такой же." iOS does not hold the visible height still during a drag — it wobbles a few pixels per
+    // frame — and answering every wobble moves the shell, which is the same shudder in miniature. A keyboard moves
+    // this number by hundreds; a wobble by single digits. Zero always lands, because settling flush matters more.
+    expect(gapWriter).toMatch(/const settled = gap === 0 \|\| viewportGapWritten < 0 \|\| Math\.abs\(gap - viewportGapWritten\) >= VIEWPORT_GAP_SETTLE_PX;/);
+    const threshold = Number(/const VIEWPORT_GAP_SETTLE_PX = (\d+);/.exec(app)?.[1] ?? 0);
+    expect(threshold, 'big enough to ignore a wobble').toBeGreaterThanOrEqual(16);
+    expect(threshold, 'small enough that no real keyboard is missed').toBeLessThan(120);
 
     // The compensation machinery that fought the viewport instead of following it must not come back.
     expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
@@ -557,7 +574,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(live).toMatch(/window\.innerHeight - viewport\.height\) > 0/);
     expect(live).toContain("document.querySelector('.composer.is-maximized')");
     expect(live, 'it stops itself when the keyboard goes down').toMatch(/cancelAnimationFrame\(viewportVarsFrame\)/);
-    expect(live, 'and writes only when the number moved').toMatch(/if \(gap !== viewportVarsLastGap\)/);
+    expect(live, 'and defers the arithmetic to the single writer').toContain('writeVisibleBottomGap();');
 
     // The FLIP measures its target AFTER re-reading the viewport, or it animates to a rectangle that is already
     // stale — the composer flying somewhere wrong and then jumping into place.
