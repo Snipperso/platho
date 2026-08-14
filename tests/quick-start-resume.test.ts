@@ -596,12 +596,16 @@ describe('quick-start resume + activation gate guard', () => {
     expect(gapWriter).toMatch(/\} else if \(Math\.abs\(raw - keyboardGapLatched\) >= KEYBOARD_RESIZE_PX\) \{/);
     // Counter-case: while the keyboard is up and its size unchanged, NOTHING is written — that is the whole fix.
     expect(gapWriter).toMatch(/if \(next === keyboardGapLatched\) return false;/);
-    // EVERY size is derived from the latch, not from the live reading. Pinning only the bottom edge to a latched
-    // value while the heights still tracked the raw number left the shudder untouched — the bottom held still and
-    // the TOP breathed with the noise, which looks exactly the same. [OWNER 2026-08-14: "всё равно дёргается"]
-    expect(app).toMatch(/const derived = Math\.max\(0, Math\.round\(window\.innerHeight - keyboardGapLatched\)\);/);
-    expect(app, 'the heights must not be read straight off the viewport again')
-      .not.toMatch(/setProperty\('--app-viewport-height(-exact)?', `\$\{(visual|Math\.round\(viewport)/);
+    // THE SIZES ARE READ, NOT DERIVED. [MEASURED in the installed app, keyboard open] innerHeight 894, visible
+    // height 508 — and the app was using 550. The 42px difference was the latch: the keyboard's height was
+    // captured at 344 while it was still sliding up, settled at 386, and the 60px re-latch threshold refused to
+    // correct a 42px error. The latch existed to keep a few pixels of noise from moving the layout and cost a
+    // 42px lie to do it. Read the number, use the number.
+    expect(app, 'the height must not be derived from the latch').not.toMatch(/window\.innerHeight - keyboardGapLatched/);
+    expect(app).toMatch(/setProperty\('--app-viewport-height', `\$\{rounded\}px`\)/);
+    // NO FLOOR either. A 320px minimum built the shell TALLER than the screen whenever the visible area fell
+    // below it, putting its bottom row off the edge. [OWNER: "do not add anything to the height"]
+    expect(app, 'no floor may be reintroduced').not.toMatch(/Math\.max\(320, rounded\)/);
     // ...and the loop recomputes them only when the latch moved, so an open, unchanged keyboard writes nothing.
     expect(app).toMatch(/if \(writeVisibleBottomGap\(\)\) syncViewportCssVars\(\);/);
     const present = Number(/const KEYBOARD_PRESENT_PX = (\d+);/.exec(app)?.[1] ?? 0);
@@ -637,13 +641,17 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app, 'the transition must name the property that actually changes').toMatch(/transition = `top 0\.5s/);
     expect(app, 'and the cleanup must drop it, or a stale inline bottom outlives the flip')
       .toMatch(/\['transition', 'top', 'bottom', 'left', 'right', 'width', 'height'\]/);
-    // The document must NOT be scrollable, and this half is kept — it is not part of the compensation machinery.
-    // [MEASURED on the owner's iPhone] window.scrollY reached 586: the page really was being dragged, because
-    // `body { overflow: hidden }` alone does not cover it (iOS scrolls the ROOT) and html had no overflow at all.
-    // Every scroller in the app lives inside the shell, so a scrollable document has no purpose but to be dragged.
+    // THE PAGE IS OUT OF FLOW, so there is physically nothing to scroll — the decisive fix of the whole hunt.
+    // [MEASURED in the installed app] Tapping the composer sent the interface off the top of the screen and the
+    // owner could SCROLL IT BACK DOWN, diagnostic strip and all — and that strip is fixed to the viewport, so it
+    // cannot move unless the document does. `overflow: hidden` was already here and does not stop it: when a
+    // field takes focus iOS MUST bring the caret into view and scrolls the document regardless. The only refusal
+    // is having no scrollable document, which position:fixed gives.
     const rootStart = css.indexOf('html,\nbody {');
     const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart));
-    expect(rootRule, 'iOS scrolls the ROOT element, so html needs the height too').toContain('height: 100%;');
+    expect(rootRule, 'out of flow: nothing to scroll').toContain('position: fixed;');
+    expect(rootRule).toContain('inset: 0;');
+    expect(rootRule, 'a content-driven height brings the scrollable page back').not.toMatch(/min-height: 100%/);
     expect(rootRule).toContain('overflow: hidden;');
     expect(rootRule, 'and no rubber-band bounce at the end of a drag').toContain('overscroll-behavior: none;');
   });

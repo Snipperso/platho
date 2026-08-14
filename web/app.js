@@ -2222,25 +2222,21 @@ function syncViewportCssVars() {
     }
   }
   composerHandleKeyboardVisibility(); // blur the composer if the soft keyboard was just dismissed (kills the re-pop at its source)
-  // Latch the keyboard's height BEFORE the sizes below, because they are derived from it.
   writeVisibleBottomGap();
-  // EVERY size comes off the latched figure, not off the live reading.
+  // THE VISIBLE HEIGHT, AS REPORTED. Nothing latched, nothing floored, nothing derived.
   //
-  // [OWNER 2026-08-14] Pinning the bottom edge to a latched value while these two still tracked the raw height
-  // left the shudder exactly as it was: the bottom was steady and the TOP edge breathed with the noise, which
-  // looks identical. The visible height is innerHeight minus what the keyboard covers, and that second term is
-  // now a constant for as long as the keyboard is up — so this is a constant too, and nothing moves between the
-  // keyboard arriving and leaving.
+  // [MEASURED in the owner's installed app, keyboard open] innerHeight 894, visible height 508 — and the app was
+  // using 550. The 42px difference was mine: the keyboard's height had been LATCHED at 344 during the moment it
+  // was still sliding up, its real value settled at 386, and the 60px re-latch threshold refused to correct a
+  // 42px error. So the shell was built 42px taller than the screen can show and its bottom row sat under the
+  // keyboard — which is the whole complaint, and it survived every attempt to fix it by moving things.
   //
-  // Telegram keeps its own authority: its client-reported height still caps the result, and off iOS the latched
-  // gap equals the live one anyway, so neither platform sees a change.
-  const derived = Math.max(0, Math.round(window.innerHeight - keyboardGapLatched));
-  const stable = telegramHeight > 0 ? Math.min(telegramHeight, derived || telegramHeight) : derived;
-  const rounded = Math.max(0, Math.round(stable || height));
-  // NO FLOOR. [OWNER 2026-08-14] "What are you adding to the height? Do not add anything." There was exactly one
-  // place that added anything, and it was here: a 320px minimum, so whenever the visible area fell below it the
-  // shell was built TALLER than what can be seen and its bottom row went off the edge. A number invented to
-  // protect a layout is worse than the small layout it protects — it makes the app lie about the screen it is on.
+  // The latch existed to stop a few pixels of frame-to-frame noise from moving the layout. It cost a 42px lie to
+  // save that, which is a bad trade — and the shudder it was fighting had a different cause anyway (two corrections
+  // applied to the same box; see the note on .composer.is-maximized). Read the number, use the number.
+  //
+  // Telegram keeps its own authority: its client-reported height still caps the result.
+  const rounded = Math.max(0, Math.round(telegramHeight > 0 ? Math.min(telegramHeight, height || telegramHeight) : height));
   document.documentElement.style.setProperty('--app-viewport-height', `${rounded}px`);
   // Identical to the above now that the floor is gone. Kept as a separate name only because the stylesheet refers
   // to it in several places; both are simply "the visible height", with nothing added to either.
