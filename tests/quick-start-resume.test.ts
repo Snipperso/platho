@@ -520,29 +520,22 @@ describe('quick-start resume + activation gate guard', () => {
     // body's own overflow:hidden was already there and is NOT enough: iOS scrolls the ROOT element.
     expect(rootRule, 'html must be pinned too, not just body').toContain('height: 100%;');
 
-    // THE SHELL FOLLOWS THE VISIBLE AREA — it does not fight it. [OWNER 2026-08-14] The first attempt noticed the
-    // scroll and scrolled back to zero, which he named on sight: "I drag it and it jumps back when I let go."
-    // Undoing a drag is precisely what that did. A fixed element cannot be told to follow the visual viewport, but
-    // it CAN be told where to start, so `top` is driven from visualViewport.offsetTop and the shell travels with
-    // what the user can actually see: the drag moves nothing on screen and there is nothing to spring back.
-    expect(app, 'the scroll-fighting hack must be gone').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
-    expect(app).toMatch(/const offsetTop = Math\.max\(0, Math\.round\(viewport\?\.offsetTop \?\? 0\)\);/);
-    expect(app).toMatch(/setProperty\('--app-viewport-offset-top', `\$\{offsetTop\}px`\)/);
-    const shellRule = css.slice(css.indexOf('  .app-shell {'), css.indexOf('overflow: hidden;', css.indexOf('  .app-shell {')));
-    expect(shellRule.length, 'the mobile shell rule must not collapse').toBeGreaterThan(300);
-    expect(shellRule).toContain('top: var(--app-viewport-offset-top, 0px);');
-    // Load-bearing ORDER: `inset: 0` also sets top, so the variable must come after it or it never applies.
-    expect(shellRule.indexOf('inset: 0;'), 'top must override inset, not the other way round')
-      .toBeLessThan(shellRule.indexOf('top: var(--app-viewport-offset-top'));
+    expect(app).toMatch(/function keepDocumentPinnedToTop\(\) \{/);
+    const pin = app.slice(app.indexOf('function keepDocumentPinnedToTop() {'), app.indexOf('function syncViewportCssVars()'));
+    expect(pin).toMatch(/window\.scrollTo\(0, 0\);/);
+    expect(pin, 'a smooth scroll would show the app jumping away and back').not.toMatch(/behavior: 'smooth'/);
+    expect(pin, 'reading three offsets covers the engines that disagree').toMatch(/window\.scrollY \|\| window\.pageYOffset \|\| document\.documentElement\.scrollTop/);
 
-    // BOTH viewport events. `resize` reports a change in the visible area's HEIGHT (the keyboard opening);
-    // `scroll` reports a change in its POSITION (the finger dragging). Dropping the second leaves the shell
-    // following the keyboard but not the drag — which is the half the owner could still see moving.
-    expect(app).toMatch(/window\.visualViewport\?\.addEventListener\?\.\('resize', syncViewportCssVars/);
-    expect(app).toMatch(/window\.visualViewport\?\.addEventListener\?\.\('scroll', syncViewportCssVars/);
+    // THE SET OF DOORS. Each covers a case the others miss, so dropping any one leaves a live path back to the bug:
+    // the document can scroll without the visual viewport moving, and Safari does it AFTER the focus handler returns.
+    expect(app).toMatch(/function syncViewportCssVars\(\) \{[\s\S]{0,400}?keepDocumentPinnedToTop\(\);/);
+    expect(app).toMatch(/window\.addEventListener\('scroll', keepDocumentPinnedToTop, \{ passive: true \}\);/);
+    const focusin = app.slice(app.indexOf("document.addEventListener('focusin'"), app.indexOf("document.addEventListener('focusin'") + 300);
+    expect(focusin, 'focusin bubbles, so one listener covers every field').toContain('keepDocumentPinnedToTop();');
+    expect(focusin, 'the scroll lands a frame later, so an immediate undo alone undoes nothing')
+      .toContain('requestAnimationFrame(keepDocumentPinnedToTop);');
 
-    // ...and the 1.0.25 half stays: the shell must still follow the keyboard's height, or its bottom goes back
-    // under the keyboard. Height says how tall the visible area is, offsetTop says where it begins; both needed.
+    // ...and the 1.0.25 half stays: the shell must still follow the keyboard, or its bottom goes under it again.
     expect(css).toMatch(/min-height: var\(--app-viewport-height, 100svh\);/);
     expect(css).toMatch(/height: var\(--app-viewport-height, 100dvh\);/);
   });
