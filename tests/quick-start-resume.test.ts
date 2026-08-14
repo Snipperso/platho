@@ -516,19 +516,42 @@ describe('quick-start resume + activation gate guard', () => {
     //            recomputed from an event handler, so the interface shook and the maximized composer came apart.
     //
     // Reverted to the pre-1.0.25 line. This gate exists so the "obvious improvement" is not made a fourth time.
+    // THE BOTTOM EDGE IS THE ONE THAT MUST LINE UP. Both the shell and the maximized composer are pinned by it,
+    // from the same number: innerHeight − visualViewport.height − offsetTop, i.e. how far the bottom of the
+    // VISIBLE area sits above the bottom of the page. Anchoring the top instead — which is what every earlier
+    // attempt did — puts a correctly-sized box in the wrong place, and the difference falls off the screen: the
+    // tab bar was half below the edge, and the maximized composer left a band of app showing under it.
     const shellRule = css.slice(css.indexOf('  .app-shell {'), css.indexOf('overflow: hidden;', css.indexOf('  .app-shell {')));
     expect(shellRule.length, 'the mobile shell rule must not collapse').toBeGreaterThan(300);
-    expect(shellRule, 'the floor is the keyboard-less screen').toContain('min-height: 100svh;');
-    expect(shellRule, 'and it must NOT follow the variable').not.toMatch(/min-height: var\(/);
+    expect(shellRule).toContain('bottom: var(--app-viewport-bottom-gap, 0px);');
+    expect(shellRule).toContain('top: auto;');
+    // min-height BEATS height, so any floor above the visible area pushes the pinned bottom back off screen.
+    expect(shellRule, 'a floor would undo the pinning').toContain('min-height: 0;');
+    expect(shellRule, 'and it must never follow a viewport variable again').not.toMatch(/min-height: var\(|min-height: 100svh/);
     expect(shellRule, 'a fixed element chasing offsetTop flickers once per scroll frame')
       .not.toMatch(/top: var\(--app-viewport-offset-top/);
-    // The half that predates 1.0 is untouched — this gate must never be read as "the keyboard is ignored".
     expect(shellRule).toContain('height: var(--app-viewport-height, 100dvh);');
-    expect(app).toMatch(/--app-viewport-height-exact/);
+    const maximized = css.slice(css.indexOf('.composer.is-maximized {'), css.indexOf('\n}', css.indexOf('.composer.is-maximized {')));
+    expect(maximized, 'the composer is pinned the same way').toContain('bottom: var(--app-viewport-bottom-gap, 0px);');
+    expect(maximized).toContain('top: auto;');
+    expect(app).toMatch(/const visibleBottomGap = Math\.max\(0, Math\.round\(window\.innerHeight - \(viewport\?\.height \?\? window\.innerHeight\) - \(viewport\?\.offsetTop \?\? 0\)\)\);/);
 
-    // None of the compensation machinery may come back, in the file OR in the shipped listeners.
+    // The compensation machinery that fought the viewport instead of following it must not come back.
     expect(app, 'the scroll-undo hack').not.toMatch(/keepDocumentPinnedToTop|window\.scrollTo\(0, 0\)/);
     expect(app, 'the offsetTop variable it was replaced with').not.toMatch(/--app-viewport-offset-top/);
+
+    // A frame loop while the composer is full screen: the browser reports a viewport change AFTER the frame that
+    // moved it, so anything positioned from an event handler is a frame behind the finger — the shudder the owner
+    // reported. It must be scoped to that one state, or it is a permanent rAF loop for nothing.
+    expect(app).toMatch(/function keepViewportVarsLiveWhileComposerIsOpen\(\)/);
+    const live = app.slice(app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'), app.indexOf('function syncViewportCssVars()'));
+    expect(live).toContain("document.querySelector('.composer.is-maximized')");
+    expect(live, 'it stops itself when the composer closes').toMatch(/cancelAnimationFrame\(viewportVarsFrame\)/);
+    expect(live, 'and writes only when the number moved').toMatch(/if \(gap !== viewportVarsLastGap\)/);
+
+    // The FLIP measures its target AFTER re-reading the viewport, or it animates to a rectangle that is already
+    // stale — the composer flying somewhere wrong and then jumping into place.
+    expect(app).toMatch(/syncViewportCssVars\(\);\s*const full = form\.getBoundingClientRect\(\);/);
     // The document must NOT be scrollable, and this half is kept — it is not part of the compensation machinery.
     // [MEASURED on the owner's iPhone] window.scrollY reached 586: the page really was being dragged, because
     // `body { overflow: hidden }` alone does not cover it (iOS scrolls the ROOT) and html had no overflow at all.

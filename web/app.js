@@ -263,7 +263,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.0.32';
+const PLATHO_APP_RUNTIME_VERSION = '1.0.33';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2099,6 +2099,42 @@ function composerHandleKeyboardVisibility() {
 // Both existed to compensate for the shell following the keyboard's height on iOS, and that is the thing that has
 // been removed instead. See the note on .app-shell in styles.css.
 
+/**
+ * While the composer is open FULL SCREEN, re-read the viewport every frame instead of waiting to be told.
+ *
+ * [OWNER 2026-08-14] "Nail the composer down so it stops shuddering." The jitter is a reporting delay, not a layout
+ * bug: the browser announces a viewport change AFTER the frame that moved it, so a composer positioned from the
+ * event handler is always one frame behind the finger — visible as a shudder on every scroll.
+ *
+ * A frame loop has nothing to be late for. It runs ONLY while a maximized composer is on screen, which is the one
+ * moment this matters, and stops by itself the instant it closes — so it costs nothing the rest of the time.
+ * Writes only when the number actually changed, so an idle frame does no work at all.
+ */
+let viewportVarsFrame = 0;
+let viewportVarsLastGap = -1;
+
+function keepViewportVarsLiveWhileComposerIsOpen() {
+  const wanted = Boolean(document.querySelector('.composer.is-maximized'));
+  if (!wanted) {
+    if (viewportVarsFrame) { cancelAnimationFrame(viewportVarsFrame); viewportVarsFrame = 0; }
+    return;
+  }
+  if (viewportVarsFrame) return;
+  const tick = () => {
+    if (!document.querySelector('.composer.is-maximized')) { viewportVarsFrame = 0; return; }
+    const viewport = window.visualViewport;
+    const gap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0)));
+    if (gap !== viewportVarsLastGap) {
+      viewportVarsLastGap = gap;
+      document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${gap}px`);
+      const exact = Math.max(0, Math.round(viewport?.height ?? window.innerHeight));
+      if (exact > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${exact}px`);
+    }
+    viewportVarsFrame = requestAnimationFrame(tick);
+  };
+  viewportVarsFrame = requestAnimationFrame(tick);
+}
+
 function syncViewportCssVars() {
   // Inside Telegram the WebView height is governed by the client (viewportStableHeight),
   // not window.visualViewport — using the latter alone clips content under Telegram's header.
@@ -2147,6 +2183,7 @@ function syncViewportCssVars() {
   // two viewports already agree, so nothing there changes.
   const visibleBottomGap = Math.max(0, Math.round(window.innerHeight - (viewport?.height ?? window.innerHeight) - (viewport?.offsetTop ?? 0)));
   document.documentElement.style.setProperty('--app-viewport-bottom-gap', `${visibleBottomGap}px`);
+  keepViewportVarsLiveWhileComposerIsOpen();
 }
 
 // ---- Telegram Mini App adapter --------------------------------------------
@@ -19311,6 +19348,12 @@ function composerRunMaximizeGeo(form, growing) {
     const curTop = form.__spacer.getBoundingClientRect().top;
     inlineRect = { ...inlineRect, top: inlineRect.top + (curTop - form.__spacerTop0) };
   }
+  // Re-read the viewport BEFORE measuring the target. [OWNER 2026-08-14] "The composer should expand INTO the
+  // right place, not somewhere wrong and then get dragged there." That is exactly what a stale
+  // --app-viewport-bottom-gap does: maximizing raises the keyboard, so the visible area is changing in the very
+  // frame this measurement happens, and the browser reports the viewport change only afterwards. The animation
+  // then flies to yesterday's rectangle and snaps to the real one when the variable catches up.
+  syncViewportCssVars();
   const full = form.getBoundingClientRect(); // form currently has .is-maximized -> its full-screen rect
   if (!inlineRect || !full.width || !full.height) { if (!growing) composerCollapseMaximizeNow(form); return; }
   const fullRect = { top: full.top, left: full.left, width: full.width, height: full.height };
