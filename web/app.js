@@ -15533,8 +15533,14 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
       parts,
     };
   }
-  const price = composerEstimatedNetCostNanotons(pricedProfile, parts);
-  const hold = composerEstimatedMaxChargeNanotons(pricedProfile, parts);
+  // The INTRO publish, when the next send is a first contact. It is a SECOND on-chain write on top of the message's
+  // own, so leaving it out understated the first message of every conversation — and understating it is the shape
+  // that hurts: the user sees a price, funds exactly that, and the send is refused by a gate for the difference.
+  // It rides the EXISTING cost line rather than a warning of its own, so nothing new hangs under the composer and
+  // the figure returns to normal by itself once the conversation exists. [owner, 2026-08-14]
+  const extra = options.extraNanotons ?? 0n;
+  const price = composerEstimatedNetCostNanotons(pricedProfile, parts) + extra;
+  const hold = composerEstimatedMaxChargeNanotons(pricedProfile, parts) + extra;
   const surchargeParts = Array.isArray(pricedProfile)
     ? pricedProfile.length
     : Math.max(1, Number(parts) || 1);
@@ -15562,6 +15568,18 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
   };
 }
 
+/**
+ * The extra on-chain write a first contact pays for, or zero.
+ *
+ * THE SAME PREDICATE THE SEND USES, deliberately: attemptConvMessagePublishDirect routes on `convPeerKeyId` being
+ * absent, so anything else here would price one path and take another. Self-notes never introduce anybody and are
+ * excluded by the same test the send path applies.
+ */
+function privateFirstContactExtraNanotons(thread) {
+  if (!thread || isRealSavedThread(thread)) return 0n;
+  return thread.convPeerKeyId ? 0n : INTRO_PUBLISH_VALUE;
+}
+
 function refreshComposerCostStatus() {
   if (privateComposerCostStatus) {
     const privatePlan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
@@ -15581,6 +15599,7 @@ function refreshComposerCostStatus() {
           parts: Math.max(1, privatePlan.length),
           pricedProfile: privateComposerPublishProfilesForPlan(currentOutgoingPrivateSuite(), privatePlan),
           ignoreTonRpcLimit: true,
+          extraNanotons: privateFirstContactExtraNanotons(activeThread()),
         },
       );
     privateComposerCostStatus.textContent = status.text;
@@ -24081,14 +24100,19 @@ function cancelPrivateMessageFromUi(thread, message) {
 // message; the ONLY swap vs the Vault path is the seal (createEncryptedConvCapsule / bucketKey) and the transport
 // (publishConvLaneParts / RecordShard) instead of Vault→CapsuleHub. Gated behind privateLane.directPay.
 //
-// clean-17 first contact (INTRO) direct-pay. A conversation has no K_root until an INTRO mints one, so the FIRST message
-// to a not-yet-introduced peer is sent as an INTRO that carries the message AND establishes the pairwise K_root. Resolve
-// the recipient's KeyShard bundle (INTRO needs the scan key for the stealth view_tag), seal the INTRO with the composed
-// document as its first message, publish into a bucket the recipient scans, read back the CONTRACT created_at (never
-// Date.now — a local clock forks a later re-INTRO [[reintro-kroot-adoption-invariant]]), adopt the minted K_root, and
-// stamp convPeerKeyId so every subsequent message goes over the CONV lane. Gated behind privateLane.directPay.
-// FIRST-CUT BOUNDS: INTRO is a SINGLE capsule, so an oversized first message throws in the seal (fail-closed, never
-// truncated) — multipart first contact is a follow-up; a proper post-send created_at confirm driver is a follow-up too.
+// clean-17 first contact (INTRO) direct-pay. A conversation has no K_root until an INTRO mints one, so a peer who has
+// never been introduced needs TWO on-chain writes and this function performs both, in one slot of the outgoing queue:
+// an INTRO that mints the pairwise K_root and carries NOTHING ELSE, then the user's message on the ordinary CONV lane.
+//
+// Resolve the recipient's KeyShard bundle (INTRO needs the scan key for the stealth view_tag), seal an empty INTRO,
+// publish into a bucket the recipient scans, read back the CONTRACT created_at (never Date.now — a local clock forks a
+// later re-INTRO [[reintro-kroot-adoption-invariant]]), adopt the minted K_root, stamp convPeerKeyId, and hand the
+// message to the CONV lane. Gated behind privateLane.directPay.
+//
+// [CHANGED 2026-08-14] The INTRO used to carry the first message, which made that one message different from every
+// other in two ways that both cost the user something: it lived on a transient, deliver-once carrier, and it could
+// not be split into parts. Neither is true of a CONV record. The cost of the change is one extra publish per first
+// contact (~0.019 GRAM, shown in the composer's own cost line, not in a new warning).
 async function attemptIntroFirstContactDirect(context) {
   const { thread, message } = context;
   const selfKeyId = localRecipientKeyPair?.keyId;
@@ -24125,15 +24149,35 @@ async function attemptIntroFirstContactDirect(context) {
     const bundle = await resolveRecipientBundleByWallet({ provider, wallet: peerWallet, callOptions: criticalChainReadOptions() });
     const peerKeyId = bundle.keyId;
 
-    const firstMessageBytes = messageDocumentBytesFromDraft(
+    // ENCODED HERE ONLY TO PROVE THERE IS SOMETHING TO SEND. These bytes no longer ride the INTRO; the CONV send
+    // below re-encodes them from the same draft. Refusing an empty draft before spending anything on chain is worth
+    // the duplicate encode.
+    const draftBytes = messageDocumentBytesFromDraft(
       context.text, context.attachments, {},
       context.replyDraft === undefined ? privateReplyDraft : context.replyDraft,
       context.fileAttachments === undefined ? privateFileAttachments : context.fileAttachments,
       context.shareDraft === undefined ? privateShareDraft : context.shareDraft);
-    if (!firstMessageBytes) throw new Error('INTRO direct-pay: nothing to send');
+    if (!draftBytes) throw new Error('INTRO direct-pay: nothing to send');
 
+    // THE INTRO CARRIES NO MESSAGE, and that is the whole point of this change.
+    //
+    // OWNER, 2026-08-14: the message inside an INTRO is lost over time, so the conversation ends up incomplete.
+    // Correct, and it is a property of the carrier rather than a bug in it. An INTRO lives in an IntroShard, the scan
+    // hands each
+    // entry over exactly once (intro-cursor-store keeps its delivered set), and those shards are retired. A CONV
+    // record lives in the conversation's own RecordShard for the retention window and is re-readable. So the first
+    // message was the ONE message in every conversation stored on the transient lane, and a conversation that
+    // outlives its first shard begins with a hole.
+    //
+    // It also made the first message the only one that could not be multipart: an INTRO is a single capsule, so an
+    // image over the largest size class threw in the seal — measured by the owner at 33370 bytes against a 32768
+    // ceiling, i.e. failing by the size of the handshake envelope alone. Sending the message down the ordinary lane
+    // removes that ceiling instead of raising it.
+    //
+    // serializeIntroPayload has always encoded a missing first message as zero bytes, and the receive side already
+    // guards on `bytes.length > 0`, so nothing on the wire or at the far end changes shape.
     const capsule = await createEncryptedIntroCapsule(bundle, localIdentity, {
-      firstMessageBytes, now: Date.now(), ...currentProfilePointerFields(),
+      now: Date.now(), ...currentProfilePointerFields(),
     });
     const { r, viewTag } = introCapsuleStealthFields(capsule);
 
@@ -24197,10 +24241,25 @@ async function attemptIntroFirstContactDirect(context) {
   followContactPublicChannel(sendState.peerWallet);
 
   globalThis.plathoLastIntroDirectSend = { peerKeyId: sendState.peerKeyId, epoch: sendState.epoch, bucket: sendState.bucket, createdAtSec };
-  // Green on arrival, and earned: reaching this line means confirmIntroCreatedAt already READ our entry back out of
-  // the IntroShard (matching r and view_tag), because the K_root adoption above binds to that entry's created_at.
-  markDirectSendBroadcast(thread, message, { verified: true });
-  return { peerKeyId: sendState.peerKeyId };
+
+  // AND NOW THE MESSAGE ITSELF, down the same lane as every message that will ever follow it.
+  //
+  // NOT EARLIER, and this is the one ordering the protocol fixes for us: a CONV capsule seals against the K_root
+  // adopted three lines above, and that K_root binds to the INTRO's CONTRACT created_at. Until the confirm loop has
+  // read that time back out of the shard there is no conversation to publish into — so "immediately after" is as
+  // immediate as first contact can be, not a delay anyone chose.
+  //
+  // The dispatcher re-reads thread.convPeerKeyId, which is now stamped, so this lands on the CONV branch and cannot
+  // recurse. Everything the first message needs — multipart splitting, the idempotent re-broadcast capture, the
+  // delivery confirm that turns it green or red — is that branch's, already built and already exercised by every
+  // other message. This function deliberately no longer marks anything: the message's state belongs to the send that
+  // actually carries it.
+  //
+  // PARTIAL FAILURE IS SAFE. If the INTRO landed and this throws, convPeerKeyId is stamped and persisted, so the
+  // retry routes straight here and never re-mints an INTRO. The user sees a red message next to an established
+  // conversation, which is both true and recoverable — where the old path could report the whole first contact
+  // delivered while the text it carried was already unreadable.
+  return attemptConvMessagePublishDirect(context);
 }
 
 // How long a captured direct-pay external stays re-broadcastable. The wallet external is valid for ~300s (its
@@ -24225,21 +24284,20 @@ const DIRECT_SEND_REBROADCAST_WINDOW_MS = 330_000;
 function markDirectSendBroadcast(thread, message, options = {}) {
   clearPrivateSendRetry(message);
   clearPrivateMessageManualRecovery(message);
-  // THREE HONEST ANSWERS, one per lane, and each says exactly what is known at this point:
+  // TWO HONEST ANSWERS, one per lane, and each says exactly what is known at this point:
   //
   //   'sending'   (default, CONV) — signed and handed to the network. A delivery confirm will read the shard and
   //               upgrade this to green, or redden it. The bucket is a PROMISE that something resolves it.
-  //   'published' (verified, INTRO) — the chain has ALREADY been read. attemptIntroFirstContactDirect cannot finish
-  //               without confirmIntroCreatedAt matching BOTH r and view_tag against the shard's own entry: the
-  //               conversation's K_root binds to that entry's created_at, so an unverified INTRO throws instead of
-  //               adopting. That is STRONGER proof than the CONV confirm, which is asynchronous and may end
-  //               inconclusive. I first shipped this lane as 'sent' after looking for a confirm DRIVER and not
-  //               finding one — without checking whether the send verifies itself inline. It does, and it must.
   //   'sent'      (awaitsConfirm:false, self-notes) — RecoveryShard slots are never read back. Nothing will ever
   //               resolve this, so 'sending' would hang forever and 'published' would be a claim we cannot support.
-  message.meta = options.verified === true
-    ? 'published'
-    : (options.awaitsConfirm === false ? 'sent' : 'sending');
+  //
+  // [WAS THREE, 2026-08-14] A `verified: true` answer existed for the INTRO lane, which read its own entry back
+  // inline and could honestly paint green on the spot. That lane no longer marks anything: an INTRO carries no
+  // message now, so there is no message whose state it could own — it establishes the conversation and hands the
+  // user's text to the CONV lane, which lands here through the default branch like every other message. The option
+  // is gone rather than left unused: a branch nothing can reach, documenting proof nothing supplies, is how a
+  // reader ends up trusting a mechanism that never runs.
+  message.meta = options.awaitsConfirm === false ? 'sent' : 'sending';
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
   thread.state = 'sealed';
