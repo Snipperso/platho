@@ -4445,9 +4445,14 @@ button.feed-item:hover {
    .action-dialog input gives every dialog input a 44px touch target. A checkbox keeps its 16x16 painted glyph but
    INHERITS that minimum, so the element still starts in grid column 1 of row 1 while the glyph renders centred in a
    44px box — about one line below its own label, which reads as "the label is a heading and the box is under it".
-   MEASURED on the deployed stylesheet: width 16px, height 16px, min-height 44px. */
+   MEASURED on the deployed stylesheet: width 16px, height 16px, min-height 44px.
+
+   The margin-top that used to sit here went with it. It was nudging the box down to meet a label it could never
+   reach while the 44px minimum held, and once the minimum was gone it became the whole remaining skew — the owner
+   saw it immediately. MEASURED again, box centre against label centre: 2px -> 1.9px low, 0 -> 0.1px. The label's
+   line box is 16.2px and the box is 16px, so `align-items: start` lands them level with no nudge at all, and a
+   caption that wraps still keeps the box on its first line. */
 .action-checkbox-field input {
-  margin-top: 2px;
   width: 16px;
   height: 16px;
   min-height: 0;
