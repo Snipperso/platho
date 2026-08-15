@@ -401,6 +401,7 @@ const identityMenuButton = document.querySelector('#identityMenuButton');
 const search = document.querySelector('#threadSearch');
 const newChatDialog = document.querySelector('#newChatDialog');
 const newChatForm = document.querySelector('#newChatForm');
+const newChatSubmitButton = document.querySelector('#newChatSubmitButton');
 const recipientInput = document.querySelector('#recipientInput');
 const recipientLocalLabel = document.querySelector('#recipientLocalLabel');
 const recipientHint = document.querySelector('#recipientHint');
@@ -1072,6 +1073,22 @@ const PLATHO_USERNAME_OWNER_CACHE_TTL_MS = 5 * 60_000;
 let plathoWallet = null;
 // Guards the async new-chat resolve against a double-submit race (the handler awaits a chain read before opening).
 let isResolvingNewChat = false;
+
+/**
+ * ONE SWITCH FOR BOTH, because they were two and only one of them was ever thrown.
+ *
+ * The guard above already refused a second submit while the resolve was in flight — silently. The button kept its
+ * full colour and stayed pressable, so the owner pressed a live-looking button and nothing acknowledged it. The
+ * app HAS one dimming for every disabled control (--disabled-opacity), and it applies to this button's class
+ * already; what was missing was the `disabled` that triggers it.
+ *
+ * Setting them together is the point rather than a tidiness: a busy flag and the look of being busy are the same
+ * fact, and the bug was exactly that the code could hold one without the other.
+ */
+function setNewChatResolving(resolving) {
+  isResolvingNewChat = resolving;
+  if (newChatSubmitButton) newChatSubmitButton.disabled = resolving;
+}
 let activeRuntimeWalletAddress = null;
 let localReplayStore = createMemoryReplayStore();
 let encryptedMessageStore = null;
@@ -18502,7 +18519,7 @@ newChatForm?.addEventListener('submit', async (event) => {
   // Username / TON DNS: a username is a movable alias — resolve it to the CURRENT owner wallet (canonical) and
   // key the dialog by that wallet, so addressing a transferred username opens the NEW owner's dialog and we can
   // relabel any old-owner dialog still wearing it. The resolve also validates the name actually exists.
-  isResolvingNewChat = true;
+  setNewChatResolving(true);
   showNewChatHint(t('chat.resolvingUsername', { name: canonicalUsernameDisplay(identity.label) }), 'info');
   try {
     let ownerWallet = null;
@@ -18543,7 +18560,7 @@ newChatForm?.addEventListener('submit', async (event) => {
       }
     }
   } finally {
-    isResolvingNewChat = false;
+    setNewChatResolving(false);
   }
 });
 actionCancelButton?.addEventListener('click', () => {
