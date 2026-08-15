@@ -2321,105 +2321,11 @@ function syncViewportCssVars() {
   // to it in several places; both are simply "the visible height", with nothing added to either.
   if (rounded > 0) document.documentElement.style.setProperty('--app-viewport-height-exact', `${rounded}px`);
   keepViewportVarsLiveWhileComposerIsOpen();
-  renderViewportDebugOverlay();
 }
 
-/**
- * A numbers overlay for the iOS keyboard problem, off unless the URL says ?vp=1.
- *
- * [2026-08-14] Thirteen attempts at the composer's position, and the one probe that finally produced numbers used
- * a standalone page whose single fixed strip stayed exactly where it belonged — while the app, on the same phone
- * in the same moment, flies off the top of the screen. So the fault is in something the probe did not have, and
- * no more can be learned by measuring a stand-in: this measures THE APP.
- *
- * Deliberately not a dev-only build flag: the device that reproduces this is the owner's, it runs production, and
- * a diagnostic that cannot be turned on there is no diagnostic. It renders nothing at all without the parameter.
- */
-let viewportDebugNode = null;
-const viewportDebugPeak = { scrollY: 0, offset: 0, shellUp: 0 };
 // Last height written to CSS. Only a CHANGE means the keyboard arrived or left; anything else is a drag, and a
 // drag must not be interfered with — that distinction is what separates this from the 1.0.28 scroll-fighting hack.
 let viewportHeightLastWritten = -1;
-
-// Turned on INSIDE the app, by triple-tapping the version number, and remembered.
-//
-// [OWNER 2026-08-14] A ?vp=1 URL was the obvious way and it does not work: on iOS an installed PWA has its own
-// storage, separate from Safari's, so opening the link in the browser showed him an app with no wallet in it —
-// and without a wallet the composer is disabled, which is the very thing being measured. The diagnostic has to
-// live where the bug does, so it is reachable from inside the installed app with no address bar to type into.
-const VIEWPORT_DEBUG_KEY = 'platho.viewportDebug.v1';
-let viewportDebugTaps = [];
-
-function viewportDebugEnabled() {
-  try {
-    if (new URLSearchParams(location.search).get('vp') === '1') return true;
-    return localStorageOrNull()?.getItem(VIEWPORT_DEBUG_KEY) === '1';
-  } catch { return false; }
-}
-
-function toggleViewportDebugOnTripleTap() {
-  const now = Date.now();
-  // Four seconds, not two, and every tap acknowledges itself. [OWNER 2026-08-14] It did not register for him in
-  // the installed app and there was no way to tell a missed tap from a broken feature — which is its own kind of
-  // failure in a diagnostic.
-  viewportDebugTaps = viewportDebugTaps.filter((at) => now - at < 4000);
-  viewportDebugTaps.push(now);
-  if (viewportDebugTaps.length < 3) {
-    flashWalletIdentityStatus(`${viewportDebugTaps.length}/3`);
-    return;
-  }
-  viewportDebugTaps = [];
-  const next = viewportDebugEnabled() ? null : '1';
-  try {
-    if (next) localStorageOrNull()?.setItem(VIEWPORT_DEBUG_KEY, next);
-    else localStorageOrNull()?.removeItem(VIEWPORT_DEBUG_KEY);
-  } catch { /* private mode: the tap simply does nothing, which is honest */ }
-  if (!next && viewportDebugNode) { viewportDebugNode.remove(); viewportDebugNode = null; }
-  renderViewportDebugOverlay();
-}
-
-function renderViewportDebugOverlay() {
-  if (!viewportDebugEnabled()) return;
-  if (!viewportDebugNode) {
-    viewportDebugNode = document.createElement('pre');
-    viewportDebugNode.id = 'viewportDebugOverlay';
-    document.body.appendChild(viewportDebugNode);
-  }
-  const viewport = window.visualViewport;
-  const shell = document.querySelector('.app-shell');
-  const composer = document.querySelector('.composer.is-maximized') ?? document.querySelector('#publicComposer');
-  const rect = (node) => {
-    if (!node) return 'none';
-    const box = node.getBoundingClientRect();
-    return `${Math.round(box.top)}..${Math.round(box.bottom)}`;
-  };
-  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '-';
-  // PEAKS, because the interesting moment is never the moment of the screenshot: by the time anyone can take one
-  // the page has been dragged back and every live number reads zero again. These remember the worst seen.
-  const scrolled = Math.round(window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
-  const shellTop = shell ? Math.round(shell.getBoundingClientRect().top) : 0;
-  viewportDebugPeak.scrollY = Math.max(viewportDebugPeak.scrollY, Math.abs(scrolled));
-  viewportDebugPeak.offset = Math.max(viewportDebugPeak.offset, Math.round(viewport?.offsetTop ?? 0));
-  viewportDebugPeak.shellUp = Math.max(viewportDebugPeak.shellUp, -shellTop);
-  viewportDebugNode.textContent = [
-    `inner ${Math.round(window.innerHeight)}  vv ${Math.round(viewport?.height ?? 0)}  off ${Math.round(viewport?.offsetTop ?? 0)}`,
-    `scrollY ${scrolled}  latch ${keyboardGapLatched}`,
-    `--height ${cssVar('--app-viewport-height')}  --exact ${cssVar('--app-viewport-height-exact')}`,
-    `shell ${rect(shell)}  composer ${rect(composer)}`,
-    `MAX scroll ${viewportDebugPeak.scrollY}  off ${viewportDebugPeak.offset}  shell up ${viewportDebugPeak.shellUp}`,
-    // [OWNER 2026-08-15] "I don't believe Safari ignores the page height if you physically shrink it." He was
-    // right, and the reading that appeared to prove him wrong was a bug in the READING.
-    //
-    // On the ROOT element, clientHeight and scrollHeight are DEFINED to report the viewport rather than the
-    // element (CSSOM View; MDN states it outright: "When clientHeight is used on the root element (the <html>
-    // element) ... the viewport's height is returned"). So the earlier `doc 894/894` never described <html> at
-    // all — it was the window, restated. It could not have shown anything else, whatever the CSS did.
-    //
-    // getBoundingClientRect DOES describe the element. These two are the honest measurement.
-    `html ${Math.round(document.documentElement.getBoundingClientRect().height)}`
-      + `  body ${Math.round(document.body.getBoundingClientRect().height)}  css ${cssVar('--app-viewport-height')}`,
-  ].join('\n');
-}
 
 // ---- Telegram Mini App adapter --------------------------------------------
 // Single codebase: when Platho runs inside a Telegram Mini App we load the
@@ -26040,16 +25946,6 @@ window.addEventListener('appinstalled', () => {
 window.matchMedia?.('(display-mode: standalone)')?.addEventListener?.('change', refreshInstallButtons);
 refreshInstallButtons();
 refreshInstalledRelatedPwaState().catch(() => {});
-// Triple-tap a pane title ("Platho.app") to toggle the viewport diagnostic. It has to be reachable INSIDE the
-// installed app — that is where the iOS keyboard problem lives, and there is no address bar there to put a
-// parameter into. [OWNER 2026-08-14] The version number was the obvious target and is invisible on a phone: the
-// brand block is display:none in the mobile layout and the profile copy ships `hidden`. A pane title is on screen
-// on every tab. It carries no other tap behaviour, so three taps on it cannot mean anything else.
-for (const paneTitle of document.querySelectorAll('.pane-header h1')) {
-  paneTitle.addEventListener('click', toggleViewportDebugOnTripleTap);
-}
-renderViewportDebugOverlay();
-
 for (const eventName of ['pointerdown', 'keydown', 'touchstart']) {
   window.addEventListener(eventName, noteWalletActivity, { passive: true });
 }

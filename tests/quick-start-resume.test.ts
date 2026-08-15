@@ -699,8 +699,8 @@ describe('quick-start resume + activation gate guard', () => {
     expect(rootClientHeight.length, 'one use only: the viewport-height fallback').toBe(1);
     expect(app, 'and that use must be the fallback, not a document measurement')
       .toMatch(/window\.innerHeight \?\? document\.documentElement\.clientHeight/);
-    // An element's own height comes from getBoundingClientRect, which has no root-element special case.
-    expect(app).toMatch(/document\.documentElement\.getBoundingClientRect\(\)\.height/);
+    // If the page height ever needs measuring again, getBoundingClientRect is the call — it has no root-element
+    // special case and reports the element. The diagnostic that used it is gone with the question it answered.
 
     // ONE DECISION PER GESTURE. The refusal has to walk the ancestor chain calling getComputedStyle to find out
     // whether anything can consume the drag; doing that per touchmove is that walk sixty times a second, and this
