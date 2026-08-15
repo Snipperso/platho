@@ -7059,15 +7059,15 @@ describe('PWA runtime config guard', () => {
 
     // The broadcast return says 'sending', which is what is actually true at that moment.
     // A confirm-backed lane lands in the sending bucket; the lanes with no verifier opt out — see PWA-HONESTGREEN-03.
-    expect(app).toMatch(/function markDirectSendBroadcast\(thread, message, options = \{\}\) \{[\s\S]{0,1600}?: 'sending'\);/);
+    expect(app).toMatch(/function markDirectSendBroadcast\(thread, message, options = \{\}\) \{[\s\S]{0,2600}?: 'sending';/);
     expect(app, 'the optimistic-green helper came back').not.toContain('function markDirectSendPublished(');
     // ...and the ONLY place that paints green is the branch that has READ the record out of the shard.
     expect(app).toMatch(/if \(res\.landed\) \{[\s\S]{0,400}?message\.meta = 'published';/);
-    // The invariant is not "one place" but "only where the chain was READ". There are exactly two such places, and
-    // each is pinned to its proof: the CONV confirm's res.landed branch above, and the INTRO lane's `verified: true`
-    // — which is only reachable after confirmIntroCreatedAt matched our entry (see PWA-HONESTGREEN-03).
-    expect((app.match(/message\.meta = 'published';/g) ?? []).length, 'a third green appeared — check what proves it').toBe(1);
-    expect(app).toMatch(/message\.meta = options\.verified === true\s*\n\s*\? 'published'/);
+    // The invariant is not "one place" but "only where the chain was READ". Since the INTRO lane stopped carrying a
+    // message (2026-08-14) there is exactly ONE such place left — the CONV confirm's res.landed branch above — and
+    // no way to paint green without it.
+    expect((app.match(/message\.meta = 'published';/g) ?? []).length, 'a second green appeared — check what proves it').toBe(1);
+    expect(app, 'the inline INTRO green came back without a message to justify it').not.toContain('options.verified === true');
 
     // The deadline case that can prove neither side says so, in the SENT bucket — an unverified success, not a failure.
     expect(app).toContain("message.meta = 'sent, not verified';");
@@ -7115,29 +7115,29 @@ describe('PWA runtime config guard', () => {
     // 'sending' is a PROMISE that something resolves it. A lane that cannot keep that promise says 'sent': broadcast,
     // never claimed confirmed. Lying 'published' again would be the other wrong answer.
     const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toMatch(/message\.meta = options\.verified === true\s*\n\s*\? 'published'\s*\n\s*: \(options\.awaitsConfirm === false \? 'sent' : 'sending'\);/);
+    expect(app).toMatch(/message\.meta = options\.awaitsConfirm === false \? 'sent' : 'sending';/);
 
     // EVERY caller is accounted for, and each one must justify its bucket:
     //   armed  — a delivery confirm follows on the next line and will resolve 'sending';
-    //   verified — the send already READ the chain itself (INTRO: confirmIntroCreatedAt matches r + view_tag, and
-    //              the K_root adoption depends on it, so an unverified INTRO throws rather than reaching here);
     //   opted out — nothing verifies that lane at all, so it must not sit in 'sending' forever.
     const callers = [...app.matchAll(/markDirectSendBroadcast\(thread, message([^)]*)\);\n(.*)/g)]
       .map((m) => ({ opts: m[1], next: m[2] }));
-    expect(callers.length, 'a caller appeared or vanished — re-check each one').toBe(4);
+    expect(callers.length, 'a caller appeared or vanished — re-check each one').toBe(3);
     for (const caller of callers) {
       const optedOut = caller.opts.includes('awaitsConfirm: false');
-      const verified = caller.opts.includes('verified: true');
       const armed = caller.next.includes('armConvDeliveryConfirm(thread, message)');
-      expect(optedOut || verified || armed, `a caller justifies no bucket: ${caller.opts}`).toBe(true);
+      expect(optedOut || armed, `a caller justifies no bucket: ${caller.opts}`).toBe(true);
     }
 
-    // INTRO's green rests on that inline read — if the confirm ever stops gating the adoption, the green becomes a
-    // claim nothing supports and this lane must go back to 'sending' with a driver, or to 'sent'.
+    // THE INTRO LANE MARKS NOTHING, and that is what keeps this invariant whole: it establishes the conversation and
+    // delegates the message, so the first message of a conversation reaches a bucket through the SAME confirm-backed
+    // caller as every later one. If it ever marks the message itself again, it owes this test a proof.
     const intro = app.slice(app.indexOf('async function attemptIntroFirstContactDirect('),
-      app.indexOf("markDirectSendBroadcast(thread, message, { verified: true });"));
+      app.indexOf('const DIRECT_SEND_REBROADCAST_WINDOW_MS'));
     expect(intro, 'INTRO no longer reads its own entry back before adopting').toContain('confirmIntroCreatedAt({');
     expect(intro).toContain('await convKeyStore.upsertConversationKRoot(');
+    expect(intro, 'INTRO started marking a message again').not.toContain('markDirectSendBroadcast(');
+    expect(intro, 'INTRO stopped handing the message to the CONV lane').toContain('return attemptConvMessagePublishDirect(context);');
   });
 
   it('PWA-HONESTGREEN-02: the LAST external keeps a watcher after the send call returns', () => {
