@@ -4441,10 +4441,16 @@ button.feed-item:hover {
   line-height: 1.35;
 }
 
+/* min-height RESET, and it is the whole fix for a box that looked like it had fallen out of its own row.
+   .action-dialog input gives every dialog input a 44px touch target. A checkbox keeps its 16x16 painted glyph but
+   INHERITS that minimum, so the element still starts in grid column 1 of row 1 while the glyph renders centred in a
+   44px box — about one line below its own label, which reads as "the label is a heading and the box is under it".
+   MEASURED on the deployed stylesheet: width 16px, height 16px, min-height 44px. */
 .action-checkbox-field input {
   margin-top: 2px;
   width: 16px;
   height: 16px;
+  min-height: 0;
 }
 
 .recipient-submit {

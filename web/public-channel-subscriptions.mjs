@@ -2,7 +2,7 @@
 // hoped over. Importing the i18n engine into a data module is safe in both runtimes: it holds the active locale in
 // a module variable, touches the DOM only inside try/catch, and falls back to English when initI18n never ran —
 // which is exactly what the Node tests get, unchanged.
-import { t, tPlural } from './i18n.mjs?v=72';
+import { t, tPlural } from './i18n.mjs?v=73';
 import { messagePreviewText } from './message-plain-text.mjs?v=1';
 
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
