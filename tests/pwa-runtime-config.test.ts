@@ -7140,6 +7140,29 @@ describe('PWA runtime config guard', () => {
     expect(intro, 'INTRO stopped handing the message to the CONV lane').toContain('return attemptConvMessagePublishDirect(context);');
   });
 
+  it('PWA-BUSYBUTTON-01: the new-chat submit cannot be busy without looking busy', () => {
+    // OWNER, 2026-08-15: pressing "Start" in New Chat changed nothing about the button, so either the shared
+    // disabled colour was not reaching it or it never became disabled. It was the second: the handler guarded the
+    // double-submit with a FLAG and left the button lit and pressable through a chain read.
+    //
+    // The app has exactly one dimming for every disabled control and this button's class is already in that rule,
+    // so nothing needed styling — the `disabled` that triggers it was missing. Flag and appearance are one fact,
+    // and this pins that they are set in one place, because the bug was holding one without the other.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    const setter = app.slice(app.indexOf('function setNewChatResolving('),
+      app.indexOf('function setNewChatResolving(') + 260);
+    expect(setter, 'the setter stopped touching the flag').toContain('isResolvingNewChat = resolving;');
+    expect(setter, 'the setter stopped disabling the button').toContain('newChatSubmitButton.disabled = resolving;');
+
+    // ...and NOTHING else may write the flag, or the two can drift apart again. The declaration and the setter are
+    // the only permitted writes; every caller goes through setNewChatResolving.
+    const writes = (app.match(/isResolvingNewChat = /g) ?? []).length;
+    expect(writes, 'the busy flag is written outside its setter — that is how the button went dark').toBe(2);
+    expect(app, 'the button lost the id the setter reaches it by').toContain("querySelector('#newChatSubmitButton')");
+    expect(readFileSync('web/index.html', 'utf8')).toContain('id="newChatSubmitButton"');
+  });
+
   it('PWA-HONESTGREEN-02: the LAST external keeps a watcher after the send call returns', () => {
     // The final hole in the send path. The wallet re-broadcasts only while a send is RUNNING, so the last external
     // of a message had nobody watching it once the call returned — MEASURED on the owner's wallet at 148s to reach a
