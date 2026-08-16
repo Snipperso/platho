@@ -107,6 +107,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'public-lane-send.mjs',
   'public-shard-ton-rpc-provider.mjs',
   'publish-price.mjs',
+  'wallet-send-fee.mjs',
   'key-shard-register-send.mjs',
   'shard-rpc.mjs',
   'shard-discovery.mjs',

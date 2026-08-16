@@ -31,8 +31,10 @@ describe('fee estimate matches the send', () => {
     const request = exported('USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS');
     expect(request).toBeGreaterThan(0n);
 
-    // The estimator must return the exported constant itself, not a copy of its digits.
-    expect(APP).toMatch(/function estimatedUsernameMintTonFeeNanotons\(\) \{\n(?:.*\n)*?\s*return USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS;/);
+    // The estimator must return the exported constant itself, not a copy of its digits. Since 2026-08-16 it also adds
+    // walletSendFeeNanotons — what the network charges the wallet to SEND the request, which no quote in this app used
+    // to count (tests/wallet-send-fee.test.ts). The constant must still be the base it builds on.
+    expect(APP).toMatch(/function estimatedUsernameMintTonFeeNanotons\(\) \{\n(?:.*\n)*?\s*return USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS \+ walletSendFeeNanotons\(\[\]\);/);
     // And the send path must attach that same constant.
     expect(APP).toContain('const USERNAME_MINT_DIRECT_REQUEST_VALUE = USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS;');
     expect(APP).toContain('valueNanotons: USERNAME_MINT_DIRECT_REQUEST_VALUE');

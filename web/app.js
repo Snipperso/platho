@@ -168,6 +168,7 @@ import { createPublicLane } from './public-lane.mjs?v=25';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=14';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
+import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=2';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=14';
 import { createIntroLane } from './intro-lane.mjs?v=20';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=4';
@@ -15309,11 +15310,25 @@ function composerProfileNetPriceNanotons(profile) {
   return nonNegativeBigInt(settled) + currentNetworkFeeSurchargeNanotons();
 }
 
+// [ADDED 2026-08-16] What the wallet pays the NETWORK to send the transfer, on top of what the message carries to the
+// shard. Owner-measured: the composer quoted 0.0191 (= CONV_PUBLISH_VALUE) for a minimal private message while 0.0223
+// left the wallet. The missing 0.0032 is the import fee + gas + per-message forward fee that sendMode 3 charges the
+// wallet separately from the value. Every direct-pay quote funnels through here — private, public, comment, avatar and
+// the channel-profile dialog — so all of them gain the term at once. The capsule is padded to its size class, so the
+// class is all the fee depends on; see web/wallet-send-fee.mjs for the measurement behind that.
+function composerWalletSendFeeNanotons(profiles) {
+  const list = Array.isArray(profiles) ? profiles : [profiles];
+  return walletSendFeeNanotons(list.map((item) => Number(item?.sizeClass ?? 1)));
+}
+
 function composerEstimatedNetCostNanotons(profile, parts = 1) {
   if (Array.isArray(profile)) {
-    return profile.reduce((sum, item) => sum + composerProfileNetPriceNanotons(item), 0n);
+    const attached = profile.reduce((sum, item) => sum + composerProfileNetPriceNanotons(item), 0n);
+    return attached + composerWalletSendFeeNanotons(profile);
   }
-  return composerProfileNetPriceNanotons(profile) * BigInt(Math.max(1, Number(parts) || 1));
+  const count = Math.max(1, Number(parts) || 1);
+  return composerProfileNetPriceNanotons(profile) * BigInt(count)
+    + composerWalletSendFeeNanotons(Array.from({ length: count }, () => profile));
 }
 
 // Hold -> net fallback for paths that only have the final hold (no per-part profiles): the settled net cost
@@ -15430,16 +15445,22 @@ function refreshPublicSendButtonState() {
 // figure for a contract clean-17 deleted — while the direct-pay send below actually asks the wallet to sign
 // 1,100,000,000. The user was shown 0.617 GRAM and handed a 1.1 GRAM signing request: wrong by 78%, on the screen
 // where they decide whether to trust the app.
+// [2026-08-16] …and it still quoted only what the request CARRIES. A mint is one signed transfer, so the wallet also
+// pays to import and forward it — the same term the composer was missing. walletSendFeeNanotons([]) prices exactly
+// that: one transfer, one outgoing message, no capsule payload.
 function estimatedUsernameMintTonFeeNanotons() {
-  return USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS;
+  return USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS + walletSendFeeNanotons([]);
 }
 
 function estimatedProfileAvatarTonFeeNanotons(attachment) {
   const plan = imagePartsForSend(attachment, 'profile avatar');
   const pricedProfiles = publicComposerPublishProfilesForPlan(plan);
   // Same defect as the mint estimator above: this added the Vault-era 115,000,000 while the send attaches 200,000,000.
+  // The wallet-send fee for the capsule parts rides in via composerEstimatedMaxChargeNanotons; the ProfileRegistry
+  // write is a FURTHER message in the same transfer, so its own forward+action cost is added here.
   return composerEstimatedMaxChargeNanotons(pricedProfiles, 1)
-    + PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS;
+    + PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS
+    + WALLET_SEND_FEE_PER_PART_NANOTONS;
 }
 
 /**

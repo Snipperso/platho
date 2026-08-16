@@ -287,6 +287,10 @@
     "version": "59",
     "sha256": "9f2107f8ae7958360f2d29c8f764a426c90dd57eeff1cd24d1beea5ca0c4af55"
   },
+  "wallet-send-fee.mjs": {
+    "version": "2",
+    "sha256": "4f2038c18d78372325b422c22614942354ae64667ca9d099b4769bb5170e6cb3"
+  },
   "webp-encoder.mjs": {
     "version": "1",
     "sha256": "0ecbbc627b232ecda048978dafc942870751369896650712d36830ba8649d9b3"

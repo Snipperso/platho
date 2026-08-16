@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-15T13:16:07.941Z",
+  "generatedAt": "2026-08-16T18:37:02.118Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,9 +8,9 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 232,
-    "totalBytes": 5802948,
-    "bundleSha256": "487f3a2565e994a02999569ff235fd79e2555bd5d82dc3894f26f5b035da19b6",
+    "fileCount": 233,
+    "totalBytes": 5809130,
+    "bundleSha256": "55f806ab96413e8b07c2d548d5131ff1f244e7eb64a673bb49f67be9aff1266c",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -24,8 +24,8 @@
       },
       {
         "path": "app.js",
-        "bytes": 1426871,
-        "sha256": "541aa6ece1523707bd17d3717550f368a815b1bdfe435297a708a0296fc09574"
+        "bytes": 1428631,
+        "sha256": "3e6bb104e856ecc4818841003bae367af471ab6f46c452c5cc0378dfb6f7d4bd"
       },
       {
         "path": "assets/icons/about.svg",
@@ -525,7 +525,7 @@
       {
         "path": "index.html",
         "bytes": 66139,
-        "sha256": "ab52f389cda2e3cfa822932c5203485449ee5f4751c460fb453a0bc68554620f"
+        "sha256": "189a55950c5d4faecd4fc7494d25b0398818359100db8c7cab890587bcb61c58"
       },
       {
         "path": "intro-bucket.mjs",
@@ -769,8 +769,8 @@
       },
       {
         "path": "sw.js",
-        "bytes": 10086,
-        "sha256": "6b3ce929ed42e061252ae61b0788a67136a7dca6bd60fbde0dc534c94a668f02"
+        "bytes": 10117,
+        "sha256": "82e0aff09197ba86caffbb0584faa63019f81dc735c302082eb7fb3ac0136558"
       },
       {
         "path": "ton-dns-provider.mjs",
@@ -1166,6 +1166,11 @@
         "path": "vendor/telegram-web-app.js",
         "bytes": 116341,
         "sha256": "bcc5e1ca219fbea9498e826e0f5648603582c7988ec8c3ce0b85c86a9eb6299c"
+      },
+      {
+        "path": "wallet-send-fee.mjs",
+        "bytes": 4391,
+        "sha256": "4f2038c18d78372325b422c22614942354ae64667ca9d099b4769bb5170e6cb3"
       },
       {
         "path": "webp-encoder.mjs",
