@@ -207,8 +207,12 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
     expect(fatal).toMatch(/code === 'PLATHO_NOTES_FULL'/);
     expect(fatal).toMatch(/code === 'PLATHO_NOTES_RESTORE_INCOMPLETE'/);
 
-    // Funds are checked against the number of slots this save actually writes, before signing.
-    expect(app).toMatch(/RECOVERY_PUBLISH_VALUE \* BigInt\(built\.publishes\.length\) \+ WALLET_FEE_HEADROOM_NANOTONS/);
+    // Funds are checked against the number of slots this save actually writes, before signing — and against what
+    // the network charges to SEND them, which since 2026-08-16 is measured per slot instead of a flat headroom
+    // (a flat one under-reserved a big write ~3x; tests/wallet-send-fee.test.ts). The reserve must be derived from
+    // the publishes, not a constant, or the check drifts from the send again.
+    expect(app).toMatch(/RECOVERY_PUBLISH_VALUE \* BigInt\(built\.publishes\.length\)/);
+    expect(app).toMatch(/walletSendFeeReserveNanotons\(built\.publishes\.map\(/);
     // A snapshot identical to what is already stored writes nothing and still reports the note delivered — the
     // publish helper returns 0 slots written, which is a SUCCESS, and the send path marks the note published anyway.
     expect(app).toMatch(/if \(built\.publishes\.length === 0\) return 0;/);

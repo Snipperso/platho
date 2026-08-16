@@ -26,8 +26,14 @@
 // wallet cannot fund, and that is the shape that hurts — the user funds exactly the quoted figure and the send is
 // refused for the difference.
 
+import {
+  PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET,
+  PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
+  PLATHO_WALLET_MESSAGE_FRAMING_BYTES,
+} from './platho-wallet.mjs?v=32';
+
 /**
- * Fixed cost of one signed transfer: importing the external plus the wallet's own compute.
+ * Fixed cost of ONE EXTERNAL: importing it plus the wallet's own compute.
  * Measured 816,190 against a sandbox treasury; raised to cover the ~224,200 by which a treasury understates a real
  * WalletContractV5R1 (sandbox-treasury-is-not-a-wallet) and checked against the owner's on-chain 0.0223.
  */
@@ -49,26 +55,80 @@ export const WALLET_SEND_FEE_PER_PART_BY_SIZE_CLASS = Object.freeze({
 /** The smallest class's fee — what a caller pays for a part whose payload is not known yet. */
 export const WALLET_SEND_FEE_PER_PART_NANOTONS = WALLET_SEND_FEE_PER_PART_BY_SIZE_CLASS[1];
 
+/**
+ * Serialized payload bytes one publish of each size class contributes to the external — the number the wallet's own
+ * packer measures (estimateWalletMessageExternalBytes). Measured through the REAL builder; WSF-07 re-derives the
+ * external count from these against chunkWalletMessages itself, so a drift here turns a test red rather than a quote
+ * low.
+ */
+export const WALLET_SEND_PAYLOAD_BYTES_BY_SIZE_CLASS = Object.freeze({
+  1: 2_454,
+  2: 3_502,
+  4: 5_598,
+  8: 9_790,
+  16: 18_177,
+  32: 35_224,
+});
+
 const SIZE_CLASSES = Object.freeze([1, 2, 4, 8, 16, 32]);
+
+/** The real size class an input maps to: unknown or between-class values round UP to the next real one. */
+function normalizedSizeClass(sizeClass) {
+  const requested = Number(sizeClass);
+  const normalized = Number.isFinite(requested) && requested > 0 ? requested : 1;
+  return SIZE_CLASSES.find((value) => value >= normalized) ?? SIZE_CLASSES[SIZE_CLASSES.length - 1];
+}
 
 /** Per-part fee for one capsule of `sizeClass`. An unknown class rounds UP to the next real one. */
 function perPartFeeNanotons(sizeClass) {
-  const requested = Number(sizeClass);
-  const normalized = Number.isFinite(requested) && requested > 0 ? requested : 1;
-  const bucket = SIZE_CLASSES.find((value) => value >= normalized) ?? SIZE_CLASSES[SIZE_CLASSES.length - 1];
-  return WALLET_SEND_FEE_PER_PART_BY_SIZE_CLASS[bucket];
+  return WALLET_SEND_FEE_PER_PART_BY_SIZE_CLASS[normalizedSizeClass(sizeClass)];
+}
+
+/** Serialized bytes one publish of `sizeClass` contributes to the external it rides in. */
+function payloadBytesFor(sizeClass) {
+  return WALLET_SEND_PAYLOAD_BYTES_BY_SIZE_CLASS[normalizedSizeClass(sizeClass)];
 }
 
 /**
- * The fee the wallet pays to send ONE transfer carrying `sizeClasses.length` publishes.
+ * How many EXTERNALS these parts will be signed as. One "send" is not one external: sendPlathoWalletTransaction runs
+ * the list through chunkWalletMessages, which closes a chunk when the next message would breach the 58,000-byte
+ * budget or the 255-message count, and sends each chunk as its own seqno-ordered external. Each of those pays its
+ * own import fee and its own compute — so the base is per EXTERNAL, not per send.
+ *
+ * This mirrors the packer instead of calling it, because calling it would mean synthesizing a full base64 payload
+ * per part on every keystroke. WSF-07 pins the mirror against the real chunkWalletMessages across a matrix of part
+ * lists, so the two cannot drift apart silently.
+ */
+export function walletSendExternalCount(sizeClasses = []) {
+  const list = Array.isArray(sizeClasses) ? sizeClasses : [sizeClasses];
+  if (list.length === 0) return 1;
+  let externals = 1;
+  let bytes = 0;
+  let count = 0;
+  for (const sizeClass of list) {
+    const messageBytes = payloadBytesFor(sizeClass) + PLATHO_WALLET_MESSAGE_FRAMING_BYTES;
+    if (count > 0 && (count >= PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER
+      || bytes + messageBytes > PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET)) {
+      externals += 1;
+      bytes = 0;
+      count = 0;
+    }
+    bytes += messageBytes;
+    count += 1;
+  }
+  return externals;
+}
+
+/**
+ * The fee the wallet pays to send these publishes.
  *
  * `sizeClasses` is each part's capsule size class (1, 2, 4, 8, 16, 32 — the plan already carries it). An empty array
- * means one bodyless part (a mint request, an activation): still a signed transfer, still charged.
+ * means one bodyless part (a mint request, an activation): still a signed external, still charged.
  */
 export function walletSendFeeNanotons(sizeClasses = []) {
   const list = Array.isArray(sizeClasses) ? sizeClasses : [sizeClasses];
   const parts = list.length > 0 ? list : [1];
-  let fee = WALLET_SEND_FEE_BASE_NANOTONS;
+  let fee = WALLET_SEND_FEE_BASE_NANOTONS * BigInt(walletSendExternalCount(list));
   for (const sizeClass of parts) fee += perPartFeeNanotons(sizeClass);
   return fee;
 }

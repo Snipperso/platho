@@ -30,7 +30,7 @@ import {
   formatTonUserFriendlyAddress,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=31';
+} from './platho-wallet.mjs?v=32';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createInlineFormatRegex, messagePreviewText,
@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=47';
+} from './public-channel-subscriptions.mjs?v=48';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -108,6 +108,8 @@ import {
   encodeShareBlockContent,
   decodeShareBlockContent,
   SHARE_SNIPPET_MAX_BYTES,
+  minimalCapsuleUsefulBytesForLength,
+  capsuleSizeClassForUsefulBytes,
 } from './capsule-part-policy.mjs?v=10';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
@@ -164,44 +166,44 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=57';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=25';
+import { createPublicLane } from './public-lane.mjs?v=26';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=14';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=15';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=2';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=14';
-import { createIntroLane } from './intro-lane.mjs?v=20';
+import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=3';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=15';
+import { createIntroLane } from './intro-lane.mjs?v=21';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=4';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=14';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=14';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=15';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=15';
 import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=4';
-import { createConvReadLane } from './conv-lane.mjs?v=17';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=16';
+import { createConvReadLane } from './conv-lane.mjs?v=18';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=17';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=15';
-import { readAccountStates } from './shard-reader.mjs?v=14';
+import { readAccountStates } from './shard-reader.mjs?v=15';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=14';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=15';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=14';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=15';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=14';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=15';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=16';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=15';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=1';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=1';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=2';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=14';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=14';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=15';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=15';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=15';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=16';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -213,7 +215,7 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=16';
+} from './shard-discovery.mjs?v=17';
 import { createTonDnsProvider } from './ton-dns-provider.mjs?v=53';
 import {
   computeUsernameNameHash,
@@ -244,7 +246,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=73';
+} from './i18n.mjs?v=74';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -1581,9 +1583,21 @@ let vaultProtocolState = {
 let athProtocolState = {
   total_supply: null,
 };
-// External-message fee headroom on top of the summed message values when pre-checking the WALLET balance.
-// Shared by every direct-pay pre-flight (avatar, public post/comment) — one number, one meaning.
+// FLOOR for the external-message fee headroom on top of the summed message values when pre-checking the WALLET
+// balance. Shared by every direct-pay pre-flight (avatar, public post/comment) — one number, one meaning.
+//
+// [2026-08-16] It used to be the WHOLE reserve, flat. It is not enough for a big message: sending one 32 KiB part
+// costs 28,167,641 (sandbox-measured, tests/wallet-send-fee.test.ts), so a large post could clear this check and
+// still be short when the wallet signs — and the wallet stamps SendIgnoreErrors on every action, so the shortfall
+// would not fail loudly, it would drop the tail of a multipart message and report success. Every site now reserves
+// walletSendFeeReserveNanotons() instead; this stays as the floor so no path reserves LESS than it did before.
 const WALLET_FEE_HEADROOM_NANOTONS = 10_000_000n;
+
+/** The measured cost of sending these parts, never below the historical flat floor. */
+function walletSendFeeReserveNanotons(sizeClasses = []) {
+  const measured = walletSendFeeNanotons(sizeClasses);
+  return measured > WALLET_FEE_HEADROOM_NANOTONS ? measured : WALLET_FEE_HEADROOM_NANOTONS;
+}
 
 // This wallet's activity-credit ticket. `credits === null` means NOT READ YET — distinct from a read that found no
 // account, which is `credits = 0n` and the ordinary state of a wallet that has not published. Conflating the two
@@ -14560,7 +14574,10 @@ async function waitForPlathoAccountActivation(stillWanted = () => true) {
 function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
   // clean-17 direct-pay: a KeyShard register is a fixed wallet send of KEYSHARD_REGISTER_VALUE (the shard reserves its
   // rent and refunds the surplus), NOT a Vault-estimated external. Gate so every fee-display site is correct at cutover.
-  if (privateLaneDirectPayEnabled()) return KEYSHARD_REGISTER_VALUE;
+  // …plus what the network charges to SEND that register: it is a signed external carrying the shard's StateInit,
+  // and the quote named only the value it attaches. MEASURED 4,120,453 for a 1,399-byte register body — above the
+  // smallest class, hence KEYSHARD_REGISTER_SIZE_CLASS. Pinned by PWA-ACTIVATION-FEE-01.
+  if (privateLaneDirectPayEnabled()) return KEYSHARD_REGISTER_VALUE + walletSendFeeNanotons([KEYSHARD_REGISTER_SIZE_CLASS]);
   return estimateVaultAttachedValueNanotons('RegisterMessagingKeys', localVaultDraft?.message ?? { crypto_suite_mask: VAULT_CRYPTO_SUITE.HYBRID }, {
     userExists: user?.exists === true,
   });
@@ -14927,10 +14944,13 @@ function privateComposerPublishProfile(suite = currentOutgoingPrivateSuite(), si
   };
 }
 
-function publicComposerPublishProfile(sizeClass = 1) {
+// `publicKind` is the PublicShard kind this part is published under (0 channel, 2 beacon, 3 avatar) — it decides the
+// attached value in composerProfileNetPriceNanotons and is NOT the same axis as publishKind (private vs public).
+function publicComposerPublishProfile(sizeClass = 1, publicKind = 0) {
   const normalizedSizeClass = normalizePrivateSizeClass(sizeClass);
   return {
     publishKind: VAULT_PUBLISH_KIND.PUBLIC,
+    publicKind,
     sizeClass: BigInt(normalizedSizeClass),
     cryptoSuite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
     priceSuite: MESSAGE_PRICE_SUITES.PUBLIC_V1,
@@ -14939,9 +14959,17 @@ function publicComposerPublishProfile(sizeClass = 1) {
   };
 }
 
-function publicComposerPublishProfilesForPlan(plan) {
+function publicComposerPublishProfilesForPlan(plan, publicKind = 0) {
   const parts = Array.isArray(plan) && plan.length > 0 ? plan : [{ sizeClass: 1 }];
-  return parts.map((part) => publicComposerPublishProfile(part.sizeClass));
+  return parts.map((part) => publicComposerPublishProfile(part.sizeClass, publicKind));
+}
+
+// The two legs a channel profile is published as — ONE payload part, written to the CHANNEL shard and to a BEACON
+// shard in the same transfer (publishChannelProfileDirect). Shared by the cost estimate and the pre-flight so the
+// dialog and the send can never price different things.
+function channelProfilePublishProfiles(plan) {
+  const first = (Array.isArray(plan) && plan.length > 0 ? plan : [{ sizeClass: 1 }])[0];
+  return [publicComposerPublishProfile(first.sizeClass, 0), publicComposerPublishProfile(first.sizeClass, 2)];
 }
 
 function composerPartCount(text, maxTextBytes = SINGLE_CAPSULE_USEFUL_BYTES) {
@@ -15300,7 +15328,10 @@ function composerProfileNetPriceNanotons(profile) {
   // settled one (19.1M quoted vs 18.87M settled) — erring high is honest, erring low would promise a send the wallet
   // cannot fund.
   if (privateLaneDirectPayEnabled()) {
-    const attached = isPublic ? publicPublishValueForKind(0) : CONV_PUBLISH_VALUE;
+    // The KIND decides the attached value, and they differ by ~2x: a channel post is 20,300,000 while an avatar
+    // part is 39,500,000. This read `publicPublishValueForKind(0)` for every public profile, so the avatar's own
+    // "up to" label quoted a channel post's price for an avatar write. [caught in review 2026-08-16]
+    const attached = isPublic ? publicPublishValueForKind(Number(profile?.publicKind ?? 0)) : CONV_PUBLISH_VALUE;
     return nonNegativeBigInt(attached) + currentNetworkFeeSurchargeNanotons();
   }
   const sizeClass = Number(profile?.sizeClass ?? 1);
@@ -15454,7 +15485,7 @@ function estimatedUsernameMintTonFeeNanotons() {
 
 function estimatedProfileAvatarTonFeeNanotons(attachment) {
   const plan = imagePartsForSend(attachment, 'profile avatar');
-  const pricedProfiles = publicComposerPublishProfilesForPlan(plan);
+  const pricedProfiles = publicComposerPublishProfilesForPlan(plan, 3);   // AVATAR kind — see publicComposerPublishProfile
   // Same defect as the mint estimator above: this added the Vault-era 115,000,000 while the send attaches 200,000,000.
   // The wallet-send fee for the capsule parts rides in via composerEstimatedMaxChargeNanotons; the ProfileRegistry
   // write is a FURTHER message in the same transfer, so its own forward+action cost is added here.
@@ -15544,7 +15575,10 @@ function estimatedChannelProfileChargeNanotons(description, tags) {
   const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
   const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
   const parts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES);
-  return composerEstimatedMaxChargeNanotons(publicComposerPublishProfilesForPlan(parts), 1);
+  // TWO legs, not one: publishChannelProfileDirect signs the same payload into the author's CHANNEL shard AND into a
+  // BEACON shard (that second write is what makes the channel discoverable). Pricing only the channel leg quoted
+  // roughly half of what saving a description costs.
+  return composerEstimatedMaxChargeNanotons(channelProfilePublishProfiles(parts), 1);
 }
 
 function composerCostStatusText(profile, text, maxTextBytes, attachment = null, options = {}) {
@@ -15613,9 +15647,22 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
  * absent, so anything else here would price one path and take another. Self-notes never introduce anybody and are
  * excluded by the same test the send path applies.
  */
+// The INTRO capsule is a FIXED-SIZE handshake (no user text rides in it), so its size class is a constant rather
+// than something the composer plan can report — the capsule does not exist yet when the line is drawn. Pinned by
+// PWA-INTRO-FEE-01 against a really-sealed capsule, so a handshake that grows past the class turns a test red
+// instead of quietly quoting low.
+const INTRO_CAPSULE_SIZE_CLASS = 2;
+
+// Same shape for the KeyShard register that activates an account: a fixed body (the signed key bundle), so its send
+// cost is a constant the fee label can name before anything is built. MEASURED 1,399 payload bytes -> class 2.
+const KEYSHARD_REGISTER_SIZE_CLASS = 2;
+
 function privateFirstContactExtraNanotons(thread) {
   if (!thread || isRealSavedThread(thread)) return 0n;
-  return thread.convPeerKeyId ? 0n : INTRO_PUBLISH_VALUE;
+  // A first contact is TWO signed transfers, not one message with a bigger value: the INTRO is published on its own
+  // (attemptIntroFirstContactDirect -> publishIntroLane), so it pays its own external import, gas and forward fee.
+  // Counting only INTRO_PUBLISH_VALUE understated every first message by that whole second send.
+  return thread.convPeerKeyId ? 0n : INTRO_PUBLISH_VALUE + walletSendFeeNanotons([INTRO_CAPSULE_SIZE_CLASS]);
 }
 
 function refreshComposerCostStatus() {
@@ -19116,7 +19163,7 @@ async function submitAirdropClaim() {
   const value = nonNegativeBigInt(athTicketState.claimMinValue ?? 0n);
   if (value <= 0n) throw new Error('Airdrop ticket did not report its claim value');
 
-  const required = value + WALLET_FEE_HEADROOM_NANOTONS;
+  const required = value + walletSendFeeReserveNanotons();
   const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
   if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < required) {
     const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(required) }));
@@ -22331,7 +22378,7 @@ async function openBuyAthDialog() {
       if (amountAtomic <= 0n) return { ok: false, error: t('profile.buyAthEnterAmount') };
       const total = buyValueNanotons(amountAtomic, state.currentMultiplier);
       try {
-        await assertWalletGramAtLeast(total + WALLET_FEE_HEADROOM_NANOTONS, 'buy');
+        await assertWalletGramAtLeast(total + walletSendFeeReserveNanotons(), 'buy');
       } catch {
         return { ok: false, error: t('profile.buyAthLowBalance', { amount: formatGramNanotons(total) }) };
       }
@@ -23226,7 +23273,9 @@ async function submitProfileAvatarDirect(avatar) {
   // pointer is never written. See assertConnectedAthAtLeast for why the two rules differ.
   await assertConnectedAthAtLeast(PROFILE_AVATAR_PRICE_ATH, 'set an avatar');
   await assertWalletGramAtLeast(
-    avatarValue * BigInt(shardParts.length) + PROFILE_AVATAR_DIRECT_REQUEST_VALUE + WALLET_FEE_HEADROOM_NANOTONS,
+    avatarValue * BigInt(shardParts.length) + PROFILE_AVATAR_DIRECT_REQUEST_VALUE
+      // …plus the registry write, a further message in the same transfer (class 1 — a small request body).
+      + walletSendFeeReserveNanotons([...payloads.map((payload) => payload.sizeClass), 1]),
     'set an avatar',
   );
 
@@ -23367,6 +23416,10 @@ async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
     if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
   }
   vaultDraftStatus.textContent = t('vault.signing');
+  // Affordability before signing, on the same figure the fee label quoted. Activation is the one send a brand-new
+  // wallet makes, so this is exactly where a balance funded to the quoted number gets tested.
+  await assertWalletGramAtLeast(
+    KEYSHARD_REGISTER_VALUE + walletSendFeeReserveNanotons([KEYSHARD_REGISTER_SIZE_CLASS]), 'activate');
   const result = await publishKeyShardRegister({
     wallet: requirePlathoWallet(), transport, ownerWallet, profileRegistry: registry,
     keyRecord: localVaultDraft.message, value: KEYSHARD_REGISTER_VALUE,
@@ -24228,6 +24281,11 @@ async function attemptIntroFirstContactDirect(context) {
       peerKeyId, peerWallet, epoch: slot.epoch, bucket: slot.bucket, expectedEntryId: slot.expectedEntryId, r, viewTag,
     };
     message.introDirectSend = pending;
+    // Affordability before signing — this transfer had NO pre-flight at all, the only direct-pay send without one.
+    // It matters here as much as on the message itself: an underfunded INTRO leaves a conversation half-opened (the
+    // peer never learns the keys) while the wallet has already paid for whatever did land.
+    await assertWalletGramAtLeast(
+      INTRO_PUBLISH_VALUE + walletSendFeeReserveNanotons([capsule?.header0?.sizeClass ?? INTRO_CAPSULE_SIZE_CLASS]), 'send');
     try {
       const result = await publishIntroLane({ wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE });
       pending.boc = result?.result?.boc ?? null;
@@ -24712,7 +24770,9 @@ async function attemptConvMessagePublishDirect(context) {
   // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a
   // conversation part carries a CONSUMED seq (nextOutgoingSeq already advanced), so the dropped tail cannot be
   // re-sent under the same seq. Fail-open on an unreadable balance; the send stays the authority.
-  await assertWalletGramAtLeast(CONV_PUBLISH_VALUE * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'send');
+  await assertWalletGramAtLeast(
+    CONV_PUBLISH_VALUE * BigInt(parts.length)
+      + walletSendFeeReserveNanotons(parts.map((part) => part.capsule?.header0?.sizeClass)), 'send');
 
   let result;
   // Diagnostics for the send path, which had none. `sendInFlight` is what tells "the call never returned" apart from
@@ -24848,7 +24908,14 @@ async function publishSelfNotesSnapshotForThread(thread) {
   }
   if (built.publishes.length === 0) return 0;
   await assertWalletGramAtLeast(
-    RECOVERY_PUBLISH_VALUE * BigInt(built.publishes.length) + WALLET_FEE_HEADROOM_NANOTONS, 'save a note');
+    // A notes publish carries no size class of its own — the SEALED blob is the payload, so its byte count decides
+    // what the send costs. That count is `blobBytes`, carried out of sealNotesBlob deliberately: `blob` is a snake
+    // CELL, and reading `.length` off it resolves to undefined and prices every slot as the smallest class — a
+    // silent 5x under-reserve on a full notepad. (First written that way here; caught in review 2026-08-16.)
+    RECOVERY_PUBLISH_VALUE * BigInt(built.publishes.length)
+      + walletSendFeeReserveNanotons(built.publishes.map(
+        (publish) => capsuleSizeClassForUsefulBytes(minimalCapsuleUsefulBytesForLength(publish.blobBytes)),
+      )), 'save a note');
   await sendPlathoWalletTransaction(plathoWallet, {
     messages: built.publishes.map((publish) => ({
       address: publish.to, amount: publish.value, bounce: true,
@@ -25487,7 +25554,8 @@ async function submitPublicPostDirect(draft = null) {
   // `sendMode | 2`), so an underfunded MULTIPART post does not fail — the fundable prefix lands and the rest
   // is dropped silently, which the reader then discards as an incomplete stream (assemblePublicParts). The
   // user would see "public published" for a post that does not exist. Fail-open on an unreadable balance.
-  await assertWalletGramAtLeast(value * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'publish');
+  await assertWalletGramAtLeast(
+    value * BigInt(parts.length) + walletSendFeeReserveNanotons(payloads.map((payload) => payload.sizeClass)), 'publish');
 
   let result;
   try {
@@ -25550,6 +25618,12 @@ async function publishChannelProfileDirect(description, tags) {
     value: publicPublishValueForKind(2), partitionKey: await publicBeaconPartitionKey(bucket), epochTag: publicEpochTag(2, publicEraOf(2, createdAtSec)),
   };
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+  // Affordability before signing — the eighth direct-pay send, and the only one that never had this check. Both legs
+  // ride ONE transfer under SendIgnoreErrors, so an underfunded save could land the channel write and drop the
+  // beacon: a description saved but never discoverable, with nothing on screen saying so.
+  await assertWalletGramAtLeast(
+    channelPart.value + beaconPart.value
+      + walletSendFeeReserveNanotons([profilePayload.sizeClass, profilePayload.sizeClass]), 'save a channel description');
   const result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, [channelPart, beaconPart]);
   return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
 }
@@ -25600,7 +25674,8 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
 
   // Same two rules as the post path: pre-check the wallet (SendIgnoreErrors drops unfundable actions silently)
   // and keep the record pending after broadcast until the chain twin appears.
-  await assertWalletGramAtLeast(value * BigInt(parts.length) + WALLET_FEE_HEADROOM_NANOTONS, 'comment');
+  await assertWalletGramAtLeast(
+    value * BigInt(parts.length) + walletSendFeeReserveNanotons(payloads.map((payload) => payload.sizeClass)), 'comment');
 
   let result;
   try {

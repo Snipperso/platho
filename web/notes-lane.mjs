@@ -15,11 +15,11 @@
 // (RS_MAX_BLOB_CELLS) and the blob is base64-in-JSON around AES-GCM ciphertext, so the on-chain cost runs well above
 // the plaintext byte count. packNotes measures every candidate chunk by SEALING it and counting cells — the same
 // number the contract's gate 13560 counts — instead of estimating from string length.
-import { selfRecoveryShard } from './conv-discovery.mjs?v=14';
-import { sealNotesBlob, openNotesBlob } from './recovery-blob.mjs?v=4';
-import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=14';
-import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=16';
-import { probeActiveAddresses } from './shard-reader.mjs?v=14';
+import { selfRecoveryShard } from './conv-discovery.mjs?v=15';
+import { sealNotesBlob, openNotesBlob } from './recovery-blob.mjs?v=5';
+import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=15';
+import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=17';
+import { probeActiveAddresses } from './shard-reader.mjs?v=15';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS (gate 13560). Mirrored, not imported, for the same reason the
 // recovery lane mirrors it: an over-cap blob BOUNCES on chain, and a fire-and-forget caller would record the bounce
@@ -143,7 +143,7 @@ export async function prepareNotesBackup({ seed, notes, readView, value, readSta
     const bound = view?.bound === true;
     // A trailing chunk that is empty AND was never bound needs no write at all.
     if (chunkNotes.length === 0 && !bound) continue;
-    const { body, h0, h1 } = await sealNotesBlob(seed, serializeNotes(chunkNotes), index);
+    const { body, bodyBytes, h0, h1 } = await sealNotesBlob(seed, serializeNotes(chunkNotes), index);
     // Unchanged content: the stored h1 already commits to exactly these bytes. Skip the write and its gas.
     if (bound && view?.h1 !== undefined && view?.h1 !== null && BigInt(view.h1) === BigInt(h1)) continue;
     const nextSeq = Number(bound ? BigInt(view.seq) : 0n) + 1;
@@ -154,7 +154,8 @@ export async function prepareNotesBackup({ seed, notes, readView, value, readSta
     // slot store) can hold exactly what the contract will store without re-sealing it under a fresh nonce.
     publishes.push({
       ...built, chunkIndex: index, seq: nextSeq, count: chunkNotes.length,
-      slotAddress: slot.address, h1, blob: body,
+      // `blobBytes` is the SEALED size, which is what the send costs — `blob` is a cell and cannot report it.
+      slotAddress: slot.address, h1, blob: body, blobBytes: bodyBytes,
     });
   }
   return { publishes, chunks };

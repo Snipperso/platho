@@ -20,7 +20,7 @@
 // retries; it is a queue, not a failure.
 import { beginCell } from './pwa-contract-transactions.mjs?v=37';
 import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=31';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=32';
 import { buyValueNanotons } from './market-stability-read.mjs?v=1';
 
 const MARKET_STABILITY_BUY_OPCODE = 0x4D534558n; // "MSEX"
