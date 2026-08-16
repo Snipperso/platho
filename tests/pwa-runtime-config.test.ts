@@ -3524,7 +3524,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/content = encodeProfileBlockContent\(block\);/);
     expect(app).toMatch(/const profile = decodeProfileBlockContent\(content\);\s*if \(profile\) blocks\.push\(\{ type: 'profile', \.\.\.profile \}\);/);
     // Imported from the policy module (bumped ?v in lockstep with the codec change).
-    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,\s*\} from '\.\/capsule-part-policy\.mjs\?v=\d+';/);
+    // The tail of the import list is open: other names may be added after SHARE_SNIPPET_MAX_BYTES (the capsule
+    // size-class helpers were, for the wallet-send-fee reserve). What this pins is that the PROFILE codec names
+    // come from the policy module under a versioned URL, not that nothing else does.
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,[\s\S]*?\} from '\.\/capsule-part-policy\.mjs\?v=\d+';/);
   });
 
   it('PWA-PROFILE-USERNAME-01: channel .ath username is claimed in the profile, verified on-chain, and only the verified name is shown', () => {
@@ -3594,10 +3597,18 @@ describe('PWA runtime config guard', () => {
     expect(css).not.toMatch(/\.channel-about-edit \{[^}]*background: transparent/);
     // Estimator mirrors estimatedProfileAvatarTonFeeNanotons but for the PROFILE document (a channel profile is a
     // plain public post): encode the SAME bytes publishChannelProfile does → split → price it.
-    const est = app.slice(app.indexOf('function estimatedChannelProfileChargeNanotons('), app.indexOf('function estimatedChannelProfileChargeNanotons(') + 800);
+    // Window sized for the function BODY, not for how much prose happens to sit in it — a fixed 800 chars pushed the
+    // return line out of view the moment a comment was added above it (prose-pins-break-on-line-wrap, again).
+    const estStart = app.indexOf('function estimatedChannelProfileChargeNanotons(');
+    const est = app.slice(estStart, app.indexOf('\n}', estStart));
     expect(est).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername \}\]\)/);
     expect(est).toMatch(/splitBytesToCapsuleParts\(documentBytes, MAX_CAPSULE_USEFUL_BYTES\)/);
-    expect(est).toMatch(/composerEstimatedMaxChargeNanotons\(publicComposerPublishProfilesForPlan\(parts\), 1\)/);
+    // …priced as BOTH legs. publishChannelProfileDirect signs the same payload into the author's CHANNEL shard AND
+    // into a BEACON shard (the write that makes the channel discoverable), so pricing publicComposerPublishProfilesForPlan
+    // — a channel part only — quoted roughly half of what saving a description costs. [caught in review 2026-08-16]
+    expect(est).toMatch(/composerEstimatedMaxChargeNanotons\(channelProfilePublishProfiles\(parts\), 1\)/);
+    const legs = app.slice(app.indexOf('function channelProfilePublishProfiles('), app.indexOf('function channelProfilePublishProfiles(') + 600);
+    expect(legs, 'the estimate must carry the CHANNEL leg and the BEACON leg').toMatch(/publicComposerPublishProfile\(first\.sizeClass, 0\), publicComposerPublishProfile\(first\.sizeClass, 2\)/);
 
     // AND THAT ESTIMATOR MUST QUOTE THE DIRECT-PAY FIGURE. Reported by the owner 2026-08-04: this dialog said
     // "up to 0.1698 GRAM from Vault". Both halves were wrong. The Vault is deleted, and 0.1698 is what the Vault's

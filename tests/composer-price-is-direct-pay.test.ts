@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { CONV_PUBLISH_VALUE, publicPublishValueForKind } from '../web/publish-price.mjs';
 import { PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS } from '../web/message-pricing-policy.mjs';
 import { walletSendFeeNanotons } from '../web/wallet-send-fee.mjs';
+import { I18N_STRINGS } from '../web/i18n-strings.mjs';
 
 // The composer quoted a price and a hold that both belonged to Vault, a contract clean-17 deleted.
 //
@@ -20,7 +21,11 @@ describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => 
   it('PRICE-01: the direct-pay quote is the attached publish value, not the Vault settlement table', () => {
     const fn = APP.slice(APP.indexOf('function composerProfileNetPriceNanotons'), APP.indexOf('function composerEstimatedNetCostNanotons'));
     expect(fn).toContain('if (privateLaneDirectPayEnabled()) {');
-    expect(fn).toContain('const attached = isPublic ? publicPublishValueForKind(0) : CONV_PUBLISH_VALUE;');
+    // The KIND decides the value and they differ ~2x (channel post 20,300,000 vs avatar part 39,500,000), so the
+    // quote reads the part's own kind. Hard-wiring 0 here made the avatar modal quote a channel post's price for an
+    // avatar write. [caught in review 2026-08-16]
+    expect(fn).toContain('const attached = isPublic ? publicPublishValueForKind(Number(profile?.publicKind ?? 0)) : CONV_PUBLISH_VALUE;');
+    expect(APP).toContain('publicComposerPublishProfilesForPlan(plan, 3)');   // the avatar plan says so
   });
 
   it('PRICE-02: the figures it now quotes are the ones the send really uses', () => {
@@ -47,6 +52,24 @@ describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => 
     // The carried value alone — what this test used to check — is NOT the answer, and saying so keeps the next
     // reader from "simplifying" it back.
     expect(CONV_PUBLISH_VALUE).toBeLessThan(walletDebitMeasured);
+  });
+
+  it('PRICE-05: the cost line says the figure is a MAXIMUM, in every locale', () => {
+    // The quote is an upper bound by construction: it prices the first send into a fresh epoch shard, and a later
+    // message into a live one settles lower (measured 0.0186 against the quoted 0.0225). Stating it as an exact
+    // price made the line wrong for the common case even after the fee term was added, so every locale now says
+    // "up to". A locale added later without that word puts the old claim back on the screen.
+    const upTo: Record<string, string> = {
+      en: 'up to', ru: 'до', zh: '最多', es: 'hasta', pt: 'até',
+      fr: "jusqu'à", de: 'bis zu', hi: 'तक', id: 'hingga', ja: '最大',
+    };
+    for (const [locale, token] of Object.entries(upTo)) {
+      const line = I18N_STRINGS[locale]?.['composer.costStatus'];
+      expect(line, `${locale} has no composer.costStatus`).toBeTruthy();
+      expect(line, `${locale} states an exact cost: ${line}`).toContain(token);
+    }
+    // Every shipped locale is covered above — a new one must be added here too.
+    expect(Object.keys(upTo).sort()).toEqual(Object.keys(I18N_STRINGS).sort());
   });
 
   it('PRICE-04: the direct-pay status line exists in every locale and names no hold', () => {

@@ -243,6 +243,10 @@ export async function sealNotesBlob(seed, notesBytes, chunkIndex) {
   const bytes = utf8(JSON.stringify(record));
   return {
     body: tonCell.snakeCellFromBytes(bytes, 'notes blob'),
+    // The sealed byte count travels with the cell because a caller cannot get it BACK from the cell without walking
+    // the snake chain: `body.length` is undefined on a cell, and a caller reaching for it gets a silent zero. The
+    // send-fee reserve prices a notes write off exactly this number (app.js, publishSelfNotesSnapshotForThread).
+    bodyBytes: bytes.length,
     h0: await sha256Big(utf8(NOTES_BLOB_H0_DOMAIN)),   // fixed notes version-domain marker (non-zero, distinct)
     h1: await sha256Big(bytes),                        // blob content hash (non-zero)
   };

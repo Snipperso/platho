@@ -53,7 +53,10 @@ export const PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET = 58000;
 // the 255-count external stays far under the ceiling. For a LARGE (media) part the ~30KB payload dominates and this
 // term is negligible; the budget's ~7.5KB margin under 65535 absorbs the uncounted shared StateInit + envelope, so
 // no validly-chunked external can trip the hard guard. [byte-aware chunk calibration]
-const PLATHO_WALLET_MESSAGE_FRAMING_BYTES = 150;
+// EXPORTED because the send-fee model has to split a part list into externals exactly the way chunkWalletMessages
+// does — each external is separately signed and separately IMPORTED, so it carries its own base fee. A copy of this
+// number over there would be a copy of a derived value: one edit here and the quote silently drifts.
+export const PLATHO_WALLET_MESSAGE_FRAMING_BYTES = 150;
 export const PLATHO_WALLET_V5R1_CODE_BOC =
   'te6ccgECFAEAAoEAART/APSkE/S88sgLAQIBIAINAgFIAwQC3NAg10nBIJFbj2Mg1wsfIIIQZXh0br0hghBzaW50vbCSXwPgghBleHRuuo60gCDXIQHQdNch+kAw+kT4KPpEMFi9kVvg7UTQgQFB1yH0BYMH9A5voTGRMOGAQNchcH/bPOAxINdJgQKAuZEw4HDiEA8CASAFDAIBIAYJAgFuBwgAGa3OdqJoQCDrkOuF/8AAGa8d9qJoQBDrkOuFj8ACAUgKCwAXsyX7UTQcdch1wsfgABGyYvtRNDXCgCAAGb5fD2omhAgKDrkPoCwBAvIOAR4g1wsfghBzaWduuvLgin8PAeaO8O2i7fshgwjXIgKDCNcjIIAg1yHTH9Mf0x/tRNDSANMfINMf0//XCgAK+QFAzPkQmiiUXwrbMeHywIffArNQB7Dy0IRRJbry4IVQNrry4Ib4I7vy0IgikvgA3gGkf8jKAMsfAc8Wye1UIJL4D95w2zzYEAP27aLt+wL0BCFukmwhjkwCIdc5MHCUIccAs44tAdcoIHYeQ2wg10nACPLgkyDXSsAC8uCTINcdBscSwgBSMLDy0InXTNc5MAGk6GwShAe78uCT10rAAPLgk+1V4tIAAcAAkVvg69csCBQgkXCWAdcsCBwS4lIQseMPINdKERITAJYB+kAB+kT4KPpEMFi68uCR7UTQgQFB1xj0BQSdf8jKAEAEgwf0U/Lgi44UA4MH9Fvy4Iwi1woAIW4Bs7Dy0JDiyFADzxYS9ADJ7VQAcjDXLAgkji0h8uCS0gDtRNDSAFETuvLQj1RQMJExnAGBAUDXIdcKAPLgjuLIygBYzxbJ7VST8sCN4gAQk1vbMeHXTNA=';
 
