@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { CONV_PUBLISH_VALUE, publicPublishValueForKind } from '../web/publish-price.mjs';
 import { PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS } from '../web/message-pricing-policy.mjs';
+import { walletSendFeeNanotons } from '../web/wallet-send-fee.mjs';
 
 // The composer quoted a price and a hold that both belonged to Vault, a contract clean-17 deleted.
 //
@@ -33,12 +34,19 @@ describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => 
   });
 
   it('PRICE-03: the quote never UNDERSTATES what leaves the wallet', () => {
-    // The surplus returns by mode-128, so the attached figure is an upper bound on the settled one. Erring high is
-    // honest; erring low would promise a send the wallet cannot fund. Measured settled for a 1-part CONV: 18,865,000.
-    const settledMeasured = 18_865_000n;
-    expect(CONV_PUBLISH_VALUE).toBeGreaterThanOrEqual(settledMeasured);
+    // [RE-AIMED 2026-08-16] This test asserted its own name and missed. It compared the attached value against the
+    // SETTLEMENT AT THE SHARD (18,865,000) — but "what leaves the wallet" also includes what the network charges the
+    // wallet to send: import fee, gas, and a forward fee per message, which sendMode 3 pays separately from the value.
+    // The owner measured 22,300,000 leaving the wallet for a minimal message while the composer said 19,100,000, and
+    // this guard was green the whole time, aimed at a number that was never the claim.
+    const walletDebitMeasured = 22_300_000n;
+    const quoted = CONV_PUBLISH_VALUE + walletSendFeeNanotons([1]);
+    expect(quoted).toBeGreaterThanOrEqual(walletDebitMeasured);
     // …and not absurdly high either: a quote 2x the truth is its own kind of lie.
-    expect(CONV_PUBLISH_VALUE).toBeLessThan(settledMeasured * 2n);
+    expect(quoted).toBeLessThan(walletDebitMeasured * 2n);
+    // The carried value alone — what this test used to check — is NOT the answer, and saying so keeps the next
+    // reader from "simplifying" it back.
+    expect(CONV_PUBLISH_VALUE).toBeLessThan(walletDebitMeasured);
   });
 
   it('PRICE-04: the direct-pay status line exists in every locale and names no hold', () => {
