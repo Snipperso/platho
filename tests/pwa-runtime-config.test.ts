@@ -2583,14 +2583,18 @@ describe('PWA runtime config guard', () => {
     // While pending and not yet active, the row stays disabled and shows progress
     // instead of reverting to the clickable "Activate / fee" resting state — the bug
     // where the button looked like it ignored the first press.
-    expect(controls).toMatch(/if \(accountActive\) \{ plathoAccountActivationPending = false; forgetPlathoActivationInFlight\(\); \}/);
+    // Both markers AND the re-broadcast schedule stop together on the one transition that means "settled";
+    // see PWA-ACTIVATION-FORCE-01 for why there is a schedule to stop.
+    expect(controls).toMatch(/if \(accountActive\) \{ plathoAccountActivationPending = false; forgetPlathoActivationInFlight\(\); clearPlathoActivationForce\(\); \}/);
     // [OWNER 2026-08-13] The lock now has a WRITTEN half as well. The in-memory flag dies with the tab, so a reload
     // inside the settling window put the row back to "Activate" for a registration that was already paid for and on
     // its way — pressing it again is a second fee for one registration. ORed, not substituted: the marker survives a
     // reload, the flag covers a tab whose storage is unavailable.
     expect(controls).toMatch(/const activationInFlight = plathoAccountActivationPending \|\| plathoActivationInFlightForCurrentWallet\(\);/);
     expect(controls).toMatch(/const activationPending = activationInFlight && !accountActive/);
-    expect(submitActivation).toMatch(/rememberPlathoActivationInFlight\(ownerWallet\);/);
+    // The marker now carries the signed external as well, so the send site hands it over — PWA-ACTIVATION-FORCE-01
+    // owns why. Still pinned here that the send site is where it is written at all.
+    expect(submitActivation).toMatch(/rememberPlathoActivationInFlight\(ownerWallet, /);
     expect(controls).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending \|\| activationPending/);
     expect(controls).toMatch(/activationPending\s*\?\s*t\('vault\.statusActivating'\)/);
     expect(EN_STRINGS['vault.statusActivating']).toBe('activating');
@@ -7199,6 +7203,42 @@ describe('PWA runtime config guard', () => {
     expect(finalAt, 'the final re-verify attempt vanished').not.toBeNull();
     expect(Number(String(finalAt![1]).replace(/_/g, '')),
       'the activation window is back under two minutes').toBeGreaterThan(120_000);
+  });
+
+  it('PWA-ACTIVATION-FORCE-01: activation keeps knocking instead of waiting to be pressed again', () => {
+    // The second real user: activation "did not go through the first time", so he went into settings and pressed
+    // again. The wallet DOES re-broadcast across the three doors — but only while its send call is running, so a
+    // suspended tab ended the effort and the only thing left was a lock that expired and a button that came back.
+    //
+    // A lock alone prevents a second fee and delivers nothing. So the signed external is persisted and re-sent on
+    // its own schedule, and picked up again after a reload. It is bound to its seqno: the chain runs it at most
+    // once however many copies arrive.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // The bytes are written down WITH the marker, and it is the last chunk's — the one that may still be flying.
+    expect(app).toMatch(/rememberPlathoActivationInFlight\(ownerWallet, result\?\.result\?\.pendingBoc/);
+    expect(app).toMatch(/function plathoActivationPendingBoc\(\)/);
+
+    // The knocker rotates doors rather than re-knocking on the one that already has it.
+    const force = app.slice(app.indexOf('function forcePlathoActivationDelivery()'),
+      app.indexOf('function forcePlathoActivationDelivery()') + 1800);
+    expect(force, 'the knocker stopped rotating doors').toContain('broadcastThroughNextDoor(boc)');
+    expect(force, 'the knocker no longer re-reads activation').toContain('refreshVaultActivationStatus()');
+    expect(force, 'the knocker never gives up on a landed account').toContain('hasActivePlathoAccount()');
+
+    // Armed at send AND on every wallet load, or a suspended tab still ends the effort.
+    expect(app).toMatch(/rememberPlathoActivationInFlight\(ownerWallet[\s\S]{0,200}?forcePlathoActivationDelivery\(\);/);
+    expect(app).toMatch(/if \(plathoActivationPendingBoc\(\)\) forcePlathoActivationDelivery\(\);/);
+
+    // ...and it stops the moment the chain says the account is active.
+    expect(app).toMatch(/if \(accountActive\) \{[^}]*clearPlathoActivationForce\(\);/);
+
+    // The lock must outlast the external it protects: releasing while the first copy can still execute is how a
+    // user is invited to pay the activation fee twice.
+    const ttl = /const PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS = ([0-9_]+);/.exec(app);
+    expect(ttl, 'the activation horizon vanished').not.toBeNull();
+    expect(Number(String(ttl![1]).replace(/_/g, '')),
+      'the horizon is back inside the external validity window').toBeGreaterThan(300_000);
   });
 
   it('PWA-HONESTGREEN-02: the LAST external keeps a watcher after the send call returns', () => {
