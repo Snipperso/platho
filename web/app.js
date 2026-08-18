@@ -366,6 +366,22 @@ const APP_DOCS = [
     title: t('docs.cryptoTitle'),
     path: './docs/crypto-protocol.md',
   },
+  // ENGLISH LABELS, deliberately, where the three above are translated: these two are legal texts, and a policy
+  // that says one thing in one language and another somewhere else is worse than a policy in a language the
+  // reader has to work at. Telegram Apps Center requires both documents to exist and be reachable before it will
+  // review a Mini App, which is what put them here [2026-08-18].
+  {
+    id: 'privacy',
+    label: 'Privacy',
+    title: 'Privacy Policy',
+    path: './docs/privacy-policy.md',
+  },
+  {
+    id: 'terms',
+    label: 'Terms',
+    title: 'Terms of Use',
+    path: './docs/terms-of-use.md',
+  },
 ];
 const basePublicChannelRegistry = appConfig.publicChannels ?? DEFAULT_PUBLIC_CHANNELS;
 const previewThreads = (appConfig.preview?.threads ?? []).map((thread) => ({
