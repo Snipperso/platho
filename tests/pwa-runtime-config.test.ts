@@ -1979,7 +1979,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(response\.ok\) return \{ ok: true \}/);
     expect(app).toMatch(/response\.status === 401 \|\| response\.status === 403\) return \{ ok: false, reason: 'invalid' \}/);
     // No Save button: the settings field validates + saves on change (blur / Enter). A 401/403 is NOT a hard
-    // reject — a brand-new toncenter key needs up to ~1 min to activate — so the key is saved anyway, shown as
+    // reject — a brand-new toncenter key is not active immediately, and how long it takes is not known — so the key is saved anyway, shown as
     // 'activating', and re-verified in the background (flips to active, or reverts to keyless if still rejected).
     expect(app).toMatch(/async function commitToncenterKeyFromInput\(\)/);
     expect(app).toMatch(/toncenterApiKeyInput\?\.addEventListener\('change'/);
@@ -2023,9 +2023,9 @@ describe('PWA runtime config guard', () => {
     expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.action-note-steps/);
     // The Save button is gone.
     expect(app).not.toMatch(/saveToncenterKeyButton/);
-    // Quick-start step 2 validates too: an invalid key surfaces a message and does NOT advance the stepper.
-    expect(app).toMatch(/if \(result\.reason === 'invalid'\) return t\('quickstart\.keyRejected'\)/);
-    expect(EN_STRINGS['quickstart.keyRejected']).toBe('That key was rejected by TON Center. Check it and retry, or Skip.');
+    // Quick-start step 2 validates too — but a 401 there is almost always a key that has not activated yet,
+    // so it does NOT block: the key is saved and re-verified exactly as the settings path does. Pinned by
+    // PWA-FRESHKEY-01, which is the gate that owns this behaviour now.
     // The stepper handler renders a string run() result as a non-advancing failure message.
     expect(app).toMatch(/if \(typeof ok === 'string'\) \{[\s\S]*setText\(quickStartStepStatus, ok\)/);
   });
@@ -7172,6 +7172,33 @@ describe('PWA runtime config guard', () => {
     expect(writes, 'the busy flag is written outside its setter — that is how the button went dark').toBe(2);
     expect(app, 'the button lost the id the setter reaches it by').toContain("querySelector('#newChatSubmitButton')");
     expect(readFileSync('web/index.html', 'utf8')).toContain('id="newChatSubmitButton"');
+  });
+
+  it('PWA-FRESHKEY-01: onboarding may not reject a key that is merely still activating', () => {
+    // THE FIRST REAL USER OF THE APP hit this: a brand-new toncenter key, pasted seconds after the bot issued
+    // it, came back 401 and quick-start told them it was rejected. The settings path had known better all along
+    // — save it, show 'activating', re-verify in the background — and said so in a comment; onboarding, the one
+    // screen where a key is guaranteed to be brand new, took the opposite branch.
+    //
+    // A mechanism that exists, is documented, and is bypassed on the path that needs it most is the failure this
+    // codebase keeps re-learning. So both halves are pinned: the step must not return the rejection string, and
+    // it must reach the same optimistic save + re-verify the settings path uses.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    expect(app, 'onboarding hard-rejects a fresh key again').not.toContain("return t('quickstart.keyRejected')");
+
+    const step = app.slice(app.indexOf("querySelector('#quickStartKeyInput')"), app.indexOf("key: 'export',"));
+    expect(step, 'the key step stopped saving the key').toContain('applyToncenterApiKey(trimmed);');
+    expect(step, 'the key step stopped re-verifying an activating key')
+      .toContain('scheduleToncenterKeyReverify(trimmed);');
+
+    // ...and the grace window must outlast a minute, which is what threw the working key away.
+    const win = app.slice(app.indexOf('function scheduleToncenterKeyReverify('),
+      app.indexOf('function scheduleToncenterKeyReverify(') + 2200);
+    const finalAt = /attempt\(true\).*?\}, ([0-9_]+)\)/s.exec(win);
+    expect(finalAt, 'the final re-verify attempt vanished').not.toBeNull();
+    expect(Number(String(finalAt![1]).replace(/_/g, '')),
+      'the activation window is back under two minutes').toBeGreaterThan(120_000);
   });
 
   it('PWA-HONESTGREEN-02: the LAST external keeps a watcher after the send call returns', () => {

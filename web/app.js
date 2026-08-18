@@ -628,9 +628,19 @@ function scheduleToncenterKeyReverify(key) {
       setToncenterKeyStatusIcon('error');
     }
   };
-  // toncenter activation typically lands within a minute; re-check at 25s and (final) 60s.
-  toncenterKeyReverifyTimers.push(setTimeout(() => { attempt(false).catch(() => {}); }, 25000));
-  toncenterKeyReverifyTimers.push(setTimeout(() => { attempt(true).catch(() => {}); }, 60000));
+  // THE WINDOW WAS TOO SHORT, and the first real user is how that was found. It was 25s plus a final 60s,
+  // written on the belief that activation "typically lands within a minute". A genuinely valid key was still
+  // 401-ing past that and got thrown away as wrong — the worst of the three outcomes: the user did nothing
+  // wrong, the key was fine, and the app told them it was not.
+  //
+  // HOW LONG ACTIVATION ACTUALLY TAKES IS NOT KNOWN. Nobody has measured it and toncenter does not publish it,
+  // so this ladder is deliberately generous rather than tuned: better to keep re-asking for ten minutes than to
+  // discard a working key at sixty seconds. Each re-check is one request, so the whole window costs six.
+  // If someone ever measures the real distribution, tighten it then — with the number in this comment.
+  for (const at of [25_000, 60_000, 120_000, 240_000, 420_000]) {
+    toncenterKeyReverifyTimers.push(setTimeout(() => { attempt(false).catch(() => {}); }, at));
+  }
+  toncenterKeyReverifyTimers.push(setTimeout(() => { attempt(true).catch(() => {}); }, 600_000));
 }
 
 // No Save button: validate + save when the field loses focus after an edit (or on Enter). On success shows
@@ -26809,8 +26819,20 @@ const QUICK_START_STEPS = [
       // A previously stored key is deliberately left alone, so a blank field can never silently drop one.
       if (!trimmed) return true;
       const result = await validateToncenterApiKey(trimmed);
-      if (result.reason === 'invalid') return t('quickstart.keyRejected');
+      // A 401 HERE IS ALMOST NEVER A WRONG KEY. This step is reached seconds after the @toncenter bot issued
+      // one, and toncenter answers 401 until it activates — which the settings path has always known (it saves
+      // the key, shows 'activating' and re-verifies in the background) while this one did the opposite: refused
+      // the key, saved nothing, scheduled nothing, and told a first-time user their brand-new key was rejected.
+      // OBSERVED on the first real user, 2026-08-18.
+      //
+      // So onboarding now behaves like settings — keep the key, say it is activating, and let the background
+      // re-verify settle it. Nothing is lost if the key really is wrong: the final attempt reverts to keyless,
+      // which is the mode the user would have been in anyway had they skipped this step.
       applyToncenterApiKey(trimmed);
+      if (result.reason === 'invalid') {
+        setToncenterKeyStatusIcon('activating');
+        scheduleToncenterKeyReverify(trimmed);
+      }
       return true;
     },
   },
