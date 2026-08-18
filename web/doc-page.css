@@ -1,0 +1,102 @@
+/* Standalone document pages (privacy, terms).
+   Tokens copied from the app so a policy page does not look like it belongs to a different product.
+   Kept as its own file rather than inline: the production CSP has no 'unsafe-inline' for style-src, so an
+   inline <style> block is dropped and the page renders naked. */
+
+:root {
+  --bg: #0b0d0f;
+  --panel: #111417;
+  --text: #f4f7f5;
+  --muted: #96a19c;
+  --accent: #30d5b0;
+  --line: #283136;
+  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 var(--font);
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.doc-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; }
+.doc-brand img { border-radius: 7px; display: block; }
+.doc-nav nav { display: flex; gap: 18px; font-size: 14px; }
+
+.doc {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 36px 22px 64px;
+}
+
+.doc h1 {
+  margin: 0 0 6px;
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* The "Last updated" line is the first paragraph and carries the date; monospace marks it as metadata. */
+.doc h1 + p {
+  margin: 0 0 34px;
+  color: var(--muted);
+  font: 13px/1.6 var(--mono);
+}
+
+.doc h2 {
+  margin: 38px 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 19px;
+  letter-spacing: -0.005em;
+}
+
+.doc p { margin: 0 0 16px; }
+.doc strong { color: #fff; }
+
+.doc ul { margin: 0 0 18px; padding-left: 20px; }
+.doc li { margin: 0 0 8px; }
+
+.doc code {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  font: 13px/1.4 var(--mono);
+  color: var(--accent);
+}
+
+.doc-foot {
+  display: flex;
+  gap: 20px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 22px 22px 44px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .doc h1 { font-size: 26px; }
+  .doc { padding: 26px 18px 48px; }
+}

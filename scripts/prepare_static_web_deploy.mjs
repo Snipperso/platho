@@ -20,6 +20,13 @@ const DEFAULT_DOMAIN = 'platho.app';
 
 const ROOT_RUNTIME_FILES = new Set([
   'index.html',
+  // Standalone legal pages. They exist because platho.app serves web/docs/*.md as text/markdown with
+  // nosniff, so a browser DOWNLOADS the policy instead of showing it — and that link is what Telegram's
+  // app moderation and every catalogue asks for. Generated from the markdown by
+  // scripts/build_doc_pages.mjs; the markdown stays the single source.
+  'privacy.html',
+  'terms.html',
+  'doc-page.css',
   'styles.css',
   'app.js',
   'boot-guard.js',

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b0d0f">
+    <meta name="color-scheme" content="dark">
+    <title>Platho — Privacy Policy</title>
+    <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
+    <link rel="stylesheet" href="/doc-page.css?v=1">
+  </head>
+  <body>
+    <header class="doc-nav">
+      <a class="doc-brand" href="/">
+        <img src="/assets/platho-icon-192.png?v=3" alt="" width="28" height="28">
+        <span>Platho</span>
+      </a>
+      <nav>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+      </nav>
+    </header>
+    <main class="doc">
+      <h1>Privacy Policy</h1>
+      <p>Last updated: 18 August 2026</p>
+      <p>Platho is a messenger with no backend. This document is short because there is very little to disclose — and specific where something genuinely leaves your device.</p>
+      <h2>What we collect</h2>
+      <p>Nothing.</p>
+      <p>There is no Platho server. The application is a static page that runs entirely in your browser. We operate no account system, no user database, no analytics, no crash reporting and no advertising. We cannot see your messages, your contacts, your balance or your activity, because none of it is sent to us.</p>
+      <p>We do not ask for an email address, a phone number or a name.</p>
+      <h2>What stays on your device</h2>
+      <ul>
+      <li>Your 24-word recovery phrase, and the wallet and messaging keys derived from it.</li>
+      <li>Your message history and drafts.</li>
+      <li>Your settings, including an optional API key for a public TON node provider.</li>
+      </ul>
+      <p>This data is stored in your browser's local storage and is encrypted with a password you choose (AES-GCM-256 with PBKDF2-SHA-256 key derivation). We never receive it. Clearing your browser data deletes it, and without your recovery phrase it cannot be restored by us or by anyone else.</p>
+      <h2>What is public by design</h2>
+      <p><strong>Private messages are encrypted on your device</strong> before they are published, and only the intended recipient can read their contents.</p>
+      <p><strong>Public posts are not encrypted.</strong> They are written to the TON blockchain in plain text, and they are permanent: neither we, nor an administrator, nor a government, nor you as their author can remove them. Do not publish anything publicly that you would need to withdraw later.</p>
+      <p>The blockchain is a public ledger. Even for encrypted messages, the fact that a transaction occurred, its time and its cost are visible to anyone. Wallet addresses are public. If you link an address to your identity elsewhere, the activity of that address can be associated with you.</p>
+      <h2>Third parties your device contacts</h2>
+      <p>The application has no server of ours to talk to, so it talks to public TON infrastructure directly. When you use Platho, your browser sends requests to:</p>
+      <ul>
+      <li><code>toncenter.com</code></li>
+      <li><code>tonapi.io</code></li>
+      <li><code>mainnet-v4.tonhubapi.com</code></li>
+      </ul>
+      <p>These providers necessarily see your IP address and the requests your device makes, and they operate under their own privacy policies, which we do not control. This is the one place where information about you leaves your device to a party other than the blockchain itself. If you use a VPN or the Tor network, these providers see that instead.</p>
+      <p>If you supply your own API key for one of these providers, it is stored locally on your device and sent only to that provider.</p>
+      <h2>Telegram Mini App</h2>
+      <p>Platho can also run inside Telegram as a Mini App. In that mode Telegram itself governs what it provides to the application and what it records about your use of Telegram; that is covered by Telegram's own privacy policy, not this one.</p>
+      <h2>Children</h2>
+      <p>Platho is not directed at children under 13.</p>
+      <h2>Changes</h2>
+      <p>If this policy changes, the date at the top changes with it. The current version is always the one published in the application and at platho.app.</p>
+      <h2>Language</h2>
+      <p>This document is published in several languages. The translations are provided for convenience; if they differ, the English version is the one that governs.</p>
+      <h2>Contact</h2>
+      <p>Questions about this policy: <a href="https://t.me/plathoapp">https://t.me/plathoapp</a></p>
+    </main>
+    <footer class="doc-foot">
+      <a href="https://platho.app">platho.app</a>
+      <a href="https://github.com/Snipperso/platho">Source</a>
+      <a href="https://t.me/plathoapp">Telegram</a>
+    </footer>
+  </body>
+</html>
