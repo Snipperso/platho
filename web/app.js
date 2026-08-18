@@ -14535,14 +14535,76 @@ function hasActivePlathoAccount() {
 // wallet that sent it, and expires on the same horizon the in-memory poll uses, so a reload can never claim a
 // longer in-flight window than a tab that stayed open.
 const PLATHO_ACTIVATION_IN_FLIGHT_KEY = 'platho.accountActivation.inFlight.v1';
-const PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS = 95_000;
+// 95_000 UNTIL 2026-08-18, and that number was the danger rather than the protection. The external a wallet
+// signs is valid for ~300s, so between 95s and 300s the marker had expired while the FIRST activation could
+// still execute — the app put the Activate button back and invited exactly the second fee the comment above
+// exists to prevent. Reported by the second real user: activation "did not go through the first time", so he
+// went into settings and pressed again.
+//
+// The horizon now outlasts the external instead of the poller's patience, and matches the number the message
+// lane already uses for the same reason (DIRECT_SEND_REBROADCAST_WINDOW_MS): past it, the external is
+// GUARANTEED dead, so a rebuild cannot double-execute.
+const PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS = 330_000;
 
-function rememberPlathoActivationInFlight(walletAddress) {
+function rememberPlathoActivationInFlight(walletAddress, pendingBoc = null) {
   const raw = rawWalletAddress(walletAddress);
   if (!raw) return;
   try {
-    localStorageOrNull()?.setItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY, JSON.stringify({ wallet: raw, at: Date.now() }));
+    // THE SIGNED BYTES RIDE ALONG, which is the whole difference between this and a lock. A marker on its own only
+    // stops a second fee; it does nothing to make the first activation arrive, so a tab the phone suspended left
+    // the user waiting out the horizon and then pressing Activate again — which is what the second real user did.
+    // Persisted, the same external can be re-broadcast on the next load: it is bound to its seqno, so the chain
+    // runs it at most once no matter how many copies reach it.
+    localStorageOrNull()?.setItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY,
+      JSON.stringify({ wallet: raw, at: Date.now(), boc: pendingBoc ?? null }));
   } catch { /* private mode / quota: the in-memory flag still covers this tab */ }
+}
+
+/** The external still owed a delivery, or null. Same wallet, same horizon as the lock — one source of truth. */
+function plathoActivationPendingBoc() {
+  const raw = rawWalletAddress(plathoWallet?.address);
+  if (!raw) return null;
+  let record = null;
+  try { record = JSON.parse(localStorageOrNull()?.getItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY) ?? 'null'); }
+  catch { return null; }
+  if (!record || record.wallet !== raw || typeof record.boc !== 'string' || !record.boc) return null;
+  const age = Date.now() - Number(record.at ?? 0);
+  return (age >= 0 && age < PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS) ? record.boc : null;
+}
+
+/**
+ * Keep knocking until the account reads active or the external is provably dead.
+ *
+ * OWNER, 2026-08-18: "force activation the same as messages — the carousel hammers everywhere it can and it all
+ * happens fast." That is exactly what the message lane does and what this did not: the wallet re-broadcasts
+ * across the three doors only while its send call is RUNNING, so a suspended tab or a closed app ended the
+ * effort. Here the same bytes go back out on their own schedule, through a DIFFERENT door each time — the
+ * external reaches one node and spreads from there, so knocking twice on the door that already has it is worth
+ * nothing while another entry point is another route to the collator.
+ */
+let plathoActivationForceTimers = [];
+function clearPlathoActivationForce() {
+  for (const t of plathoActivationForceTimers) { try { clearTimeout(t); } catch { /* best effort */ } }
+  plathoActivationForceTimers = [];
+}
+function forcePlathoActivationDelivery() {
+  clearPlathoActivationForce();
+  const knock = async () => {
+    if (hasActivePlathoAccount()) { clearPlathoActivationForce(); return; }
+    const boc = plathoActivationPendingBoc();
+    if (!boc) { clearPlathoActivationForce(); return; }   // landed, expired, or another wallet — nothing owed
+    try {
+      const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+      const rotated = await broadcastThroughNextDoor(boc);
+      if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc, walletAddress: plathoWallet?.address });
+    } catch { /* a refused door proves nothing: an earlier copy may still land, so keep the schedule */ }
+    try { await refreshVaultActivationStatus(); } catch { /* transient read */ }
+  };
+  // Dense at the start because that is where a landing normally happens, thinning out towards the external's own
+  // expiry. Each knock is one POST; the whole ladder costs less than a single feed sync.
+  for (const at of [3_000, 8_000, 15_000, 25_000, 40_000, 60_000, 90_000, 130_000, 180_000, 240_000, 300_000]) {
+    plathoActivationForceTimers.push(setTimeout(() => { knock().catch(() => {}); }, at));
+  }
 }
 
 function forgetPlathoActivationInFlight() {
@@ -14566,7 +14628,10 @@ function plathoActivationInFlightForCurrentWallet() {
 // Poll the user's OWN KeyShard until the account reads active, or the horizon runs out. Rising delays: the first
 // read is cheap and often enough, and a register that has not settled in ten seconds will not settle in eleven.
 // The delays sum to PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS on purpose — ONE horizon, read by everything that waits.
-const PLATHO_ACTIVATION_CONFIRM_DELAYS_MS = [0, 4_000, 6_000, 8_000, 12_000, 15_000, 20_000, 30_000];
+// The tail past 95s was added with the widened horizon: reads are cheap, and the alternative — giving up while
+// the external is still alive — is what made a user notice activation at all. Kept on ONE line because a gate
+// sums this list and compares it to the horizon; a comment inside the brackets turns that sum into NaN.
+const PLATHO_ACTIVATION_CONFIRM_DELAYS_MS = [0, 4_000, 6_000, 8_000, 12_000, 15_000, 20_000, 30_000, 40_000, 45_000, 65_000, 85_000];
 
 async function waitForPlathoAccountActivation(stillWanted = () => true) {
   for (const delayMs of PLATHO_ACTIVATION_CONFIRM_DELAYS_MS) {
@@ -17813,7 +17878,7 @@ function refreshMessagingControls() {
   // the button looks like it ignored the first press and the user re-clicks.
   // queueVaultPostTransactionRefresh clears the flag once activation confirms or its
   // poll horizon elapses; a wallet change resets it.
-  if (accountActive) { plathoAccountActivationPending = false; forgetPlathoActivationInFlight(); }
+  if (accountActive) { plathoAccountActivationPending = false; forgetPlathoActivationInFlight(); clearPlathoActivationForce(); }
   // The written-down marker is ORed in, not substituted: it is what survives a reload, while the in-memory flag is
   // what covers a tab whose storage is unavailable. Either one means an external is on its way and the row must not
   // invite a second one.
@@ -22609,6 +22674,11 @@ function queueVaultRefreshAfterWalletChange() {
     if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
     if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
   });
+  // RESUME THE KNOCKING. This runs on every wallet load, which includes a fresh start of the app — so an external
+  // whose tab the phone suspended is picked up here and finished, instead of waiting for someone to notice the
+  // account never activated and press the button again. Costs nothing when there is nothing owed:
+  // plathoActivationPendingBoc is null unless THIS wallet has an unexpired external on record.
+  if (plathoActivationPendingBoc()) forcePlathoActivationDelivery();
 }
 
 async function resolveUsernameRegistryProvider() {
@@ -23435,8 +23505,12 @@ async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
     keyRecord: localVaultDraft.message, value: KEYSHARD_REGISTER_VALUE,
   });
   plathoAccountActivationPending = true;
-  // ...and written down, so a reload inside the settling window does not offer to pay the fee a second time.
-  rememberPlathoActivationInFlight(ownerWallet);
+  // ...and written down WITH the signed external, so a reload inside the settling window neither offers to pay the
+  // fee a second time nor abandons the copy already paid for. `pendingBoc` is the LAST chunk's — the one that may
+  // still be in flight when the send call returns; the top-level `boc` is the first chunk's and would re-send the
+  // wrong bytes.
+  rememberPlathoActivationInFlight(ownerWallet, result?.result?.pendingBoc ?? result?.result?.boc ?? null);
+  forcePlathoActivationDelivery();
   vaultDraftStatus.textContent = t('vault.activationSent');
   queueVaultPostTransactionRefresh({ pollActivation: true });
   return result;

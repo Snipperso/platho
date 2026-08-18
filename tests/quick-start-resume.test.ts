@@ -285,7 +285,9 @@ describe('quick-start resume + activation gate guard', () => {
     expect(total, 'the poll ladder and the in-flight horizon must be the same number').toBe(ttl);
     // (d) A RELOAD inside that window must not re-offer a registration that is already paid for and in flight —
     // pressing it again is a second fee for one registration. The in-memory flag alone could not survive a reload.
-    expect(app).toMatch(/rememberPlathoActivationInFlight\(ownerWallet\);/);
+    // The marker carries the signed external too now, so the call has a second argument — the delivery it
+    // enables is owned by PWA-ACTIVATION-FORCE-01.
+    expect(app).toMatch(/rememberPlathoActivationInFlight\(ownerWallet, /);
     expect(app).toMatch(/const activationInFlight = plathoAccountActivationPending \|\| plathoActivationInFlightForCurrentWallet\(\);/);
     // Wallet-scoped, so it can never lock a DIFFERENT wallet out of activating.
     const inFlight = app.slice(
@@ -295,7 +297,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(inFlight).toMatch(/if \(!record \|\| record\.wallet !== raw\) return false;/);
     expect(inFlight).toMatch(/PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS/);
     // ...and released the moment the chain confirms, so it can never outlive what it is standing in for.
-    expect(app).toMatch(/if \(accountActive\) \{ plathoAccountActivationPending = false; forgetPlathoActivationInFlight\(\); \}/);
+    expect(app).toMatch(/if \(accountActive\) \{ plathoAccountActivationPending = false; forgetPlathoActivationInFlight\(\); clearPlathoActivationForce\(\); \}/);
     // (e) A wait belonging to a step the user has left writes nothing.
     expect(activateBody).toMatch(/const generation = quickStartActivationGeneration;/);
     expect(activateBody).toMatch(/const mine = \(\) => generation === quickStartActivationGeneration;/);
