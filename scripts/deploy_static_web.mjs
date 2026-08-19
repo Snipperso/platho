@@ -44,6 +44,41 @@ if (MODE === 'production' && prep.productionReady !== true) {
 const bundleHash = prep.runtime?.bundleSha256;
 if (!bundleHash) die(`missing runtime.bundleSha256 in ${PREP}`);
 
+// THE VERSION MUST MOVE, AND THIS IS THE ONLY PLACE THAT CAN INSIST.
+//
+// The product version is semantic and deliberately hand-decided (it was split away from the cache keys on
+// 2026-08-09 so it could stand still through a one-line hotfix). Nothing about that decision made anyone
+// REMEMBER it: the number sat at 1.0.34 across several releases, because no step in the ritual required it.
+//
+// A bump cannot be automatic without turning the version back into a build counter. Refusing to ship a version
+// that is ALREADY LIVE gets the same guarantee from the other side: you still choose patch or minor, and you
+// cannot skip the choice.
+//
+// SOFT ON A FAILED LOOKUP, hard on a real match: an unreachable site must not block a deploy (that is when you
+// most need one), but a version we can see and that equals ours is a mistake every time.
+if (MODE === 'production' && !process.argv.includes('--same-version')) {
+  const shipping = /(id="appVersionLabel">)(\d+\.\d+\.\d+)</.exec(readFileSync('web/index.html', 'utf8'))?.[2];
+  if (!shipping) die('could not read the version out of web/index.html');
+  const probe = spawnSync(process.execPath, ['-e', `
+    fetch('https://platho.app/', { cache: 'no-store' })
+      .then((r) => r.text())
+      .then((t) => process.stdout.write(/id="appVersionLabel">(\\d+\\.\\d+\\.\\d+)</.exec(t)?.[1] ?? ''))
+      .catch(() => process.stdout.write(''));
+  `], { encoding: 'utf8', timeout: 20_000 });
+  const live = (probe.stdout ?? '').trim();
+  if (!live) {
+    console.error('note: could not read the live version — shipping without the same-version check');
+  } else if (live === shipping) {
+    die(`version ${shipping} is already live. Bump it first:\n`
+      + '  node scripts/bump_release_version.mjs            (a fix)\n'
+      + '  node scripts/bump_release_version.mjs --minor    (a feature a user can see)\n'
+      + '  node scripts/bump_module_versions.mjs --run && npm run web:deploy:prepare\n'
+      + 'Re-deploying the same version on purpose? Pass --same-version.');
+  } else {
+    console.error(`version ${live} -> ${shipping}`);
+  }
+}
+
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, '').replace('T', '-');
 const release = `release-${stamp}-${bundleHash.slice(0, 12)}`;
 const tarPath = `artifacts/local/platho-web-static-${release}.tar`;
