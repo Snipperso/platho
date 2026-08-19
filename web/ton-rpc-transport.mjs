@@ -1206,39 +1206,72 @@ export function createTonCenterV3Transport(options = {}) {
       if (!endpointForSend) {
         throw new TonRpcTransportError('TON sendBoc endpoint is not configured');
       }
-      const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
-      if (apiKey) headers['X-API-Key'] = apiKey;
       const resolvedRequestTimeoutMs = resolveTonRpcRequestTimeoutMs({ priority, requestTimeoutMs, timeoutMs }, {
         ...options,
         requestTimeoutMs: options.sendBocRequestTimeoutMs ?? options.requestTimeoutMs,
       });
-      const response = await scheduleToncenterHttpRequest(
-        endpointForSend,
-        apiKey,
-        () => fetchWithTonRpcTimeout(fetchImpl, endpointForSend, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ boc }),
-        }, resolvedRequestTimeoutMs),
-        {
-          rateLimitKey: options.rateLimitKey,
-          requestSpacingMs,
-          rateLimitBackoffMs,
-          rateLimitRetries: finiteNonNegativeMs(options.sendBocRateLimitRetries, Math.max(rateLimitRetries, 1)),
-          // The ONLY caller that opts into 5xx retries — see the note in scheduleToncenterHttpRequest. Safe because
-          // the external is signed against one seqno, so the chain runs it at most once however many copies arrive.
-          serverErrorRetries: finiteNonNegativeMs(
-            options.sendBocServerErrorRetries, TONCENTER_SEND_BOC_SERVER_ERROR_RETRIES,
-          ),
-          skipIfRateLimited: skipIfRateLimited === true,
-          priority,
-          queueTimeoutMs,
-        },
-      );
+      // The API KEY MUST NOT LEAVE toncenter.com — not in a header, and not as the limiter's bucket identity. The
+      // limiter KEY does stay shared, though: a different host may not become a different QUEUE, because two queues
+      // mean two workers mean two simultaneous connections, which is what stalled the WebKit run loop on iPhone.
+      // ONE SHOT for an alternate door, the full ladder for the primary. Letting the alternate inherit the 5xx
+      // retry ladder made a refusal cost its backoff BEFORE the primary was even tried — a change meant to remove
+      // twenty seconds would have added seven. Caught by LARGEDOOR-05.
+      const postThrough = (endpointToUse, oneShot = false) => {
+        // Keyed by IDENTITY, not by hostname: the key belongs to the configured provider, and an alternate door is
+        // by construction never that provider. Matching on "looks like toncenter.com" would also quietly strip the
+        // key from any other primary endpoint.
+        const keyForHost = endpointToUse === endpointForSend ? apiKey : null;
+        const headers = { 'Content-Type': 'application/json', ...(options.headers ?? {}) };
+        if (keyForHost) headers['X-API-Key'] = keyForHost;
+        return scheduleToncenterHttpRequest(
+          endpointToUse,
+          keyForHost,
+          () => fetchWithTonRpcTimeout(fetchImpl, endpointToUse, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ boc }),
+          }, resolvedRequestTimeoutMs),
+          {
+            rateLimitKey: options.rateLimitKey,
+            requestSpacingMs,
+            rateLimitBackoffMs,
+            rateLimitRetries: oneShot
+              ? 0
+              : finiteNonNegativeMs(options.sendBocRateLimitRetries, Math.max(rateLimitRetries, 1)),
+            // The ONLY caller that opts into 5xx retries — see the note in scheduleToncenterHttpRequest. Safe
+            // because the external is signed against one seqno, so the chain runs it at most once however many
+            // copies arrive.
+            serverErrorRetries: oneShot ? 0 : finiteNonNegativeMs(
+              options.sendBocServerErrorRetries, TONCENTER_SEND_BOC_SERVER_ERROR_RETRIES,
+            ),
+            skipIfRateLimited: skipIfRateLimited === true,
+            priority,
+            queueTimeoutMs,
+          },
+        );
+      };
+
+      // A LARGE external does not start at toncenter — see firstBroadcastDoorForBytes for the measurement. If the
+      // alternate refuses, the primary still gets its turn immediately, so this can only ever be faster than
+      // before: the fallback is the exact request that used to be the first one.
+      const alternate = firstBroadcastDoorForBytes(approximateBocBytes(boc), options.config ?? null);
+      let response = null;
+      if (alternate && alternate.sendBocEndpoint !== endpointForSend) {
+        try {
+          const viaAlternate = await postThrough(alternate.sendBocEndpoint, true);
+          if (viaAlternate?.ok) response = viaAlternate;
+        } catch {
+          // Swallowed: an alternate that will not take the message proves nothing, and the primary is next.
+        }
+      }
+      if (!response) response = await postThrough(endpointForSend);
       if (!response.ok) {
         throw await toncenterHttpErrorWithBody('TON RPC sendBoc', response, rateLimitBackoffMs);
       }
-      const json = await response.json();
+      // Doors that are not toncenter answer with their own body shapes (tonhub replies {"status":n}), and a
+      // success with an empty body is not an error — only an explicit `ok: false` is.
+      let json = {};
+      try { json = await response.json(); } catch { json = {}; }
       const ok = json.ok ?? json.result?.ok ?? true;
       if (ok === false) throw new TonRpcTransportError('TON RPC sendBoc rejected message');
       clearToncenterRunGetMethodCache({ endpoint, apiKey, rateLimitKey: options.rateLimitKey });
@@ -1592,6 +1625,59 @@ export function broadcastDoors(config = null) {
   const resolved = config ?? globalThis.plathoTonRpcConfig ?? null;
   const doors = Array.isArray(resolved?.broadcastDoors) ? resolved.broadcastDoors : [];
   return doors.filter((door) => typeof door?.sendBocEndpoint === 'string' && door.sendBocEndpoint);
+}
+
+/** Bytes behind a base64 BOC. Padding makes this at most two bytes high, which a size gate does not care about. */
+export function approximateBocBytes(boc) {
+  if (typeof boc !== 'string' || boc.length === 0) return 0;
+  return Math.ceil((boc.length * 3) / 4);
+}
+
+function isToncenterHost(endpoint) {
+  try {
+    return /(^|\.)toncenter\.com$/i.test(new URL(endpoint).hostname);
+  } catch {
+    return false;
+  }
+}
+
+// Which alternate door the next large first-broadcast uses. Module state so consecutive large sends spread across
+// the alternates instead of every Platho client in the world hammering whichever one happens to be listed first.
+let firstBroadcastDoorCursor = -1;
+
+/** Test seam — the cursor is module state, and a test that cannot reset it cannot prove the rotation. */
+export function __resetFirstBroadcastDoorCursorForTests() {
+  firstBroadcastDoorCursor = -1;
+}
+
+/**
+ * The door the FIRST broadcast of a LARGE external should use, or null to keep the configured primary.
+ *
+ * MEASURED 2026-08-19, 100 alternating trials through toncenter with the official TON SDK, one POST each, no
+ * re-sending: a 1252 B external landed 50/50, median 2.2s. A 62161 B external — same wallet, same destination,
+ * same minute — landed 29/49, median 24.7s, worst case 100.2s. Re-run through the OTHER two doors with the sizes
+ * still alternating: large externals landed in 2.0-2.3s, indistinguishable from small ones, while toncenter in the
+ * very same cycles took 18.3, 24.6 and 21.3s. Small externals stayed at ~2.2s on every door throughout, which is
+ * what rules out "the network was busy" — the penalty follows the door, not the hour and not the size.
+ *
+ * So a large external must not START at toncenter. This is NOT a mirror: the same bytes go out exactly once, to a
+ * different host. Mirroring was rejected on upload cost (a two-part image would cost 220KB instead of 73KB) and
+ * that reasoning is untouched.
+ *
+ * The threshold is the honest edge of what has been measured, not a curve fit: 3762 B externals were clean in the
+ * 2026-08-05 measurement and 36555 B ones were not, so the gate sits just above the largest size known to be fine.
+ * Anything between 4 KB and 36 KB is unmeasured, and routing it to an alternate costs nothing — those doors were
+ * as fast as toncenter at small sizes too.
+ */
+export function firstBroadcastDoorForBytes(bocBytes, config = null) {
+  const resolved = config ?? globalThis.plathoTonRpcConfig ?? null;
+  const threshold = Number(resolved?.firstBroadcastAlternateDoorAboveBytes ?? 0);
+  if (!Number.isFinite(threshold) || threshold <= 0) return null;
+  if (!(Number(bocBytes) > threshold)) return null;
+  const alternates = broadcastDoors(resolved).filter((door) => !isToncenterHost(door.sendBocEndpoint));
+  if (alternates.length === 0) return null;
+  firstBroadcastDoorCursor = (firstBroadcastDoorCursor + 1) % alternates.length;
+  return alternates[firstBroadcastDoorCursor];
 }
 
 /**

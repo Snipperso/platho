@@ -110,11 +110,14 @@ export const PLATHO_APP_CONFIG = deepFreeze({
       // difference in the message is what luck-of-the-route looks like — so a retry should try a DIFFERENT door
       // rather than knock on the same one.
       //
-      // NOT A MIRROR, deliberately. The first broadcast still goes to the primary alone, so a message that lands
-      // quickly costs exactly what it costs today. Only the RETRY that already exists changes address, which is why
-      // this adds ZERO requests: a 2-part image would have cost 220KB of upload instead of 73KB if every send were
-      // mirrored to all three. And because the retry rotates, each individual door still sees one POST per ~15s at
-      // the 5s cadence — today's per-door rate, on somebody else's free service.
+      // NOT A MIRROR, deliberately. Every broadcast goes to ONE door: a 2-part image would have cost 220KB of
+      // upload instead of 73KB if every send were mirrored to all three. Only the RETRY that already existed
+      // changes address, which is why this adds ZERO requests, and because it rotates, each individual door still
+      // sees one POST per ~15s at the 5s cadence — today's per-door rate, on somebody else's free service.
+      //
+      // Which door goes FIRST depends on size, and only on size — see firstBroadcastAlternateDoorAboveBytes below.
+      // A small external still starts at the primary. A large one starts at an alternate, because the primary was
+      // measured to stall it; the count of requests is unchanged either way.
       //
       // VERIFIED anonymously 2026-08-05 (POST with a deliberately invalid body — a PARSE error, never 401/403, is
       // what proves no key is needed; nothing real was broadcast): toncenter 422 "invalid base64", tonapi 400 "boc
@@ -132,6 +135,19 @@ export const PLATHO_APP_CONFIG = deepFreeze({
         { id: 'tonapi', sendBocEndpoint: 'https://tonapi.io/v2/blockchain/message' },
         { id: 'tonhub-v4', sendBocEndpoint: 'https://mainnet-v4.tonhubapi.com/send' },
       ],
+      // Above this many bytes the FIRST broadcast skips toncenter and goes straight to one of the doors above.
+      //
+      // MEASURED 2026-08-19 with the official TON SDK, one POST per attempt, sizes alternating so a busy hour
+      // cannot pose as a size effect. Through toncenter: 1252 B landed 50/50 with a 2.2s median, 62161 B landed
+      // 29/49 with a 24.7s median and a 100.2s worst case. Through tonapi and tonhub, same sizes, same minutes:
+      // the 62161 B externals landed in 2.0-2.3s — the same as small ones — while toncenter in those very cycles
+      // took 18.3, 24.6 and 21.3s. Small externals stayed ~2.2s on all three doors throughout. The penalty
+      // follows the DOOR, so a large external simply must not start at that one.
+      //
+      // 4096 is the edge of measured knowledge, not a fitted curve: 3762 B externals were clean on 2026-08-05 and
+      // 36555 B ones were not. The band between is unmeasured and routing it to an alternate costs nothing, since
+      // those doors matched toncenter on small externals too.
+      firstBroadcastAlternateDoorAboveBytes: 4096,
       requestSpacingMs: 250,
       rateLimitBackoffMs: 7000,
       rateLimitRetries: 1,
@@ -144,7 +160,7 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=53',
+      moduleUrl: './ton-dns-provider.mjs?v=54',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
