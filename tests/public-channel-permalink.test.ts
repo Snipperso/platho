@@ -127,8 +127,13 @@ describe('CHANLINK — a channel is shareable on its own', () => {
     expect(primitive).toContain("return 'copied';");
     expect(primitive).toContain("return 'shared';");
     const handler = app.slice(app.indexOf('publicChannelViewShareButton?.addEventListener'));
-    expect(handler.slice(0, 800)).toContain("outcome !== 'copied'");
-    expect(handler.slice(0, 800)).toContain("t('dialog.shareLinkCopied')");
+    // BOTH clipboard outcomes speak. The first fix covered only success and left failure reporting itself to the
+    // same console.debug — caught when a copy really did fail (an unfocused window refuses the clipboard) and the
+    // button again sat there saying nothing.
+    expect(handler.slice(0, 900)).toContain("t('dialog.shareLinkCopied')");
+    expect(handler.slice(0, 900)).toContain("t('dialog.shareCopyFailed')");
+    // A dismissed share sheet stays silent — the user closed it themselves.
+    expect(handler.slice(0, 900)).toContain('if (!said) return;');
     // And the periodic re-render must not eat the confirmation before it is read.
     const render = app.slice(app.indexOf('if (publicChannelViewShareButton) {'));
     expect(render.slice(0, 600)).toContain("dataset.copied !== 'true'");

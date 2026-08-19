@@ -19530,10 +19530,15 @@ publicChannelViewShareButton?.addEventListener('click', async () => {
     publicChannelPermalink(publicChannelViewWallet),
     publicChannelViewTitle?.textContent ?? '',
   );
-  // A share sheet already showed the user something happened; a clipboard write showed them nothing.
-  if (outcome !== 'copied') return;
+  // A share sheet already showed the user something happened, and a dismissal was their own doing. The two
+  // CLIPBOARD outcomes both need saying out loud: success showed nothing, and failure said so only to a
+  // console.debug — the same silence, on the branch I first fixed only one side of.
+  const said = outcome === 'copied' ? t('dialog.shareLinkCopied')
+    : outcome === 'failed' ? t('dialog.shareCopyFailed')
+    : null;
+  if (!said) return;
   button.dataset.copied = 'true';
-  button.textContent = t('dialog.shareLinkCopied');
+  button.textContent = said;
   window.setTimeout(() => {
     if (button.dataset.copied !== 'true') return;
     button.dataset.copied = 'false';
