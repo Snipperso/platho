@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=48';
+} from './public-channel-subscriptions.mjs?v=49';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -246,7 +246,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=74';
+} from './i18n.mjs?v=75';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -747,6 +747,7 @@ const publicChannelViewAvatar = document.querySelector('#publicChannelViewAvatar
 const publicChannelViewTitle = document.querySelector('#publicChannelViewTitle');
 const publicChannelViewSubtitle = document.querySelector('#publicChannelViewSubtitle');
 const publicChannelViewFollowButton = document.querySelector('#publicChannelViewFollowButton');
+const publicChannelViewShareButton = document.querySelector('#publicChannelViewShareButton');
 const publicChannelViewBody = document.querySelector('#publicChannelViewBody');
 const publicJumpDownButton = document.querySelector('#publicJumpDownButton');
 const publicComposer = document.querySelector('#publicComposer');
@@ -7549,21 +7550,7 @@ function chooseShareTargetOwnChannel() {
 async function chooseShareLink() {
   const share = pendingSharePayload;
   closeSharePostDialog();
-  const url = share?.permalink;
-  if (!url) return;
-  const title = String(share.title ?? '').trim();
-  if (canSystemShareLink(url)) {
-    try {
-      await navigator.share(title ? { title, url } : { url });
-      return;
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-      console.warn('[share] system share sheet failed, falling back to the clipboard', error);
-    }
-  }
-  copyTextToClipboard(url)
-    .then(() => setPublicStatus(t('dialog.shareLinkCopied')))
-    .catch((error) => { console.error(error); setPublicStatus(t('dialog.shareCopyFailed')); });
+  await shareLinkOutOfPlatho(share?.permalink, share?.title);
 }
 
 // Copy the shared post's text to the clipboard (title + the UNTRUNCATED body) — a plain "take it elsewhere" affordance.
@@ -8030,7 +8017,12 @@ function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet) {
 // nginx hard-404s these prefixes (`location ~ ^/(assets|vendor)/ { try_files $uri =404; }`) so that a MISSING
 // asset fails as an asset instead of answering with the app shell. A username colliding with one could not be
 // linked at the root, so the builder falls back to the wallet address for them — which always resolves.
-const PERMALINK_RESERVED_SEGMENTS = new Set(['assets', 'vendor']);
+// `privacy` and `terms` are in here for a DIFFERENT reason than assets/vendor, and it matters: the legal pages
+// live at /privacy.html and /terms.html, so the extensionless forms fall through to the app shell today and would
+// be read as channel names the moment a bare /<name> means a channel. Both fit the username rules ([a-z0-9_-]{4,16}),
+// so somebody could register them. Reserving them keeps the door open for serving those pages extensionless later
+// without a link that used to open a channel silently changing meaning.
+const PERMALINK_RESERVED_SEGMENTS = new Set(['assets', 'vendor', 'privacy', 'terms']);
 // Second segment is the feed entryId (epochTag.shardSeq.entryId) — all digits, so it can never be mistaken for a
 // username (which is [a-z0-9_-]{4,16}, no dots) and the two segments cannot swap places.
 const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:-]{4,80})\/(\d+\.\d+\.\d+)\/?$/;
@@ -8058,6 +8050,79 @@ function publicPostPermalink(item) {
 function parsePublicPostPermalink(pathname) {
   const match = PUBLIC_POST_PERMALINK_RE.exec(String(pathname ?? ''));
   return match ? { author: decodeURIComponent(match[1]), entryId: match[2] } : null;
+}
+
+// A CHANNEL link is the same idea one segment shorter: https://platho.app/<username|wallet>. Sharing a channel is
+// what someone does to introduce it; sharing a post is what they do to quote it. Both had to exist.
+//
+// DELIBERATELY NARROWER THAN THE POST FORM. A post link is unambiguous because its second segment is digits and
+// dots, so the first can be permissive. A single segment has nothing to lean on, and everything the server does
+// not have a file for arrives here — so this accepts ONLY the two shapes that can actually name a channel: a
+// username exactly as the registry spells it, or a wallet address. Anything with a dot in it (/app.js,
+// /favicon.ico, a typo'd asset) fails the username test, is not an address, and is left alone rather than opened
+// as somebody's channel.
+const PUBLIC_CHANNEL_PERMALINK_USERNAME_RE = /^[a-z0-9_-]{4,16}$/;
+
+/** The absolute link to a channel, or null when the author has no linkable segment. */
+function publicChannelPermalink(authorWallet) {
+  const segment = publicPostPermalinkAuthorSegment(authorWallet);
+  return segment ? `${location.origin}/${segment}` : null;
+}
+
+/** {author} for a channel-link path, or null. Pure — resolution of `author` happens on chain. */
+function parsePublicChannelPermalink(pathname) {
+  const raw = String(pathname ?? '').replace(/\/+$/, '');
+  if (!raw.startsWith('/') || raw.length < 2) return null;
+  const segment = decodeURIComponent(raw.slice(1));
+  if (segment.includes('/')) return null;
+  if (PERMALINK_RESERVED_SEGMENTS.has(segment.toLowerCase())) return null;
+  if (PUBLIC_CHANNEL_PERMALINK_USERNAME_RE.test(segment)) return { author: segment };
+  return rawWalletAddress(segment) ? { author: segment } : null;
+}
+
+/**
+ * Open the channel a link names. Runs at boot off the address bar, like the post form, and for the same reason
+ * works with NO ACCOUNT: the channel is read from its author's PublicShard over a keyless RPC read, so a stranger
+ * gets the channel rather than a sign-up wall.
+ *
+ * The URL is left in place on success so it can be copied back out of the address bar; cleared on failure so a
+ * reload lands in the normal app.
+ */
+async function openPublicChannelFromPermalink(link) {
+  if (!link) return false;
+  setView('public');
+  setPublicStatus(t('public.openingLink'));
+  try {
+    const wallet = await resolvePermalinkAuthorWallet(link.author);
+    if (!wallet) throw new Error('channel link author does not resolve to a wallet');
+    openPublicChannelView({ authorWallet: wallet });
+    setPublicStatus('feed');
+    return true;
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] channel link open failed', link, error);
+    setPublicStatus(error instanceof UsernameNotRegisteredError ? t('public.linkNoSuchName') : t('public.linkNotFound'));
+    clearPublicPostPermalinkFromAddressBar();
+    return false;
+  }
+}
+
+/** Share a link OUT of Platho: the system sheet where there is one, the clipboard otherwise. */
+async function shareLinkOutOfPlatho(url, title = '') {
+  if (!url) return;
+  const heading = String(title ?? '').trim();
+  if (canSystemShareLink(url)) {
+    try {
+      await navigator.share(heading ? { title: heading, url } : { url });
+      return;
+    } catch (error) {
+      // A dismissed sheet is the user changing their mind, not a failure — report nothing and stop.
+      if (error?.name === 'AbortError') return;
+      console.warn('[share] system share sheet failed, falling back to the clipboard', error);
+    }
+  }
+  copyTextToClipboard(url)
+    .then(() => setPublicStatus(t('dialog.shareLinkCopied')))
+    .catch((error) => { console.error(error); setPublicStatus(t('dialog.shareCopyFailed')); });
 }
 
 /**
@@ -8102,7 +8167,11 @@ async function openPublicPostFromPermalink(link) {
 /** Drop the permalink path so a reload starts clean. Never touches the URL when there is nothing to drop. */
 function clearPublicPostPermalinkFromAddressBar() {
   try {
-    if (parsePublicPostPermalink(location.pathname)) history.replaceState(null, '', '/');
+    // BOTH link shapes: this is the failure path for the channel form too, and a channel link left in the bar
+    // would be retried on every reload.
+    if (parsePublicPostPermalink(location.pathname) || parsePublicChannelPermalink(location.pathname)) {
+      history.replaceState(null, '', '/');
+    }
   } catch (error) {
     console.warn('[public] could not clear the permalink path', error);
   }
@@ -9155,6 +9224,12 @@ function renderPublicChannelView() {
     publicChannelViewFollowButton.hidden = own;
     publicChannelViewFollowButton.textContent = followed ? t('public.unfollow') : t('public.follow');
     publicChannelViewFollowButton.dataset.followed = followed ? 'true' : 'false';
+  }
+  if (publicChannelViewShareButton) {
+    // Shown only when there IS a link to give away. A channel whose author has neither a verified name nor a
+    // readable address cannot be addressed, and a button that copies nothing is worse than no button.
+    publicChannelViewShareButton.hidden = !publicChannelPermalink(wallet);
+    publicChannelViewShareButton.textContent = t('public.shareChannel');
   }
   const items = publicChannelViewItems();
   const profile = wallet ? cachedChannelProfile(wallet) : null;
@@ -19429,6 +19504,11 @@ publicDiscoveryBackButton?.addEventListener('click', () => closePublicDiscovery(
 // requestNavBack (NOT a direct close): the channel view is a nav overlay — the direct close would leave the
 // Telegram BackButton shown / the non-TG history sentinel un-popped (the next hardware Back then closes nothing).
 publicChannelViewBackButton?.addEventListener('click', () => requestNavBack());
+// Straight out of Platho, no target picker: a channel link only has one useful destination — someone who is not
+// here yet. (A post gets the full share dialog because it can also be quoted into a note or a private chat.)
+publicChannelViewShareButton?.addEventListener('click', () => {
+  void shareLinkOutOfPlatho(publicChannelPermalink(publicChannelViewWallet), publicChannelViewTitle?.textContent ?? '');
+});
 publicChannelViewFollowButton?.addEventListener('click', () => {
   if (!publicChannelViewChannelId) return;
   if (isPublicChannelSubscribed(publicChannelViewChannelId)) {
@@ -27510,8 +27590,12 @@ bootCrypto()
     // decision so the post lands on a live surface, and INDEPENDENTLY of which branch that decision took — a
     // reader arriving from a link may have no wallet at all, which is exactly who a shared link is for. Its own
     // failures are handled inside (status + a cleared address bar), so nothing here can break the boot chain.
+    // POST FORM FIRST: it is the stricter of the two (two segments, the second all digits and dots), so a path
+    // that satisfies it can never have been meant as a channel.
     const link = parsePublicPostPermalink(location.pathname);
-    if (!link) return undefined;
-    return openPublicPostFromPermalink(link).catch((error) => console.error(error));
+    if (link) return openPublicPostFromPermalink(link).catch((error) => console.error(error));
+    const channelLink = parsePublicChannelPermalink(location.pathname);
+    if (channelLink) return openPublicChannelFromPermalink(channelLink).catch((error) => console.error(error));
+    return undefined;
   })
   .catch((error) => { setBootDebug(`boot-chain-err ${error?.message ?? error}`); console.error(error); });

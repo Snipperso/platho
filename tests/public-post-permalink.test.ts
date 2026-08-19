@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PERMALINKS — platho.app/<username|wallet>/<epochTag.shardSeq.entryId>
@@ -66,14 +66,27 @@ describe('public post permalinks', () => {
       expect(fns.publicPostPermalinkAuthorSegment(WALLET)).not.toBe(reserved);
       expect(fns.publicPostPermalinkAuthorSegment(WALLET)).toMatch(/^UQ/);
     }
-    // The client's list and the prefixes the server treats as assets are the SAME SET — derived from the config,
-    // not typed twice. A prefix added to one and forgotten in the other is exactly how this rots.
+    // The reserved list has TWO origins and both are pinned here, because a list whose entries nobody can
+    // account for is a list nobody dares to prune.
+    //
+    //  1. Every asset prefix the server treats as immutable. Derived from the config, never typed twice — a
+    //     prefix added to one side and forgotten on the other is exactly how this rots.
+    //  2. The extensionless forms of the pages served at the root. Added 2026-08-19 with channel links: from
+    //     then on a bare /<name> means a channel, and /privacy would otherwise stop being available for the
+    //     page that lives at /privacy.html.
     const reservedInApp = /const PERMALINK_RESERVED_SEGMENTS = new Set\(\[([^\]]*)\]\)/.exec(app)?.[1] ?? '';
     const names = [...reservedInApp.matchAll(/'([a-z0-9_-]+)'/g)].map((m) => m[1]).sort();
     const assetPrefixes = /@immutable_assets \{\s*path ([^\n]+)/.exec(caddy)?.[1] ?? '';
     const fromConfig = [...assetPrefixes.matchAll(/\/([a-z0-9_-]+)\/\*/g)].map((m) => m[1]).sort();
     expect(fromConfig.length).toBeGreaterThan(0);
-    expect(names).toEqual(fromConfig);
+    for (const prefix of fromConfig) expect(names, `${prefix} is an asset prefix`).toContain(prefix);
+    const rootPages = ['privacy', 'terms'];
+    for (const page of rootPages) {
+      expect(existsSync(`web/${page}.html`), `${page}.html must exist to be worth reserving`).toBe(true);
+      expect(names, `/${page} must not become a channel`).toContain(page);
+    }
+    // Nothing ELSE may sit in the list unexplained.
+    expect(names).toEqual([...new Set([...fromConfig, ...rootPages])].sort());
   });
 
   it('PERMA-03: a post with no addressable row has no link (nothing to point at)', () => {
@@ -180,9 +193,13 @@ describe('public post permalinks', () => {
     expect(list).toContain('if (permalink) {');
     // Honest label: a phone hands the URL to its share sheet, a desktop browser can only copy it.
     expect(list).toContain("canSystemShareLink(permalink) ? t('dialog.shareLink') : t('dialog.shareCopyLink')");
+    // The sheet-then-clipboard dance moved into shareLinkOutOfPlatho on 2026-08-19, when channel links needed
+    // the same behaviour; chooseShareLink now delegates. Follow it there rather than assert on an empty shell.
     const choose = app.slice(app.indexOf('async function chooseShareLink()'), app.indexOf('// Copy the shared post'));
+    expect(choose).toContain('shareLinkOutOfPlatho(share?.permalink, share?.title)');
+    const primitive = app.slice(app.indexOf('async function shareLinkOutOfPlatho('));
     // A dismissed share sheet is the user changing their mind, not a failure to report.
-    expect(choose).toContain("if (error?.name === 'AbortError') return;");
-    expect(choose).toContain('copyTextToClipboard(url)');
+    expect(primitive).toContain("if (error?.name === 'AbortError') return;");
+    expect(primitive).toContain('copyTextToClipboard(url)');
   });
 });
