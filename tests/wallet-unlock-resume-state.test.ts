@@ -66,7 +66,7 @@ function harness(initial: Record<string, unknown> = {}): Harness {
     const document = { get hidden() { return hiddenNow; } };
     const hasStoredPlathoWalletRecord = () => storedRecord;
     const clearWalletUnlockPromptTimer = () => { walletUnlockPromptTimer = null; };
-    const clearTelegramBackgroundLockTimer = () => {};
+    const clearBackgroundGraceLock = () => {};
     const showBootScreenForRelock = () => { walletUnlockPromptTimer = 'armed'; };
 
     ${fn('shouldOpenWalletUnlockPrompt')}

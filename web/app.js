@@ -1413,6 +1413,13 @@ const PLATHO_WALLET_KDF_ITERATIONS = 350_000;
 const PLATHO_WALLET_PASSWORD_MIN_LENGTH = 10;
 const PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH = 20;
 const WALLET_AUTO_LOCK_MS = 30 * 60 * 1000;
+// How long a background transition is still allowed to be a BLIP rather than a departure: a password-manager
+// sheet over an open dialog, a permission prompt, the app switcher glanced at and dismissed. Every exemption in
+// shouldIgnoreTransientWalletLock exists for the blip and for nothing else, so this is the ceiling on ALL of
+// them — the deferred lock is re-armed against this deadline (scheduleBackgroundGraceLock) instead of being
+// cancelled. It was a bare 8000 inline on the "just unlocked" clause; the "a dialog is open" clause had no
+// ceiling at all, which is the defect below.
+const WALLET_TRANSIENT_LOCK_GRACE_MS = 8_000;
 // Max time a background auto-lock may be deferred while a send actively needs the key. Covers a slow
 // multi-external send on a degraded/keyless path (inter-batch nonce-confirm waits + the final broadcast +
 // the stale-read floor reconciliation) that can run several minutes. Still bounded below the 30min idle
@@ -3342,6 +3349,11 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
   // next unlock (the flag is only set once they confirm). The fallback depends on
   // neither clipboard nor file download — the words are shown for manual transcription.
   for (let attempt = 0; attempt < 4; attempt += 1) {
+    // The ONE loop that re-opens a dialog it got a null from, so it is the one loop a lock has to be able to
+    // stop: lockPlathoWallet closes the live dialog, and without this the next turn would put the recovery
+    // words straight back on top of a locked app. Re-gating is already the design ("the flag is only set once
+    // they confirm"), so leaving is free — the next unlock asks again.
+    if (plathoWallet?.address !== wallet.address) return;
     // eslint-disable-next-line no-await-in-loop
     const result = await openActionDialog({
       title: t('wallet.seedBackupTitle'),
@@ -4450,12 +4462,16 @@ function markWalletUnlocked() {
   // A wallet in hand settles the question the flag was holding open.
   walletUnlockPromptDeclined = false;
   clearWalletUnlockPromptTimer();
-  clearTelegramBackgroundLockTimer();
+  clearBackgroundGraceLock();
 }
 
+// Reasons a background lock may be POSTPONED — never reasons it may be skipped. Every caller of this that
+// answers "yes" must arm scheduleBackgroundGraceLock, or the exemption becomes a cancellation: an open action
+// dialog satisfies the first clause for as long as it is on screen, which is how a modal came back from the
+// background sitting on top of an unmasked app. See lockPlathoWallet.
 function shouldIgnoreTransientWalletLock() {
   return Boolean(activeActionDialog)
-    || (Date.now() - lastWalletUnlockAt) < 8000
+    || (Date.now() - lastWalletUnlockAt) < WALLET_TRANSIENT_LOCK_GRACE_MS
     // Don't tear down an in-flight send on a brief background: defer the lock while signing/broadcasting
     // actively holds the key (bounded by SEND_LOCK_MAX_GRACE_MS). Confirmation is keyless and not counted.
     || shouldDeferLockForActiveSend();
@@ -4527,12 +4543,28 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
     return;
   }
   if (options.transient === true && shouldIgnoreTransientWalletLock()) {
+    // A deferral is a POSTPONEMENT, and this line is what makes that true. Without it the exemptions cancelled
+    // the lock outright: an open action dialog satisfies shouldIgnoreTransientWalletLock for as long as it is on
+    // screen, so backgrounding with a modal up left the keys in memory and the app unmasked until the 30-minute
+    // idle backstop — and on a platform that SUSPENDS timers (iOS), not even then.
+    // [OWNER 2026-08-19] "Backgrounded the app with the modal open, came back and saw the modal. Closed it and
+    // saw the lock screen." The modal outliving the lock and the missing mask are the same missing deadline.
     scheduleWalletAutoLock();
+    scheduleBackgroundGraceLock(WALLET_TRANSIENT_LOCK_GRACE_MS);
     return;
   }
   clearWalletAutoLockTimer();
-  clearTelegramBackgroundLockTimer();
+  clearBackgroundGraceLock();
   clearVaultAutoRefreshTimer();
+  // The session that owned whatever dialog is on screen is being torn down on the next line, so the dialog goes
+  // with it. Everything else here already does that — keys, identity, vault state, lanes, timers — and the modal
+  // was the one piece of the unlocked session left standing, which is what put a live "Buy ATH" sheet on top of
+  // a locked app. It ALSO clears the way for the unlock prompt: shouldOpenWalletUnlockPrompt refuses to open
+  // over another dialog (rightly — one opened while already locked is the user's own), so with the stale one
+  // still up there was no prompt and no boot-screen mask either, and the app just sat there unlocked-looking.
+  // Only reachable with a live wallet (the guard on the first line of this function), so the dialog is by
+  // definition of the unlocked session — never the password dialog, which only runs while locked.
+  closeActionDialog(null);
   plathoWallet = null;
   localIdentity = null;
   localVaultAuthKeyPair = null;
@@ -4566,29 +4598,69 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
 }
 
 const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 300_000;
-let telegramBackgroundLockTimer = null;
+let backgroundGraceLockTimer = null;
+let backgroundGraceLockDeadline = 0;
 
-function clearTelegramBackgroundLockTimer() {
-  if (telegramBackgroundLockTimer) {
-    clearTimeout(telegramBackgroundLockTimer);
-    telegramBackgroundLockTimer = null;
+function clearBackgroundGraceLock() {
+  if (backgroundGraceLockTimer) {
+    clearTimeout(backgroundGraceLockTimer);
+    backgroundGraceLockTimer = null;
   }
+  backgroundGraceLockDeadline = 0;
 }
 
-function scheduleTelegramBackgroundLock() {
-  clearTelegramBackgroundLockTimer();
-  telegramBackgroundLockTimer = setTimeout(() => {
-    telegramBackgroundLockTimer = null;
-    // Lock only if still backgrounded; the hard idle auto-lock still applies.
-    if (!document.hidden || !plathoWallet) return;
+/**
+ * ONE deferred background lock, for every reason a background lock gets deferred — Telegram's constant WebView
+ * backgrounding (a long grace, because there it is usually not a departure at all) and the transient-lock
+ * exemptions in shouldIgnoreTransientWalletLock (a blip-length grace). The deferral was previously Telegram's
+ * alone; the exemptions simply returned, which is why an open modal could outlive the lock indefinitely.
+ *
+ * The deadline is stamped ONCE per departure — the SEND_LOCK_MAX_GRACE_MS idiom — so repeated hidden events
+ * while away cannot push it out. The one thing allowed to re-arm the timer against the SAME deadline is an
+ * active send, below.
+ */
+function scheduleBackgroundGraceLock(graceMs) {
+  if (backgroundGraceLockDeadline !== 0) return;
+  backgroundGraceLockDeadline = Date.now() + graceMs;
+  armBackgroundGraceLockTimer(graceMs);
+}
+
+function armBackgroundGraceLockTimer(delayMs) {
+  if (backgroundGraceLockTimer) clearTimeout(backgroundGraceLockTimer);
+  backgroundGraceLockTimer = setTimeout(() => {
+    backgroundGraceLockTimer = null;
+    // Back in the foreground before the deadline: that was a blip, and the return doors own it from here.
+    // The hard idle auto-lock still applies either way.
+    if (!document.hidden || !plathoWallet) { clearBackgroundGraceLock(); return; }
     if (shouldDeferLockForActiveSend()) {
       // A send still holds the key — don't drop the background lock, re-arm and recheck.
       // Bounded by SEND_LOCK_MAX_GRACE_MS on the send side, so this cannot loop forever.
-      scheduleTelegramBackgroundLock();
+      armBackgroundGraceLockTimer(delayMs);
       return;
     }
+    clearBackgroundGraceLock();
     lockPlathoWallet(t('wallet.locked'));
-  }, TELEGRAM_BACKGROUND_LOCK_GRACE_MS);
+  }, delayMs);
+}
+
+/**
+ * The other half of the deferral, and the half a timer cannot cover: iOS suspends the page while it is away, so
+ * the timer above is frozen for exactly the interval it was meant to measure and thaws only once the app is back
+ * on screen. Every return door therefore settles the deadline itself, BEFORE the unlock prompt resumes — past
+ * it, lock now (which masks the app and closes the modal the departed session left open); short of it, the
+ * absence really was a blip and the deferral is spent.
+ */
+function enforceBackgroundGraceLockOnReturn() {
+  const deadline = backgroundGraceLockDeadline;
+  clearBackgroundGraceLock();
+  if (deadline === 0 || !plathoWallet || Date.now() < deadline) return;
+  // A send still holding the key is the ONE exemption allowed to outlive the deadline here, and only because of
+  // where "here" is: the app is back in the foreground with the user in front of it, so a lock buys no privacy
+  // and would strand exactly the send PWA-SEND-LOCK-01 exists to let finish ("complete on foreground"). The
+  // hidden half above locks it regardless once SEND_LOCK_MAX_GRACE_MS is out, and the 30-minute idle backstop
+  // governs from here, so this cannot become an unlocked-forever state.
+  if (shouldDeferLockForActiveSend()) return;
+  lockPlathoWallet(t('wallet.locked'));
 }
 
 function lockPlathoWalletForBackground() {
@@ -4599,7 +4671,7 @@ function lockPlathoWalletForBackground() {
   // iOS suspends the WebView (timers freeze), so it keeps the immediate lock-on-suspend
   // below; resume after suspend is keyless by design. closing-confirmation guards true close.
   if (isTelegramEnv() && !isTelegramSuspendingPlatform() && plathoWallet && !shouldIgnoreTransientWalletLock()) {
-    scheduleTelegramBackgroundLock();
+    scheduleBackgroundGraceLock(TELEGRAM_BACKGROUND_LOCK_GRACE_MS);
     return;
   }
   lockPlathoWallet(t('wallet.locked'), { transient: true });
@@ -26228,7 +26300,7 @@ document.addEventListener('visibilitychange', () => {
     noteWalletUnlockInterruptedByBackground();
     lockPlathoWalletForBackground();
   } else {
-    clearTelegramBackgroundLockTimer();
+    enforceBackgroundGraceLockOnReturn();
     resumeWalletUnlockPrompt();
     scheduleMessageAutoSync(2_000);
     armIntroReceiveLane().catch((error) => console.warn('[intro] arm on visible failed', error));
@@ -26254,7 +26326,7 @@ window.addEventListener('pagehide', () => {
   lockPlathoWalletForBackground();
 });
 window.addEventListener('pageshow', () => {
-  clearTelegramBackgroundLockTimer();
+  enforceBackgroundGraceLockOnReturn();
   resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   resumeWalletUnlockPrompt();
@@ -26269,7 +26341,7 @@ window.addEventListener('pageshow', () => {
   }
 });
 window.addEventListener('focus', () => {
-  clearTelegramBackgroundLockTimer();
+  enforceBackgroundGraceLockOnReturn();
   resumePendingPublicPublishConfirmations();
   resumePendingPrivateSendRetries();
   // THE THIRD RETURN DOOR, and it was the only one not asking. This handler is otherwise a line-for-line copy of
