@@ -198,8 +198,9 @@ describe('public post permalinks', () => {
     const choose = app.slice(app.indexOf('async function chooseShareLink()'), app.indexOf('// Copy the shared post'));
     expect(choose).toContain('shareLinkOutOfPlatho(share?.permalink, share?.title)');
     const primitive = app.slice(app.indexOf('async function shareLinkOutOfPlatho('));
-    // A dismissed share sheet is the user changing their mind, not a failure to report.
-    expect(primitive).toContain("if (error?.name === 'AbortError') return;");
+    // A dismissed share sheet is the user changing their mind, not a failure to report. It reports a DISTINCT
+    // outcome rather than a bare return, so a caller that confirms a copy on screen stays silent for a dismissal.
+    expect(primitive).toContain("if (error?.name === 'AbortError') return 'dismissed';");
     expect(primitive).toContain('copyTextToClipboard(url)');
   });
 });

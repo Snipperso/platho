@@ -8106,23 +8106,37 @@ async function openPublicChannelFromPermalink(link) {
   }
 }
 
-/** Share a link OUT of Platho: the system sheet where there is one, the clipboard otherwise. */
+/**
+ * Share a link OUT of Platho: the system sheet where there is one, the clipboard otherwise.
+ *
+ * RETURNS THE OUTCOME because the caller has to be the one that confirms it. A share sheet IS its own
+ * confirmation; a silent clipboard write is not, and there is no global toast in this app (see the identity
+ * popover's copy button, which relabels itself for the same reason). setPublicStatus is a console.debug wrapper,
+ * NOT a UI surface — leaning on it is exactly how the channel Share button shipped looking dead: it copied the
+ * link correctly and said so only to a filtered-out debug log.
+ */
 async function shareLinkOutOfPlatho(url, title = '') {
-  if (!url) return;
+  if (!url) return 'failed';
   const heading = String(title ?? '').trim();
   if (canSystemShareLink(url)) {
     try {
       await navigator.share(heading ? { title: heading, url } : { url });
-      return;
+      return 'shared';
     } catch (error) {
       // A dismissed sheet is the user changing their mind, not a failure — report nothing and stop.
-      if (error?.name === 'AbortError') return;
+      if (error?.name === 'AbortError') return 'dismissed';
       console.warn('[share] system share sheet failed, falling back to the clipboard', error);
     }
   }
-  copyTextToClipboard(url)
-    .then(() => setPublicStatus(t('dialog.shareLinkCopied')))
-    .catch((error) => { console.error(error); setPublicStatus(t('dialog.shareCopyFailed')); });
+  try {
+    await copyTextToClipboard(url);
+    setPublicStatus(t('dialog.shareLinkCopied'));
+    return 'copied';
+  } catch (error) {
+    console.error(error);
+    setPublicStatus(t('dialog.shareCopyFailed'));
+    return 'failed';
+  }
 }
 
 /**
@@ -9229,7 +9243,11 @@ function renderPublicChannelView() {
     // Shown only when there IS a link to give away. A channel whose author has neither a verified name nor a
     // readable address cannot be addressed, and a button that copies nothing is worse than no button.
     publicChannelViewShareButton.hidden = !publicChannelPermalink(wallet);
-    publicChannelViewShareButton.textContent = t('public.shareChannel');
+    // A background sync re-renders this view every cycle. Relabelling here unconditionally would eat the "link
+    // copied" confirmation within a second of the tap that earned it.
+    if (publicChannelViewShareButton.dataset.copied !== 'true') {
+      publicChannelViewShareButton.textContent = t('public.shareChannel');
+    }
   }
   const items = publicChannelViewItems();
   const profile = wallet ? cachedChannelProfile(wallet) : null;
@@ -19506,8 +19524,21 @@ publicDiscoveryBackButton?.addEventListener('click', () => closePublicDiscovery(
 publicChannelViewBackButton?.addEventListener('click', () => requestNavBack());
 // Straight out of Platho, no target picker: a channel link only has one useful destination — someone who is not
 // here yet. (A post gets the full share dialog because it can also be quoted into a note or a private chat.)
-publicChannelViewShareButton?.addEventListener('click', () => {
-  void shareLinkOutOfPlatho(publicChannelPermalink(publicChannelViewWallet), publicChannelViewTitle?.textContent ?? '');
+publicChannelViewShareButton?.addEventListener('click', async () => {
+  const button = publicChannelViewShareButton;
+  const outcome = await shareLinkOutOfPlatho(
+    publicChannelPermalink(publicChannelViewWallet),
+    publicChannelViewTitle?.textContent ?? '',
+  );
+  // A share sheet already showed the user something happened; a clipboard write showed them nothing.
+  if (outcome !== 'copied') return;
+  button.dataset.copied = 'true';
+  button.textContent = t('dialog.shareLinkCopied');
+  window.setTimeout(() => {
+    if (button.dataset.copied !== 'true') return;
+    button.dataset.copied = 'false';
+    button.textContent = t('public.shareChannel');
+  }, 1600);
 });
 publicChannelViewFollowButton?.addEventListener('click', () => {
   if (!publicChannelViewChannelId) return;

@@ -116,6 +116,24 @@ describe('CHANLINK — a channel is shareable on its own', () => {
     expect(handler.slice(0, 400)).toContain('publicChannelPermalink(publicChannelViewWallet)');
   });
 
+  it('CHANLINK-09: a clipboard copy is CONFIRMED on screen, because nothing else would be', () => {
+    // SHIPPED BROKEN 2026-08-19 and found by the owner: the button copied the link correctly and reported it
+    // through setPublicStatus, which is a console.debug wrapper and not a UI surface at all. From the outside the
+    // control looked dead — "ничего не происходит, в консоли ошибок нет".
+    const status = app.slice(app.indexOf('function setPublicStatus('), app.indexOf('function setPublicStatus(') + 260);
+    expect(status, 'if this ever becomes a real surface, this gate should be revisited').toContain('console.debug');
+    const primitive = app.slice(app.indexOf('async function shareLinkOutOfPlatho('));
+    // The outcome has to reach the caller — only the caller knows what its surface can show.
+    expect(primitive).toContain("return 'copied';");
+    expect(primitive).toContain("return 'shared';");
+    const handler = app.slice(app.indexOf('publicChannelViewShareButton?.addEventListener'));
+    expect(handler.slice(0, 800)).toContain("outcome !== 'copied'");
+    expect(handler.slice(0, 800)).toContain("t('dialog.shareLinkCopied')");
+    // And the periodic re-render must not eat the confirmation before it is read.
+    const render = app.slice(app.indexOf('if (publicChannelViewShareButton) {'));
+    expect(render.slice(0, 600)).toContain("dataset.copied !== 'true'");
+  });
+
   it('CHANLINK-08: both share paths go through ONE primitive', () => {
     // chooseShareLink used to carry its own copy of the share-sheet-then-clipboard dance; a second copy is how
     // the two drift apart (one gains an AbortError branch, the other does not).
