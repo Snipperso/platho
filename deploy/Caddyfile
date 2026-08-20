@@ -8,7 +8,19 @@
 # `reload` refuses a config that does not load, so a syntax error cannot take the site down.
 {
 	servers {
-		protocols h1 h2
+		# HTTP/1.1 ONLY, and this is not a preference — it is the fix for a full outage.
+		#
+		# 2026-08-20, ~09:43 UTC: Caddy was OOM-killed and went into a crash loop that took the whole box with it.
+		# sshd could not fork, the provider panel had no console, and the only way back in was a VPS resize.
+		# MEASURED during recovery, same traffic each time: with `h1 h2` the process climbed 46MB -> 3.9GB in 14
+		# seconds and died; with `h1` it sat at 62MB. Sixty times less, at ~600 concurrent connections.
+		#
+		# HTTP/2 keeps per-connection flow-control buffers, and the site had just gone from a handful of visitors
+		# to ~900 concurrent ones. It survived a month at the old load, which is exactly why nothing warned us.
+		#
+		# The cost is real but small for this site: every asset is versioned and served once, then held by the
+		# service worker, so h2 multiplexing buys little. Do not restore it without re-measuring under load.
+		protocols h1
 	}
 }
 
@@ -86,7 +98,7 @@ platho.app {
 		respond @disallowed_methods 405
 		@sensitive_paths path /.git* /.env* /package*.json /tact.config.json /scripts/* /artifacts/* /server-status /backup* /config.json
 		respond @sensitive_paths 404
-		encode zstd gzip
+		encode gzip
 
 		# A REQUEST FOR A FILE MUST FAIL AS A FILE. Everything else falls through to the shell — that is what makes
 		# post permalinks work — and without this a mistyped or missing asset answered 200 with HTML. A module that
@@ -109,6 +121,12 @@ about.platho.app {
 		X-Frame-Options "DENY"
 		Referrer-Policy "no-referrer"
 		Permissions-Policy "accelerometer=(), bluetooth=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), serial=(), usb=()"
+		# AUDIT 2026-08-20: these were on platho.app and missing here. A second config that drifts from the first
+		# is how the weaker one gets forgotten; `-Server` stops announcing which software to aim at.
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Alt-Svc "clear"
+		-Server
 	}
 	root * /srv/about/current
 	route {
@@ -116,8 +134,10 @@ about.platho.app {
 		respond @disallowed_methods 405
 		@sensitive_paths path /.git* /.env* /scripts/* /artifacts/*
 		respond @sensitive_paths 404
-		encode zstd gzip
-		try_files {path} /index.html
+		encode gzip
+		# NO try_files fallback: this is one static page, not an app with client-side routes, and the fallback made
+		# every path on earth answer 200 with it — /.DS_Store, /backup.tar, /wp-admin. The main site needs the
+		# fallback because a post permalink IS a path; this one does not.
 		file_server
 	}
 }

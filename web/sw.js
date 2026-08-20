@@ -1,12 +1,12 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-8bd9761d2a33';
+const CACHE_NAME = 'platho-pwa-88989e1b5ca9';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=339',
-  './app.js?v=bf36260a7',
+  './app.js?v=bdf52708a',
   './i18n.mjs?v=76',
   './i18n-strings.mjs?v=78',
   './boot-signal-field.mjs?v=1',
@@ -234,23 +234,71 @@ async function navigationResponse(event) {
   try {
     const shellRequest = new Request(event.request.url, { cache: 'no-cache', credentials: 'same-origin' });
     const response = await fetchWithTimeout(shellRequest, NAVIGATION_NETWORK_TIMEOUT_MS);
-    return await cacheSameOrigin(appShellCacheRequest(), response);
+    // BACKFILL ONLY — never overwrite a shell that belongs to a complete cached release.
+    //
+    // This used to cache every fresh shell it fetched, which quietly broke the one property the cache exists
+    // for. The shell and the asset URLs it names are versioned together and precached together under one
+    // CACHE_NAME; writing a NEWER shell into the CURRENT cache leaves the pair mismatched — a shell asking for
+    // ./app.js?v=bdf52708a while the cache holds ./app.js?v=bdf52708a. Online nobody notices, the network fills the gap.
+    // Offline the app will not start at all: MEASURED 2026-08-20, during the outage, the owner's own device
+    // showed "resource failed: app.js?v=bf36260a7" from the boot guard while every byte it needed to run sat in
+    // the cache under the previous version's URL.
+    //
+    // So the cached shell now changes only when a new service worker installs and precaches its whole release,
+    // which is atomic by construction. The page still gets the FRESH shell from the network — only the cached
+    // copy is left alone.
+    if (!(await cachedAppShell())) await cacheSameOrigin(appShellCacheRequest(), response);
+    return response;
   } catch (error) {
     return await cachedAppShell() || Response.error();
   }
 }
 
-async function staleWhileRevalidate(event) {
+/**
+ * LAST RESORT when the network is gone and the exact URL is not cached: the same path under a DIFFERENT ?v=.
+ *
+ * The precache is deliberately non-atomic (see install: one failing asset must not block activation), so a cache
+ * can be complete enough to run and still miss the one file a newer shell asks for. Serving the previous build's
+ * copy of that file is not ideal — it is a build behind — but the alternative is a blank page, and every module
+ * here is loaded by the same graph, so a one-release skew starts where a missing file cannot.
+ */
+async function cachedIgnoringVersion(request) {
+  try {
+    return await caches.match(request, { ignoreSearch: true }) || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * CACHE FIRST, AND THEN STOP ASKING.
+ *
+ * This was stale-while-revalidate: serve the cached copy, then fetch the same file again in the background "in
+ * case it changed". For this app that background fetch can never find anything, and it is not free.
+ *
+ * Every module URL here carries its content's version (./app.js?v=bdf52708a<hash>, ./conv-lane.mjs?v=19). A changed file
+ * gets a changed URL — that is the whole point of the scheme — so a cached response for a given URL cannot go
+ * stale. The unversioned entries (icons, the manifest, the docs) do not need revalidating either: they are
+ * refreshed by the INSTALL, which re-fetches the whole list with cache:'reload' whenever CACHE_NAME moves.
+ *
+ * So the revalidation was re-asking the network, on every single app open, about files that are immutable by
+ * construction. MEASURED against the precache list: ~6 MB of requests per repeat visit, versus ~70 KB — the app
+ * shell and the worker — once this stops. At the scale that took the server down on 2026-08-20, that difference
+ * is the difference.
+ *
+ * THE SHELL STAYS ON THE NETWORK (see navigationResponse). It is the only thing that tells a device a new release
+ * exists; serving it from cache first would mean updates never arrive.
+ */
+async function cacheFirst(event) {
   const request = event.request;
   const cached = await caches.match(request);
-  const network = fetch(request)
-    .then((response) => cacheSameOrigin(request, response))
-    .catch(() => cached || Response.error());
-  if (cached) {
-    event.waitUntil(network.catch(() => undefined));
-    return cached;
+  if (cached) return cached;
+  try {
+    const response = await fetch(request);
+    return await cacheSameOrigin(request, response);
+  } catch (error) {
+    return await cachedIgnoringVersion(request) || Response.error();
   }
-  return cached || network;
 }
 
 self.addEventListener('fetch', (event) => {
@@ -264,5 +312,5 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(staleWhileRevalidate(event));
+  event.respondWith(cacheFirst(event));
 });

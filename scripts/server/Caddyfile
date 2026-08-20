@@ -1,6 +1,9 @@
 {
 	servers {
-		protocols h1 h2
+		# HTTP/1.1 ONLY — see the long note in deploy/Caddyfile. Short version: on 2026-08-20 `h1 h2` took the
+		# server from 46MB to 3.9GB in 14 seconds under ~900 concurrent users and OOM-killed the box out of
+		# reach; `h1` held the same load at 62MB. Do not restore without re-measuring under load.
+		protocols h1
 	}
 }
 
