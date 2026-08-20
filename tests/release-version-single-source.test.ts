@@ -72,6 +72,24 @@ describe('RELVER — the product version is one number', () => {
     expect(deploy).toContain('bump_release_version.mjs');
     // An unreachable site must NOT block a deploy — that is exactly when you most need one.
     const check = deploy.slice(deploy.indexOf('THE VERSION MUST MOVE'));
-    expect(check.slice(0, 2000)).toContain('could not read the live version');
+    expect(check.slice(0, 3000)).toContain('shipping without the same-version check');
+  });
+
+  it('RELVER-05: the guard reads the machine being deployed to, not the public name', () => {
+    // With one server these are the same address and the difference is invisible. With two they are not: on
+    // 2026-08-20, right after 1.1.7 reached the live box, shipping the SAME release to the second server — still
+    // on 1.1.5 — was refused as "already live". The guard had asked a machine nobody was deploying to, and the
+    // only way past it was --same-version, which also waves through the real mistake this exists to catch.
+    expect(deploy, 'the version probe is pinned to a hard-coded URL again')
+      .not.toMatch(/fetch\(\s*['"]https:\/\/platho\.app\//);
+    // It must connect to HOST while still presenting the real name, or Caddy answers for a vhost that does not
+    // exist and the probe reads an empty version — which silently disables the check instead of failing loudly.
+    const guard = deploy.slice(deploy.indexOf("!process.argv.includes('--same-version')"));
+    const body = guard.slice(0, guard.indexOf('\n}'));
+    expect(body).toContain('JSON.stringify(HOST)');
+    expect(body).toContain("servername: 'platho.app'");
+    expect(body).toMatch(/Host:\s*'platho\.app'/);
+    // Unreachable target still ships, and the note names WHICH machine could not be read.
+    expect(body).toContain('could not read the version on');
   });
 });

@@ -59,17 +59,37 @@ if (!bundleHash) die(`missing runtime.bundleSha256 in ${PREP}`);
 if (MODE === 'production' && !process.argv.includes('--same-version')) {
   const shipping = /(id="appVersionLabel">)(\d+\.\d+\.\d+)</.exec(readFileSync('web/index.html', 'utf8'))?.[2];
   if (!shipping) die('could not read the version out of web/index.html');
+  // ASK THE MACHINE WE ARE SHIPPING TO, not the public name.
+  //
+  // This used to fetch https://platho.app/ no matter what --host said, so with two servers it compared the wrong
+  // one: on 2026-08-20, immediately after 1.1.7 went to the live box, deploying the SAME release to the second
+  // server was refused as "already live" while that server sat on 1.1.5. The guard fired on a machine it was not
+  // being asked about, and the only way past it was --same-version — which would also have waved through the
+  // genuine mistake it exists to catch.
+  //
+  // fetch() cannot be pinned to an address (it silently drops a Host header, and there is no connect override),
+  // so this speaks https directly: connect to the target, but present the real name in SNI and Host, or Caddy
+  // answers for a vhost that does not exist.
   const probe = spawnSync(process.execPath, ['-e', `
-    fetch('https://platho.app/', { cache: 'no-store' })
-      .then((r) => r.text())
-      .then((t) => process.stdout.write(/id="appVersionLabel">(\\d+\\.\\d+\\.\\d+)</.exec(t)?.[1] ?? ''))
-      .catch(() => process.stdout.write(''));
+    const https = require('node:https');
+    const done = (v) => { process.stdout.write(v); process.exit(0); };
+    const req = https.request({
+      host: ${JSON.stringify(HOST)}, port: 443, path: '/', method: 'GET', servername: 'platho.app',
+      headers: { Host: 'platho.app', 'Cache-Control': 'no-store' },
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => done(/id="appVersionLabel">(\\d+\\.\\d+\\.\\d+)</.exec(body)?.[1] ?? ''));
+    });
+    req.setTimeout(15000, () => { req.destroy(); done(''); });
+    req.on('error', () => done(''));
+    req.end();
   `], { encoding: 'utf8', timeout: 20_000 });
   const live = (probe.stdout ?? '').trim();
   if (!live) {
-    console.error('note: could not read the live version — shipping without the same-version check');
+    console.error(`note: could not read the version on ${HOST} — shipping without the same-version check`);
   } else if (live === shipping) {
-    die(`version ${shipping} is already live. Bump it first:\n`
+    die(`version ${shipping} is already live on ${HOST}. Bump it first:\n`
       + '  node scripts/bump_release_version.mjs            (a fix)\n'
       + '  node scripts/bump_release_version.mjs --minor    (a feature a user can see)\n'
       + '  node scripts/bump_module_versions.mjs --run && npm run web:deploy:prepare\n'
