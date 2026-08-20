@@ -266,7 +266,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.1.1';
+const PLATHO_APP_RUNTIME_VERSION = '1.1.2';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -23475,6 +23475,17 @@ async function submitUsernameMintDirect(username) {
   // an unreadable jetton wallet must not become "go ahead and mint"). This used to be an inline copy; the avatar
   // lane grew the same check and the two are now one primitive.
   await assertConnectedAthAtLeast(priceAtomic, 'mint a name');
+  // AND ENOUGH GRAM TO CARRY IT. The ATH check above was the only affordability gate here, so a wallet with the
+  // name's ATH but not its GRAM signed an external the wallet contract could not execute: the send action was
+  // SILENTLY SKIPPED (mode IGNORE_ERRORS), the seqno moved, and the client read that as "sent".
+  //
+  // MEASURED on a real user's failed mint, 2026-08-20: balance 0.266225197 before, 0.265632119 after, the
+  // transaction's own action phase reporting `tot_actions 1, skipped_actions 1, msgs_created 0`. They lost 0.0006
+  // GRAM to fees, not the 1.1 an explorer displays — an explorer renders the INTENDED action — and they tried
+  // nine times because nothing told them what was wrong. submitAirdropClaim already guards its send for exactly
+  // this reason and says so in its own comment; this lane and the avatar lane below never grew the same check.
+  await assertWalletGramAtLeast(
+    USERNAME_MINT_DIRECT_REQUEST_VALUE + walletSendFeeReserveNanotons(), 'mint a name');
   setUsernameMintStatus(t('username.signing'));
   const athWalletAddress = await loadConnectedAthWalletAddress();
   const athRequest = createAthWalletMessage('ATHTransferRequestRegistryMintUsername', {
