@@ -266,7 +266,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.1.2';
+const PLATHO_APP_RUNTIME_VERSION = '1.1.3';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1509,6 +1509,10 @@ const LEGACY_REPLAY_DB_NAME = 'platho-local-security-v1';
 // 128/channel, long mode 4096/channel -> tens of thousands across many channels).
 const PUBLIC_FEED_RENDER_CAP = 150;
 const PUBLIC_FEED_RENDER_PAGE = 150;
+// How often a sync pass may repaint the feed while it is still walking channels. The first channel always paints
+// immediately (that frame is the whole point); after it, a floor so that walking a crowd of channels costs one
+// rebuild every quarter second rather than one per chain read.
+const PUBLIC_FEED_PROGRESSIVE_PAINT_MS = 250;
 // Initialize the module-scope publicFeedShownCap now that its const exists (it is DECLARED far above with the other
 // public state; initializing it up there would forward-reference this const in its TDZ and crash boot).
 publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
@@ -11367,8 +11371,28 @@ async function syncPublicChannelFromShards() {
   // that write. The invalidation epoch is bumped by every such event; capture it here and refuse the write if it
   // moved. The CapsuleHub sync had this guard — it is the cache-coherency half of the walk, not Hub machinery.
   const invalidationEpochAtStart = publicSyncInvalidationEpoch;
-  const nextFeedCache = { ...publicChannelFeedCache };
   const touched = [];
+  // PAINT AS THEY ARRIVE, not once at the end. [OWNER 2026-08-20, during the user influx: asked for the feed to
+  // fill DURING the scan instead of appearing whole once every channel has been read.]
+  //
+  // The pass used to build a private copy of the cache and assign it after the loop, so with a handful of
+  // channels the wait was invisible and with a crowd of them the screen simply stayed empty until the last read
+  // returned. Nothing about the reads changed here — only when their results become visible.
+  //
+  // THE SNAPSHOT WAS LOAD-BEARING, though, and that is why the epoch check moved rather than disappeared:
+  // unsubscribing a channel or switching wallets mid-pass bumps publicSyncInvalidationEpoch, and a deferred write
+  // of a pre-invalidation snapshot would resurrect what the user just removed. Checking BEFORE each per-channel
+  // write gives the same guarantee at finer grain — and abandons the rest of the pass, as before.
+  let lastPaintedAt = 0;
+  const paint = (force) => {
+    const now = Date.now();
+    // Throttled: with many channels an unconditional repaint per channel is a rebuild per chain read. The render
+    // is signature-guarded, so this bounds the wasted work rather than the correctness.
+    if (!force && now - lastPaintedAt < PUBLIC_FEED_PROGRESSIVE_PAINT_MS) return;
+    lastPaintedAt = now;
+    try { renderPublicSurface({ anchorUnread: false }); }
+    catch (error) { console.warn('[public] progressive feed paint failed', error); }
+  };
   for (const channel of feedChannels) {
     if (!channel.authorWallet) continue;
     let shardPosts;
@@ -11385,14 +11409,19 @@ async function syncPublicChannelFromShards() {
     const existing = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
     const merged = upsertPublicChainPosts(existing, posts);
     const withPending = mergeLocalPendingPublicFeed(channel.id, merged);
-    nextFeedCache[channel.id] = { feed: { version: 1, channelId: channel.id, updatedAt, posts: withPending }, syncedAt: updatedAt };
+    if (publicSyncInvalidationEpoch !== invalidationEpochAtStart) {
+      globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt, discarded: 'invalidated' };
+      return false;   // the feed changed under this pass — stop rather than write into a cache that moved on
+    }
+    publicChannelFeedCache = {
+      ...publicChannelFeedCache,
+      [channel.id]: { feed: { version: 1, channelId: channel.id, updatedAt, posts: withPending }, syncedAt: updatedAt },
+    };
     touched.push(channel.id);
+    // The FIRST channel paints immediately: the difference between an empty screen and a filling one is what was
+    // actually being complained about, and it is all in that first frame.
+    paint(touched.length === 1);
   }
-  if (publicSyncInvalidationEpoch !== invalidationEpochAtStart) {
-    globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt, discarded: 'invalidated' };
-    return false;   // the feed changed under this pass — its snapshot is stale, drop it rather than resurrect it
-  }
-  publicChannelFeedCache = nextFeedCache;
   globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt };
   return true;
 }
