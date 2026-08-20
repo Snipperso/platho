@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-20T12:58:47.116Z",
+  "generatedAt": "2026-08-20T15:42:02.755Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 256,
-    "totalBytes": 5974593,
-    "bundleSha256": "bd1c39dfa733e79d16f6e88bcf23885010fc9e4273a2e96d01e62e7c0fe22327",
+    "totalBytes": 5976875,
+    "bundleSha256": "54bfb9b48b410e2bf0633b0982d061eca02821edaba51a2cf592b6c05b5c6402",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -879,8 +879,8 @@
       },
       {
         "path": "sw.js",
-        "bytes": 13198,
-        "sha256": "3ebbaed822eb2e6569b34e28d7eb0d4f0cb49ee629519cb0bfa561696e58e31c"
+        "bytes": 15480,
+        "sha256": "909e892f291aadf3758e57ade9ff4998d249c9784610ff1a7ec405162be46bfd"
       },
       {
         "path": "terms.html",

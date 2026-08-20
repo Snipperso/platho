@@ -55,11 +55,20 @@ describe('OFFLINE — a cached release stays internally consistent', () => {
     expect(sw).toMatch(/caches\.match\(request,\s*\{\s*ignoreSearch:\s*true\s*\}\)/);
     // Only when the network has ALREADY failed — never in front of a live network, or every device would be
     // pinned to whatever old copy happens to be cached.
+    //
+    // This used to assert "the fallback appears after `catch`", which stopped being the right question on
+    // 2026-08-20: a server answering 502 never reaches the catch, and the app died on error documents while the
+    // bytes it needed sat in the cache. There are now TWO failure paths, and what matters is that each call site
+    // is guarded BY A FAILURE — not where it sits in the file.
     const body = cacheFirstBody();
+    const sites = body.match(/cachedIgnoringVersion/g) ?? [];
+    expect(sites.length, 'a new call site appeared — prove it is only reachable after the network failed')
+      .toBe(2);
+    expect(body, 'the non-ok path no longer falls back to another version')
+      .toContain('if (!response.ok) return await cachedIgnoringVersion(request) || response;');
     const catchAt = body.indexOf('catch (error)');
-    const fallbackAt = body.indexOf('cachedIgnoringVersion');
     expect(catchAt).toBeGreaterThan(-1);
-    expect(fallbackAt).toBeGreaterThan(catchAt);
+    expect(body.slice(catchAt), 'the thrown-error path no longer falls back').toContain('cachedIgnoringVersion');
   });
 
   it('OFFLINE-04: the exact URL still wins when it is cached', () => {
@@ -78,8 +87,11 @@ describe('OFFLINE — a cached release stays internally consistent', () => {
     expect(sw, 'the background revalidation is back').not.toContain('staleWhileRevalidate');
     const body = cacheFirstBody();
     const cachedAt = body.indexOf('if (cached) return cached;');
-    const fetchAt = body.indexOf('await fetch(request)');
+    // The asset fetch is time-bounded now, so the old `await fetch(request)` needle no longer exists. Match the
+    // call by name rather than by its exact argument list, or this gate breaks again on the next change here.
+    const fetchAt = body.search(/await fetchWithTimeout\(request,/);
     expect(cachedAt).toBeGreaterThan(-1);
+    expect(fetchAt, 'the asset fetch is no longer time-bounded').toBeGreaterThan(-1);
     // The network is reached only AFTER a cache miss, never alongside a hit.
     expect(cachedAt).toBeLessThan(fetchAt);
   });

@@ -50,6 +50,20 @@ platho.app {
 	import security_headers
 	root * /srv/platho/current
 
+	# NO ACCESS LOG, and it is not an oversight — see PERMA-05. A permalink path reaches this server, so the only
+	# reason it leaks nothing about who read what is that nothing is written down.
+	#
+	# 2026-08-20: an alert claimed the site was down while it was serving perfectly, and I added a `log` block
+	# scoped by `log_skip` to the one address of the external observer, to answer "did the probe even arrive".
+	# It worked — positive and negative controls both passed — and it was still the wrong fix. The missing
+	# information belonged to the OBSERVER, which was reporting a bare "fetch failed" with no cause; the answer
+	# was to make the prober say why it failed, not to make a privacy product start keeping records. Reverted.
+	#
+	# (Also learned, and worth keeping: `caddy validate` said "Valid configuration" for a config whose reload then
+	# died with "permission denied" on /var/log — the unit's sandbox makes it read-only. That left an unloadable
+	# file on disk, and with Restart=always the next restart would have been an outage. Validation proves syntax;
+	# only a completed reload proves the config can be applied.)
+
 	# CACHE POLICY. Every module URL carries a content-derived token (?v=b<hash> on the entry, ?v=<n> elsewhere)
 	# and the service worker's CACHE_NAME moves with the bytes, so long caching is safe for anything versioned.
 	# The two things that carry NO token must never be held: the worker itself, and the app shell.

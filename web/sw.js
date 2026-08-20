@@ -212,6 +212,10 @@ function appShellCacheRequest() {
 }
 
 const NAVIGATION_NETWORK_TIMEOUT_MS = 6000;
+// Much longer than the navigation bound: the shell has a cached twin to fall back to within a second, an asset
+// on a cache miss usually does not, so cutting it short trades a slow load for a broken one. This exists only to
+// put SOME ceiling on a connection that was accepted and then abandoned.
+const ASSET_NETWORK_TIMEOUT_MS = 30000;
 
 function fetchWithTimeout(request, timeoutMs) {
   if (typeof AbortController === 'undefined') return fetch(request);
@@ -247,6 +251,21 @@ async function navigationResponse(event) {
     // So the cached shell now changes only when a new service worker installs and precaches its whole release,
     // which is atomic by construction. The page still gets the FRESH shell from the network — only the cached
     // copy is left alone.
+    // A DEAD SERVER ANSWERS. That is the whole difference between the two outages a user can have, and it is why
+    // the app opened fine in airplane mode and died when platho.app was down — REPORTED and reproduced by the
+    // owner on 2026-08-20, and it took that pair of observations to see it.
+    //
+    // With no network at all, fetch REJECTS, the catch below runs, and the cached shell is served. But a server
+    // that is failing rather than absent replies 502/503/504 — and to fetch, a reply is a success. The catch
+    // never runs, and the page is handed the error document instead of the app it already has on disk.
+    //
+    // Non-ok is a network failure as far as this worker is concerned. Falling back is only worse than the error
+    // page when there is nothing cached, so that case still returns the response.
+    if (!response.ok) {
+      const shell = await cachedAppShell();
+      if (shell) return shell;
+      return response;
+    }
     if (!(await cachedAppShell())) await cacheSameOrigin(appShellCacheRequest(), response);
     return response;
   } catch (error) {
@@ -294,7 +313,16 @@ async function cacheFirst(event) {
   const cached = await caches.match(request);
   if (cached) return cached;
   try {
-    const response = await fetch(request);
+    // Time-bounded for the same reason navigation is: a server that accepts the connection and then never
+    // answers would otherwise hold a module request open until the browser's own multi-minute limit, and the app
+    // hangs on a blank screen with the bytes it needs sitting in the cache under another version. Generous on
+    // purpose — this must not abort a slow module download on a bad mobile connection.
+    const response = await fetchWithTimeout(request, ASSET_NETWORK_TIMEOUT_MS);
+    // 502 IS A FAILURE, not an answer. cacheSameOrigin already refuses to STORE a non-ok response, but it
+    // returned one, so a dying server's error page reached the page as if it were app.js — the module fails to
+    // parse and the boot guard reports "resource failed" while the correct bytes are cached under a different
+    // ?v=. The version-agnostic fallback used to live only in the catch, which a 502 never reaches.
+    if (!response.ok) return await cachedIgnoringVersion(request) || response;
     return await cacheSameOrigin(request, response);
   } catch (error) {
     return await cachedIgnoringVersion(request) || Response.error();
