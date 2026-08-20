@@ -266,7 +266,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.1.4';
+const PLATHO_APP_RUNTIME_VERSION = '1.1.5';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -10585,12 +10585,27 @@ function assemblePublicParts(items) {
   for (const item of items) {
     const count = Number(item.partCount ?? 1);
     const index = Number(item.partIndex ?? 0);
+    // THE AUTHOR IS PART OF THE KEY. A post's parts all come from the channel's own shard, so the publisher was
+    // implicit there — but a COMMENT thread shard accepts writes from anyone, and without the author in the key a
+    // stranger publishing parts under somebody else's streamId lands them inside that person's comment. Grouping
+    // is not a place to be generous.
     const key = count <= 1
       ? `single:${item.channelId}:${item.entryId}`
-      : `${item.channelId}:${item.streamId}:${item.parentEntryId ?? ''}:${item.parentHash ?? ''}`;
-    const group = groups.get(key) ?? { expected: count, parts: [] };
+      : `${item.channelId}:${item.authorWallet ?? ''}:${item.streamId}:${item.parentEntryId ?? ''}:${item.parentHash ?? ''}`;
+    const group = groups.get(key) ?? { expected: count, parts: [], byIndex: new Map() };
     group.expected = Math.max(group.expected, count);
-    group.parts.push({ ...item, partIndex: index, partCount: count });
+    // ONE PART PER INDEX. The completeness check below counts DISTINCT indices while the join walked EVERY part,
+    // so a part read twice passed the check and was concatenated twice — the assembled document then carried
+    // bytes past its last block and decodeMessageDocumentBlocks threw "Document message has trailing bytes",
+    // which took down every comment on the post. [OWNER 2026-08-20, seen on a live post.]
+    //
+    // Duplicates are ORDINARY here, not exotic: a thread's comments are read across several era shards and the
+    // same message can legitimately appear in more than one window.
+    if (!group.byIndex.has(index)) {
+      const part = { ...item, partIndex: index, partCount: count };
+      group.byIndex.set(index, part);
+      group.parts.push(part);
+    }
     groups.set(key, group);
   }
   const out = [];
@@ -10623,11 +10638,20 @@ function assemblePublicParts(items) {
         offset += item.documentBytes.length;
       }
     }
-    const documentBlocks = documentBytes
-      // Public decode is forward-compat tolerant: a post carrying a new block type (e.g. the author-.ath
-      // tag added in a later phase) still decodes here instead of throwing. Private decode stays strict.
-      ? displayBlocksFromDocumentBlocks(decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true }))
-      : [];
+    // ONE UNDECODABLE GROUP MUST NOT COST THE OTHERS. Public decode is forward-compat tolerant about unknown
+    // BLOCK TYPES, but a malformed byte run is a different failure and it used to propagate out of the whole
+    // assembly — so a single bad comment emptied a post's entire thread and the screen blamed the connection.
+    // Skipping the group leaves the rest of the conversation readable, which is the honest trade.
+    let documentBlocks = [];
+    if (documentBytes) {
+      try {
+        documentBlocks = displayBlocksFromDocumentBlocks(
+          decodeMessageDocumentBlocks(documentBytes, { tolerateUnknownBlocks: true }));
+      } catch (error) {
+        console.warn('[public] undecodable multipart group skipped', first?.entryId ?? first?.id, error?.message ?? error);
+        continue;
+      }
+    }
     const readEntryId = ordered.reduce((max, item) => {
       const value = publicEntryIdBigInt(item.entryId) ?? -1n;
       return value > max ? value : max;
