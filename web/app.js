@@ -166,7 +166,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=58';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=27';
+import { createPublicLane } from './public-lane.mjs?v=28';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=16';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
@@ -266,7 +266,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.1.3';
+const PLATHO_APP_RUNTIME_VERSION = '1.1.4';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -9136,7 +9136,16 @@ async function openPublicDiscovery() {
   // Paint cached results immediately (fresh cache) or a loading line, then resolve.
   renderPublicDiscovery({ loading: !publicDiscoveryCache });
   try {
-    const results = await discoverChannels();
+    // Cards appear as the sweep finds them. The token guard is repeated inside the callback because the sweep
+    // keeps running after this screen closes — a late partial must not repaint a discovery panel the user left,
+    // nor one that a newer open has already taken over.
+    const results = await discoverChannels({
+      onPartial: (partial) => {
+        if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+        publicDiscoveryResults = partial;
+        renderPublicDiscovery({ loading: false, partial: true });
+      },
+    });
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     publicDiscoveryResults = results;
     renderPublicDiscovery({ loading: false });
@@ -9453,6 +9462,13 @@ function renderPublicDiscovery(options = {}) {
     return;
   }
   for (const channel of shown) publicDiscoveryBody.append(buildDiscoveryCard(channel));
+  // Still sweeping: say so UNDER the cards, so the list reads as growing rather than as finished-and-short.
+  if (options.partial === true) {
+    const more = document.createElement('p');
+    more.className = 'discovery-status';
+    more.textContent = t('public.discoverLoading');
+    publicDiscoveryBody.append(more);
+  }
 }
 
 // The discovery card's "Display as" chevron — same menu + selection semantics as a public post's chevron
@@ -10886,12 +10902,9 @@ let publicDiscoveryCache = null; // { at, results: [{ authorWallet, description,
 // clean-17 Discover: sweep the BEACON directory (public-lane ranks live buckets by entry_count, NOT lt) and adapt
 // each announcement to the 4-field shape renderPublicDiscovery consumes. The beacon card body is the raw profile
 // document (a single-part 'document' body), so it decodes header-free via readProfileDocument.
-async function discoverChannelsFromBeacon() {
+async function discoverChannelsFromBeacon({ onPartial = null } = {}) {
   const lane = directPublicLaneReader();
   if (!lane) return publicDiscoveryCache?.results ?? [];
-  let catalog;
-  try { catalog = await lane.sweepChannelCatalog({ topBuckets: 32 }); }
-  catch (error) { console.warn('[public] beacon sweep failed', error); return publicDiscoveryCache?.results ?? []; }
   const ownWallet = rawWalletAddress(plathoWallet?.address);
   const subscribedAuthors = new Set(
     subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
@@ -10900,23 +10913,46 @@ async function discoverChannelsFromBeacon() {
   );
   const results = [];
   const seen = new Set();
-  for (const item of catalog) {
-    const wallet = rawWalletAddress(item.channelWallet);
-    if (!wallet || seen.has(wallet)) continue;
-    if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;   // discovery is for finding NEW channels
-    if (subscribedAuthors.has(wallet)) continue;
-    let profileDoc = null;
-    try { profileDoc = readProfileDocument(tonCell.readSnakeCellBytes(item.card, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES })); }
-    catch { continue; }                                               // a card that is not a profile document is skipped
-    if (!profileDoc?.profileBlock) continue;
-    const description = String(profileDoc.profileBlock.description ?? '').trim();
-    const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
-    if (!publicChannelIsDiscoverable(profileDoc.profileBlock)) continue;   // discovery suggests DESCRIBED channels
-    seen.add(wallet);
-    // Warm the profile cache (also queues .ath verification) so render-time publicAuthorLabel resolves the name.
-    setChannelProfileFromWalk(wallet, profileDoc.profileBlock, null, Number(item.announcedAt ?? 0n));
-    results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
+  // IDEMPOTENT BY CONSTRUCTION, which is what makes streaming safe: `seen` means a wallet already accepted is
+  // skipped, so handing the same growing catalog in over and over adds only what is new. The sweep hands over
+  // everything it has after each bucket, and the final list is absorbed once more at the end — a card cannot
+  // arrive twice and the streamed result cannot end up different from the whole-sweep one.
+  const absorb = (catalog) => {
+    let added = 0;
+    for (const item of catalog) {
+      const wallet = rawWalletAddress(item.channelWallet);
+      if (!wallet || seen.has(wallet)) continue;
+      if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;   // discovery is for finding NEW channels
+      if (subscribedAuthors.has(wallet)) continue;
+      let profileDoc = null;
+      try { profileDoc = readProfileDocument(tonCell.readSnakeCellBytes(item.card, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES })); }
+      catch { continue; }                                               // a card that is not a profile document is skipped
+      if (!profileDoc?.profileBlock) continue;
+      const description = String(profileDoc.profileBlock.description ?? '').trim();
+      const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
+      if (!publicChannelIsDiscoverable(profileDoc.profileBlock)) continue;   // discovery suggests DESCRIBED channels
+      seen.add(wallet);
+      // Warm the profile cache (also queues .ath verification) so render-time publicAuthorLabel resolves the name.
+      setChannelProfileFromWalk(wallet, profileDoc.profileBlock, null, Number(item.announcedAt ?? 0n));
+      results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
+      added += 1;
+    }
+    return added;
+  };
+  let catalog;
+  try {
+    catalog = await lane.sweepChannelCatalog({
+      topBuckets: 32,
+      onProgress: (partial) => { if (absorb(partial) > 0 && typeof onPartial === 'function') onPartial(results); },
+    });
+  } catch (error) {
+    console.warn('[public] beacon sweep failed', error);
+    // Whatever streamed in before the failure is real and already on screen — keep it rather than fall back to a
+    // cache that may be older than what the user is looking at.
+    if (results.length > 0) { publicDiscoveryCache = { at: Date.now(), results }; return results; }
+    return publicDiscoveryCache?.results ?? [];
   }
+  absorb(catalog);
   publicDiscoveryCache = { at: Date.now(), results };
   return results;
 }
@@ -10927,7 +10963,7 @@ async function discoverChannels(options = {}) {
   }
   // clean-17 direct-pay: discovery sweeps the BEACON directory buckets (discoverChannelsFromBeacon), ranked by
   // entry_count. The removed CapsuleHub scan walked the one shared public log looking for distinct authors.
-  return discoverChannelsFromBeacon();
+  return discoverChannelsFromBeacon({ onPartial: options.onPartial ?? null });
 }
 
 // clean-17 read lane: a public-lane reader over the app's shared RPC pump. endpoint/apiKey are OMITTED on purpose —

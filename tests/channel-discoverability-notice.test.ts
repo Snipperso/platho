@@ -44,8 +44,11 @@ describe('channel discoverability notice', () => {
   it('CHDISC-02: the discovery filter and the notice ask the SAME question', () => {
     // The rule was written out by hand inside the sweep. If the notice grows its own copy, one of them will
     // eventually be relaxed and the app will promise a listing that never appears.
+    // The sweep gained a streaming callback on 2026-08-20, so the per-card work moved into an `absorb` helper
+    // inside it and the declaration no longer ends in `()`. Anchor on the function NAME — the rule this gate is
+    // about did not move, only the shape around it.
     const sweep = app.slice(
-      app.indexOf('async function discoverChannelsFromBeacon()'),
+      app.indexOf('async function discoverChannelsFromBeacon('),
       app.indexOf('async function discoverChannels(options'),
     );
     expect(sweep).toContain('if (!publicChannelIsDiscoverable(profileDoc.profileBlock)) continue;');

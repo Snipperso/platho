@@ -158,7 +158,14 @@ export function createPublicLane({
      * Returns [{ channelWallet, announcedAt, card }] where card is the beacon body cell (the client renders it,
      * but MUST treat its avatar_hash as advisory — the authoritative avatar pointer is the paid KeyShard one).
      */
-    async sweepChannelCatalog({ eraWindow = 3, topBuckets = 16 } = {}) {
+    /**
+     * `onProgress`, when given, is called with the catalog SO FAR after each beacon bucket is read — the sweep is
+     * up to `topBuckets` sequential shard reads, and a caller that waits for the last one shows nothing until then.
+     * [OWNER 2026-08-20, during the user influx: the Find-channels page took long enough that the whole list
+     * arriving at once was the complaint.] Its return value is ignored and a throw from it cannot stop the sweep:
+     * painting is the caller's business, and a caller's bad frame must not cost the remaining buckets.
+     */
+    async sweepChannelCatalog({ eraWindow = 3, topBuckets = 16, onProgress = null } = {}) {
       const nowUnix = now();
       const addresses = await publicBeaconScanAddresses(nowUnix, eraWindow);
       const states = await readStates(addresses);
@@ -188,6 +195,10 @@ export function createPublicLane({
           if (!prev || post.created_at > prev.announcedAt) {
             byWallet.set(key, { channelWallet: post.publisher, announcedAt: post.created_at, card: post.body });
           }
+        }
+        if (typeof onProgress === 'function') {
+          try { onProgress([...byWallet.values()]); }
+          catch { /* see the note on onProgress: the caller's paint is not this sweep's problem */ }
         }
       }
       return [...byWallet.values()];

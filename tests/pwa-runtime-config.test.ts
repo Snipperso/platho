@@ -3693,7 +3693,10 @@ describe('PWA runtime config guard', () => {
     // BEACON directory (a fixed bucket space), ranks live buckets by entry_count and reads the top K.
     expect(app).toMatch(/async function discoverChannels\(/);
     expect(app).toMatch(/async function discoverChannelsFromBeacon\(/);
-    expect(readFileSync('web/public-lane.mjs', 'utf8')).toMatch(/sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = 16 \} = \{\}\)/);
+    // The BOUNDS are what this line guards, not the parameter list: `onProgress` was added on 2026-08-20 so the
+    // Find-channels page can paint as the sweep reads, and it changes nothing about how much is read.
+    expect(readFileSync('web/public-lane.mjs', 'utf8'))
+      .toMatch(/sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = 16(?:, onProgress = null)? \} = \{\}\)/);
     // (The phase-1 head-of-log loop was the Hub scan itself; the beacon sweep's bounds are asserted above.)
     // Phase 2 resolves each candidate with the shallow discovery maxScan (cache-first, bounded).
     // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).
