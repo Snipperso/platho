@@ -75,8 +75,38 @@ export async function resolvePeerBundleFromKeyShardView(view, peerKeyId) {
 export async function resolveRecipientBundleByWallet({ provider, wallet, callOptions = {} }) {
   if (typeof provider?.getView !== 'function') throw new Error('resolveRecipientBundleByWallet requires a KeyShard provider');
   if (!wallet) throw new Error('resolveRecipientBundleByWallet requires the recipient wallet');
-  const view = await provider.getView(wallet, callOptions);
+  let view;
+  try {
+    view = await provider.getView(wallet, callOptions);
+  } catch (error) {
+    // A KeyShard THAT WAS NEVER DEPLOYED is not a failure — it is the answer: this wallet has published no
+    // messaging keys, so there is nothing to encrypt to and no retry will conjure one. Reported to the owner
+    // 2026-08-20 as `not sent: TON RPC get-method exit code -13` on a real send, twice, after composing an image.
+    //
+    // -13 is what mainnet returns for a codeless account and -256 is what @ton/sandbox returns for the same
+    // thing; both mean absence. HTTP 404 DELIBERATELY DOES NOT: that is any proxy having a bad moment, and
+    // calling it "this person does not exist" would be a confident lie about a live account.
+    if (isKeyShardAbsentError(error)) {
+      const absent = new Error('the recipient has not published Platho messaging keys yet');
+      absent.code = RECIPIENT_NOT_ACTIVATED;
+      absent.cause = error;
+      throw absent;
+    }
+    throw error;
+  }
   return resolveBundleFromKeyShardView(view);
+}
+
+/** The one code the UI matches on, exported so no caller has to spell it. */
+export const RECIPIENT_NOT_ACTIVATED = 'PLATHO_RECIPIENT_NOT_ACTIVATED';
+
+/** Absence, per the project-wide rule: exit -13 (mainnet) or -256 (sandbox). Never a transport status. */
+export function isKeyShardAbsentError(error) {
+  const exitCode = Number(error?.exitCode);
+  if (exitCode === -13 || exitCode === -256) return true;
+  // The exit code rides the error object, but a transport that only carried it in prose must not slip past —
+  // matched narrowly enough that "404" or a timeout can never satisfy it.
+  return /get-method exit code -(?:13|256)\b/.test(String(error?.message ?? ''));
 }
 
 /**

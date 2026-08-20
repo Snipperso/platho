@@ -71,7 +71,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=49';
+} from './public-channel-subscriptions.mjs?v=50';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -179,7 +179,7 @@ import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
 import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=16';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=16';
-import { resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=4';
+import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
 import { createConvReadLane } from './conv-lane.mjs?v=19';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=18';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=16';
@@ -246,7 +246,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=75';
+} from './i18n.mjs?v=76';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -266,7 +266,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.1.0';
+const PLATHO_APP_RUNTIME_VERSION = '1.1.1';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -7249,10 +7249,8 @@ function appendPublicItemActions(article, item) {
   {
     const commentButton = document.createElement('button');
     commentButton.type = 'button';
-    const commentsAllowed = item.commentsAllowed !== false;
-    const hasChainCommentTarget = item.entryId !== undefined
-      && item.entryId !== null
-      && /^0x[0-9a-fA-F]{64}$/.test(String(item.bodyHash ?? ''));
+    const commentsAllowed = publicPostCommentsAllowed(item);
+    const hasChainCommentTarget = publicPostHasChainCommentTarget(item);
     // Viewing comments needs no wallet — only an on-chain post to load them from. Posting a comment still
     // requires a wallet (enforced by the post detail composer). "Comments off" / "Preview only" stay disabled.
     const canViewComments = Boolean(commentsAllowed && hasChainCommentTarget);
@@ -8935,6 +8933,13 @@ function renderPublicPostDetail() {
   heading.className = 'public-detail-comments-heading';
   heading.textContent = comments.length > 0 ? t('public.commentsWithCount', { count: comments.length }) : t('public.comments');
   section.append(heading);
+  // The author switched comments off. Say so and stop — no list, no "no comments yet" (which invites one), no
+  // loading state for a read that is not happening. The composer is hidden by CSS off data-post-comments.
+  if (!publicPostCommentsAllowed(publicPostDetailItem)) {
+    section.append(publicDetailStatusNode(t('public.commentsClosedByAuthor')));
+    publicPostDetailBody.append(section);
+    return;
+  }
   // OLDER COMMENTS ARE A PAGE AWAY, NOT GONE. get_page is capped at 96 rows by the contract and the read anchors at
   // the tail, so a busy post shows its newest 96 and the rest sat on chain, paid for and unreachable — MEASURED at
   // 120 comments in tests/public-comment-window. Above the list, because that is where the older ones will appear.
@@ -9027,6 +9032,28 @@ async function warmPublicPostCommentsCache(item) {
   }
 }
 
+/**
+ * MAY THIS POST BE COMMENTED ON — the author's own answer, carried in the post body's COMMENTS_DISABLED flag.
+ *
+ * Shared rather than inlined because it was inlined ONCE, in the feed card, and the feed card is not the only way
+ * into a post. FOUND BY THE OWNER 2026-08-20: a permalink opens the detail screen directly, which never asked, so
+ * a post with comments switched off arrived with a working comment composer — and nothing on the send path asked
+ * either, so the comment would have gone on chain, cost its author money, and stayed invisible to everyone who
+ * reached the post through the feed (where the button is correctly disabled).
+ *
+ * Absence means ALLOWED: posts published before the flag existed carry no bit, and they were commentable.
+ */
+function publicPostCommentsAllowed(item) {
+  return item?.commentsAllowed !== false;
+}
+
+/** A post can hold comments only once it has chain coordinates and an authenticated body to anchor them to. */
+function publicPostHasChainCommentTarget(item) {
+  return item?.entryId !== undefined
+    && item?.entryId !== null
+    && /^0x[0-9a-fA-F]{64}$/.test(String(item?.bodyHash ?? ''));
+}
+
 function openPublicPostDetail(item) {
   if (!item || item.entryId === undefined || item.entryId === null) return;
   closePublicDiscovery();
@@ -9045,9 +9072,15 @@ function openPublicPostDetail(item) {
   publicPostDetailLoadingEarlier = false;
   publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
   if (publicPane) publicPane.dataset.postOpen = 'true';
+  // THE AUTHOR'S SETTING IS HONOURED HERE, not only by the feed button that usually guards the door — see
+  // publicPostCommentsAllowed. The composer is HIDDEN rather than handed a null target: a null target puts the
+  // shared composer back in POST mode, and posting from the post screen publishes a new entry in the reader's own
+  // channel, which is a worse outcome than the bug being fixed.
+  const commentsAllowed = publicPostCommentsAllowed(item);
+  if (publicPane) publicPane.dataset.postComments = commentsAllowed ? 'on' : 'off';
   // Shared composer -> comment mode for this post; no auto-focus (the user opens to read first) and no inline
   // context bar (the screen itself is the context).
-  setPublicCommentTarget(item, { focus: false, showContext: false });
+  if (commentsAllowed) setPublicCommentTarget(item, { focus: false, showContext: false });
   // Opening a post starts at the TOP — the post itself is what was tapped. A jump-to-latest armed by a comment on
   // the PREVIOUS post must not survive into this one.
   publicPostDetailScrollToLatest = false;
@@ -9056,7 +9089,7 @@ function openPublicPostDetail(item) {
   // DURABLE seed: after a full reload the in-memory Map is empty — pull the last-loaded comments (with images)
   // from IndexedDB and paint them instantly, before the background chain re-walk. Guarded so a fast chain result
   // or a post close/reopen is never clobbered.
-  if (publicPostDetailChainComments.length === 0) {
+  if (commentsAllowed && publicPostDetailChainComments.length === 0) {
     readCachedPublicComments(cacheKey).then((durable) => {
       if (!durable || publicPostDetailItem !== item || publicPostDetailChainComments.length > 0) return;
       publicPostDetailChainComments = durable.comments;
@@ -9066,7 +9099,9 @@ function openPublicPostDetail(item) {
       renderPublicPostDetail();
     }).catch(() => {});
   }
-  refreshPublicPostDetailComments();
+  // No chain read for a post that cannot hold comments: the reads would be paid for and the answer discarded.
+  if (commentsAllowed) refreshPublicPostDetailComments();
+  else publicPostDetailLoadState = 'idle';
 }
 
 function closePublicPostDetail() {
@@ -9077,7 +9112,10 @@ function closePublicPostDetail() {
   publicPostDetailChainComments = [];
   publicPostDetailLoadState = 'idle';
   publicPostDetailLoadToken += 1; // invalidate any in-flight comment load so a stale result can't render
-  if (publicPane) publicPane.dataset.postOpen = 'false';
+  if (publicPane) {
+    publicPane.dataset.postOpen = 'false';
+    publicPane.dataset.postComments = 'on';
+  }
   setPublicCommentTarget(null);
   renderPublicSurface({ anchorUnread: false });
 }
@@ -14987,6 +15025,10 @@ function privateSendPreflightStatusText(error) {
   // names the asset, the amount needed and the amount held, which is the most actionable text there is: pass it
   // through verbatim. isFatalPrivateSendError stops the retry loop on the same two codes.
   if (error?.code === 'PLATHO_ATH_REQUIRED' || error?.code === 'PLATHO_WALLET_GRAM_REQUIRED') return message;
+  // ABOVE the TON RPC passthrough below, and that order is the whole fix: the recipient having published no keys
+  // arrives as a get-method exit code, so the passthrough printed `TON RPC get-method exit code -13` at the person
+  // who had just picked an image and pressed send. It is not an RPC fault and it is not theirs.
+  if (error?.code === RECIPIENT_NOT_ACTIVATED) return t('chat.recipientNotActivated');
   if (isTonRpcVerificationSoftReadError(error)) return 'RPC verification pending';
   if (/TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
   return message;
@@ -15073,6 +15115,9 @@ function isFatalPrivateSendError(error) {
     // (deletes notes) or a later restore reads cleanly. An auto-retry loop against either just burns RPC budget.
     || error?.code === 'PLATHO_NOTES_FULL'
     || error?.code === 'PLATHO_NOTES_RESTORE_INCOMPLETE'
+    // A recipient who has never set Platho up will not appear because we asked again. Retrying here spent RPC
+    // budget on a question already answered and left the message churning instead of saying what happened.
+    || error?.code === RECIPIENT_NOT_ACTIVATED
     || isVaultPublishPartialError(error)
     || /not enough ath to|wallet needs ~.* gram to|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
 }

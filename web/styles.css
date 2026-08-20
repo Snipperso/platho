@@ -2950,6 +2950,14 @@ button.feed-item:hover {
   display: none;
 }
 
+/* A post whose author switched comments off shows no composer at all. HIDDEN rather than switched back to post
+   mode: the shared composer publishes a NEW ENTRY when it has no comment target, so leaving it visible here would
+   turn "reply to this" into "publish to my own channel". Reached via a permalink, which opens the detail screen
+   without passing the feed's disabled Comments button (owner, 2026-08-20). */
+.public-pane[data-post-open="true"][data-post-comments="off"] > .public-composer {
+  display: none;
+}
+
 .public-channel-view-body {
   overflow-y: auto;
   padding: 16px 24px 24px;
