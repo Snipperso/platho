@@ -3690,13 +3690,14 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const html = readFileSync('web/index.html', 'utf8');
     // Scale: discovery is bounded by CONSTRUCTION now, not by scan constants over a shared log — it sweeps the
-    // BEACON directory (a fixed bucket space), ranks live buckets by entry_count and reads the top K.
+    // BEACON directory (a fixed bucket space: 1024 buckets x the era window), every live bucket, most recently
+    // touched first. [2026-08-21: the top-K cut and the entry_count ranking in front of it are gone — MEASURED 142
+    // live buckets on mainnet, the rank was a 142-getter wall before the first card and the cut hid three quarters
+    // of the described channels. The bound is the bucket space itself; see DISCOVERSTREAM-05.]
     expect(app).toMatch(/async function discoverChannels\(/);
     expect(app).toMatch(/async function discoverChannelsFromBeacon\(/);
-    // The BOUNDS are what this line guards, not the parameter list: `onProgress` was added on 2026-08-20 so the
-    // Find-channels page can paint as the sweep reads, and it changes nothing about how much is read.
     expect(readFileSync('web/public-lane.mjs', 'utf8'))
-      .toMatch(/sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = 16(?:, onProgress = null)? \} = \{\}\)/);
+      .toMatch(/sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = null, onProgress = null \} = \{\}\)/);
     // (The phase-1 head-of-log loop was the Hub scan itself; the beacon sweep's bounds are asserted above.)
     // Phase 2 resolves each candidate with the shallow discovery maxScan (cache-first, bounded).
     // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).

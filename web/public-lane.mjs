@@ -152,48 +152,83 @@ export function createPublicLane({
 
   return {
     /**
-     * DISCOVERY. Sweep the beacon directory, keep only live buckets, rank them by entry_count (NOT lt), read the
-     * top-K buckets' announcements, and return a deduped channel list — newest announcement per wallet.
+     * DISCOVERY. Sweep the beacon directory and return a deduped channel list — newest announcement per wallet.
      *
      * Returns [{ channelWallet, announcedAt, card }] where card is the beacon body cell (the client renders it,
      * but MUST treat its avatar_hash as advisory — the authoritative avatar pointer is the paid KeyShard one).
+     *
+     * EVERY LIVE BUCKET, STREAMED, MOST RECENTLY TOUCHED FIRST — and no ranking pass in front of it.
+     *
+     * MEASURED 2026-08-21 on mainnet: 142 live beacon buckets (the bucket is walletHash % 1024, so the directory
+     * is spread by design — roughly one bucket per described channel, 1-8 announcements each). The sweep used to
+     * rank those buckets by entry_count before reading any of them — one sequential get_view per live bucket —
+     * and only then read the top 32. Two things followed. The FIRST card could not appear before 3 + 142 + 2
+     * requests on the one serial pump (~37s keyed, ~2.7 minutes keyless), which is the "nothing, nothing, then
+     * channels" the owner reported; and only 32 of 142 buckets were ever read, so most described channels never
+     * reached the page at all — a share that shrinks as the network grows. The ranking itself ranked nothing:
+     * with 1-3 entries per bucket the top 32 were arbitrary.
+     *
+     * So: the order comes FREE from the accountStates batch (last_transaction_lt — the most recently touched
+     * bucket first, which is what "recently active channels" means), every live bucket is read, and the catalog
+     * is reported after each one. The first card now costs 3 + 2 requests. A bucket whose change marker has not
+     * moved since this lane last read it is served from the lane's snapshot cache and costs nothing — the same
+     * gate the channel and thread reads use — so a re-sweep five minutes later pays for the states batch and for
+     * what actually changed.
+     *
+     * ON lt AS AN ORDER. The note at the top of this file stands: a value message moves a bucket's lt without any
+     * gate firing, so lt is a poor RANK — which is why the old top-K cut refused it. With no cut there is nothing
+     * to displace: lt decides only which bucket paints first, and the list keeps arrival order so cards do not
+     * jump under the reader's finger. Sitting at the top costs a message either way (a publish under entry_count
+     * ranking, a transfer here); neither is a defence, and this one is free to read.
+     *
+     * `topBuckets` survives as an optional CAP on how many buckets one sweep reads (null = all) — an emergency
+     * knob, not the default. `onProgress(catalogSoFar)` is called after each bucket; its return value is ignored
+     * and a throw from it cannot stop the sweep: painting is the caller's business, and a caller's bad frame must
+     * not cost the remaining buckets. [OWNER 2026-08-20, during the user influx, and again 2026-08-21.]
      */
-    /**
-     * `onProgress`, when given, is called with the catalog SO FAR after each beacon bucket is read — the sweep is
-     * up to `topBuckets` sequential shard reads, and a caller that waits for the last one shows nothing until then.
-     * [OWNER 2026-08-20, during the user influx: the Find-channels page took long enough that the whole list
-     * arriving at once was the complaint.] Its return value is ignored and a throw from it cannot stop the sweep:
-     * painting is the caller's business, and a caller's bad frame must not cost the remaining buckets.
-     */
-    async sweepChannelCatalog({ eraWindow = 3, topBuckets = 16, onProgress = null } = {}) {
+    async sweepChannelCatalog({ eraWindow = 3, topBuckets = null, onProgress = null } = {}) {
       const nowUnix = now();
       const addresses = await publicBeaconScanAddresses(nowUnix, eraWindow);
       const states = await readStates(addresses);
       if (states.size === 0) return [];
 
-      // Rank LIVE buckets by entry_count. accountStates gives no entry_count, so read get_view for the live ones;
-      // that is one getter per live bucket, and only live buckets exist in `states` (absent ones cost nothing).
-      const live = [...states.values()];
-      const ranked = [];
-      for (const state of live) {
-        try {
-          const view = await provider.getView(state.address);
-          ranked.push({ address: state.address, entryCount: view.entry_count });
-        } catch { /* a bucket that will not answer get_view is skipped, not fatal */ }
-      }
-      ranked.sort((a, b) => (a.entryCount < b.entryCount ? 1 : a.entryCount > b.entryCount ? -1 : 0));
+      // Most recently touched first. lt arrives as a string of digits; compare as BigInt (a lexical compare of
+      // unequal lengths would put 99 above 100).
+      const ltOf = (state) => { try { return BigInt(state?.lastLt ?? 0); } catch { return 0n; } };
+      const ordered = [...states.values()].sort((a, b) => (ltOf(a) < ltOf(b) ? 1 : ltOf(a) > ltOf(b) ? -1 : 0));
+      const limit = Number.isFinite(Number(topBuckets)) && Number(topBuckets) > 0 ? Number(topBuckets) : ordered.length;
 
       const byWallet = new Map();
-      for (const bucket of ranked.slice(0, topBuckets)) {
-        // entryCount is already known from the ranking read above — hand it over so readPosts skips its own
-        // entry_count probe and still anchors its window at the NEWEST announcements.
-        const { posts } = await readShardPosts(bucket.address, { entryCount: bucket.entryCount });
+      for (const state of ordered.slice(0, limit)) {
+        const key = addrKey(state.address);
+        const marker = changeMarkerOf(state);
+        const snapshot = readShardSnapshot(key, marker);
+        let posts;
+        if (snapshot) {
+          posts = snapshot.posts;
+        } else {
+          // FROM ROW 0, which for a beacon bucket is the whole bucket: announcements per bucket are a handful, and
+          // get_page(0, 96) returns them all AND the entry_count in one getter — so the tail-anchoring probe
+          // readPosts would otherwise make first (get_page(0, 0)) is not needed here. The cap is honoured all the
+          // same: a bucket that has outgrown one page also gets its tail read, so the newest announcements are
+          // never the ones cut off.
+          const first = await readShardPosts(state.address, { fromId: 0n });
+          posts = first.posts;
+          if (first.entry_count > 96n) {
+            const tail = await readShardPosts(state.address, { entryCount: first.entry_count });
+            const merged = new Map();
+            for (const post of [...tail.posts, ...posts]) merged.set(String(post.entry_id), post);
+            posts = [...merged.values()];
+          }
+          // ONE VALUE SHAPE for the shared snapshot cache — see readChannelPosts.
+          writeShardSnapshot(key, marker, { posts, from: 0n, entryCount: first.entry_count });
+        }
         for (const post of posts) {
           if (!post.publisher) continue;
-          const key = addrKey(post.publisher);
-          const prev = byWallet.get(key);
+          const wallet = addrKey(post.publisher);
+          const prev = byWallet.get(wallet);
           if (!prev || post.created_at > prev.announcedAt) {
-            byWallet.set(key, { channelWallet: post.publisher, announcedAt: post.created_at, card: post.body });
+            byWallet.set(wallet, { channelWallet: post.publisher, announcedAt: post.created_at, card: post.body });
           }
         }
         if (typeof onProgress === 'function') {

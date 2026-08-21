@@ -16,9 +16,12 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PUBLIC-LANE — the read assembly the app calls. Wires the tested pieces into sweepChannelCatalog /
 // readChannelPosts. Driven against REAL PublicShards in a sandbox for the get_page + /messages paths, with the
-// beacon-sweep accountStates mocked. The two things it must prove are the mandatory fixes:
-//   * the catalogue ranks live buckets by entry_count, NOT last_transaction_lt (the beacon-firehose defence);
-//   * a channel that announced in more than one bucket appears ONCE, newest announcement winning.
+// beacon-sweep accountStates mocked. The things it must prove:
+//   * the catalogue reads EVERY live bucket, most recently touched first, with no ranking pass in front of the
+//     first read (MEASURED 2026-08-21: 142 live buckets; the old entry_count ranking cost one get_view per bucket
+//     before a single card could appear, and the top-32 cut hid most described channels);
+//   * a channel that announced in more than one bucket appears ONCE, newest announcement winning;
+//   * an unchanged bucket is served from the lane's snapshot cache on the next sweep.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const CLOCK = 1_790_000_000;
@@ -130,7 +133,7 @@ describe('PUBLIC-LANE — the read assembly', () => {
     expect(messageReads, 'a moved marker re-reads exactly once').toBe(2);
   }, 300_000);
 
-  it('PL-02: sweepChannelCatalog ranks by entry_count and dedups a channel to its newest announcement', async () => {
+  it('PL-02: sweepChannelCatalog reads EVERY live bucket, most recently touched first, and dedups a channel to its newest announcement', async () => {
     const bc = await Blockchain.create();
     bc.now = CLOCK;
     await deployFeeSink(bc, { funderSeed: 'pl-02-sink' });
@@ -138,8 +141,10 @@ describe('PUBLIC-LANE — the read assembly', () => {
     const chanB = await bc.treasury('pl-02-chanB');
     const era = publicEraOf(KIND.BEACON, CLOCK);
 
-    // Bucket 1: chanA announces once (entry_count 1). Bucket 2: chanB announces, and chanA announces AGAIN later
-    // (entry_count 2). Ranking by entry_count puts bucket 2 first; dedup must fold chanA to its newer card.
+    // Bucket 1: chanA announces once. Bucket 2: chanB announces, and chanA announces AGAIN later. Bucket 2 was
+    // touched more recently (higher lt), so it is read first; dedup must fold chanA to its newer card. And NO
+    // get_view is spent ranking: MEASURED 2026-08-21, 142 live buckets on mainnet made that pass a 142-request
+    // wall in front of the first card, for a rank that ranked nothing (1-3 entries per bucket).
     const pk1 = await publicBeaconPartitionKey(1n);
     const b1 = await seedShard(bc, chanA, KIND.BEACON, era, pk1, 1n, 1, 2);
     const pk2 = await publicBeaconPartitionKey(2n);
@@ -158,6 +163,9 @@ describe('PUBLIC-LANE — the read assembly', () => {
 
     const k1 = addrKey(b1.shard.address.toString());
     const k2 = addrKey(shard2.address.toString());
+    const getters: string[] = [];
+    let messageReads = 0;
+    const lts = new Map([[k1, '5'], [k2, '9']]);   // bucket 2 touched more recently
     const lane = makeLane(bc, {
       pages: new Map([[k1, b1.shard], [k2, shard2]]),
       messages: new Map([
@@ -167,9 +175,28 @@ describe('PUBLIC-LANE — the read assembly', () => {
         }))],
       ]),
       liveShards: [b1.shard.address.toString(), shard2.address.toString()],
+      lt: (key?: string) => lts.get(key ?? '') ?? '1',
+      onGetMethod: (call: any) => { getters.push(call.method); },
+      onMessages: () => { messageReads += 1; },
     });
 
-    const catalog = await lane.sweepChannelCatalog({ topBuckets: 16 });
+    // STREAMED: the first report arrives after the FIRST bucket, before the second is read.
+    const readsAtFirstReport: number[] = [];
+    const firstReport: string[][] = [];
+    const catalog = await lane.sweepChannelCatalog({
+      onProgress: (partial: any[]) => {
+        if (firstReport.length === 0) {
+          readsAtFirstReport.push(messageReads);
+          firstReport.push(partial.map((c: any) => addrKey(c.channelWallet)));
+        }
+      },
+    });
+    expect(readsAtFirstReport, 'the first report came after exactly one bucket was read').toEqual([1]);
+    // chanB announced ONLY in bucket 2, so its presence in the first report proves bucket 2 (lt 9) was read before
+    // bucket 1 (lt 5). Within a bucket the order is newest announcement first: chanA's later card, then chanB's.
+    expect(firstReport[0], 'and that bucket was the most recently touched one (bucket 2)')
+      .toEqual([addrKey(chanA.address.toString()), addrKey(chanB.address.toString())]);
+
     const wallets = catalog.map((c: any) => addrKey(c.channelWallet));
     expect(wallets.includes(addrKey(chanA.address.toString())), 'chanA is listed').toBe(true);
     expect(wallets.includes(addrKey(chanB.address.toString())), 'chanB is listed').toBe(true);
@@ -177,6 +204,25 @@ describe('PUBLIC-LANE — the read assembly', () => {
       'chanA appears ONCE despite announcing in two buckets').toBe(1);
     const a = catalog.find((c: any) => addrKey(c.channelWallet) === addrKey(chanA.address.toString()));
     expect(a.announcedAt, 'and it is chanA\'s NEWER announcement that survived').toBe(BigInt(CLOCK + 4 * 1000));
+    expect(wallets, 'arrival order is kept: the most recently touched bucket first, newest card within it first')
+      .toEqual([addrKey(chanA.address.toString()), addrKey(chanB.address.toString())]);
+
+    // NO RANKING WALL, NO PROBE: two buckets cost two get_page calls and two /messages reads, and not one get_view.
+    expect(getters.filter((m) => m === 'get_view'), 'no get_view ranking pass').toEqual([]);
+    expect(getters.filter((m) => m === 'get_page').length, 'one page per bucket, no entry_count probe').toBe(2);
+    expect(messageReads, 'one history read per bucket').toBe(2);
+
+    // UNCHANGED BUCKETS ARE FREE: a second sweep with the same markers reads nothing and returns the same catalog.
+    const again = await lane.sweepChannelCatalog({});
+    expect(again.map((c: any) => addrKey(c.channelWallet)), 'identical catalog').toEqual(wallets);
+    expect(messageReads, 'served from the snapshot cache — no history re-read').toBe(2);
+    expect(getters.filter((m) => m === 'get_page').length, 'and no getter either').toBe(2);
+
+    // A bucket that DID move is re-read — exactly that one.
+    lts.set(k1, '6');
+    const third = await lane.sweepChannelCatalog({});
+    expect(third.length).toBe(2);
+    expect(messageReads, 'a moved marker re-reads exactly the moved bucket').toBe(3);
   }, 300_000);
 
   it('PL-HIJACK-01: republishing an announcement BYTE FOR BYTE does not take over the catalogue entry', async () => {
@@ -241,9 +287,10 @@ describe('PUBLIC-LANE — the read assembly', () => {
  * A lane whose transport serves get_page/get_view from the given live contracts and whose beacon sweep and
  * /messages are the given fixtures. This is how the assembly is tested without a real endpoint.
  */
-function makeLane(bc: Blockchain, fixture: { pages: Map<string, any>; messages: Map<string, any[]>; liveShards: string[]; onMessages?: () => void; lt?: () => string }) {
+function makeLane(bc: Blockchain, fixture: { pages: Map<string, any>; messages: Map<string, any[]>; liveShards: string[]; onMessages?: () => void; lt?: (key?: string) => string; onGetMethod?: (call: any) => void }) {
   const shardByKey = fixture.pages;
   const runGetMethod = async (call: any) => {
+    fixture.onGetMethod?.(call);
     const shard = shardByKey.get(addrKey(call.address));
     if (!shard) throw new Error(`no fixture shard for ${call.address}`);
     if (call.method === 'get_view') {
@@ -266,7 +313,7 @@ function makeLane(bc: Blockchain, fixture: { pages: Map<string, any>; messages: 
 }
 
 /** A fetch that answers /accountStates with the live shards present, and /messages with the fixture bodies. */
-function makeFakeFetch(bc: Blockchain, fixture: { messages: Map<string, any[]>; liveShards: string[]; onMessages?: () => void; lt?: () => string }) {
+function makeFakeFetch(bc: Blockchain, fixture: { messages: Map<string, any[]>; liveShards: string[]; onMessages?: () => void; lt?: (key?: string) => string }) {
   const liveKeys = new Set(fixture.liveShards.map(addrKey));
   return async (urlStr: string) => {
     const url = new URL(urlStr);
@@ -274,7 +321,8 @@ function makeFakeFetch(bc: Blockchain, fixture: { messages: Map<string, any[]>; 
       const requested = url.searchParams.getAll('address');
       const accounts = requested
         .filter((a) => liveKeys.has(addrKey(a)))
-        .map((a) => ({ address: addrKey(a), status: 'active', balance: '1000000', data_hash: 'h', last_transaction_lt: fixture.lt ? fixture.lt() : '1' }));
+        // `lt` may answer per shard (the sweep orders buckets by it); callers that ignore the key get one value for all.
+        .map((a) => ({ address: addrKey(a), status: 'active', balance: '1000000', data_hash: 'h', last_transaction_lt: fixture.lt ? fixture.lt(addrKey(a)) : '1' }));
       return { ok: true, status: 200, json: async () => ({ accounts }) };
     }
     if (url.pathname.endsWith('/messages')) {

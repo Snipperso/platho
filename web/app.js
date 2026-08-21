@@ -167,7 +167,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=30';
+import { createPublicLane } from './public-lane.mjs?v=31';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=18';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
@@ -10966,8 +10966,10 @@ async function discoverChannelsFromBeacon({ onPartial = null } = {}) {
   };
   let catalog;
   try {
+    // EVERY live bucket, streamed most-recently-touched first — no topBuckets cap. MEASURED 2026-08-21: 142 live
+    // beacon buckets on mainnet; the old top-32 cut showed less than a quarter of the described channels and the
+    // ranking pass in front of it (one get_view per live bucket) held the first card back for ~147 requests.
     catalog = await lane.sweepChannelCatalog({
-      topBuckets: 32,
       onProgress: (partial) => { if (absorb(partial) > 0 && typeof onPartial === 'function') onPartial(results); },
     });
   } catch (error) {
