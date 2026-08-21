@@ -168,13 +168,13 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=33';
+import { createPublicLane } from './public-lane.mjs?v=34';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=19';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=25';
+import { createIntroLane } from './intro-lane.mjs?v=26';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=5';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
@@ -184,7 +184,7 @@ import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
 import { createConvReadLane } from './conv-lane.mjs?v=21';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=20';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=18';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=19';
 import { readAccountStates } from './shard-reader.mjs?v=18';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
@@ -193,7 +193,7 @@ import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=18';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=19';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=20';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=18';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {

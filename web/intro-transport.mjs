@@ -117,6 +117,14 @@ export async function introBodyCommitBrowser(header0, body) {
   return bytesToBigUint(hash);
 }
 
+// How far around the entry's contract-stamped created_at the body is looked for when the newest window did not hold
+// it (fetchIntroCapsule, pass 2). The publish transaction precedes the stamp by seconds; ten minutes is slack for an
+// external that sat in a queue. If that window comes back FULL (a bucket busy enough that ±10 min overflows one
+// page), it narrows once to ±30 s — still wider than any honest gap between the message and its stamp.
+const INTRO_BODY_TIME_SLACK_S = 600;
+const INTRO_BODY_TIME_SLACK_NARROW_S = 30;
+const INTRO_BODY_WINDOW_FULL_ROWS = 128;   // the with-source reader's page (shard-rpc limit default)
+
 /**
  * Fetch and VERIFY the capsule of one intro.
  *
@@ -147,18 +155,38 @@ export async function fetchIntroCapsule({ address, entryId, readEntry, readMessa
   // every match reproduces the same body_commit, hence the same header0/body — so only the source differs.
   let capsuleCells = null;
   const sources = [];
-  for (const item of await readMessages(address)) {
-    // readMessages may yield plain body Cells (source-free reader) or { bodyCell, source } (with-source reader). The
-    // source is the INTRO publish transaction's src = the SENDER's wallet (direct-pay), which the responder needs to
-    // read the sender's KeyShard and resolve their full bundle for a reply. It is a HINT: verified downstream against
-    // the sender keyId, never trusted on its own. [clean17-private-lane-plan: Y reply-bundle resolution]
-    const message = item?.bodyCell ?? item;
-    const source = item?.source ?? null;
-    let parsed;
-    try { parsed = parseIntroPublish(message); } catch { continue; }            // not an IntroPublish; skip
-    if ((await introBodyCommitBrowser(parsed.header0, parsed.body)) !== wanted) continue;
-    if (!capsuleCells) capsuleCells = { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag };
-    if (source) sources.push(source);
+  const match = async (items) => {
+    for (const item of items ?? []) {
+      // readMessages may yield plain body Cells (source-free reader) or { bodyCell, source } (with-source reader). The
+      // source is the INTRO publish transaction's src = the SENDER's wallet (direct-pay), which the responder needs to
+      // read the sender's KeyShard and resolve their full bundle for a reply. It is a HINT: verified downstream against
+      // the sender keyId, never trusted on its own. [clean17-private-lane-plan: Y reply-bundle resolution]
+      const message = item?.bodyCell ?? item;
+      const source = item?.source ?? null;
+      let parsed;
+      try { parsed = parseIntroPublish(message); } catch { continue; }            // not an IntroPublish; skip
+      if ((await introBodyCommitBrowser(parsed.header0, parsed.body)) !== wanted) continue;
+      if (!capsuleCells) capsuleCells = { header0: parsed.header0, body: parsed.body, r: parsed.r, viewTag: parsed.viewTag };
+      if (source) sources.push(source);
+    }
+  };
+  // PASS 1 — the newest window, which is where a first contact that landed minutes ago lives.
+  await match(await readMessages(address));
+  // PASS 2 — BY THE ENTRY'S OWN TIME. The newest window is 128 publishes deep, and a busy bucket passes that in hours
+  // (MEASURED 2026-08-21: 648 first contacts in one bucket in one day, ~128 every five hours). A recipient who was
+  // away longer than that came back to "entry 20685:0:375 is on chain but no message in its shard window reproduces
+  // the stored body_commit" — a first contact paid for, stored, and unreadable. The contract stamps created_at on
+  // the entry, so the body is asked for from the minutes around it: a handful of rows at any load, and exactly the
+  // rows that can hold it. A reader that does not understand the bounds (a plain stub) returns its usual window and
+  // this pass simply finds nothing new. A full window with no match narrows once — at a load where ±10 minutes
+  // overflows the page, ±30 seconds does not.
+  const stampedAt = Number(entry.created_at ?? 0);
+  if (!capsuleCells && stampedAt > 0) {
+    for (const slackS of [INTRO_BODY_TIME_SLACK_S, INTRO_BODY_TIME_SLACK_NARROW_S]) {
+      const rows = await readMessages(address, { startUtime: stampedAt - slackS, endUtime: stampedAt + slackS });
+      await match(rows);
+      if (capsuleCells || (rows?.length ?? 0) < INTRO_BODY_WINDOW_FULL_ROWS) break;
+    }
   }
   if (!capsuleCells) return null;   // the entry exists but its transaction is beyond what this endpoint retains
 

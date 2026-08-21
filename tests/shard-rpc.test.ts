@@ -206,6 +206,28 @@ describe('SHARD-RPC — the opcode-filtered history window', () => {
     expect(seen[0].url, 'and no offset is spent').not.toContain('offset=');
   });
 
+  it('RPC-WIN-01: a window can be moved BACK — by lt or by time — and the bounds reach the wire only when asked', async () => {
+    // Two readers page a shard's bodies backwards now: the comment thread by `end_lt` (older pages of "show earlier
+    // comments") and the INTRO lane by `start_utime`/`end_utime` (an entry whose body fell out of the newest window).
+    // Both parameters were MEASURED honoured by toncenter v3 on 2026-08-21. A plain read must not carry them, or a
+    // proxy that trips on unknown parameters would break every read, not just the paged ones.
+    const rows = Array.from({ length: 2 }, () => ({ opcode: '0x50535031', source: null, created_lt: '5000', message_content: { body: psp1Body() } }));
+    const read = createShardMessagesWithSourceReader({ endpoint: MESSAGES, opcode: PSP1, limit: 4, fetch: fakeFetch({ messages: rows }) });
+    await read('0:' + '44'.repeat(32));
+    expect(seen[0].url).not.toMatch(/end_lt=|start_utime=|end_utime=/);
+    const plain = await read('0:' + '44'.repeat(32), { endLt: '7777' });
+    expect(seen[1].url).toContain('end_lt=7777');
+    expect(plain[0].createdLt, 'each row reports where it sits in the history').toBe('5000');
+    await read('0:' + '44'.repeat(32), { startUtime: 1_790_000_000, endUtime: 1_790_000_600 });
+    expect(seen[2].url).toContain('start_utime=1790000000');
+    expect(seen[2].url).toContain('end_utime=1790000600');
+    expect(seen[2].url, 'a time-bounded read carries no lt bound').not.toContain('end_lt=');
+    // An endpoint that IGNORED end_lt would hand the newest rows back under an older name: rows above the bound are
+    // dropped here rather than trusted.
+    const above = await read('0:' + '44'.repeat(32), { endLt: '10' });
+    expect(above, 'rows newer than the bound never come back').toEqual([]);
+  });
+
   it('RPC-OP-03: an endpoint that IGNORES the filter is detected by the rows, and paged past', async () => {
     // THE DEFENCE THAT MATTERS. An unknown query parameter is dropped silently and still answers 200 (MEASURED
     // for `op`, `op_code`, `message_opcode`), so support can only be proven by the rows. Here the endpoint

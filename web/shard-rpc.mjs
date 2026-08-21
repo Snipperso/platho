@@ -184,7 +184,12 @@ function rowIsForeign(row, opcode) {
 // NEWEST 128 bodies, so "show earlier comments" worked exactly once per 128 comments and then matched nothing.
 // An endpoint that ignored the parameter would hand the newest window back under an older name, so rows above the
 // bound are dropped here rather than trusted.
-async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false, endLt = null }) {
+// `startUtime` / `endUtime` (unix seconds, inclusive) bound the window by TIME instead: an entry whose created_at the
+// contract stamped can have its body fetched from the minute it was written rather than from the newest-N window —
+// which is how an INTRO that landed while the recipient was offline for hours stays readable (owner's console,
+// 2026-08-21: "entry 20685:0:375 is on chain but no message in its shard window reproduces the stored body_commit" —
+// the 375th of 648 that day, long past the newest 128). toncenter v3 `start_utime`/`end_utime`, MEASURED honoured.
+async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false, endLt = null, startUtime = null, endUtime = null }) {
   const headers = { Accept: 'application/json' };
   if (key) headers['X-API-Key'] = key;
   const rows = [];
@@ -193,6 +198,8 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
   let pages = 0;
   let previousPageMark = null;
   const bound = endLt === null || endLt === undefined ? null : BigInt(endLt);
+  const fromUtime = Number.isFinite(Number(startUtime)) && startUtime !== null ? Math.floor(Number(startUtime)) : null;
+  const toUtime = Number.isFinite(Number(endUtime)) && endUtime !== null ? Math.floor(Number(endUtime)) : null;
 
   for (let page = 0; page < maxPages; page += 1) {
     const url = new URL(base);
@@ -201,6 +208,8 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     url.searchParams.set('sort', 'desc');
     if (opcode !== null && opcode !== undefined) url.searchParams.set('opcode', opcodeParam(opcode));
     if (bound !== null) url.searchParams.set('end_lt', String(bound));
+    if (fromUtime !== null) url.searchParams.set('start_utime', String(fromUtime));
+    if (toUtime !== null) url.searchParams.set('end_utime', String(toUtime));
     if (offset > 0) url.searchParams.set('offset', String(offset));
 
     const response = await scheduleToncenterHttpRequest(
@@ -308,10 +317,10 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
 export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
-  return async (address, { endLt = null } = {}) => {
+  return async (address, { endLt = null, startUtime = null, endUtime = null } = {}) => {
     const base = resolveEndpoint('messages', endpoint);
     const key = resolveApiKey(apiKey);
-    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict, endLt });
+    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict, endLt, startUtime, endUtime });
     const out = [];
     for (const message of rows) {
       const raw = message?.message_content?.body;
