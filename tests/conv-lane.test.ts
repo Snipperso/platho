@@ -73,6 +73,69 @@ describe('CONV-LANE (read assembly)', () => {
     expect(opened.openedAs).toBe('recipient');
   }, 120_000);
 
+  it('CONV-PAGE-01: a shard that outran the 128-body window is paged BACK to what the device already holds — and a real gap is said once', async () => {
+    // MEASURED 2026-08-21 on the owner's incoming shards: 159, 213, 371, 2156 and 3968 capsules in one direction-epoch,
+    // single senders, thousands in minutes. The reader took the newest 128 bodies, the app's high-water jumped to the
+    // top, and every body between the mark and the window was lost without a word — except fifteen "page cap" lines
+    // every twelve seconds, one per shard, saying the same thing forever.
+    const A: any = await createMessagingIdentity();
+    const B: any = await createMessagingIdentity();
+    const bBundle = exportPublicKeyBundle(B.encryptionKeyPair);
+    const routeA = await outgoingRecordShard({ kRoot, selfKeyId: keyIdA, peerKeyId: keyIdB, createdAtSec: CREATED });
+    const N = 700;
+    const rows: Array<{ bodyCell: any; source: null; createdLt: string; seq: number }> = [];
+    for (let seq = 1; seq <= N; seq += 1) {
+      const capsule = await createEncryptedConvCapsule(`msg ${seq}`, bBundle, A, routeA.bucketKey, {});
+      const built = await buildConvPublishWalletMessage({
+        writePublicKey: routeA.writePublicKey, writeSecret: routeA.writeSecret, seq, epoch: routeA.epoch, capsule, value: CONV_PUBLISH_VALUE,
+      });
+      rows.push({ bodyCell: onWire(built.body), source: null, createdLt: String(1_000 + seq), seq });
+    }
+    const shardKey = addrKey(rows.length ? (await buildConvPublishWalletMessage({
+      writePublicKey: routeA.writePublicKey, writeSecret: routeA.writeSecret, seq: 1, epoch: routeA.epoch,
+      capsule: await createEncryptedConvCapsule('addr', bBundle, A, routeA.bucketKey, {}), value: CONV_PUBLISH_VALUE,
+    })).to : '');
+    // toncenter-shaped: newest first, 128 per call, `end_lt` honoured (MEASURED).
+    const reads: any[] = [];
+    const readMessagesWithSource = async (address: string, options: any = {}) => {
+      reads.push(options);
+      if (addrKey(address) !== shardKey) return [];
+      const endLt = options?.endLt == null ? null : BigInt(options.endLt);
+      return rows.filter((r) => endLt === null || BigInt(r.createdLt) <= endLt).sort((a, b) => b.seq - a.seq).slice(0, 128)
+        .map(({ bodyCell, source, createdLt }) => ({ bodyCell, source, createdLt }));
+    };
+    const lane = createConvReadLane({ readMessagesWithSource });
+    const warns: any[] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: any[]) => { warns.push(args.join(' ')); };
+    try {
+      // The device holds up to seq 100. The newest window (573..700) does not reach it: page back until it does.
+      reads.length = 0;
+      const entries = await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2, knownSeqOf: () => 100 });
+      const seqs = new Set(entries.map((e: any) => Number(e.seq)));
+      for (let seq = 101; seq <= N; seq += 1) expect(seqs.has(seq), `seq ${seq} must be readable — it was never read before`).toBe(true);
+      expect(reads.filter((o) => o?.endLt != null).length, 'four older pages: 445.., 317.., 189.., 61..').toBe(4);
+      expect(lane.shardReadStats().pagedBack, 'counted').toBe(4);
+      expect(warns, 'the window was closed, so nothing to say').toEqual([]);
+
+      // The device holds almost nothing (seq 10): the cap stops paging at seq 61 — a REAL gap, said ONCE.
+      reads.length = 0;
+      await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2, knownSeqOf: () => 10 });
+      expect(warns.length, 'one honest line').toBe(1);
+      expect(warns[0]).toMatch(/outran the reader/);
+      await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2, knownSeqOf: () => 10 });
+      expect(warns.length, 'not a line per pass').toBe(1);
+
+      // No mark from the caller: the window is read as before, nothing is paged, nothing is said.
+      reads.length = 0;
+      const plain = await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2 });
+      expect(plain.length, 'the newest 128').toBe(128);
+      expect(reads.filter((o) => o?.endLt != null).length).toBe(0);
+    } finally {
+      console.warn = origWarn;
+    }
+  }, 300_000);
+
   it('CONV-LANE-02: a conversation with no published messages reads back empty (clean, not an error)', async () => {
     const lane = createConvReadLane({ readMessagesWithSource: async () => [] });
     const entries = await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2 });

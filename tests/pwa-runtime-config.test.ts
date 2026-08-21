@@ -7356,6 +7356,23 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain('for (const item of windowItems.slice().reverse()) {');
   });
 
+  it('PWA-CONVPAGE-01: the private sync hands the lane its high-water, so a shard that outran the window is paged back', () => {
+    // MEASURED 2026-08-21: incoming shards of 2156 and 3968 capsules in one direction-epoch behind a 128-body window.
+    // The lane can only page back to what the device holds if the app tells it what that is (CONV-PAGE-01 proves the
+    // lane's half); this pins that the app passes the mark, keyed the same way the mark is kept.
+    const app = readFileSync('web/app.js', 'utf8');
+    const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('async function syncPrivateCapsulesFromChain('));
+    expect(sync).toMatch(/knownSeqOf: \(bucket\) => convBucketSeqHighWater\(String\(bucket \?\? ''\)\),/);
+    // The same key the app advances: the lane's bucket.address is what the app stores the mark under.
+    expect(sync).toContain("const bucket = String(found.address ?? '');");
+    expect(sync).toContain('advanceConvBucketSeqHighWater(bucket, seq)');
+    // And the INTRO twin: a replay is tagged by the handler and retired by the runner, never re-fetched.
+    const handler = readFileSync('web/intro-receive-handler.mjs', 'utf8');
+    const runner = readFileSync('web/intro-scan-runner.mjs', 'utf8');
+    expect(handler).toContain("error.code = 'INTRO_REPLAY';");
+    expect(runner).toMatch(/if \(error\?\.code === 'INTRO_REPLAY'\) \{\s*\n\s*delivered\.set\(key, hit\.epoch\);/);
+  });
+
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {
     // Owner, 2026-08-04: "скорость важна". Two large images landed 22s and 37s apart on chain — both published, but
     // far past the 1-5s of index lag the seqno fix was expected to cost. Guessing the owner phase is the mistake

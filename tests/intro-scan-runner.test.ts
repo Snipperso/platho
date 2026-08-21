@@ -386,6 +386,31 @@ describe('INTRO-SCAN-RUNNER — the loop a user actually experiences', () => {
     runner.stop();
   }, 300_000);
 
+  it('RUN-13: a REPLAY is recorded, not retried — the same copy is never fetched again', async () => {
+    // OBSERVED 2026-08-21: the same INTRO published twice (entries 375 and 376 of one bucket). The first was adopted;
+    // the second hit the replay guard, which throws — and the runner treated the throw as transient, rolled the
+    // cursor back, and fetched entry 376 once a minute for good. A replay is permanent by construction (the nonce
+    // stays seen), so it is recorded like a delivery and left alone. Any OTHER throw still rolls back and retries.
+    const mine = x25519.utils.randomSecretKey();
+    await publishIntroTo(mine, 4);
+
+    const store = createMemoryIntroCursorStore();
+    let attempts = 0;
+    const errors: any[] = [];
+    const runner = makeRunner(mine, store, [], {
+      onIntro: async () => { attempts += 1; const e: any = new Error('INTRO replay detected (introNonce already seen)'); e.code = 'INTRO_REPLAY'; throw e; },
+      onError: (error: any) => errors.push(error),
+    });
+    await runner.start();
+    expect(attempts, 'the replay was attempted once').toBe(1);
+    expect(errors.length, 'and reported once').toBe(1);
+    expect(runner.lastStats!.replays, 'and counted as a replay').toBe(1);
+
+    for (let i = 0; i < 6; i += 1) await advance(5 * 60_000);
+    expect(attempts, 'a replay is never re-delivered — the hit is in the ledger').toBe(1);
+    runner.stop();
+  }, 300_000);
+
   it('RUN-11: the delivery ledger is pruned, so it cannot grow for the life of the install', async () => {
     const mine = x25519.utils.randomSecretKey();
     await publishIntroTo(mine, 3);

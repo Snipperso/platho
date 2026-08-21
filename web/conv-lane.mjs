@@ -27,6 +27,17 @@ import { addrKey } from './shard-discovery.mjs?v=20';
 // [conv-receive review]
 const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
 
+// HOW MANY OLDER BODY PAGES ONE PASS MAY PULL for a shard whose newest window did not reach what we already hold.
+//
+// MEASURED 2026-08-21 on the owner's incoming shards: record counts of 159, 213, 371, 2156 and 3968 in ONE
+// direction-epoch — single senders writing thousands of capsules in minutes (3968 in ten). The reader took the newest
+// 128 bodies and the high-water mark jumped to the top, so everything between the mark and the window was never read:
+// not a warning, a loss. Paging back by lt (toncenter `end_lt`, measured honoured) closes the gap for any honest
+// burst; the cap keeps a flood from turning one sync pass into a thousand requests — beyond it the gap is real and
+// is said ONCE per shard, not once per pass (fifteen shards at the cap produced fifteen lines every twelve seconds).
+const CONV_MAX_OLDER_BODY_PAGES = 4;
+const convGapWarnedShards = new Set();
+
 /**
  * Build the CONV read lane.
  *
@@ -102,7 +113,7 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
      * epochNow]. Each entry is ready for openPrivateCapsuleChainEntry. Foreign/malformed/wrong-signature bodies are
      * dropped. A shard whose read throws is skipped (its conversation window is best-effort, never fatal to the rest).
      */
-    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null }) {
+    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null }) {
       // `shards` lets a caller that already derived these buckets hand them over rather than pay the HKDF twice;
       // `states` lets a caller that batched the accountStates read for MANY conversations at once share the answer
       // (1024 addresses fit one request, so every conversation's window costs one request between them all).
@@ -131,12 +142,56 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
         let messages;
         try { messages = await readMessagesWithSource(bucket.address); } catch { continue; }
         laneStats.read += 1;
-        if (marker !== null) markShard(key, marker);
-        if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT) {
-          // Not silent: a shard at the page cap may hide older bodies (no pagination yet). Ordinary text stays well
-          // under this; a burst / large multipart in one direction-epoch can hit it. Pagination is the fix.
-          console.warn('[conv] incoming shard at message page cap — older bodies may be unread', bucket.address, messages.length);
+        // THE NEWEST WINDOW MAY NOT REACH WHAT WE ALREADY HOLD. The caller knows the highest seq it has stored for
+        // this shard (knownSeqOf); if the window is full and its oldest capsule is still above that mark, the bodies
+        // in between were never read — page back by lt until the mark is reached, the history runs out, or the cap
+        // says stop. A caller that gives no mark gets the window as before.
+        let pagedBack = 0;
+        let olderReadFailed = false;
+        if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT && typeof knownSeqOf === 'function') {
+          const known = Number(knownSeqOf(bucket.address));
+          const oldestSeqOf = (rows) => {
+            let oldest = null;
+            for (const row of rows ?? []) {
+              const seq = Number(parseCapsulePublishBody(row?.bodyCell)?.seq);
+              if (Number.isFinite(seq) && (oldest === null || seq < oldest)) oldest = seq;
+            }
+            return oldest;
+          };
+          const oldestLtOf = (rows) => {
+            let oldest = null;
+            for (const row of rows ?? []) {
+              if (row?.createdLt == null) continue;
+              try { const lt = BigInt(row.createdLt); if (oldest === null || lt < oldest) oldest = lt; } catch { /* not an lt */ }
+            }
+            return oldest;
+          };
+          let page = messages;
+          while (pagedBack < CONV_MAX_OLDER_BODY_PAGES) {
+            const oldestSeq = oldestSeqOf(page);
+            if (oldestSeq === null || (Number.isFinite(known) && oldestSeq <= known + 1)) break;   // reached what we hold
+            const oldestLt = oldestLtOf(page);
+            if (oldestLt === null) break;                                   // no lt on the wire — cannot page
+            let older;
+            // An older page that FAILED leaves no mark on this shard (below): the newest window was read, but the
+            // pass did not see everything it could have, so the next pass must come back even if nobody writes.
+            try { older = await readMessagesWithSource(bucket.address, { endLt: String(oldestLt - 1n) }); } catch { olderReadFailed = true; break; }
+            if (!older || older.length === 0) break;                        // the history ran out
+            pagedBack += 1;
+            laneStats.pagedBack = (laneStats.pagedBack ?? 0) + 1;
+            messages = [...messages, ...older];
+            page = older;
+          }
+          const stillOldest = oldestSeqOf(page);
+          const gapRemains = stillOldest !== null && Number.isFinite(known) && stillOldest > known + 1
+            && pagedBack >= CONV_MAX_OLDER_BODY_PAGES;
+          if (gapRemains && !convGapWarnedShards.has(key)) {
+            convGapWarnedShards.add(key);
+            laneStats.gaps = (laneStats.gaps ?? 0) + 1;
+            console.warn('[conv] incoming shard outran the reader — bodies between seq', known, 'and', stillOldest, 'could not be paged this pass (cap', CONV_MAX_OLDER_BODY_PAGES, 'pages); said once for', bucket.address);
+          }
         }
+        if (marker !== null && !olderReadFailed) markShard(key, marker);
         for (const { bodyCell } of messages ?? []) {
           const parsed = parseCapsulePublishBody(bodyCell);
           if (!parsed) continue;

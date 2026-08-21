@@ -145,6 +145,7 @@ export function createIntroScanRunner({
       // check the ledger first, so a retry cannot become a duplicate. The ledger is written immediately after a
       // successful hand-off, in the same save as the cursors below.
       let deliveries = 0;
+      let replays = 0;
       const undelivered = new Set();
       for (const hit of result.hits) {
         const key = deliveryKey(hit);
@@ -168,6 +169,15 @@ export function createIntroScanRunner({
           deliveries += 1;
         } catch (error) {
           onError(error);
+          // A REPLAY is not a failed delivery, it is a second copy of a contact already delivered (the guard keeps the
+          // nonce for good, so the refusal is permanent). Record the hit like a delivery and move on: re-reading it
+          // every pass could only throw again — which is exactly what it did, once a minute, for entries 375 and 376
+          // of one bucket on 2026-08-21. The first copy was adopted; the second is noise the runner now absorbs.
+          if (error?.code === 'INTRO_REPLAY') {
+            delivered.set(key, hit.epoch);
+            replays += 1;
+            continue;
+          }
           // NOT recorded — and its shard's cursor must not advance either, or the next pass will never re-read
           // the entry and the first contact is lost for good. Leaving the cursor alone costs one re-read.
           undelivered.add(hit.key);
@@ -208,7 +218,7 @@ export function createIntroScanRunner({
       await store.saveDelivered?.(pruneDelivered(delivered, oldestUseful));
       await store.saveMeta(nextMeta);
 
-      lastStats = { ...result.stats, delivered: deliveries, unfetchable: unfetchable.size, plan: { full: plan.full, intervalMs: plan.intervalMs, estimatedDailyBytes: plan.estimatedDailyBytes } };
+      lastStats = { ...result.stats, delivered: deliveries, replays, unfetchable: unfetchable.size, plan: { full: plan.full, intervalMs: plan.intervalMs, estimatedDailyBytes: plan.estimatedDailyBytes } };
       return { hits: result.hits.length, delivered: deliveries, stats: lastStats, nextIntervalMs: plan.intervalMs };
     } finally {
       passInFlight = false;

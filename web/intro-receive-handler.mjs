@@ -56,10 +56,23 @@ export function createIntroReceiveHandler({
     const capsule = delivery?.capsule ?? delivery;
     const header0Bytes = asBytes(capsule.header0, 'intro header0');
     const bodyBytes = asBytes(capsule.body, 'intro body');
-    const opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, {
-      introReplayGuard: introReplayGuard ?? undefined,
-      enforceExpiry: false,
-    });
+    let opened;
+    try {
+      opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, {
+        introReplayGuard: introReplayGuard ?? undefined,
+        enforceExpiry: false,
+      });
+    } catch (error) {
+      // A REPLAY IS TERMINAL, and the runner has to be able to tell. The guard refuses a byte-identical capsule for
+      // good — the nonce stays seen — so re-trying this hit on the next pass can only throw again. Without the tag the
+      // runner treated the throw as transient, rolled the shard's cursor back, and fetched the same entry once a minute
+      // for as long as the app lived (OBSERVED 2026-08-21, entries 375 and 376 of one bucket: the same INTRO published
+      // twice). The throw itself stays: a replay must not be adopted, and IRH-04 pins that it is refused.
+      if (error && /INTRO replay detected/i.test(String(error.message ?? ''))) {
+        try { error.code = 'INTRO_REPLAY'; } catch { /* frozen error — the message still says it */ }
+      }
+      throw error;
+    }
 
     // Adoption ordering MUST be the CONTRACT-STAMPED created_at surfaced by fetchIntroCapsule (IntroShard stamps now()):
     // it is the ONLY recency value both sides read identically. A local clock here would let the two parties disagree on

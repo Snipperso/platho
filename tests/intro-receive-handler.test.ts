@@ -118,6 +118,23 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     await expect(onIntro(unfetched)).rejects.not.toThrow(/must be a TON cell/);
   });
 
+  it('IRH-07: a replay still throws (IRH-04), and the throw is TAGGED so the runner can retire it', async () => {
+    // OBSERVED 2026-08-21: the same INTRO published twice. The guard refused the second copy — correctly — but the
+    // runner could not tell a permanent refusal from a transient failure, rolled the cursor back, and fetched the
+    // copy once a minute for good. The handler keeps refusing; it now says WHY in a code the runner can read.
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, { firstMessageBytes: utf8('дважды') });
+    const guard = createMemoryReplayStore();
+    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: createMemoryConvKeyStore(), introReplayGuard: guard });
+    expect((await onIntro(asScanCapsule(built, 1_790_000_000, '0:' + 'ab'.repeat(32)))).adoption).toBe('created');
+    let caught: any = null;
+    try { await onIntro(asScanCapsule(built, 1_790_000_001, '0:' + 'ab'.repeat(32))); } catch (error) { caught = error; }
+    expect(caught, 'the copy is refused').not.toBeNull();
+    expect(String(caught.message)).toMatch(/replay/i);
+    expect(caught.code, 'and the refusal is named').toBe('INTRO_REPLAY');
+  });
+
   // ── IRH-04/05: the replay guard has to OUTLIVE a reload (wave-7 audit) ─────────────────────────────────────
   // openIntroCapsuleFromChainCells states it plainly: the intro nonce is the ONLY thing that stops a byte-identical
   // replay, because the transcript signature, the keyId binding and the confirm tag are all valid on a replay by

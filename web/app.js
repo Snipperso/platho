@@ -174,15 +174,15 @@ import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMess
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=26';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=5';
+import { createIntroLane } from './intro-lane.mjs?v=27';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
 import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=18';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=21';
+import { createConvReadLane } from './conv-lane.mjs?v=22';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=20';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=19';
 import { readAccountStates } from './shard-reader.mjs?v=18';
@@ -13273,6 +13273,10 @@ async function syncConvCapsulesFromShards() {
       try {
         entries = await lane.readIncoming({
           kRoot, selfKeyId, peerKeyId, epochNow, windowW: plan.windowW, shards, states: shardStates,
+          // What this device already holds per shard, so a window that does not reach it is paged back rather than
+          // letting the mark jump over unread bodies (MEASURED 2026-08-21: shards of 2156 and 3968 capsules in one
+          // direction-epoch behind a 128-body window).
+          knownSeqOf: (bucket) => convBucketSeqHighWater(String(bucket ?? '')),
         });
       } catch (error) {
         convClean = false; allClean = false;
