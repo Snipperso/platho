@@ -131,6 +131,16 @@ describe('CONV-LANE (read assembly)', () => {
       const plain = await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2 });
       expect(plain.length, 'the newest 128').toBe(128);
       expect(reads.filter((o) => o?.endLt != null).length).toBe(0);
+
+      // A COLD shard (mark -1: nothing held from it — a fresh device, a deleted dialog) is not a gap: the newest
+      // window, no paging, no line. OBSERVED 2026-08-21 on the owner's reload: "bodies between seq -1 and 3694" on a
+      // farm-bot shard — five pages of spam decrypted per shard per reload for nothing.
+      reads.length = 0;
+      const warnsBefore = warns.length;
+      const cold = await lane.readIncoming({ kRoot, selfKeyId: keyIdB, peerKeyId: keyIdA, epochNow: EPOCH, windowW: 2, knownSeqOf: () => -1 });
+      expect(cold.length, 'the newest 128, as a cold start always read').toBe(128);
+      expect(reads.filter((o) => o?.endLt != null).length, 'no paging for a shard with no mark').toBe(0);
+      expect(warns.length, 'and nothing said').toBe(warnsBefore);
     } finally {
       console.warn = origWarn;
     }

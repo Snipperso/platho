@@ -48,8 +48,8 @@
     "sha256": "91b978490fc3da588108b7c735be74fa4b166d8d10db27690a39bed58e8e7af0"
   },
   "conv-lane.mjs": {
-    "version": "22",
-    "sha256": "70c2399e39f0d61d8b9b0de9f8adf8f3297f9dfc5e9782e52b877d89a48157f6"
+    "version": "23",
+    "sha256": "550f1b354af880476fda5bb71983aaa1a4cb389930f42c157bc0ca124b4870cc"
   },
   "conv-publish-browser.mjs": {
     "version": "4",

@@ -148,8 +148,14 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
         // says stop. A caller that gives no mark gets the window as before.
         let pagedBack = 0;
         let olderReadFailed = false;
-        if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT && typeof knownSeqOf === 'function') {
-          const known = Number(knownSeqOf(bucket.address));
+        // ONLY WHEN THERE IS A MARK TO REACH. A device that holds nothing from this shard (mark -1: a cold start, a
+        // dialog deleted locally, history cleared) has no gap between "what I hold" and the window — it has a
+        // window, and reading five pages of it instead of one buys little and costs five times the decryption
+        // (OBSERVED 2026-08-21 on the owner's reload: "bodies between seq -1 and 3694" on two shards a farm bot had
+        // filled with thousands of capsules — 640 spam bodies opened per shard per reload). So a cold shard reads
+        // the newest window as it always did, silently; paging back is for a mark the window did not reach.
+        const known = typeof knownSeqOf === 'function' ? Number(knownSeqOf(bucket.address)) : NaN;
+        if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT && Number.isFinite(known) && known >= 0) {
           const oldestSeqOf = (rows) => {
             let oldest = null;
             for (const row of rows ?? []) {
