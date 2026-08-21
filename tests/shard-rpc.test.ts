@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { beginCell } from '@ton/core';
 import { createShardStatesRequest, createShardMessagesReader, createShardMessagesWithSourceReader } from '../web/shard-rpc.mjs';
-import { readAccountStates } from '../web/shard-reader.mjs';
+import { readAccountStates, refusedIndexFromDetail, __resetRefusedAddressesForTests } from '../web/shard-reader.mjs';
 import { toncenterScanLaneOptions } from '../web/ton-rpc-transport.mjs';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 
@@ -119,6 +119,57 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     await expect(readAccountStates([bad], { request })).resolves.toBeTruthy();   // single refused → unknown, no throw
     const plain = createShardStatesRequest({ endpoint: ENDPOINT, fetch: async () => ({ ok: false, status: 422, text: async () => '{"detail":"why"}' }) as any });
     await expect(plain({ path: '/accountStates?address=x' })).rejects.toThrow(/HTTP 422: \{"detail":"why"\}/);
+  });
+
+  it('RPC-04D: when toncenter NAMES the refused position, that address is excised in one request and remembered for the session', async () => {
+    // OWNER'S CONSOLE 2026-08-21, after RPC-04C shipped: a column of identical red 422 rows — the same probe, every
+    // pass, bisected from the top every time. Two facts the first cut missed. (1) toncenter v3 says WHICH address:
+    // {"error":"failed to decode: schema: error converting value for index N of \"address\""} — measured live the
+    // same day. (2) A refusal is about the address, not the moment, so asking again next pass is the same 422.
+    // So: excise the named index and ask the rest ONCE (2 requests for any batch size, not 2·log2 N), and remember
+    // the refused wire address so later batches answer it from memory with no request at all.
+    __resetRefusedAddressesForTests();
+    const addrs = Array.from({ length: 8 }, (_, i) => '0:' + (0x60 + i).toString(16).repeat(32));
+    const bad = addrs[5];
+    const urls: string[] = [];
+    const fetchImpl = async (url: string) => {
+      urls.push(String(url));
+      const asked = new URL(String(url)).searchParams.getAll('address');
+      const at = asked.indexOf(bad);
+      if (at >= 0) {
+        // The live body, verbatim shape (a Go schema decoder naming the index).
+        return { ok: false, status: 422, text: async () => `{"error":"failed to decode: schema: error converting value for index ${at} of \\"address\\""}` } as any;
+      }
+      return { ok: true, status: 200, json: async () => ({ accounts: asked.map((a) => ({ address: a, status: 'active', balance: '1', data_hash: 'h', last_transaction_lt: '9' })) }) } as any;
+    };
+    const request = createShardStatesRequest({ endpoint: ENDPOINT, fetch: fetchImpl, strict: true });
+    const first = await readAccountStates(addrs, { request });
+    expect(urls.length, 'full batch (422, index named) + the other seven in ONE request').toBe(2);
+    expect(new URL(urls[1]).searchParams.getAll('address')).toEqual(addrs.filter((a) => a !== bad));
+    for (const a of addrs) expect(first.get(a)?.status, a).toBe(a === bad ? 'unknown' : 'active');
+    expect(first.get(bad)?.refused).toBe(true);
+    // Next pass: the refused address never reaches the wire again; the rest is one clean request.
+    const second = await readAccountStates(addrs, { request });
+    expect(urls.length, 'one more request, and it does not carry the refused address').toBe(3);
+    expect(new URL(urls[2]).searchParams.getAll('address')).not.toContain(bad);
+    expect(second.get(bad)?.status, 'still present as UNKNOWN — never omitted').toBe('unknown');
+    expect(second.size).toBe(8);
+    // The parser itself, against the live body and against bodies that do not name a position.
+    expect(refusedIndexFromDetail('{"error":"failed to decode: schema: error converting value for index 0 of \\"address\\""}')).toBe(0);
+    expect(refusedIndexFromDetail('{"error":"failed to decode: schema: error converting value for index 1023 of "address"}')).toBe(1023);
+    expect(refusedIndexFromDetail('{"detail":[{"loc":["query","address",3],"msg":"invalid address"}]}')).toBe(-1);
+    expect(refusedIndexFromDetail('')).toBe(-1);
+    expect(refusedIndexFromDetail(null)).toBe(-1);
+    // An index the body names but the batch does not have (a proxy's lie) falls back to bisection, never throws.
+    __resetRefusedAddressesForTests();
+    const lying = createShardStatesRequest({ endpoint: ENDPOINT, fetch: async (url: string) => {
+      const asked = new URL(String(url)).searchParams.getAll('address');
+      if (asked.length > 1) return { ok: false, status: 422, text: async () => '{"error":"failed to decode: schema: error converting value for index 99 of \\"address\\""}' } as any;
+      return { ok: true, status: 200, json: async () => ({ accounts: asked.map((a) => ({ address: a, status: 'active', balance: '1', data_hash: 'h', last_transaction_lt: '9' })) }) } as any;
+    }, strict: true });
+    const viaBisect = await readAccountStates(addrs.slice(0, 2), { request: lying });
+    expect(viaBisect.size).toBe(2);
+    __resetRefusedAddressesForTests();
   });
 
   it('RPC-04B: a STRICT reader refuses to turn a request that never ran into an empty account list', async () => {

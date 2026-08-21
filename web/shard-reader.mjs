@@ -55,11 +55,47 @@ export function toWireAddress(address) {
  * Returns a Map keyed by the canonical address string. ABSENT MEANS EMPTY: a bucket nobody has written to has no
  * account, which is the normal case under lazy deploy, not a failure.
  */
+// ADDRESSES THE ENDPOINT HAS REFUSED THIS SESSION, by wire form. A refusal is a verdict about the address, not about
+// the moment: the same probe runs every pass (the conversation sweep, the recovery-slot check), and a refused address
+// asked again is the same 422 again — the owner's console, 2026-08-21, was a column of identical red rows. Once
+// refused, an address is answered from here as UNKNOWN and never put on the wire again until reload.
+const refusedWire = new Set();
+// Whether a 422 whose body does NOT name the position has been reported this session. One line, red, with the
+// endpoint's own words: the owner reads the console by its red rows, and a handled-but-unexplained refusal that
+// only ever warned in yellow stayed invisible to them (2026-08-21, twice).
+let unnamedRefusalReported = false;
+export function __resetRefusedAddressesForTests() { refusedWire.clear(); unnamedRefusalReported = false; }
+
+const refusedRow = (wire) => ({ address: wire, status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });
+
+/**
+ * Which address a 422 is about, when the endpoint says. toncenter v3 names the culprit by position:
+ *   {"error":"failed to decode: schema: error converting value for index 7 of \"address\""}
+ * -1 when the body does not say (an older endpoint, a proxy, a different reason) — the caller then bisects.
+ */
+export function refusedIndexFromDetail(detail) {
+  const m = /index (\d+) of \\?"address\\?"/.exec(String(detail ?? ''));
+  return m ? Number(m[1]) : -1;
+}
+
 export async function readAccountStates(addresses, { request, includeBoc = false, chunkSize } = {}) {
   if (typeof request !== 'function') throw new Error('readAccountStates requires a `request` function');
   const out = new Map();
+  const noteRefused = (wire, detail) => {
+    // Red on purpose, once per address per session: this is an address the app built and the endpoint will not
+    // parse, which is either a client bug or an endpoint change — both need a human, and the human reads red rows.
+    if (!refusedWire.has(wire)) console.error('[states] the endpoint refused one address — left UNKNOWN, not absent:', wire, detail ?? '');
+    refusedWire.add(wire);
+    out.set(addrKey(wire), refusedRow(wire));
+  };
   const readGroup = async (group) => {
-    const wire = group.map(toWireAddress);
+    const wire = [];
+    for (const address of group) {
+      const w = toWireAddress(address);
+      if (refusedWire.has(w)) out.set(addrKey(w), refusedRow(w));   // answered from memory, not from the wire
+      else wire.push(w);
+    }
+    if (wire.length === 0) return;
     const qs = wire.map((a) => `address=${encodeURIComponent(a)}`).join('&');
     const path = `/accountStates?${qs}&include_boc=${includeBoc ? 'true' : 'false'}`;
     let body;
@@ -68,20 +104,30 @@ export async function readAccountStates(addresses, { request, includeBoc = false
     } catch (error) {
       // A 422 IS ABOUT THE REQUEST, NOT THE ENDPOINT. The owner's console, 2026-08-21: one probe over every
       // conversation's shards answered 422, and the whole probe was abandoned — every shard then read the slow way,
-      // every pass. Whatever the endpoint refused (one address it will not take, a length it will not take), the
-      // rest of the batch is still answerable: split it and ask again, down to single addresses. A single address
-      // the endpoint still refuses is recorded as UNKNOWN — not omitted, because for the lanes that read this map
-      // an omitted address means "never written, skip it", and that is the silent-loss shape. An unknown row
-      // carries no marker, which every lane already treats as "read it, remember nothing".
-      if (error?.status === 422 && group.length > 1) {
-        const mid = Math.ceil(group.length / 2);
-        await readGroup(group.slice(0, mid));
-        await readGroup(group.slice(mid));
-        return;
-      }
-      if (error?.status === 422 && group.length === 1) {
-        console.warn('[states] the endpoint refused one address — left UNKNOWN, not absent', wire[0], error?.detail ?? '');
-        out.set(addrKey(wire[0]), { address: wire[0], status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });
+      // every pass. Whatever the endpoint refused, the rest of the batch is still answerable. When the body NAMES
+      // the position, that one address is excised and the rest asked again in ONE request; when it does not, the
+      // batch is split and asked again, down to single addresses. A refused address is recorded as UNKNOWN — not
+      // omitted, because for the lanes that read this map an omitted address means "never written, skip it", and
+      // that is the silent-loss shape. An unknown row carries no marker, which every lane already treats as "read
+      // it, remember nothing".
+      if (error?.status === 422) {
+        const index = refusedIndexFromDetail(error?.detail);
+        if (index >= 0 && index < wire.length) {
+          noteRefused(wire[index], error?.detail);
+          if (wire.length > 1) await readGroup([...wire.slice(0, index), ...wire.slice(index + 1)]);
+          return;
+        }
+        if (wire.length > 1) {
+          if (!unnamedRefusalReported) {
+            unnamedRefusalReported = true;
+            console.error(`[states] HTTP 422 on a batch of ${wire.length} addresses and the body names no position — splitting it; the endpoint said:`, error?.detail ?? '(empty body)');
+          }
+          const mid = Math.ceil(wire.length / 2);
+          await readGroup(wire.slice(0, mid));
+          await readGroup(wire.slice(mid));
+          return;
+        }
+        noteRefused(wire[0], error?.detail);
         return;
       }
       throw error;
