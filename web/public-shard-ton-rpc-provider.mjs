@@ -267,7 +267,12 @@ export function createPublicShardTonRpcProvider(options = {}) {
      * newest first — bodyCell is the raw inbound message body, source the sender address. web/shard-rpc's
      * createShardMessagesReader yields the cells; a thin wrapper adds the per-message source.
      */
-    async readPosts(shardAddress, { readMessagesWithSource, fromId = null, maxCount = 96n, callOptions = {}, entryCount = null } = {}) {
+    // `messagesEndLt`: read the BODIES from the window ending at this lt (inclusive) instead of the newest one. A
+    // paged read of older rows needs older bodies — matching rows 58..153 of a 250-row shard against the newest 128
+    // messages found nothing, which is how "show earlier comments" worked once and then did nothing (owner,
+    // 2026-08-21). The result reports `oldestLt`, the lt of the oldest body it matched, so the caller can ask for
+    // the window before it next time.
+    async readPosts(shardAddress, { readMessagesWithSource, fromId = null, maxCount = 96n, callOptions = {}, entryCount = null, messagesEndLt = null } = {}) {
       if (typeof readMessagesWithSource !== 'function') {
         throw new PublicShardTonRpcProviderError('readPosts requires a readMessagesWithSource(address) function');
       }
@@ -291,7 +296,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
         start = BigInt(fromId);
       }
       // The bodies are read ONCE and reused across pages: /messages is the expensive call, get_page is cheap.
-      const messages = await readMessagesWithSource(raw);
+      const messages = await readMessagesWithSource(raw, messagesEndLt === null || messagesEndLt === undefined ? {} : { endLt: messagesEndLt });
       const matchRows = async (rows) => {
         // [CHANGED 2026-07-30, wave-8 HIGH] On a duplicate body_commit the OLDEST entry wins, not the newest.
         //
@@ -333,6 +338,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
             publisher: source,
             header: parsed.header,
             body: parsed.body,
+            lt: message.createdLt ?? null,   // where in the shard's message history this body sits — for paging back
           });
         }
         return out;
@@ -362,7 +368,14 @@ export function createPublicShardTonRpcProvider(options = {}) {
         cursor = cursor > BigInt(maxCount) ? cursor - BigInt(maxCount) : 0n;
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
-      return { entry_count: entryCountSeen, posts };
+      // The oldest body this read matched, as a decimal lt string (null when the endpoint gave no lt, or nothing
+      // matched). A caller paging backwards passes `messagesEndLt: oldestLt - 1` next time.
+      let oldestLt = null;
+      for (const post of posts) {
+        if (post.lt == null) continue;
+        try { if (oldestLt === null || BigInt(post.lt) < BigInt(oldestLt)) oldestLt = String(post.lt); } catch { /* not an lt */ }
+      }
+      return { entry_count: entryCountSeen, posts, oldestLt };
     },
   };
 }

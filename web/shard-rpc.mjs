@@ -178,7 +178,13 @@ function rowIsForeign(row, opcode) {
  * Returns `{ rows, serverFiltered, pages }`. `serverFiltered` is false when the endpoint handed back rows we
  * did not ask for — the caller may want to know its window was assembled the expensive way.
  */
-async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false }) {
+// `endLt`, when given, moves the window BACK in time: only messages with created_lt <= endLt are returned (toncenter
+// v3 `end_lt`, inclusive — MEASURED 2026-08-21 against the live endpoint, honoured). It is what lets a reader page
+// a shard's bodies backwards in step with get_page: without it every page of older ROWS was matched against the
+// NEWEST 128 bodies, so "show earlier comments" worked exactly once per 128 comments and then matched nothing.
+// An endpoint that ignored the parameter would hand the newest window back under an older name, so rows above the
+// bound are dropped here rather than trusted.
+async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false, endLt = null }) {
   const headers = { Accept: 'application/json' };
   if (key) headers['X-API-Key'] = key;
   const rows = [];
@@ -186,6 +192,7 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
   let offset = 0;
   let pages = 0;
   let previousPageMark = null;
+  const bound = endLt === null || endLt === undefined ? null : BigInt(endLt);
 
   for (let page = 0; page < maxPages; page += 1) {
     const url = new URL(base);
@@ -193,6 +200,7 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('sort', 'desc');
     if (opcode !== null && opcode !== undefined) url.searchParams.set('opcode', opcodeParam(opcode));
+    if (bound !== null) url.searchParams.set('end_lt', String(bound));
     if (offset > 0) url.searchParams.set('offset', String(offset));
 
     const response = await scheduleToncenterHttpRequest(
@@ -225,9 +233,12 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     if (offset > 0 && pageMark === previousPageMark) break;
     previousPageMark = pageMark;
 
-    const wanted = (opcode === null || opcode === undefined)
+    const inBound = bound === null
       ? pageRows
-      : pageRows.filter((row) => !rowIsForeign(row, opcode));
+      : pageRows.filter((row) => { try { return row?.created_lt == null || BigInt(row.created_lt) <= bound; } catch { return false; } });
+    const wanted = (opcode === null || opcode === undefined)
+      ? inBound
+      : inBound.filter((row) => !rowIsForeign(row, opcode));
     // A row belonging to someone else is the ONLY proof that the filter was ignored — the status code says
     // nothing, since an unknown query parameter is dropped silently and still answers 200.
     if (wanted.length !== pageRows.length) serverFiltered = false;
@@ -291,20 +302,23 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
 // `opcode` is what keeps that budget spent on real publishes rather than on whatever a stranger chose to send —
 // see the measured block above. Each lane passes its own: PSP1 for public posts, ISP1 for first contacts, RSP1
 // for CONV capsules. Omitting it preserves the take-everything behaviour.
+// `endLt` (second argument, optional) moves the window back in time — see readMessageRows. Each row carries its
+// `createdLt` (toncenter's created_lt, a decimal string, or null) so a reader can record where its window ended and
+// ask for what lies before it next time.
 export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
-  return async (address) => {
+  return async (address, { endLt = null } = {}) => {
     const base = resolveEndpoint('messages', endpoint);
     const key = resolveApiKey(apiKey);
-    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict });
+    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict, endLt });
     const out = [];
     for (const message of rows) {
       const raw = message?.message_content?.body;
       if (!raw) continue;
       let bodyCell;
       try { bodyCell = parseBocBase64(raw); } catch { continue; }
-      out.push({ bodyCell, source: message?.source ?? null });
+      out.push({ bodyCell, source: message?.source ?? null, createdLt: message?.created_lt == null ? null : String(message.created_lt) });
     }
     return out;
   };

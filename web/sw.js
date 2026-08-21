@@ -1,12 +1,12 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-e43a46d32688';
+const CACHE_NAME = 'platho-pwa-09afcd69e425';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=339',
-  './app.js?v=b34c4b572',
+  './app.js?v=b8cf29b9d',
   './i18n.mjs?v=76',
   './i18n-strings.mjs?v=78',
   './boot-signal-field.mjs?v=1',
@@ -50,7 +50,7 @@ const ASSETS = [
   './intro-codec.mjs?v=2',
   './intro-cursor-store.mjs?v=1',
   './intro-lane-send.mjs?v=18',
-  './intro-lane.mjs?v=24',
+  './intro-lane.mjs?v=25',
   './intro-publish-browser.mjs?v=18',
   './intro-receive-handler.mjs?v=5',
   './intro-receive.mjs',
@@ -65,10 +65,10 @@ const ASSETS = [
   './market-stability-buy-send.mjs?v=5',
   './market-stability-read.mjs?v=1',
   './notes-lane.mjs?v=18',
-  './public-lane-send.mjs?v=18',
-  './public-lane.mjs?v=32',
-  './public-publish-browser.mjs?v=4',
-  './public-shard-ton-rpc-provider.mjs?v=4',
+  './public-lane-send.mjs?v=19',
+  './public-lane.mjs?v=33',
+  './public-publish-browser.mjs?v=5',
+  './public-shard-ton-rpc-provider.mjs?v=5',
   './publish-price.mjs?v=1',
   './recovery-blob.mjs?v=5',
   './recovery-lane.mjs?v=18',
@@ -77,7 +77,7 @@ const ASSETS = [
   './shard-address.mjs?v=7',
   './shard-discovery.mjs?v=20',
   './shard-reader.mjs?v=18',
-  './shard-rpc.mjs?v=17',
+  './shard-rpc.mjs?v=18',
   './ton-stack-num.mjs?v=1',
   './wallet-send-fee.mjs?v=6',
   './vendor/@noble/hashes/hkdf.js',
@@ -243,7 +243,7 @@ async function navigationResponse(event) {
     // This used to cache every fresh shell it fetched, which quietly broke the one property the cache exists
     // for. The shell and the asset URLs it names are versioned together and precached together under one
     // CACHE_NAME; writing a NEWER shell into the CURRENT cache leaves the pair mismatched — a shell asking for
-    // ./app.js?v=b34c4b572 while the cache holds ./app.js?v=b34c4b572. Online nobody notices, the network fills the gap.
+    // ./app.js?v=b8cf29b9d while the cache holds ./app.js?v=b8cf29b9d. Online nobody notices, the network fills the gap.
     // Offline the app will not start at all: MEASURED 2026-08-20, during the outage, the owner's own device
     // showed "resource failed: app.js?v=bf36260a7" from the boot guard while every byte it needed to run sat in
     // the cache under the previous version's URL.
@@ -295,7 +295,7 @@ async function cachedIgnoringVersion(request) {
  * This was stale-while-revalidate: serve the cached copy, then fetch the same file again in the background "in
  * case it changed". For this app that background fetch can never find anything, and it is not free.
  *
- * Every module URL here carries its content's version (./app.js?v=b34c4b572<hash>, ./conv-lane.mjs?v=21). A changed file
+ * Every module URL here carries its content's version (./app.js?v=b8cf29b9d<hash>, ./conv-lane.mjs?v=21). A changed file
  * gets a changed URL — that is the whole point of the scheme — so a cached response for a given URL cannot go
  * stale. The unversioned entries (icons, the manifest, the docs) do not need revalidating either: they are
  * refreshed by the INSTALL, which re-fetches the whole list with cache:'reload' whenever CACHE_NAME moves.

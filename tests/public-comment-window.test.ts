@@ -65,10 +65,13 @@ function laneOverThread(shard: any, rows: Array<{ header: any; body: any; source
     if (url.pathname.endsWith('/messages')) {
       const limit = Number(url.searchParams.get('limit') ?? '128');
       const offset = Number(url.searchParams.get('offset') ?? '0');
-      const all = rows.map((r) => ({
-        opcode: '0x50535031', source: r.source,
+      // created_lt grows with publish order, like the chain's; `end_lt` (inclusive) is honoured the way toncenter v3
+      // honours it (MEASURED 2026-08-21) — it is what lets the bodies page backwards in step with get_page.
+      const endLt = url.searchParams.get('end_lt');
+      const all = rows.map((r, i) => ({
+        opcode: '0x50535031', source: r.source, created_lt: String(1_000 + i),
         message_content: { body: bocBase64(publishBody(keyArg, r.header, r.body)) },
-      }));
+      })).filter((m) => endLt === null || BigInt(m.created_lt) <= BigInt(endLt));
       const ordered = url.searchParams.get('sort') === 'desc' ? [...all].reverse() : all;
       return { ok: true, status: 200, json: async () => ({ messages: ordered.slice(offset, offset + limit) }) } as any;
     }
@@ -143,6 +146,46 @@ describe('PCWINDOW — a post keeps its newest comments and loses sight of the o
     // nothing in the client that could ask for them and no way for the screen to know they existed.
     expect(first.hasMore, 'the reader must know something older is there').toBe(true);
     expect(first.shardsSeen, 'a live thread shard is proof somebody commented').toBe(1);
+  }, 600_000);
+
+  it('PCWINDOW-04: past 128 comments the BODIES page back with the rows — every press yields the page before', async () => {
+    // OWNER 2026-08-21: "Show earlier comments works once, then presses do nothing." The rows paged back through
+    // get_page, but the bodies always came from the NEWEST 128 messages: the second page of a 260-comment thread
+    // (rows 68..163) had bodies only for its newest part, the third (rows 0..67) had none — so the button kept
+    // showing (rows remained) and pressing it changed nothing. The cursor now carries the lt of the oldest body
+    // matched, and the next page reads /messages bounded at end_lt = that - 1. Mutation: drop `messagesEndLt` in
+    // the lane's paged read and the third page comes back EMPTY here.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'pcwindow-04-sink' });
+    const channel = await bc.treasury('pcwindow-04-channel');
+    const commenter = await bc.treasury('pcwindow-04-commenter');
+    const N = 260;   // three pages: 96 + 96 + 68, and more than the 128-message body window
+    const { shard, rows, postUid, channelEpochTag } = await seedThread(bc, channel.address.toString(), commenter, N);
+    expect((await shard.getGetView()).entry_count).toBe(BigInt(N));
+
+    const lane = laneOverThread(shard, rows, postUid);
+    const read = (olderThan: any = null) =>
+      lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, { channelShardSeq: 0, olderThan });
+    const span = (posts: any[]) => posts.map((c) => (Number(c.created_at) - CLOCK) / 97).sort((a, b) => a - b);
+
+    const first = await read();
+    expect(span(first.posts), 'open: the newest page').toEqual(Array.from({ length: PAGE_CAP }, (_, i) => N - PAGE_CAP + i));
+    expect(first.hasMore).toBe(true);
+    const cursor1 = Object.values(first.cursors)[0] as any;
+    expect(cursor1.oldestLt, 'the cursor remembers where the bodies ended').toBe(String(1_000 + (N - PAGE_CAP)));
+
+    const second = await read(first.cursors);
+    expect(span(second.posts), 'press 1: the full page before — bodies included').toEqual(Array.from({ length: PAGE_CAP }, (_, i) => N - 2 * PAGE_CAP + i));
+    expect(second.hasMore).toBe(true);
+
+    const third = await read(second.cursors);
+    expect(span(third.posts), 'press 2: the remaining oldest comments, not an empty answer').toEqual(Array.from({ length: N - 2 * PAGE_CAP }, (_, i) => i));
+    expect(third.hasMore, 'the thread is exhausted').toBe(false);
+
+    // Nothing overlaps across the three pages, so the merge on screen cannot double-count.
+    const all = [...span(first.posts), ...span(second.posts), ...span(third.posts)];
+    expect(new Set(all).size, 'every comment exactly once').toBe(N);
   }, 600_000);
 
   it('PCWINDOW-03: reading with the returned cursors yields the page BEFORE — not the same rows again', async () => {

@@ -23,10 +23,10 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole lane
 // runs against a stub transport and a fixed clock, the way the intro lane does.
 
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=17';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=18';
 import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=18';
-import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=4';
-import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=4';
+import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=5';
+import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=5';
 import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=7';
 import {
   publicBeaconScanAddresses,
@@ -410,18 +410,27 @@ export function createPublicLane({
         const snapshot = paged ? null : readShardSnapshot(key, marker);
         if (snapshot) {
           posts.push(...snapshot.posts);
-          cursors[key] = { from: snapshot.from, entryCount: snapshot.entryCount };
+          cursors[key] = { from: snapshot.from, entryCount: snapshot.entryCount, oldestLt: snapshot.oldestLt ?? null };
           report();
           continue;
         }
-        const { posts: shardPosts, entry_count: entryCount } = await readShardPosts(address, {
+        // THE BODIES MUST PAGE BACK WITH THE ROWS. get_page(fromId, …) returns older ROWS; the bodies come from
+        // /messages, newest first, 128 at a time — so a paged read used to match rows 58..153 of a 250-comment
+        // thread against the newest 128 bodies and find nothing: "show earlier comments" worked once (while the
+        // rows still had bodies in that window) and then did nothing, with the button still showing (owner,
+        // 2026-08-21). Each cursor now remembers the lt of the oldest body its window matched, and a paged read asks
+        // /messages for the window ending just before it (toncenter `end_lt`, measured honoured). A cursor without an
+        // lt (an endpoint that gave none) falls back to the newest window, which is the old behaviour, not a loss.
+        const previousOldestLt = previous?.oldestLt == null ? null : (() => { try { return String(BigInt(previous.oldestLt) - 1n); } catch { return null; } })();
+        const { posts: shardPosts, entry_count: entryCount, oldestLt } = await readShardPosts(address, {
           ...(fromId === null ? {} : { fromId, maxCount: BigInt(pageRows) }),
+          ...(paged && previousOldestLt !== null ? { messagesEndLt: previousOldestLt } : {}),
         });
         const count = Number(entryCount ?? 0);
         const from = fromId === null ? Math.max(0, count - PAGE_ROWS) : Number(fromId);
-        if (!paged) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count });
+        if (!paged) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count, oldestLt: oldestLt ?? null });
         posts.push(...shardPosts);
-        cursors[key] = { from, entryCount: count };
+        cursors[key] = { from, entryCount: count, oldestLt: oldestLt ?? null };
         report();
       }
       // hasMore asks the only question the button needs: is there a row BEFORE what we have read, anywhere in the
