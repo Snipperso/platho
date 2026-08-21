@@ -5,7 +5,7 @@ import { x25519 } from '@noble/curves/ed25519.js';
 import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { buildIntroPublish } from '../web/publish-builder.mjs';
 import { addrKey } from '../web/shard-discovery.mjs';
-import { createIntroScanRunner } from '../web/intro-scan-runner.mjs';
+import { createIntroScanRunner, INTRO_CAPSULE_EAGER_RETRIES } from '../web/intro-scan-runner.mjs';
 import { createMemoryIntroCursorStore } from '../web/intro-cursor-store.mjs';
 import { DEFAULT_POLICY } from '../web/intro-scan-policy.mjs';
 import { computePrivateScanViewTag } from '../web/crypto/platho-crypto.mjs';
@@ -330,6 +330,59 @@ describe('INTRO-SCAN-RUNNER — the loop a user actually experiences', () => {
 
     await advance(5 * 60_000);
     expect(seen.length, 'but only once — the retry is recorded').toBe(1);
+    runner.stop();
+  }, 300_000);
+
+  it('RUN-12: a body that cannot be fetched is retried with back-off — never handed over as null, never once a pass forever', async () => {
+    // OBSERVED 2026-08-21 in the owner's console, once a minute: "[intro] scan error TypeError: intro header0 must be
+    // a TON cell or BoC payload". The scan page had the entry, get_entry had it, and toncenter's /messages did not
+    // yet carry the publish — fetchCapsule answered null, the runner handed `capsule: null` to onIntro, the handler
+    // threw about header0, the cursor rolled back, and the identical fetch ran again on every pass for as long as
+    // the app lived. A null body is "try again later": eagerly for a few passes (index lag is seconds), then with a
+    // doubling back-off — and the moment the body appears, it is delivered exactly once.
+    const mine = x25519.utils.randomSecretKey();
+    await publishIntroTo(mine, 3);
+
+    const store = createMemoryIntroCursorStore();
+    let passes = 0;
+    const load = store.load.bind(store);
+    store.load = async () => { passes += 1; return load(); };
+    let fetches = 0;
+    let available = false;
+    const errors: any[] = [];
+    const delivered: any[] = [];
+    const runner = makeRunner(mine, store, delivered, {
+      fetchCapsule: async () => { fetches += 1; return available ? { header0: cellOf(1), body: cellOf(2), bodyCommit: 1n } : null; },
+      onError: (error: any) => errors.push(error),
+    });
+
+    await runner.start();
+    expect(fetches, 'the first pass tried to fetch the body').toBe(1);
+    expect(delivered, 'and handed nothing over — a null body is not a first contact').toEqual([]);
+    expect(errors.length, 'one honest line about it').toBe(1);
+    expect(String(errors[0]?.message), 'which names the actual problem').toMatch(/not readable yet/);
+    expect(errors[0]?.code).toBe('INTRO_CAPSULE_UNAVAILABLE');
+
+    // Many more passes with the body still missing. Eager for the first few, then backing off: the number of
+    // fetches grows like log(passes), not like passes — and the console is not written on every attempt either.
+    for (let i = 0; i < 24; i += 1) await advance(5 * 60_000);
+    expect(passes, 'the loop kept running').toBeGreaterThan(10);
+    expect(delivered, 'still nothing handed over').toEqual([]);
+    const bound = INTRO_CAPSULE_EAGER_RETRIES + 1 + Math.ceil(Math.log2(Math.max(1, passes)));
+    expect(fetches, `${fetches} fetches over ${passes} passes — the retry must back off`).toBeLessThanOrEqual(bound);
+    expect(fetches, 'but it keeps trying').toBeGreaterThanOrEqual(INTRO_CAPSULE_EAGER_RETRIES);
+    expect(fetches, 'and it is NOT one fetch per pass').toBeLessThan(passes);
+    expect(errors.length, 'and not a log line per attempt').toBeLessThan(fetches);
+    expect(runner.lastStats!.unfetchable, 'the dump shows the stuck entry').toBe(1);
+
+    // The body appears (the index caught up). The next due attempt delivers it — once.
+    available = true;
+    for (let i = 0; i < 200 && delivered.length === 0; i += 1) await advance(5 * 60_000);
+    expect(delivered.length, 'delivered as soon as the body could be read').toBe(1);
+    expect(delivered[0].capsule, 'with the body, never null').toBeTruthy();
+    expect(runner.lastStats!.unfetchable, 'and it is no longer stuck').toBe(0);
+    for (let i = 0; i < 6; i += 1) await advance(5 * 60_000);
+    expect(delivered.length, 'and never a second time').toBe(1);
     runner.stop();
   }, 300_000);
 

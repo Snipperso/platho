@@ -105,6 +105,19 @@ describe('INTRO-RECEIVE-HANDLER', () => {
     expect(store.getConversation(recipient.encryptionKeyPair.keyId, sender.encryptionKeyPair.keyId), 'nothing stored for a rejected forgery').toBeNull();
   });
 
+  it('IRH-06: an unfetched body (capsule: null) is named as such — not as a header0 type error', async () => {
+    // OBSERVED 2026-08-21: the runner handed over `capsule: null` (toncenter's index had not caught up with the
+    // entry), the handler fell through to the hit itself and threw "intro header0 must be a TON cell or BoC
+    // payload" — once a minute, naming the wrong problem. The runner now retries such hits itself; the handler's
+    // own answer for any other caller has to say what actually happened.
+    const recipient: any = await createMessagingIdentity();
+    const store = createMemoryConvKeyStore();
+    const onIntro = createIntroReceiveHandler({ recipientKeyPair: recipient.encryptionKeyPair, convKeyStore: store });
+    const unfetched = { r: 0n, view_tag: 1, epoch: 0, bucket: 0, entryId: 0, capsule: null };
+    await expect(onIntro(unfetched)).rejects.toThrow(/was not fetched/);
+    await expect(onIntro(unfetched)).rejects.not.toThrow(/must be a TON cell/);
+  });
+
   // ── IRH-04/05: the replay guard has to OUTLIVE a reload (wave-7 audit) ─────────────────────────────────────
   // openIntroCapsuleFromChainCells states it plainly: the intro nonce is the ONLY thing that stops a byte-identical
   // replay, because the transcript signature, the keyId binding and the confirm tag are all valid on a replay by

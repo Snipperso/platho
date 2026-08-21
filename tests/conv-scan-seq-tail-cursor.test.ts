@@ -18,7 +18,7 @@ const CONV_LANE = readFileSync('web/conv-lane.mjs', 'utf8');
 /** The scan body, so ordering assertions cannot accidentally match some other loop. */
 const SCAN = APP.slice(
   APP.indexOf('const bucketMaxSeq = new Map();'),
-  APP.indexOf('if (convClean) await convKeyStore.advanceConvScanCursor('),
+  APP.indexOf('if (convClean && !tornDown()) await store.advanceConvScanCursor('),
 );
 
 describe('SEQTAIL — the CONV scan skips already-decrypted entries before decrypting them', () => {

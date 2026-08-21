@@ -5,6 +5,7 @@ import {
   sendPlathoWalletTransaction,
   getPlathoWalletSeqno,
   __resetWalletSeqnoFloorsForTests,
+  __resetWalletSendLanesForTests,
 } from '../web/platho-wallet.mjs';
 
 // A BURST OF MESSAGES MUST NOT SIGN TWICE AGAINST THE SAME SEQNO.
@@ -130,6 +131,38 @@ describe('BURSTSEQ — consecutive sends must not collide on one wallet seqno', 
     }
     expect(seqnos).toEqual([100, 101, 102, 103, 104, 105, 106, 107]);
     expect(new Set(seqnos).size, 'a repeated seqno means a silently dropped message').toBe(8);
+  });
+
+  it('BURSTSEQ-08: CONCURRENT sends on one wallet never sign the same seqno — one signer at a time', async () => {
+    // RECONSTRUCTED FROM THE CHAIN, 2026-08-21: a recovery backup was writing ~35 slots back to back when the owner
+    // sent a message. The backup's next item and the message both read seqno N, both took the floor N+1, both sat in
+    // awaitWalletSeqnoConsumed — and ONE chain advance released BOTH. Two externals signed against N+1; the message
+    // lost (exit 133), the doors refused every re-offer (406/406/500), and the shard never saw seq 1 of that day.
+    //
+    // BURSTSEQ-02/03 drive sends ONE AFTER ANOTHER and so never meet this; the floor only protects sequential sends
+    // against a lagging read, because it is raised AFTER the broadcast. Overlapping senders need a lane, and the lane
+    // must live in the wallet — every external in the app leaves through sendPlathoWalletTransaction.
+    __resetWalletSeqnoFloorsForTests();
+    __resetWalletSendLanesForTests();
+    const wallet = await createPlathoWallet({ mnemonic: MNEMONIC });
+    const chain = frozenChainTransport(7, { lagReads: 1 });
+    const opts = { transport: chain.transport, seqnoCatchupMs: 0 };
+    const results = await Promise.all([
+      sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, opts),
+      sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, opts),
+      sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, opts),
+    ]);
+    const seqnos = results.map((r: any) => r.seqno);
+    expect(new Set(seqnos).size, `two concurrent sends signed the same seqno: ${seqnos.join(',')}`).toBe(3);
+    expect(seqnos.slice().sort((a: number, b: number) => a - b)).toEqual([7, 8, 9]);
+    expect(chain.sent, 'three externals, none dropped').toHaveLength(3);
+
+    // A send that THROWS must not poison the lane: the next sender still goes through.
+    const broken = { ...chain.transport, sendBoc: async () => { throw new Error('door slammed'); } };
+    await expect(sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, { ...opts, transport: broken }))
+      .rejects.toThrow(/door slammed/);
+    const after = await sendPlathoWalletTransaction(wallet, { messages: [MESSAGE], validUntil: 1_700_000_300 }, opts);
+    expect(after.seqno, 'the lane is free again and the floor was not raised by the failed send').toBe(10);
   });
 
   it('BURSTSEQ-06: a chain that NEVER advances is a LOST external, and must not be signed past', async () => {

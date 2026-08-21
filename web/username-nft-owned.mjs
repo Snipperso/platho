@@ -21,7 +21,7 @@
 // to "you own nothing", and this list is a statement about somebody's PROPERTY. A down indexer must degrade to "here
 // is what I can prove, the list may be incomplete" and never to silence — `complete` carries that, and a caller that
 // ignores it will show a list that lies.
-import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=60';
+import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=61';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
 
 /** Public indexer, read-only. Already reachable under the production CSP as a broadcast door; this reads. */

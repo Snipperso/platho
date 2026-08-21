@@ -46,6 +46,13 @@ export function createIntroReceiveHandler({
     // from there. A flat capsule (a direct caller / an old test shape) is tolerated so both work. Getting this wrong is
     // silent: header0 reads undefined, the open throws, and EVERY first contact is lost while the sender thinks it
     // succeeded — exactly the seam a same-commit fixture cannot prove. [intro-send review]
+    // An EXPLICIT `capsule: null` is the runner saying "I could not fetch the body" — not a flat-shape delivery.
+    // Falling through to the hit produced a TypeError about header0 that named the wrong problem entirely
+    // (OBSERVED 2026-08-21: "intro header0 must be a TON cell or BoC payload", once a minute, for a body toncenter's
+    // index had not caught up with). The runner now retries such hits itself; this guard is for any other caller.
+    if (delivery && typeof delivery === 'object' && 'capsule' in delivery && delivery.capsule == null) {
+      throw new Error('intro capsule was not fetched — nothing to open (the body is not in the shard window yet)');
+    }
     const capsule = delivery?.capsule ?? delivery;
     const header0Bytes = asBytes(capsule.header0, 'intro header0');
     const bodyBytes = asBytes(capsule.body, 'intro body');

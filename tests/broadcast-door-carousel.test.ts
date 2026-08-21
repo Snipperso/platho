@@ -4,6 +4,7 @@ import { PLATHO_APP_CONFIG, validatePlathoAppConfig } from '../web/platho-config
 import {
   broadcastDoors,
   broadcastThroughNextDoor,
+  classifyBroadcastDoorAnswer,
   __resetBroadcastDoorCursorForTests,
   __toncenterLimiterKeysForTests,
 } from '../web/ton-rpc-transport.mjs';
@@ -65,6 +66,55 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
     await expect(broadcastThroughNextDoor('te6ccgEBAQEAAgAAAA==', { config, fetch: fetchImpl }))
       .resolves.not.toBeNull();
     // Delivery is decided by READING THE SHARD. A door's refusal proves nothing: the earlier copy may still land.
+  });
+
+  it('DOORS-08: a door\'s refusal is READ — a chain verdict is told apart from a door that merely failed', () => {
+    // OWNER'S CONSOLE 2026-08-21: tonapi 406, tonhub 406, toncenter 500 — three refusals of the same bytes in a
+    // row, and under each one an INFO line claiming the re-broadcast had gone out. Nobody read the status. The
+    // three bodies below are the MEASURED answers of the three doors to an external the chain cannot run (one
+    // POST per door, 2026-08-21); "rejected by the chain" must be recognised in every one of those shapes, and a
+    // bare 5xx with no verdict in it must NOT be — that one is the door's own failure and is still worth retrying.
+    const liteServer = 'cannot apply external message to current state : External message was not accepted: cannot run message on account: inbound external message rejected by transaction 410E…:\nexitcode=133, steps=4, gas_used=0\nVM Log (truncated):\n...';
+    const toncenter = classifyBroadcastDoorAnswer({ status: 500, body: JSON.stringify({ error: `LITE_SERVER_UNKNOWN: ${liteServer}` }) });
+    expect(toncenter.rejectedByChain, 'toncenter: 500 carrying the lite-server verdict').toBe(true);
+    expect(toncenter.chainExitCode, 'and the contract exit code is surfaced').toBe(133);
+
+    const tonapi = classifyBroadcastDoorAnswer({ status: 406, body: JSON.stringify({ error: `error code: 4294966595 message: ${liteServer}` }) });
+    expect(tonapi.rejectedByChain, 'tonapi: 406 carrying the same text').toBe(true);
+    // "error code: 4294966595" precedes the exit code in tonapi's body — the parser must not mistake it for one.
+    expect(tonapi.chainExitCode, 'the TVM exit code, not tonapi\'s own error code').toBe(133);
+
+    const tonhub = classifyBroadcastDoorAnswer({ status: 406, body: JSON.stringify({ status: -5 }) });
+    expect(tonhub.rejectedByChain, 'tonhub: 406 with no text at all — the status IS the verdict').toBe(true);
+    expect(tonhub.chainExitCode, 'no exit code to surface').toBeNull();
+
+    const doorDown = classifyBroadcastDoorAnswer({ status: 502, body: '<html>Bad Gateway</html>' });
+    expect(doorDown.rejectedByChain, 'a bare 5xx is the DOOR failing, not the chain refusing').toBe(false);
+    const throttled = classifyBroadcastDoorAnswer({ status: 429, body: JSON.stringify({ error: 'rate limit' }) });
+    expect(throttled.rejectedByChain, 'a 429 says nothing about the bytes').toBe(false);
+    expect(classifyBroadcastDoorAnswer({ status: 200, body: '' }).rejectedByChain).toBe(false);
+  });
+
+  it('DOORS-09: the carousel reports the classified answer and still never throws', async () => {
+    // The caller used to get { door, status } and nothing else — so the CONV confirm could not stop re-offering
+    // bytes the chain had already refused, and could not tell the console the truth. The answer rides along now;
+    // DOORS-04 still holds (a thrown fetch resolves, never rejects).
+    const answers = [
+      { ok: false, status: 406, text: async () => JSON.stringify({ error: 'cannot apply external message to current state : … exitcode=133, steps=4' }) },
+      { ok: false, status: 500, text: async () => JSON.stringify({ error: 'upstream timeout' }) },
+      { ok: true, status: 200, text: async () => '' },
+    ];
+    let i = 0;
+    const fetchImpl = async () => answers[i++ % answers.length];
+    const first = await broadcastThroughNextDoor('te6ccgEBAQEAAgAAAA==', { config, fetch: fetchImpl });
+    expect(first).toMatchObject({ door: 'tonapi', status: 406, rejectedByChain: true, chainExitCode: 133 });
+    const second = await broadcastThroughNextDoor('te6ccgEBAQEAAgAAAA==', { config, fetch: fetchImpl });
+    expect(second).toMatchObject({ door: 'tonhub-v4', status: 500, rejectedByChain: false, chainExitCode: null });
+    const third = await broadcastThroughNextDoor('te6ccgEBAQEAAgAAAA==', { config, fetch: fetchImpl });
+    expect(third).toMatchObject({ door: 'toncenter', status: 200, rejectedByChain: false });
+    // A fetch that throws still resolves to a door answer with no verdict in it.
+    const down = await broadcastThroughNextDoor('te6ccgEBAQEAAgAAAA==', { config, fetch: async () => { throw new Error('offline'); } });
+    expect(down).toMatchObject({ status: null, rejectedByChain: false });
   });
 
   it('DOORS-06: every door host is allowed by the served Content-Security-Policy', () => {

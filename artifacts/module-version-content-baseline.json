@@ -4,12 +4,12 @@
     "sha256": "abb2b78e66245b57365069c15aefd43287c9ca71e940c87474968e6b73f5866e"
   },
   "airdrop-ticket-read.mjs": {
-    "version": "16",
-    "sha256": "a1bbccf873a23a626c26a16325ed762628d7c66bc5da57d252a3453ab01469b4"
+    "version": "18",
+    "sha256": "b6964ce53c271e666d6f401df42f3c1c69326d07b84aa420f019d24b50f8ecb2"
   },
   "ath-ton-rpc-provider.mjs": {
-    "version": "55",
-    "sha256": "163588dfa757a4e43816ff6e0842fb62f5586fcdeaa760de7dc759557b3b8203"
+    "version": "56",
+    "sha256": "e07bac29f682d82f3d63ad8ade88616a8be39a1ecd1344f6f587cfe8f6f5ed13"
   },
   "boot-guard.js": {
     "version": "6",
@@ -28,8 +28,8 @@
     "sha256": "f934f175c7986eb4dacb59c72174ae8c77edfe80b8d9fb9123d078cf8ff6540f"
   },
   "conv-discovery.mjs": {
-    "version": "16",
-    "sha256": "92124896cecf1937ee052f4e3d11c94add7595f5eb7f77271a9911c3c8524df1"
+    "version": "18",
+    "sha256": "70a2b39f6b88b93fa762226828f2931d5bd59174d98c4ff38ff7e94af06099e1"
   },
   "conv-key-persist.mjs": {
     "version": "4",
@@ -40,16 +40,16 @@
     "sha256": "622a1a303881b53c9eb109c547f41eb3ee7d85202877197f891aa302a8b74391"
   },
   "conv-lane-read.mjs": {
-    "version": "18",
-    "sha256": "e187663e880b93eb0249088af8d29e044a66c250c719a8890e90950148bd7e1f"
+    "version": "20",
+    "sha256": "d4f6923d37ec803b00a68c78e23ccdb8188c60ae057ce530d1b22984a2c91c16"
   },
   "conv-lane-send.mjs": {
-    "version": "16",
-    "sha256": "442c85f441209293fededa92bc4c26f92a8fad8ada929488880e47d57ecde1b2"
+    "version": "18",
+    "sha256": "91b978490fc3da588108b7c735be74fa4b166d8d10db27690a39bed58e8e7af0"
   },
   "conv-lane.mjs": {
-    "version": "19",
-    "sha256": "fcd10243a32bf9dff1c7c140f0784b726f97aa06ed8a2d5495e1d41a183b09c0"
+    "version": "21",
+    "sha256": "5fb48063bac516fde8313c7dfce17a9758196a3ad21f8d72c7ea533188669110"
   },
   "conv-publish-browser.mjs": {
     "version": "4",
@@ -76,8 +76,8 @@
     "sha256": "b685dcb1288206fee2046d91e7e2cf5587ddc78a53895087bcb7f2c4ee6cff8f"
   },
   "intro-bucket.mjs": {
-    "version": "16",
-    "sha256": "0935e3cc78864ef8ddb439fc73d5a87d0701ff5532fc816fcb0744e84161fea2"
+    "version": "18",
+    "sha256": "9675464a2ae016e49f61ae19600ea6f6d6aa9142fad4b5f9f8ababaead0f24a4"
   },
   "intro-codec.mjs": {
     "version": "2",
@@ -88,56 +88,56 @@
     "sha256": "cfce0d745cfe21fd5d1c61d944f0d031d26305d84479d247c746452e8a4aca1a"
   },
   "intro-lane-send.mjs": {
-    "version": "16",
-    "sha256": "a1d215dd4bb6591bacd1b153c1e10871076051ba191171efd0856f1a31b80de5"
+    "version": "18",
+    "sha256": "ea6e140b6464d94aff99811210de8e147425fa168827dc1d7772b8568a9e458b"
   },
   "intro-lane.mjs": {
-    "version": "22",
-    "sha256": "d80949324b54172db9074aeb368ad2ad42a63d5082132db74b4bf56c5d5633ca"
+    "version": "24",
+    "sha256": "0764ca86baa9daafae962c64bb36b5aa33e6f3bccf1838f8d6d8f572178a9fca"
   },
   "intro-publish-browser.mjs": {
-    "version": "16",
-    "sha256": "0135b3b446fb60e424bd5a3e68ce50f7b73be47dd928f69062c25373c9419a80"
+    "version": "18",
+    "sha256": "e12da295eb65654d0dd74fe95e240f28c09e46bcfde4e79b4ef8e55d561d7ce2"
   },
   "intro-receive-handler.mjs": {
-    "version": "4",
-    "sha256": "4f0ab2993e9b01b7b075bda9e5254c433b1e0b73b54d4168862e4dcf4dd528be"
+    "version": "5",
+    "sha256": "8f697177924ccfc2263289a254c2c59e9da961ee6a97bf336e6cf2506d8b2d54"
   },
   "intro-scan-policy.mjs": {
     "version": "1",
     "sha256": "e17dd90fe867171fff50ba4b8926068a9ccda103b954c2956d86c98f8d27fcf1"
   },
   "intro-scan-runner.mjs": {
-    "version": "16",
-    "sha256": "e1183711943202cec5196c3e54c9bb02d63cfc320483b6d2acd6a2885f685358"
+    "version": "18",
+    "sha256": "ee6428119b7300505088ef5d0de326946c08e8d4109c1c0903aa3684a31a8713"
   },
   "intro-send-coords.mjs": {
-    "version": "16",
-    "sha256": "88e519830df71f8090b1e001a5094d761fca4b9bf2c82ac88eb086900b1c97c5"
+    "version": "18",
+    "sha256": "9c637e19a904a887c38a2a116d74314c8e4b224af22fc96396693f2540d848be"
   },
   "intro-send-state.mjs": {
     "version": "1",
     "sha256": "d20b8f639d0f037cef94d252e7130a69ed29dee886a57b24ddf6ef91e61bd737"
   },
   "intro-transport.mjs": {
-    "version": "17",
-    "sha256": "33b9d78472531bed17723c4bb740277b8bf09dd4fdb3f464eafb7eb4c2a49981"
+    "version": "19",
+    "sha256": "68ac4a6b38a55d1fb8e589048193d72832feaea87f708368ee4d6e00901d0d23"
   },
   "key-shard-register-browser.mjs": {
     "version": "4",
     "sha256": "b244c02ef8feac83022009a3469f1265f6b4b866635975487dc7b0854438b8d5"
   },
   "key-shard-register-send.mjs": {
-    "version": "16",
-    "sha256": "b2695f8b6f467ec5255b9d62e435a04425a1f2c91c5831d50f7dadd690c31367"
+    "version": "18",
+    "sha256": "989652f1b4d97f0579b142abfffbfc5755bb4fdd3bb80dc08aad11793bd686ef"
   },
   "key-shard-ton-rpc-provider.mjs": {
     "version": "4",
     "sha256": "aa55ddfe32dc413213565920eea16718e0bf0afb337389eacab30af0a9f9b499"
   },
   "market-stability-buy-send.mjs": {
-    "version": "3",
-    "sha256": "31fa97a67173555fcf0f136e6050c4d1a71412f0f47a82920f88686021b965db"
+    "version": "5",
+    "sha256": "ed09e5cf5a156a687604912a1776e86155c327a6d71f86ad0c65daab75710e4a"
   },
   "market-stability-read.mjs": {
     "version": "1",
@@ -152,40 +152,40 @@
     "sha256": "dbe538c0770b5fdc215477485fe815a8de999b3528518bbf6d2965888bab8f4b"
   },
   "notes-lane.mjs": {
-    "version": "16",
-    "sha256": "0edbeb0bbad06a07f29fce1d07062098bb26fbdac1bcf9c0360ed1e6f7fee887"
+    "version": "18",
+    "sha256": "4f32fcc7a6b503100544d75e60c0d73b742a50a45ac63e3abf0fbd16e4f88572"
   },
   "platho-config.mjs": {
-    "version": "122",
-    "sha256": "85d86f394f9e774bb36249e2e5fc3742ec0ae17d7050d9210278be135d6c2a76"
+    "version": "123",
+    "sha256": "d6dfda4e2963f3eb31ec9fc0eb8efcd26af25cd24f6781f59c9d08e002fc2822"
   },
   "platho-crypto.mjs": {
     "version": "15",
     "sha256": "0b8b26e045fd6152fa7d4e1c5876651bba3ab19f59981d0f445490a8f40ee4b3"
   },
   "platho-wallet.mjs": {
-    "version": "33",
-    "sha256": "d885d8aeaf67d08bf02a8373f6a25d090d76c89118a87b4d57dcb8a5c6cfb234"
+    "version": "35",
+    "sha256": "843f0aa5a7f99283d1ebccde2d462b3b53a800dad13b7528079a6cb2b6a72d48"
   },
   "profile-avatar-media-store.mjs": {
     "version": "1",
     "sha256": "34f0dff12a64f338b1f3fe6be50effca7a31683763590acf1f0f9b1053a61b6c"
   },
   "profile-registry-ton-rpc-provider.mjs": {
-    "version": "58",
-    "sha256": "a188c5d9789ae0cca6002e2f247244727ac351ead43f1ef7b89e2ee8458341c4"
+    "version": "59",
+    "sha256": "383e761adc8a0b41129355a993a38146d484f1a6cd0aa71762c004d8038ec7d2"
   },
   "public-channel-subscriptions.mjs": {
     "version": "50",
     "sha256": "5dd9ebbd00bbd59056c52a7759fb0bb0023117e9034407ae8d2fb260a1104d45"
   },
   "public-lane-send.mjs": {
-    "version": "16",
-    "sha256": "8a5f47903de68bad38155160553eeb424c369b381d5c1edc8f8dd0e10dc0a633"
+    "version": "18",
+    "sha256": "1a57f19a1a33270d910e0bf3017388cabc562df4f0e4bf1787e3429c7a3d1f73"
   },
   "public-lane.mjs": {
-    "version": "28",
-    "sha256": "03d7299daa3f9ab70a6452adb229e81d29e0ad3c1b18931cb2b81f84046a778e"
+    "version": "30",
+    "sha256": "ac5cd490a9d2d5205caa1045e27c6917bac9ab58746d235e1d6e1482252d608e"
   },
   "public-publish-browser.mjs": {
     "version": "4",
@@ -220,16 +220,16 @@
     "sha256": "ce75da994314e927bf23f69f719df985ae3137e8ac5f9c6fab2691a1b0659046"
   },
   "recovery-lane.mjs": {
-    "version": "16",
-    "sha256": "2b35eb779dda17306278369b3333f925ca493ee032c26c921bf939fa0602d232"
+    "version": "18",
+    "sha256": "66558a0ee26004e8f6f7bf0c06d52c697f236340028899280ca975dad5e83fa8"
   },
   "recovery-publish-browser.mjs": {
-    "version": "16",
-    "sha256": "23d8951bc56a1bc30ac1fa8c46b4c2d57733d99c57eca921bb01421ec1e428df"
+    "version": "18",
+    "sha256": "b668d0c35f1e2828bfe911175b7c64a7726fe5c519a15e7befb1570833164e6d"
   },
   "recovery-transport.mjs": {
-    "version": "17",
-    "sha256": "d5e0df66ba812d09d1d081e5f757bd2d9b66c6808f86a6fb63cde33379f423e4"
+    "version": "19",
+    "sha256": "8e1709d673f9f3ab185ba9cffbe30c2773b740ee802cee4e0c1e91be80ce0f0e"
   },
   "replay-store.mjs": {
     "version": "1",
@@ -244,52 +244,52 @@
     "sha256": "1d68c54adcacd4a18c69a78b01a808db7111912e79496c8ab23f43ca2f5bf046"
   },
   "shard-discovery.mjs": {
-    "version": "18",
-    "sha256": "c4606b44778742cf1f932309d484c73e6ad5e3107ff330296254cdcf176c3390"
+    "version": "20",
+    "sha256": "efd33794b83b3ef806eac4387ac3a01e6bec7a3607f9278af280fc5f7168a25a"
   },
   "shard-reader.mjs": {
-    "version": "16",
-    "sha256": "68f73a378e48613d484b384f1bddaf83a02b2fb2c4f3033f1ea8b8a473f5323c"
+    "version": "18",
+    "sha256": "ee9d8f4a18a7ed990eda2f66e8cf77c2052f25ca771c194f6c8296051afac92c"
   },
   "shard-rpc.mjs": {
-    "version": "16",
-    "sha256": "07df8064463e56752ba3b059a0be177ed5d24fb5b6744f29322d8a5542ba3b97"
+    "version": "17",
+    "sha256": "24a7464f9e17c2d98a80b8b9768c17b075bc05aef8a9e985403de9099eb3d949"
   },
   "styles.css": {
     "version": "339",
     "sha256": "e4f3bb54b52da4e8f7a5c729ce714bab427e9c0410689a03e4a9f03c13a0cca1"
   },
   "ton-dns-provider.mjs": {
-    "version": "54",
-    "sha256": "2bb13a54bc7874294c41d9ecec5934c8905286bf60bb3767289c7af6899b76ff"
+    "version": "55",
+    "sha256": "2ef7c5600d0d7c7617ee94d54db46039f5a920ea4c934b6d240792170f1f04d9"
   },
   "ton-mnemonic-wordlist.mjs": {
     "version": "1",
     "sha256": "d13dec6a205cd361f9b87b7165095fa811c951cae210732a47032cdd9bd99575"
   },
   "ton-rpc-transport.mjs": {
-    "version": "76",
-    "sha256": "68c2773762ff980b3b7bb623035bf6b610bada3d2115d43a0913ffaed4f14611"
+    "version": "77",
+    "sha256": "f818d70e66ecd049865217c25bfffdd6aac487c3ef6dad69e9038eeecaf69749"
   },
   "ton-stack-num.mjs": {
     "version": "1",
     "sha256": "7031e619544b06e40dbabee8f7669edec08bbf65256296fb9fc854ef79b26bed"
   },
   "username-nft-owned.mjs": {
-    "version": "3",
-    "sha256": "e1739a22c4d8dd1f0515993a1fb9207961ccad9927a7bd29ec13b9229ab49b5a"
+    "version": "4",
+    "sha256": "04c2291dbe42cb0fd1e9718adaf762c370a274a4f7ff045f171954245ebe07c3"
   },
   "username-nft-transfer.mjs": {
     "version": "1",
     "sha256": "6335d94ea1e57a056cd3c1e9caff7fa7978c7335e81f9de9f54723b3a25823b9"
   },
   "username-ton-rpc-provider.mjs": {
-    "version": "60",
-    "sha256": "1721ee9a471bc54cb0a59c68019bb9aa3a8d77ddfc4931ab97a7529e8832a932"
+    "version": "61",
+    "sha256": "72d2e7e2653322f0025cab5ec8af083ffb1c6549111dc1cf9f8dca91160b2cf4"
   },
   "wallet-send-fee.mjs": {
-    "version": "4",
-    "sha256": "42851407b5d4ea58a4335cc20b97c7d9da544b6ecf5d8036612a2a87dd8b9749"
+    "version": "6",
+    "sha256": "de8fab06fae68c2ebfd0223f46cd1c7bc0e4f50bbcff274633799414c8c35628"
   },
   "webp-encoder.mjs": {
     "version": "1",

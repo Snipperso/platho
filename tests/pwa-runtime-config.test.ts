@@ -2838,7 +2838,7 @@ describe('PWA runtime config guard', () => {
     // (The unverified-index read modes and the cursor persistence mode were properties of the CapsuleHub index
     // walk: a shard read has no index to read unverified and no cursor to persist. What replaced the cursor is
     // the per-conversation scan cursor, advanced ONLY on a fully clean pass.)
-    expect(convReceiveSource).toMatch(/if \(convClean\) await convKeyStore\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
+    expect(convReceiveSource).toMatch(/if \(convClean && !tornDown\(\)\) await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
     // The rest of this block pinned the CapsuleHub walk's bookkeeping (head-repair links, the pending-publish
     // confirm sweep over hub entries, the body-history ledger, its per-group error capture). The shard receive
     // keeps the two properties that are about the USER's data rather than about the log: an incomplete multipart
@@ -7271,6 +7271,75 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/await transport\.sendBoc\(\{ boc: send\.boc, walletAddress: plathoWallet\.address \}\)/);
     // Re-armed after a reload too — the record is persisted, which is what covers "the app was closed".
     expect(app).toContain('convDirectSend: safeJsonClone(message.convDirectSend) ?? null,');
+  });
+
+  it('PWA-HONESTGREEN-05: a refused re-broadcast is READ, and a consumed external goes terminal without the 8-minute wait', () => {
+    // OWNER'S SCREEN, 2026-08-21: a message whose publish bounced sat on "sending" for the full eight minutes and
+    // then reddened — while tonapi (406), tonhub (406) and toncenter (500) had each refused the same bytes from
+    // the four-second tick on, and under every refusal the console printed "re-broadcast pending external" as
+    // if it had gone out. The doors were saying "the chain is done with these bytes"; nobody was listening.
+    const app = readFileSync('web/app.js', 'utf8');
+    const transport = readFileSync('web/ton-rpc-transport.mjs', 'utf8');
+
+    // 1. The door's answer is classified in ONE place and ridden back to the caller.
+    expect(transport).toContain('export function classifyBroadcastDoorAnswer(');
+    expect(transport).toMatch(/return \{ door: door\.id, \.\.\.classifyBroadcastDoorAnswer\(\{ status, body \}\) \};/);
+
+    // 2. The wallet seqno the bytes are signed against is persisted with them — it is what turns a door's verdict
+    // into a chain fact (a fresh seqno read), rather than trusting a possibly-lagging node.
+    expect(app).toContain('seqno: result?.result?.pendingSeqno ?? null,');
+    const rebroadcast = app.slice(
+      app.indexOf('async function rebroadcastPendingDirectSend('),
+      app.indexOf('const CONV_CONFIRM_CONSUMED_SETTLE_MS'),
+    );
+    // 3. Refused by the chain → one fresh seqno read decides consumed vs lagging-node; consumed stops re-sending.
+    expect(rebroadcast).toMatch(/if \(send\.consumedAt\) return;/);
+    expect(rebroadcast).toMatch(/if \(answer\?\.rejectedByChain\) \{\s*\n\s*await noteConvExternalRefused\(send, transport, answer\);/);
+    expect(rebroadcast).toMatch(/chainSeqno = await getPlathoWalletSeqno\(plathoWallet, transport\);/);
+    expect(rebroadcast).toMatch(/const consumed = chainSeqno != null && Number\.isFinite\(signed\) && Number\(chainSeqno\) > signed;/);
+    expect(rebroadcast).toMatch(/if \(consumed\) \{\s*\n\s*send\.consumedAt = Date\.now\(\);/);
+    // 4. The INFO line is printed only for an ACCEPTED re-send; a refusal is logged as what it is.
+    expect(rebroadcast).toMatch(/if \(answer && answer\.status != null && answer\.status >= 400\) \{[\s\S]{0,400}?return;\s*\n\s*\}\s*\n\s*console\.info\('\[conv\] re-broadcast pending external while awaiting the shard'/);
+
+    // 5. The confirm goes terminal early on a consumed+settled external, with the SAME authority rule as the
+    // deadline (complete scan or seqShort) — and the deadline rule itself is untouched (PWA-CONV-DELIVERY-01).
+    const confirm = app.slice(app.indexOf('async function runConvDeliveryConfirm'), app.indexOf('function markConvDeliveryUnlanded'));
+    expect(confirm).toMatch(/const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS \|\| consumedSettled;/);
+    expect(confirm).toMatch(/if \(consumedSettled && \(res\.complete \|\| res\.seqShort\)\) \{ markConvDeliveryUnlanded\(thread, message\); return; \}/);
+    expect(app).toMatch(/const CONV_CONFIRM_CONSUMED_SETTLE_MS = 10_000;/);
+
+    // 6. The INTRO scan's twin of the same disease — a body that could not be fetched was re-fetched every pass
+    // forever under a misleading TypeError — backs off instead, and the handler names a null capsule honestly.
+    const runner = readFileSync('web/intro-scan-runner.mjs', 'utf8');
+    const handler = readFileSync('web/intro-receive-handler.mjs', 'utf8');
+    expect(runner).toMatch(/if \(fetchCapsule && capsule == null\) \{[\s\S]{0,400}?noteUnfetchable\(key, hit\);/);
+    expect(runner).toMatch(/if \(pending && passIndex < pending\.notBeforePass\) \{ undelivered\.add\(hit\.key\); continue; \}/);
+    expect(handler).toMatch(/'capsule' in delivery && delivery\.capsule == null/);
+  });
+
+  it('PWA-SEQNOLANE-01: every wallet external leaves through ONE lane, and a sync pass writes nothing after a teardown', () => {
+    // RECONSTRUCTED FROM THE CHAIN, 2026-08-21: a recovery backup (~35 RCV1 writes, one every ~2s) overlapped the
+    // owner's message; both resolved seqno N+1 off the same chain advance, the message's external lost (exit 133)
+    // and the shard never saw seq 1 — the red "not delivered" on the owner's screen. The floor is raised only AFTER
+    // a broadcast, so two resolvers in flight see the same floor; only a lane in the wallet closes it.
+    const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
+    expect(wallet).toMatch(/export async function sendPlathoWalletTransaction\(wallet, transaction, options = \{\}\) \{\s*\n\s*if \(options\.seqno !== undefined\) return sendPlathoWalletTransactionInLane\(wallet, transaction, options\);\s*\n\s*return withWalletSendLane\(wallet, \(\) => sendPlathoWalletTransactionInLane\(wallet, transaction, options\)\);/);
+    // The tail is detached from the task's outcome, or one failed send wedges every later one (the SENDLANE lesson).
+    expect(wallet).toMatch(/const tail = previous\.then\(\(\) => gate\);/);
+    expect(wallet).toMatch(/\} finally \{\s*\n\s*release\(\);/);
+    // No caller in the app reaches the unlaned body directly.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).not.toContain('sendPlathoWalletTransactionInLane');
+
+    // THE SAME DAY, THE SAME CONSOLE: "Cannot read properties of null (reading 'advanceConvScanCursor')" — a sync
+    // pass suspended on a network read outlived a teardown and wrote into the store that was no longer there. A
+    // pass captures what it started with and ends quietly when the ground moves; it never writes past a teardown.
+    const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('async function syncPrivateCapsulesFromChain('));
+    expect(sync).toMatch(/const store = convKeyStore;\s*\n\s*const keyPair = localRecipientKeyPair;\s*\n\s*const tornDown = \(\) => convKeyStore !== store \|\| localRecipientKeyPair !== keyPair;/);
+    expect(sync.match(/if \(tornDown\(\)\) return privateSyncResult\(\{ ok: false, reason: 'torn_down', scanComplete: false \}\);/g)?.length,
+      'after the state batch, at the top of each conversation, and before the append').toBe(3);
+    expect(sync).toMatch(/if \(convClean && !tornDown\(\)\) await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
+    expect(sync, 'the live global must not be dereferenced after the first await').not.toMatch(/await convKeyStore\./);
   });
 
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {

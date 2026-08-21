@@ -20,12 +20,18 @@
 //     degrades on its own as the network grows.
 //   - Nothing runs while the app is hidden. Background polling is battery the user did not agree to spend.
 
-import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=18';
+import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=20';
 import { scanIntroWindow, INTRO_SCAN_EPOCHS_BACK, INTRO_SCAN_EPOCHS_FORWARD } from './intro-receive.mjs';
 import { planIntroScan, DEFAULT_POLICY } from './intro-scan-policy.mjs?v=1';
 import { pruneCursors, pruneDelivered, deliveryKey } from './intro-cursor-store.mjs?v=1';
 
 export const epochNow = (nowMs) => Math.floor(nowMs / 1000 / 86400);
+
+// A hit whose body could not be fetched is retried on each of the next INTRO_CAPSULE_EAGER_RETRIES passes (the
+// index catching up with the state is a matter of seconds, passes are a minute apart), then with a doubling
+// back-off in passes, capped so that even a body that never appears costs at most one fetch per 64 passes.
+export const INTRO_CAPSULE_EAGER_RETRIES = 3;
+export const INTRO_CAPSULE_MAX_BACKOFF_PASSES = 64;
 
 /**
  * Create the runner. Every dependency is injected, so a test drives it with a fake clock and a sandbox while the
@@ -63,11 +69,46 @@ export function createIntroScanRunner({
   let stopped = true;
   let lastStats = null;
 
+  // HITS WHOSE CAPSULE COULD NOT BE FETCHED — the entry is on chain (the scan page saw it, get_entry has it) but no
+  // message in the shard's window reproduces its body_commit. Usually the index is a few seconds behind the state:
+  // the entry is visible through get-methods before toncenter's /messages carries the publish. Sometimes the body
+  // has fallen out of the newest-first window. Either way the only useful move is to try again LATER.
+  //
+  // What used to happen: the null went to onIntro as `capsule: null`, the handler fell through to the hit itself
+  // and threw "intro header0 must be a TON cell or BoC payload" — a message that names the wrong problem — the
+  // cursor rolled back, and the very same fetch ran again on EVERY pass for as long as the app lived. OBSERVED
+  // 2026-08-21 in the owner's console, once a minute. Now: eager retries on the next few passes (index lag is
+  // seconds), then a doubling back-off capped at one attempt per 64 passes — never abandoned (a late-indexed body
+  // is still delivered), never a line a minute. In-memory by design: a reload restarts the eager retries, which
+  // is cheap and correct.
+  const unfetchable = new Map();   // deliveryKey -> { attempts, notBeforePass, firstAt }
+  let passIndex = 0;
+
+  function noteUnfetchable(key, hit) {
+    const prior = unfetchable.get(key);
+    const attempts = (prior?.attempts ?? 0) + 1;
+    const backoff = attempts <= INTRO_CAPSULE_EAGER_RETRIES
+      ? 1
+      : Math.min(INTRO_CAPSULE_MAX_BACKOFF_PASSES, 2 ** (attempts - INTRO_CAPSULE_EAGER_RETRIES));
+    unfetchable.set(key, { attempts, notBeforePass: passIndex + backoff, firstAt: prior?.firstAt ?? now() });
+    // Loud the first time, then rarely: a first contact that cannot be read is worth a line, not a line a minute.
+    if (attempts === 1 || attempts === INTRO_CAPSULE_EAGER_RETRIES + 1 || attempts % 16 === 0) {
+      const error = new Error(
+        `intro capsule not readable yet (attempt ${attempts}): entry ${key} is on chain but no message in its shard `
+        + `window reproduces the stored body_commit — index lag, or a body past the window; retrying in ${backoff} pass(es)`,
+      );
+      error.code = 'INTRO_CAPSULE_UNAVAILABLE';
+      error.hit = { epoch: hit.epoch, bucket: hit.bucket, entryId: hit.entryId };
+      onError(error);
+    }
+  }
+
   async function runPass({ force = false } = {}) {
     // ONE PASS AT A TIME. Two overlapping passes both load the cursor map, both extend it, and the second save
     // overwrites the first — losing the progress of whichever finished earlier and re-delivering its intros.
     if (passInFlight) return null;
     passInFlight = true;
+    passIndex += 1;
     try {
       const cursors = await store.load();
       const delivered = (await store.loadDelivered?.()) ?? new Map();
@@ -108,9 +149,21 @@ export function createIntroScanRunner({
       for (const hit of result.hits) {
         const key = deliveryKey(hit);
         if (delivered.has(key)) continue;                 // already shown; a re-read must not resurface it
+        // Backing off after a body that could not be fetched: keep the cursor where it is (so the hit comes round
+        // again) and spend nothing on it this pass.
+        const pending = unfetchable.get(key);
+        if (pending && passIndex < pending.notBeforePass) { undelivered.add(hit.key); continue; }
         try {
           const capsule = fetchCapsule ? await fetchCapsule(hit) : null;
+          if (fetchCapsule && capsule == null) {
+            // NOT a delivery and NOT an exception: a null body is "try again later", see noteUnfetchable. Handing it
+            // to onIntro would throw an error about header0 that names the wrong problem.
+            noteUnfetchable(key, hit);
+            undelivered.add(hit.key);
+            continue;
+          }
           await onIntro({ ...hit, capsule });
+          unfetchable.delete(key);
           delivered.set(key, hit.epoch);
           deliveries += 1;
         } catch (error) {
@@ -155,7 +208,7 @@ export function createIntroScanRunner({
       await store.saveDelivered?.(pruneDelivered(delivered, oldestUseful));
       await store.saveMeta(nextMeta);
 
-      lastStats = { ...result.stats, delivered: deliveries, plan: { full: plan.full, intervalMs: plan.intervalMs, estimatedDailyBytes: plan.estimatedDailyBytes } };
+      lastStats = { ...result.stats, delivered: deliveries, unfetchable: unfetchable.size, plan: { full: plan.full, intervalMs: plan.intervalMs, estimatedDailyBytes: plan.estimatedDailyBytes } };
       return { hits: result.hits.length, delivered: deliveries, stats: lastStats, nextIntervalMs: plan.intervalMs };
     } finally {
       passInFlight = false;

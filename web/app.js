@@ -28,9 +28,10 @@ import {
   deriveMessagingIdentityFromWallet,
   exportPlathoWalletRecoveryPhrase,
   formatTonUserFriendlyAddress,
+  getPlathoWalletSeqno,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=33';
+} from './platho-wallet.mjs?v=35';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createInlineFormatRegex, messagePreviewText,
@@ -41,7 +42,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=122';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=123';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -50,7 +51,7 @@ import {
   tonRpcRequestCounters,
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
-} from './ton-rpc-transport.mjs?v=76';
+} from './ton-rpc-transport.mjs?v=77';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -162,48 +163,48 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=10';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=55';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=58';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=56';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=28';
+import { createPublicLane } from './public-lane.mjs?v=30';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=16';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=18';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=4';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=16';
-import { createIntroLane } from './intro-lane.mjs?v=22';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=4';
+import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
+import { createIntroLane } from './intro-lane.mjs?v=24';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=5';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=16';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=16';
+import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=18';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=19';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=18';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=16';
-import { readAccountStates } from './shard-reader.mjs?v=16';
+import { createConvReadLane } from './conv-lane.mjs?v=21';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=20';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=17';
+import { readAccountStates } from './shard-reader.mjs?v=18';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=16';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=18';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=16';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=17';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=16';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=18';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=19';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=18';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=1';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=3';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=5';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=16';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=16';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=17';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=18';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=18';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=19';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -215,19 +216,19 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=18';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=54';
+} from './shard-discovery.mjs?v=20';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=55';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=60';
+} from './username-ton-rpc-provider.mjs?v=61';
 import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=3';
+} from './username-nft-owned.mjs?v=4';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,
@@ -13138,6 +13139,15 @@ async function syncConvCapsulesFromShards() {
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
+  // THE STORE AND KEY PAIR THIS PASS STARTED WITH. A lock, a wallet switch or a background teardown sets both to
+  // null (or to the NEXT wallet's) while this pass is suspended on a network read — and the pass then wrote into
+  // whatever was there: `convKeyStore.advanceConvScanCursor` on null (OBSERVED 2026-08-21 in the owner's console,
+  // "Cannot read properties of null"), or, worse, an append into a freshly unlocked wallet's threads — the
+  // identity-bleed class. Every write below first checks that nothing moved; a pass that finds the ground gone
+  // simply ends, and the next wallet's own tick starts clean.
+  const store = convKeyStore;
+  const keyPair = localRecipientKeyPair;
+  const tornDown = () => convKeyStore !== store || localRecipientKeyPair !== keyPair;
   const selfKeyId = localRecipientKeyPair.keyId;
   const lane = convReadLane();
   const epochNow = epochFromCreatedAtSeconds(Math.floor(Date.now() / 1000));
@@ -13186,9 +13196,11 @@ async function syncConvCapsulesFromShards() {
   // were written to at all. 1024 addresses fit a single request, so this is one request for the whole device, not
   // one per conversation. `null` means the question could not be answered; then pass 3 reads everything, as before.
   const shardStates = await readConvShardStates(plans);
+  if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
 
   // PASS 3 — history reads, decryption, append. Only for shards the batch above says have moved.
   for (const plan of plans) {
+    if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
     const peerKeyId = plan.peerKeyId;
     const targetThread = resolveConvReceiveThread(introKeyIdString(peerKeyId));
     const collected = [];
@@ -13255,6 +13267,8 @@ async function syncConvCapsulesFromShards() {
         await cooperativeYield();
       }
     }
+    // The reads above are where a teardown lands; nothing of this wallet's may be written past it.
+    if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
     const appendedNow = await appendConvOpenedCapsules(collected, targetThread);
     // Advance the per-shard marks ONLY here — after the append actually stored them. Moving the mark before this
     // line would lose every collected message if the append threw.
@@ -13277,7 +13291,7 @@ async function syncConvCapsulesFromShards() {
     }
     // Advance the cursor ONLY on a fully clean scan — a failed read must leave the cursor so those epochs are retried,
     // never silently skipped past.
-    if (convClean) await convKeyStore.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
+    if (convClean && !tornDown()) await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
   }
   if (imported > 0) { renderThreads(); renderConversation(); }
   globalThis.plathoLastConvSync = {
@@ -24930,7 +24944,14 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   // Only the TERMINAL tick needs the authoritative full-shard walk (to prove ABSENCE via complete). Earlier ticks scan
   // just the recent top — a LANDED message is there and short-circuits to verified; a not-found stays inconclusive and
   // re-arms — so the up-to-record_count walk runs at most once, not on every tick. [confirm review: per-tick re-walk cost]
-  const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS;
+  //
+  // TERMINAL EARLY when the chain is KNOWN to have run the external (send.consumedAt — a door refused the bytes and
+  // a fresh wallet seqno read confirmed the seqno moved past them, see noteConvExternalRefused) and the shard has
+  // had CONV_CONFIRM_CONSUMED_SETTLE_MS to take the internal it carried. From that moment the record is either stored
+  // or bounced — nothing is in flight — so a complete scan is exactly as authoritative now as at the 8-minute
+  // deadline, and waiting for the deadline only keeps a bounced message on "sending" for seven more minutes.
+  const consumedSettled = Number(send.consumedAt) > 0 && (Date.now() - Number(send.consumedAt)) >= CONV_CONFIRM_CONSUMED_SETTLE_MS;
+  const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS || consumedSettled;
   let res;
   // clean-17 keyless coordination: pause the background index-walk sync for THIS confirm read only (not the whole
   // re-arm window) so on the paced ~1 rps keyless path the read gets the scarce budget without the walk interleaving;
@@ -24963,9 +24984,12 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
     refreshMessagingControls();
     return;
   }
-  // Definitive non-delivery needs BOTH: the external is provably dead (past max age — it can never land now) AND the read
-  // was authoritative — the scan reached the bottom (res.complete) OR the shard never accepted my seq (res.seqShort:
-  // mine-only + strictly-increasing ⇒ it never will now). Before max age it is indexer lag, not loss — keep polling.
+  // Definitive non-delivery needs BOTH: the external is provably dead AND the read was authoritative — the scan reached
+  // the bottom (res.complete) OR the shard never accepted my seq (res.seqShort: mine-only + strictly-increasing ⇒ it
+  // never will now). "Provably dead" has two proofs: the chain RAN it and the shard has settled (consumedSettled,
+  // above — the early terminal), or it is past max age and can never land. Before either it is indexer lag, not
+  // loss — keep polling. An inconclusive early read is not a failure either: it re-arms and the deadline still rules.
+  if (consumedSettled && (res.complete || res.seqShort)) { markConvDeliveryUnlanded(thread, message); return; }
   if (ageMs >= CONV_CONFIRM_MAX_AGE_MS) {
     if (res.complete || res.seqShort) markConvDeliveryUnlanded(thread, message);
     else markConvDeliveryUnverified(thread, message);
@@ -24996,6 +25020,9 @@ const DIRECT_SEND_CONFIRM_REBROADCAST_MS = 5_000;
  */
 async function rebroadcastPendingDirectSend(send, transport) {
   if (!send?.boc || !transport?.sendBoc || !plathoWallet?.address) return;
+  // The chain has already RUN these bytes (noteConvExternalRefused proved it): there is nothing left to re-send,
+  // and the shard read alone decides what became of the record.
+  if (send.consumedAt) return;
   const now = Date.now();
   const validUntilMs = Number(send.validUntil) > 0
     ? Number(send.validUntil) * 1000
@@ -25003,18 +25030,85 @@ async function rebroadcastPendingDirectSend(send, transport) {
   if (now >= validUntilMs) return;
   if (now - Number(send.lastRebroadcastAt ?? 0) < DIRECT_SEND_CONFIRM_REBROADCAST_MS) return;
   send.lastRebroadcastAt = now;
+  let answer = null;   // { door, status, chainExitCode, rejectedByChain, detail } — the door's classified reply
   try {
     // Rotate the entry point, do not re-knock: see broadcastThroughNextDoor. Falls back to the primary
     // transport when no doors are configured.
     const rotated = await broadcastThroughNextDoor(send.boc);
     if (!rotated) await transport.sendBoc({ boc: send.boc, walletAddress: plathoWallet.address });
-    console.info('[conv] re-broadcast pending external while awaiting the shard', { seq: send.maxSeq ?? null });
+    answer = rotated ?? null;
   } catch (error) {
-    // The SHARD READ is the verdict on delivery, never this POST. A failed re-send changes nothing: the earlier copy
-    // may still land, so the confirm keeps polling instead of concluding anything here.
-    if (!noteTonRpcRateLimit(error)) console.warn('[conv] pending re-broadcast failed', error);
+    // The primary THROWS where a door reports: the same verdict arrives on the error (chainExitCode is parsed off
+    // toncenter's body by the transport). Everything else is a failed POST, and a failed POST changes nothing: the
+    // earlier copy may still land, so the confirm keeps polling instead of concluding anything here.
+    if (error?.chainExitCode == null && error?.status !== 406) {
+      if (!noteTonRpcRateLimit(error)) console.warn('[conv] pending re-broadcast failed', error);
+      return;
+    }
+    answer = { door: 'primary', status: error?.status ?? null, chainExitCode: error?.chainExitCode ?? null, rejectedByChain: true, detail: String(error?.responseBody ?? '').slice(0, 200) || null };
+  }
+  if (answer?.rejectedByChain) {
+    await noteConvExternalRefused(send, transport, answer);
+    return;
+  }
+  // HONEST ABOUT WHAT HAPPENED. This line used to print after ANY door answer — the owner's console showed it right
+  // under a 406 and a 500, three times in a row. A refusal that is not a chain verdict (a bare 5xx, a 429 the pump
+  // did not absorb) is logged as what it is; only an accepted POST is called a re-broadcast.
+  if (answer && answer.status != null && answer.status >= 400) {
+    console.info('[conv] re-broadcast door refused (no chain verdict) — the next tick rotates', { seq: send.maxSeq ?? null, door: answer.door, status: answer.status, detail: answer.detail });
+    return;
+  }
+  console.info('[conv] re-broadcast pending external while awaiting the shard', { seq: send.maxSeq ?? null, door: answer?.door ?? 'primary' });
+}
+
+/**
+ * A door (or the primary) answered that the chain will not run these bytes against the current state — for a
+ * wallet external that is exit 133 (the signed seqno is not the stored one) or 136 (expired). Which of two worlds
+ * that puts us in is decided by ONE fresh read of the wallet seqno, never by the door alone: its lite-server may
+ * simply be a block behind, and a lagging node sees exactly the same mismatch a consumed external produces.
+ *
+ *   - wallet seqno PAST the signed one → the chain already executed this external. The internal it carried has by
+ *     now been accepted or bounced by the shard; the shard read holds the answer and nothing else ever will.
+ *     Re-sending is over (send.consumedAt), and runConvDeliveryConfirm may go terminal as soon as the shard has
+ *     had a moment to settle instead of sitting on "sending" until the 8-minute deadline.
+ *   - wallet seqno still AT the signed one → the external has not run; the refusing node was behind. The bytes are
+ *     alive, and the next tick knocks on the next door exactly as before.
+ *
+ * OBSERVED 2026-08-21 on the owner's screen: a message whose publish bounced sat on "sending" for the full eight
+ * minutes while all three doors had said "done with these bytes" from the four-second tick on.
+ */
+async function noteConvExternalRefused(send, transport, answer) {
+  const signed = Number(send?.seqno);
+  let chainSeqno = null;
+  if (Number.isFinite(signed) && plathoWallet) {
+    try {
+      chainSeqno = await getPlathoWalletSeqno(plathoWallet, transport);   // never from cache — a signing input
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) console.warn('[conv] wallet seqno read failed after a refused re-broadcast', error);
+    }
+  }
+  const consumed = chainSeqno != null && Number.isFinite(signed) && Number(chainSeqno) > signed;
+  const detail = {
+    seq: send?.maxSeq ?? null,
+    door: answer?.door ?? null,
+    status: answer?.status ?? null,
+    exitCode: answer?.chainExitCode ?? null,
+    signedSeqno: Number.isFinite(signed) ? signed : null,
+    chainSeqno,
+  };
+  if (consumed) {
+    send.consumedAt = Date.now();
+    console.warn('[conv] the chain already ran this external — re-broadcast stops, the shard read decides', detail);
+  } else {
+    console.info('[conv] a door refused the bytes but the wallet seqno has not moved — still alive, next door next tick', detail);
   }
 }
+
+// How long after the chain is KNOWN to have run the external the confirm waits before treating a complete scan as
+// terminal. The internal the external carried reaches the shard within a block or two of the wallet transaction; the
+// consumed moment is itself observed one tick AFTER the execution, so this is margin on top of margin. Ticks after
+// the first are at least 9s apart, so in practice the red is painted at the second tick after the verdict.
+const CONV_CONFIRM_CONSUMED_SETTLE_MS = 10_000;
 
 /**
  * The deadline passed and the read could prove NEITHER side — the scan never reached the bottom and the shard is not
@@ -25233,6 +25327,11 @@ async function attemptConvMessagePublishDirect(context) {
     message.convDirectSend = {
       boc: result?.result?.pendingBoc ?? null,
       validUntil: result?.result?.pendingValidUntil ?? null,
+      // The wallet seqno those bytes are signed against. It is what lets the confirm tell "the chain already RAN
+      // this external" (the wallet seqno moved past it) from "the network has not taken it yet": the difference
+      // between a re-broadcast that can still help and one that is noise — and between a red that must wait out the
+      // 8-minute deadline and one the shard can settle in seconds. See noteConvExternalRefused.
+      seqno: result?.result?.pendingSeqno ?? null,
       at: Date.now(),
     };
     // Record the parts' frame_commits + shard address + my highest seq for the delivery confirm (below). commits come
@@ -25243,7 +25342,7 @@ async function attemptConvMessagePublishDirect(context) {
     // re-seals/re-bumps the seq). Without this a transient sendBoc failure whose external actually landed would
     // double-publish on the next attempt. Capture the commits too (from error.preparedParts) so a later re-broadcast
     // success can arm the confirm on them.
-    if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, at: Date.now() };
+    if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, seqno: error.builtSeqno ?? null, at: Date.now() };
     if (Array.isArray(error?.preparedParts)) captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: error.preparedParts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
     // `broadcast` distinguishes the two outcomes that matter and that nothing recorded before: a throw with a signed
     // external attached means the request DID go out and the answer was lost (an ambiguous broadcast — the external

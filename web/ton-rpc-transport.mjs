@@ -1681,11 +1681,44 @@ export function firstBroadcastDoorForBytes(bocBytes, config = null) {
 }
 
 /**
+ * What a door's refusal MEANS. A door's answer is never a delivery verdict — the shard read is — but it is
+ * evidence about the BYTES, and two refusals that wear similar status codes say opposite things:
+ *
+ *   - THE CHAIN REFUSED THESE BYTES. The lite-server behind the door emulated the external against the current
+ *     account state and it did not pass: `cannot apply external message to current state`. MEASURED 2026-08-21
+ *     with a deliberately unrunnable external, one POST per door: toncenter answers HTTP 500 carrying the
+ *     lite-server text (`... exitcode=NNN ...`), tonapi HTTP 406 carrying the same text, tonhub HTTP 406 with
+ *     {"status":-5} and nothing else. For one of OUR wallet externals that is exit 133 — the signed seqno is not the
+ *     stored one, i.e. the external already EXECUTED or a predecessor was dropped — or 136, expired. Offering the
+ *     same bytes to the next door cannot change any of that.
+ *   - THE DOOR ITSELF FAILED: 429, a timeout, a bare 5xx with no verdict in it. Proves nothing about the bytes.
+ *
+ * The owner's console, 2026-08-21: 406, 406, 500 from the three doors in a row, each followed by an INFO line
+ * claiming the re-broadcast had gone out — because nobody read the status. This is the reading.
+ */
+export function classifyBroadcastDoorAnswer({ status, body } = {}) {
+  const code = Number(status);
+  const text = typeof body === 'string' ? body : '';
+  const chainExitCode = toncenterBroadcastExitCode(text);
+  const rejectedByChain = code === 406
+    || chainExitCode != null
+    || /cannot apply external message/i.test(text);
+  return {
+    status: Number.isFinite(code) ? code : null,
+    chainExitCode,
+    rejectedByChain,
+    detail: toncenterHttpErrorDetail(text).slice(0, 200) || null,
+  };
+}
+
+/**
  * Broadcast an ALREADY SIGNED external through the next retry door.
  *
- * Best-effort by construction: the caller never learns whether this worked, because the answer must not influence
- * anything. Delivery is decided by reading the shard, and these bytes are seqno-bound, so the chain runs them at
- * most once however many doors accept them.
+ * Best-effort by construction: this never throws and never decides delivery. Delivery is decided by reading the
+ * shard, and these bytes are seqno-bound, so the chain runs them at most once however many doors accept them.
+ * What it DOES report is the door's answer, classified (classifyBroadcastDoorAnswer): a caller that keeps
+ * re-offering bytes the chain has already refused is spending the one serial pump on noise, and a caller that
+ * logs "re-broadcast sent" over a 406 is lying to the console.
  *
  * ON THE SHARED PUMP KEY, always. A door is a different HOST but must not be a different QUEUE: two queues mean two
  * workers mean two simultaneous connections, which is what stalled the WebKit run loop on the iPhone. One worker
@@ -1713,11 +1746,17 @@ export async function broadcastThroughNextDoor(boc, options = {}) {
         skipIfRateLimited: true,
       },
     );
-    return { door: door.id, status: response?.status ?? null };
+    const status = response?.status ?? null;
+    if (response && response.ok === false) {
+      let body = '';
+      try { body = typeof response.text === 'function' ? await response.text() : ''; } catch { body = ''; }
+      return { door: door.id, ...classifyBroadcastDoorAnswer({ status, body }) };
+    }
+    return { door: door.id, status, chainExitCode: null, rejectedByChain: false, detail: null };
   } catch {
-    // Swallowed on purpose. A door that refuses proves nothing about delivery — the earlier copy may still land,
-    // and the next retry simply moves to the next door.
-    return { door: door.id, status: null };
+    // Swallowed on purpose. A door that cannot be reached proves nothing about delivery — the earlier copy may
+    // still land, and the next retry simply moves to the next door.
+    return { door: door.id, status: null, chainExitCode: null, rejectedByChain: false, detail: null };
   }
 }
 

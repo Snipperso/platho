@@ -14,7 +14,7 @@ import {
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=15';
 import { tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=76';
+import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=77';
 
 const {
   beginCell,
@@ -885,7 +885,56 @@ async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options 
   }
 }
 
+// ONE SIGNER PER WALLET AT A TIME — the seqno floor alone does not give that, and it was never supposed to.
+//
+// OBSERVED 2026-08-21 on the owner's wallet, reconstructed from the chain afterwards: a recovery backup was writing
+// ~35 RCV1 slots back to back (one external every ~2s, each waiting for the previous one to execute) when the owner
+// sent a message. The backup's next item and the message resolved their seqno the same way — chain read N, floor
+// N+1, awaitWalletSeqnoConsumed polling until the chain showed N+1 — and the SAME chain advance released BOTH
+// waiters. Two externals signed against N+1. The backup's reached the validators first; the message's was dropped
+// with exit 133, every re-offer of it got 406/406/500 from the three doors, and the shard never saw it: "not
+// delivered: the shard did not store it — resend", eight minutes later. Seq 1 of that day's shard is the hole.
+//
+// The floor cannot close this: it is raised only AFTER a broadcast (noteWalletSeqnoBroadcast), so any two resolvers
+// in flight between "read the seqno" and "POST" see the same floor and sign the same value — no chain lag needed.
+// Concurrent senders in one tab need a LANE, and the lane belongs here: every wallet external in the app leaves
+// through this function, so this is the one place that can promise "one signer at a time". The critical section is
+// resolve → sign → broadcast, plus — for a multi-chunk message — the waits between its own chunks, which must be
+// consecutive seqnos anyway. It is short: a send waits at most for the external in flight ahead of it, never for
+// anyone's minute-long confirm cycle; those run outside this function, exactly as before.
+//
+// A re-broadcast with an EXPLICIT seqno bypasses the lane: it reads nothing and signs nothing, it re-offers bytes
+// the lane already produced, and parking it behind a predecessor wait would delay the one thing that can end it.
+const walletSendLanes = new Map();   // wallet address -> the lane's tail promise
+
+async function withWalletSendLane(wallet, task) {
+  const key = walletSeqnoFloorKey(wallet) || '*';
+  const previous = walletSendLanes.get(key) ?? Promise.resolve();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  // The tail is detached from the OUTCOME of the task: a send that throws must not poison the lane for the next.
+  const tail = previous.then(() => gate);
+  walletSendLanes.set(key, tail);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (walletSendLanes.get(key) === tail) walletSendLanes.delete(key);
+  }
+}
+
+/** Test seam — the lanes are module state, like the floors; a test that cannot clear them cannot isolate itself. */
+export function __resetWalletSendLanesForTests() {
+  walletSendLanes.clear();
+}
+
 export async function sendPlathoWalletTransaction(wallet, transaction, options = {}) {
+  if (options.seqno !== undefined) return sendPlathoWalletTransactionInLane(wallet, transaction, options);
+  return withWalletSendLane(wallet, () => sendPlathoWalletTransactionInLane(wallet, transaction, options));
+}
+
+async function sendPlathoWalletTransactionInLane(wallet, transaction, options = {}) {
   const transport = options.transport
     ?? globalThis.plathoWalletRpcTransport
     ?? globalThis.plathoTonRpcTransport;
