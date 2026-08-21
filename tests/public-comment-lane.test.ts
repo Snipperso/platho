@@ -57,8 +57,52 @@ describe('CMT — a busy post can be read further back than one page', () => {
     // case) on every press, and the merge would hide the waste.
     expect(reader).toContain('const pageRows = paged ? Number(previous.from) - pageStart : PAGE_ROWS;');
     // An exhausted shard must not be read again, however many times the button is pressed.
-    expect(reader).toContain('if (previous && !paged) { cursors[key] = { from: 0, entryCount: Number(previous.entryCount ?? 0) }; continue; }');
+    expect(reader).toContain('if (previous && !paged) { cursors[key] = { from: 0, entryCount: Number(previous.entryCount ?? 0) }; report(); continue; }');
     expect(reader).toContain('const hasMore = Object.values(cursors).some((cursor) => Number(cursor.from) > 0);');
+  });
+
+  it('CMT-07: comments STREAM — the lane reports after every live shard, the app merges and never removes', () => {
+    // OWNER 2026-08-21: "make comments load progressively, like the channel search and the feed." A post a year
+    // old has up to 14 thread-era shards behind one screen, read newest first, and the screen used to wait for the
+    // last one. The shape is the channel-search one: report after each shard, merge on the screen, the final
+    // result stays the authoritative whole.
+    const reader = functionBody(LANE, 'async readThreadComments(');
+    expect(reader).toMatch(/async readThreadComments\([^)]*\{ channelShardSeq = 0, threadShardSeq = 0, olderThan = null, onProgress = null \} = \{\}\)/);
+    // Every path out of a shard reports: exhausted, served from the snapshot, and read from the chain.
+    expect(reader.match(/report\(\);/g)?.length, 'three exits, three reports').toBe(3);
+    // The report is a COPY and computes hasMore the way the final answer does.
+    expect(reader).toContain('posts: [...posts],');
+    expect(reader).toContain('cursors: { ...cursors },');
+    expect(reader).toMatch(/hasMore: Object\.values\(cursors\)\.some\(\(cursor\) => Number\(cursor\.from\) > 0\),\s*\n\s*shardsSeen,/);
+    // A consumer's throw cannot cost the remaining shards.
+    expect(reader).toMatch(/try \{\s*\n\s*onProgress\(\{[\s\S]{0,300}?\} catch \{/);
+
+    // The loader converts each partial with the SAME conversion as the final result, in ORDER, and never after the
+    // read has returned — a later, fuller partial finishing first must not be overwritten by an earlier one, and no
+    // partial may land on top of the authoritative whole.
+    const loader = functionBody(APP, 'async function loadPublicPostCommentsFromShards(');
+    expect(loader).toContain('const seq = (partialSeq += 1);');
+    expect(loader).toContain('if (partialsClosed || seq !== partialSeq) return;');
+    expect(loader).toMatch(/\} finally \{\s*\n\s*partialsClosed = true;/);
+    expect(loader).toContain('publicCommentsFromThreadPosts(item, partial.posts)');
+    expect(loader).toContain('const comments = await publicCommentsFromThreadPosts(item, read.posts);');
+    expect(APP).toContain('async function publicCommentsFromThreadPosts(item, threadPosts) {');
+    // Still: "no comments yet" comes from a live shard, for partials and for the whole alike.
+    expect(loader).toContain("onPartial({ comments, parentExists: Number(partial.shardsSeen ?? 0) > 0,");
+
+    // The screen MERGES a partial (mergePublicComments only adds) and leaves the load state alone; only the clean
+    // final result replaces the list, reaches the cache, and retires a pending local comment (CONF-03).
+    const refresh = functionBody(APP, 'async function refreshPublicPostDetailComments(');
+    expect(refresh).toContain('publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, partial.comments);');
+    expect(refresh).toContain('if (token !== publicPostDetailLoadToken) return;                     // closed or reopened — drop it');
+    expect(refresh).toContain("result = await loadPublicPostComments(item, { snapshot: snapshot?.latestLink ? snapshot : null, onPartial });");
+    const partialBody = refresh.slice(refresh.indexOf('const onPartial = (partial) => {'), refresh.indexOf('for (let attempt = 0;'));
+    expect(partialBody, 'a partial never touches the cache').not.toContain('writeCachedPublicComments');
+    expect(partialBody, 'a partial never retires a pending comment').not.toContain('retireConfirmedLocalPublicComments');
+    expect(partialBody, 'a partial never flips the load state').not.toContain('publicPostDetailLoadState =');
+    // Older pages stream the same way.
+    const earlier = functionBody(APP, 'async function loadEarlierPublicPostComments(');
+    expect(earlier).toContain("const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors, onPartial });");
   });
 
   it('CMT-04: the snapshot cache may only answer the NEWEST window', () => {

@@ -192,6 +192,64 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     expect(readPublicPostPayloadV2({ header: comments[0].header, body: comments[0].body }).text).toBe('written last era');
   }, 300_000);
 
+  it('PLE2E-05: a thread spanning two eras is reported shard by shard — the newer era first, the whole at the end', async () => {
+    // OWNER 2026-08-21: comments should load progressively, like the channel search and the feed. A thread keeps one
+    // shard per 30-day era; the reader walks them newest first and used to hand everything over only after the last
+    // one. Two comments, two eras: the first report must carry the newer era's comment alone, the second both, and
+    // the final return must equal the last report.
+    const bc = await Blockchain.create();
+    bc.now = CLOCK;
+    await deployFeeSink(bc, { funderSeed: 'ple2e-stream-sink' });
+    const channel = await bc.treasury('ple2e-stream-channel');
+    const commenter = await bc.treasury('ple2e-stream-commenter');
+
+    const channelPk = await publicChannelPartitionKey(publicWalletHash(channel.address.toString()), 0);
+    const channelEpochTag = publicEpochTag(0, publicEraOf(0, CLOCK));
+    const post = await createPublicPostPayloadV2({ type: 'post', text: 'a post read across eras', streamId: '05'.repeat(16), createdAtSec: CLOCK });
+    await sendBuilt(channel, await buildPublicPublishWalletMessage({
+      kind: 0, keyArg: 0n, header: post.headerCell, body: post.bodyCell,
+      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag,
+    }));
+    const postUid = await publicPostUid(channelPk, channelEpochTag, 0n);
+    const threadPk = await publicThreadPartitionKey(postUid, 0);
+
+    // Comment A in THIS thread era, comment B one thread era later — two live thread shards.
+    const shards = new Map<string, any>();
+    const publishComment = async (text: string, streamSeed: string, at: number) => {
+      bc.now = at;
+      const threadEpochTag = publicEpochTag(1, publicEraOf(1, at));
+      const comment = await createPublicPostPayloadV2({ type: 'comment', text, streamId: streamSeed.repeat(16), createdAtSec: at });
+      const built = await buildPublicPublishWalletMessage({
+        kind: 1, keyArg: postUid, header: comment.headerCell, body: comment.bodyCell,
+        value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag,
+      });
+      const dest = await sendBuilt(commenter, built);
+      shards.set(addrKey(dest.toString()), { shard: bc.openContract(PublicShard.fromAddress(dest)), messages: [{ body: built.body, source: commenter.address.toString() }] });
+      return dest;
+    };
+    const destA = await publishComment('written in the older era', '06', CLOCK);
+    const laterClock = CLOCK + THREAD_ERA_SECONDS;
+    const destB = await publishComment('written in the newer era', '07', laterClock);
+    expect(addrKey(destA.toString()) !== addrKey(destB.toString()), 'two eras, two thread shards').toBe(true);
+
+    const lane = laneOverShards(bc, shards, laterClock + 60);
+    const reports: any[] = [];
+    const { posts: comments } = await lane.readThreadComments(channel.address.toString(), channelEpochTag, 0n, {
+      channelShardSeq: 0,
+      onProgress: (partial: any) => { reports.push({ n: partial.posts.length, texts: partial.posts.map((p: any) => readPublicPostPayloadV2({ header: p.header, body: p.body }).text), hasMore: partial.hasMore, shardsSeen: partial.shardsSeen }); },
+    });
+
+    expect(reports.length, 'one report per live shard').toBe(2);
+    expect(reports[0].n, 'the FIRST report is the newest era alone').toBe(1);
+    expect(reports[0].texts, 'and it is the newer comment').toEqual(['written in the newer era']);
+    expect(reports[0].shardsSeen).toBe(1);
+    expect(reports[1].n, 'the second report is the whole thread').toBe(2);
+    expect(reports[1].texts.sort()).toEqual(['written in the newer era', 'written in the older era']);
+    expect(reports[1].shardsSeen).toBe(2);
+    expect(comments.length, 'the final return is the last report').toBe(2);
+    expect(reports[1].hasMore, 'two single-row shards have nothing before them').toBe(false);
+  }, 300_000);
+
   it('PLE2E-04: a channel that announces to its beacon bucket is found by sweepChannelCatalog', async () => {
     const bc = await Blockchain.create();
     bc.now = CLOCK;

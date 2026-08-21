@@ -343,7 +343,14 @@ export function createPublicLane({
      *    empty result, which cannot tell an empty thread from a live one whose entries failed to decode. A shard
      *    that is live is proof somebody commented, whatever came back.
      */
-    async readThreadComments(channelWallet, channelEpochTag, entryId, { channelShardSeq = 0, threadShardSeq = 0, olderThan = null } = {}) {
+    /**
+     * `onProgress`, when given, is called with { posts, cursors, hasMore, shardsSeen } SO FAR after each live thread
+     * shard — a thread's comments sit in one shard per 30-day era of its life, read newest era first, and a post a
+     * year old has up to 14 of them behind one screen. Same contract as sweepChannelCatalog's: the return value is
+     * ignored, a throw cannot stop the read, and the final return is the authoritative whole. [OWNER 2026-08-21:
+     * "make comments load progressively, like the channel search and the feed."]
+     */
+    async readThreadComments(channelWallet, channelEpochTag, entryId, { channelShardSeq = 0, threadShardSeq = 0, olderThan = null, onProgress = null } = {}) {
       const nowUnix = now();
       const channelPk = await publicChannelPartitionKey(publicWalletHash(channelWallet), channelShardSeq);
       const postUid = await publicPostUid(channelPk, channelEpochTag, entryId);
@@ -364,6 +371,19 @@ export function createPublicLane({
       const posts = [];
       const cursors = {};
       let shardsSeen = 0;
+      // What the caller may paint NOW, after each shard: copies, so a consumer that keeps the arrays cannot see
+      // them grow under its feet. hasMore is computed the same way the final answer computes it.
+      const report = () => {
+        if (typeof onProgress !== 'function') return;
+        try {
+          onProgress({
+            posts: [...posts],
+            cursors: { ...cursors },
+            hasMore: Object.values(cursors).some((cursor) => Number(cursor.from) > 0),
+            shardsSeen,
+          });
+        } catch { /* the caller's paint is not this read's problem — the remaining shards are the reader's comments */ }
+      };
       for (const address of coords) {
         const state = live.get(addrKey(address));
         // ACTIVE, not merely present: readAccountStates reports touched-but-uninit accounts too (525 B, status
@@ -378,7 +398,7 @@ export function createPublicLane({
         // means this shard is exhausted and asking again would re-read the same rows.
         const previous = olderThan?.[key];
         const paged = Number.isFinite(Number(previous?.from)) && Number(previous.from) > 0;
-        if (previous && !paged) { cursors[key] = { from: 0, entryCount: Number(previous.entryCount ?? 0) }; continue; }
+        if (previous && !paged) { cursors[key] = { from: 0, entryCount: Number(previous.entryCount ?? 0) }; report(); continue; }
         // The count is clamped as well as the start. Asking for a full page from a clamped start would re-read rows
         // the caller already holds — 72 of them in the 120-comment case, every time the button is pressed — and the
         // merge would hide it, so the waste would never show up as a bug.
@@ -391,6 +411,7 @@ export function createPublicLane({
         if (snapshot) {
           posts.push(...snapshot.posts);
           cursors[key] = { from: snapshot.from, entryCount: snapshot.entryCount };
+          report();
           continue;
         }
         const { posts: shardPosts, entry_count: entryCount } = await readShardPosts(address, {
@@ -401,6 +422,7 @@ export function createPublicLane({
         if (!paged) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count });
         posts.push(...shardPosts);
         cursors[key] = { from, entryCount: count };
+        report();
       }
       // hasMore asks the only question the button needs: is there a row BEFORE what we have read, anywhere in the
       // thread. A shard whose window already starts at 0 is exhausted and contributes nothing.

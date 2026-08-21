@@ -167,7 +167,7 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=31';
+import { createPublicLane } from './public-lane.mjs?v=32';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=4';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=18';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
@@ -9705,7 +9705,7 @@ function buildDiscoveryCtaCard() {
 // accountStates call — reading only the current era silently dropped every earlier comment. Shards whose change
 // marker has not moved since the last open are served from the lane's snapshot cache, so reopening an untouched
 // thread reads no bodies at all.
-async function loadPublicPostCommentsFromShards(item, { olderThan = null } = {}) {
+async function loadPublicPostCommentsFromShards(item, { olderThan = null, onPartial = null } = {}) {
   const lane = directPublicLaneReader();
   if (!lane) return { comments: [], degraded: true };
   // A post with no entryId has not been published yet, so no thread CAN exist — that is a real "no comments".
@@ -9716,17 +9716,60 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null } = {})
   // But a published post whose address we cannot compute is UNKNOWN, not empty. Reporting parentExists:false here
   // printed "no comments yet" over a thread nobody had read — a claim we had no basis for.
   if (!coords) return { comments: [], degraded: true };
+  // PROGRESSIVE, like the channel search and the feed [OWNER 2026-08-21]. The lane reports after each live thread
+  // shard (one per 30-day era of the post's life, newest first); each report is turned into comments and handed
+  // to the caller while the older shards are still being read. Two disciplines keep the stream honest:
+  //   - ORDER. The conversion is async (a body hash per comment), so a later, fuller report can finish before an
+  //     earlier one. Each report takes a sequence number and a report that is no longer the newest is dropped,
+  //     and once the read has returned no partial may land at all — the final result is the authoritative whole.
+  //   - SUBSET. Every partial is a prefix of the same read, never a different answer; the consumer MERGES it
+  //     (mergePublicComments only adds), so nothing already on screen can disappear mid-stream.
+  let partialSeq = 0;
+  let partialsClosed = false;
+  const onProgress = typeof onPartial !== 'function' ? null : (partial) => {
+    const seq = (partialSeq += 1);
+    publicCommentsFromThreadPosts(item, partial.posts).then((comments) => {
+      if (partialsClosed || seq !== partialSeq) return;
+      onPartial({ comments, parentExists: Number(partial.shardsSeen ?? 0) > 0, cursors: partial.cursors ?? null, hasMore: partial.hasMore === true });
+    }).catch(() => { /* a partial that will not convert is simply not painted; the final result still arrives */ });
+  };
   let read;
   try {
     // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
-    read = await lane.readThreadComments(coords.authorWallet, coords.epochTag, coords.shardEntryId, { channelShardSeq: coords.shardSeq, olderThan });
+    read = await lane.readThreadComments(coords.authorWallet, coords.epochTag, coords.shardEntryId, {
+      channelShardSeq: coords.shardSeq, olderThan, ...(onProgress ? { onProgress } : {}),
+    });
   } catch (error) {
+    partialsClosed = true;
     // Feed a 429 into the shared rate-limit tracker before degrading, or the app keeps hammering at the same
     // cadence while every read fails (the Hub loader did this; the shard loader silently did not).
     if (!noteTonRpcRateLimit(error)) console.warn('[public] thread comments read failed', item.entryId, error);
     return { comments: [], degraded: true };
+  } finally {
+    partialsClosed = true;
   }
-  const threadPosts = read.posts;
+  const comments = await publicCommentsFromThreadPosts(item, read.posts);
+  globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false, hasMore: read.hasMore === true };
+  // parentExists = "somebody has commented on this post", and it is asked so the empty screen can tell the ordinary
+  // case from a failed one. It used to be DERIVED FROM THE COUNT (comments.length > 0), which cannot tell those
+  // apart at all: a thread whose entries were all unreadable came back empty and was announced as "no comments yet",
+  // and the retry branch beside it — with a comment explaining exactly this distinction — could never run.
+  // A LIVE THREAD SHARD is the honest signal: the shard is only ever deployed by a comment landing in it.
+  return {
+    comments,
+    degraded: false,
+    parentExists: Number(read.shardsSeen ?? 0) > 0,
+    latestLink: String(comments.length),
+    cursors: read.cursors ?? null,
+    hasMore: read.hasMore === true,
+  };
+}
+
+/**
+ * Thread-shard posts → assembled, time-ordered comments. ONE conversion for the whole read and for every partial
+ * report of it, so a streamed list can never differ from the final one except by being shorter.
+ */
+async function publicCommentsFromThreadPosts(item, threadPosts) {
   const commentParts = [];
   for (const tp of threadPosts) {
     let payload;
@@ -9762,27 +9805,14 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null } = {})
   }
   const comments = assemblePublicParts(commentParts);
   comments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false, hasMore: read.hasMore === true };
-  // parentExists = "somebody has commented on this post", and it is asked so the empty screen can tell the ordinary
-  // case from a failed one. It used to be DERIVED FROM THE COUNT (comments.length > 0), which cannot tell those
-  // apart at all: a thread whose entries were all unreadable came back empty and was announced as "no comments yet",
-  // and the retry branch beside it — with a comment explaining exactly this distinction — could never run.
-  // A LIVE THREAD SHARD is the honest signal: the shard is only ever deployed by a comment landing in it.
-  return {
-    comments,
-    degraded: false,
-    parentExists: Number(read.shardsSeen ?? 0) > 0,
-    latestLink: String(comments.length),
-    cursors: read.cursors ?? null,
-    hasMore: read.hasMore === true,
-  };
+  return comments;
 }
 
 async function loadPublicPostComments(item, options = {}) {
   // clean-17 direct-pay: a post's comments live in its THREAD shard, derived from the parent's coordinates
   // (loadPublicPostCommentsFromShards). The removed CapsuleHub walk read a shared entry log with a snapshot
   // boundary and an incremental cursor; a thread shard is per-post, so there is no shared log to walk.
-  return loadPublicPostCommentsFromShards(item, { olderThan: options.olderThan ?? null });
+  return loadPublicPostCommentsFromShards(item, { olderThan: options.olderThan ?? null, onPartial: options.onPartial ?? null });
 }
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
@@ -9804,7 +9834,15 @@ async function loadEarlierPublicPostComments() {
   renderPublicPostDetail();
   const token = publicPostDetailLoadToken;
   try {
-    const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors });
+    // Older pages stream too: a page can span several era shards, and each one's rows are an addition the reader
+    // may see at once. Same merge, same token guard; the cursors and hasMore are taken only from the final result.
+    const onPartial = (partial) => {
+      if (token !== publicPostDetailLoadToken || !publicPostDetailOpen) return;
+      if (!Array.isArray(partial?.comments) || partial.comments.length === 0) return;
+      publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, partial.comments);
+      renderPublicPostDetail();
+    };
+    const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors, onPartial });
     if (token !== publicPostDetailLoadToken || !publicPostDetailOpen) return;   // closed or reopened mid-read
     if (result.degraded) return;                                                // keep the button, let them retry
     publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);
@@ -9834,10 +9872,23 @@ async function refreshPublicPostDetailComments() {
   }
   if (token !== publicPostDetailLoadToken) return;
   const maxAttempts = 6;
+  // PROGRESSIVE PAINT [OWNER 2026-08-21]. Each partial is MERGED into what is on screen — mergePublicComments only
+  // adds and re-sorts — so a list already showing the cached snapshot cannot lose a row to a shorter partial, and
+  // a post opened cold shows its newest era's comments while the older eras are still being read. The load state
+  // is left as it was: a cold open stays 'loading' (the list paints with "loading more…" under it), a cached open
+  // stays 'ready' (the refresh is silent, as it always was). The clean final result below still REPLACES the list,
+  // is the only thing written to the cache, and is the only read that retires a pending local comment.
+  const onPartial = (partial) => {
+    if (token !== publicPostDetailLoadToken) return;                     // closed or reopened — drop it
+    if (!Array.isArray(partial?.comments) || partial.comments.length === 0) return;
+    publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, partial.comments);
+    if (partial.parentExists === true) publicPostDetailParentExists = true;
+    renderPublicPostDetail();
+  };
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     let result;
     try {
-      result = await loadPublicPostComments(item, { snapshot: snapshot?.latestLink ? snapshot : null });
+      result = await loadPublicPostComments(item, { snapshot: snapshot?.latestLink ? snapshot : null, onPartial });
     } catch (error) {
       console.error(error);
       result = { comments: [], degraded: true };
