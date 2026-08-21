@@ -1,0 +1,81 @@
+:root {
+  --bg: #0b0d0f;
+  --surface: rgba(255, 255, 255, 0.03);
+  --line: rgba(48, 213, 176, 0.16);
+  --text: #e8eef0;
+  --muted: #8b9a9e;
+  --accent: #30d5b0;
+  --bad: #ff6b6b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 24px;
+  max-width: 1100px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+h1 { margin: 0 0 8px; font-size: 22px; }
+h2 { margin: 0 0 10px; font-size: 15px; }
+code { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+p { margin: 0 0 8px; color: var(--muted); }
+.note { font-size: 12px; }
+.manifest { font-size: 12px; }
+
+.wallet, .card {
+  margin: 0 0 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  resize: vertical;
+}
+
+.wallet-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+
+button {
+  padding: 9px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(48, 213, 176, 0.12);
+  color: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.35; cursor: default; }
+
+.toolbar { display: flex; align-items: center; gap: 14px; margin: 18px 0; }
+#status[data-tone="good"] { color: var(--accent); }
+#status[data-tone="bad"] { color: var(--bad); }
+
+main { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+.rows { display: grid; gap: 6px; margin: 12px 0; }
+.row { display: flex; justify-content: space-between; gap: 12px; }
+.row span { color: var(--muted); }
+.row strong { font-variant-numeric: tabular-nums; }
+/* A bucket with money in it should be findable without reading every card. */
+.row.is-primary strong[data-due="true"] { color: var(--accent); }
+.row.is-error { color: var(--bad); }
+.card[data-state="error"] { border-color: rgba(255, 107, 107, 0.4); }
+
+.actions { display: grid; gap: 6px; }
+.actions .note { margin: 0 0 6px; font-size: 11px; }
+/* A dead button has to say why. Muted rather than red: an unmet precondition is the normal state of the buyback
+   between accumulations, not a fault. */
+.actions .note[data-blocked="true"] { color: var(--muted); font-style: italic; }
