@@ -93,3 +93,9 @@ artifacts/M20T_TESTNET_FUNDING_*
 artifacts/SERVER_PENTEST_REPORT_*
 artifacts/*CEREMONY_RUNBOOK*
 artifacts/*REGEN_RUNBOOK*
+
+# The operator console (tools/admin) is LOCAL ONLY — it stays on the owner's machines and out of the public
+# repository (owner, 2026-08-21: nothing secret in it, but not for showing). Its own gate lives beside it and runs
+# through vitest.admin.config.ts (`npm run admin:test`) on a machine that has the folder — never through the
+# canonical `npm test`, whose file count is recorded as release evidence and compared with tests/ on every machine.
+tools/admin/

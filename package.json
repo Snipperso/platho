@@ -39,7 +39,8 @@
     "test:debug:files": "bash scripts/debug-test-files.sh",
     "web:deploy": "node scripts/deploy_static_web.mjs",
     "web:deploy:preview": "node scripts/deploy_static_web.mjs --mode preview",
-    "admin": "node scripts/serve_admin.mjs"
+    "admin": "node scripts/serve_admin.mjs",
+    "admin:test": "vitest run --config vitest.admin.config.ts"
   },
   "keywords": [],
   "author": "Platho",
