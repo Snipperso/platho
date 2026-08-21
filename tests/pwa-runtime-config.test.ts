@@ -411,7 +411,7 @@ describe('PWA runtime config guard', () => {
     // Public "Display as" menu reuses the same option builder + popover as Private.
     expect(app).toMatch(/function showPublicChannelDisplayPopover\(channel, anchor\)/);
     expect(app).toMatch(/options: identityDisplayOptions\(context\)/);
-    expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName \}\)/);
+    expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pin = null \}\)/);
 
     // The user's OWN wallet channel offers their OWN linked username (.ath) as a "Display as" option too: it
     // never arrives via received posts (you don't receive your own), so contactDisplayContextForWallet injects
@@ -3786,7 +3786,9 @@ describe('PWA runtime config guard', () => {
     // Pinned by a render-time partition — `threads` array order stays owned by sync/restore code. v731: the
     // non-Saved dialogs sort by RECENCY (newest activity first) — active chats on top, dormant ones drift down;
     // a just-created empty dialog floats up via its createdAtMs stamp (threadLastActivityMs fallback).
-    expect(render).toMatch(/\.\.\.visibleThreads\.filter\(\(thread\) => isSavedMessagesThread\(thread\)\),\s*\.\.\.visibleThreads\s*\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\)\s*\.sort\(\(a, b\) => threadLastActivityMs\(b\) - threadLastActivityMs\(a\)\),/);
+    // [2026-08-21] The partition moved into thread-list-order.mjs (My notes → pinned by recency → the rest by
+    // recency) so the share sheet orders the same way; PWA-PIN-01 proves the rule, this pins that the list uses it.
+    expect(render).toMatch(/const ordered = orderThreadsForList\(visibleThreads, \{ isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs \}\);/);
     expect(app).toMatch(/function threadLastActivityMs\(thread\) \{/);
     // Newest message wins (messages are ascending; scan from the end for a resolvable time); an empty dialog falls
     // back to its creation stamp, unknown -> 0 (sinks).
@@ -4912,7 +4914,7 @@ describe('PWA runtime config guard', () => {
     expect(shareList).toMatch(/label: t\('dialog\.shareCopyToClipboard'\),\s*icon: 'copy',/);
     // order: external link -> Copy row -> My notes (Saved, thread icon) -> own channel -> contacts by recency.
     // The permalink row leads: it is the only target that reaches someone who has no Platho account yet.
-    expect(shareList).toMatch(/icon: 'link',[\s\S]*?shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = visible/);
+    expect(shareList).toMatch(/icon: 'link',[\s\S]*?shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = orderThreadsForList\(/);
     const shareCss = readFileSync('web/styles.css', 'utf8');
     expect(shareCss).toMatch(/--modal-outline: rgba\(48, 213, 176, 0\.5\);/);
     expect(shareCss).toMatch(/\.recipient-dialog,\s*\.action-dialog,\s*\.docs-dialog,\s*\.install-dialog \{[\s\S]*?border: 1px solid var\(--modal-outline\);/);
@@ -7371,6 +7373,81 @@ describe('PWA runtime config guard', () => {
     const runner = readFileSync('web/intro-scan-runner.mjs', 'utf8');
     expect(handler).toContain("error.code = 'INTRO_REPLAY';");
     expect(runner).toMatch(/if \(error\?\.code === 'INTRO_REPLAY'\) \{\s*\n\s*delivered\.set\(key, hit\.epoch\);/);
+  });
+
+  it('PWA-MYNAMES-01: the "My .ath names" row is reconciled with the chain, and checked once per session at load', () => {
+    // OWNER 2026-08-21: "I had five names, gave one away; the dialog shows four and fixes the row, and after a reload
+    // the row says five again" — and: "at load it would be good to check the real number". The verified read kept its
+    // answer in memory only; the remembered list (the row's cold number) was never reconciled, and nothing ran the
+    // read until the dialog was opened.
+    const app = readFileSync('web/app.js', 'utf8');
+    const load = app.slice(app.indexOf('async function loadOwnedUsernameNfts('), app.indexOf('function usernameNftCardNode('));
+    // 1. A complete read forgets what is gone and remembers what was found; an incomplete read may only add.
+    expect(load).toContain('reconcileKnownPlathoUsernames(result);');
+    expect(load).toMatch(/function reconcileKnownPlathoUsernames\(result\) \{[\s\S]*?for \(const label of ownedLabels\) addKnownPlathoUsername\(label, owner\);\s*\n\s*if \(result\.complete !== true\) return;/);
+    expect(load).toContain('removeKnownPlathoUsername(label, owner);');
+    expect(load).toContain("if (readLinkedPlathoUsername(owner)?.label === label) clearLinkedPlathoUsername(owner);");
+    // 2. "Complete" is honest about a verification that threw — otherwise a transient read failure could forget a name.
+    const owned = readFileSync('web/username-nft-owned.mjs', 'utf8');
+    expect(owned).toContain('complete: indexerError === null && indexerAddresses !== null && unverified === 0');
+    // 3. One real check per wallet per session, after the first paint, from the wallet identity render.
+    expect(load).toMatch(/function scheduleOwnedUsernamesBootCheck\(\) \{[\s\S]*?if \(!address \|\| ownedUsernameNftsCheckedFor === address \|\| ownedUsernameNftsInFlight\) return;/);
+    const render = app.slice(app.indexOf('function renderWalletIdentity('), app.indexOf('function renderWalletIdentity(') + 3000);
+    expect(render).toContain('scheduleOwnedUsernamesBootCheck();');
+  });
+
+  it('PWA-PIN-01: a contact can be PINNED from the chevron menu — kept at the top, pinned ones still ordered by freshness', async () => {
+    // OWNER 2026-08-21: "add a Pin button to the 'Display as' menu; pinned contacts at the top of the contact list,
+    // and pinned ones still change places among themselves by the freshness of the last message."
+    const { orderThreadsForList } = await import('../web/thread-list-order.mjs');
+    const at = (ms: number) => ({ createdAtMs: ms });
+    const saved = { id: 'saved', pinned: false, ...at(1) };
+    const a = { id: 'a', pinned: true, ...at(100) };
+    const b = { id: 'b', pinned: true, ...at(300) };
+    const c = { id: 'c', pinned: false, ...at(500) };
+    const d = { id: 'd', pinned: false, ...at(200) };
+    const ordered = orderThreadsForList([d, a, c, saved, b], {
+      isSavedMessages: (thread: any) => thread.id === 'saved',
+      lastActivityMs: (thread: any) => thread.createdAtMs,
+    });
+    // My notes first, then the pinned pair by recency (b before a), then the rest by recency (c before d) — a fresh
+    // unpinned dialog (c, 500) does NOT climb above a pinned one; a stale pinned one (a, 100) does NOT sink below.
+    expect(ordered.map((t: any) => t.id)).toEqual(['saved', 'b', 'a', 'c', 'd']);
+    // Stable and non-mutating.
+    const tie1 = { id: 't1', pinned: true, ...at(50) }; const tie2 = { id: 't2', pinned: true, ...at(50) };
+    expect(orderThreadsForList([tie1, tie2], { lastActivityMs: (t: any) => t.createdAtMs }).map((t: any) => t.id)).toEqual(['t1', 't2']);
+    const input = [d, a, c];
+    orderThreadsForList(input, { lastActivityMs: (t: any) => t.createdAtMs });
+    expect(input.map((t: any) => t.id), 'the input array is left alone').toEqual(['d', 'a', 'c']);
+    expect(orderThreadsForList(null as any)).toEqual([]);
+
+    const app = readFileSync('web/app.js', 'utf8');
+    // The list AND the share sheet order through the one rule.
+    expect(app).toMatch(/const ordered = orderThreadsForList\(visibleThreads, \{ isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs \}\);/);
+    expect(app).toMatch(/const contacts = orderThreadsForList\(\s*\n\s*visible\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\),/);
+    expect(app, 'no second recency sort of the thread list survives').not.toMatch(/\.sort\(\(a, b\) => threadLastActivityMs\(b\) - threadLastActivityMs\(a\)\)/);
+    // The flag lives in the per-counterparty display store (device-local, like the local name), every writer of that
+    // record leaves it alone unless asked, and the thread picks it up on hydrate.
+    expect(app).toMatch(/const pinned = value\.pinned === true;\s*\n\s*if \(!displayIdentity && !localLabel && !pinned\) return null;/);
+    expect(app).toMatch(/pinned: typeof preference\?\.pinned === 'boolean' \? preference\.pinned : existingPinned,/);
+    expect(app).toContain("pinned: normalized.pinned === true,");
+    expect(app).toMatch(/thread\.pinned = stored\?\.pinned === true;/);
+    // The menu row: a labeled action (Pin / Unpin + the device-local hint), only for a pinnable Private dialog.
+    expect(app).toMatch(/pinLabel\.textContent = pin\.pinned \? t\('chat\.unpinContact'\) : t\('chat\.pinContact'\);/);
+    expect(app).toContain("pinType.textContent = t('chat.pinHint');");
+    expect(app).toMatch(/const pinnable = Boolean\(ownerWalletFromThread\(thread\)\) && !isSavedMessagesThread\(thread\);/);
+    expect(app).toMatch(/pin: pinnable \? \{ pinned: thread\.pinned === true, onToggle: \(\) => toggleThreadPinned\(thread\) \} : null,/);
+    const toggle = app.slice(app.indexOf('function toggleThreadPinned(thread) {'), app.indexOf('function showIdentityPopover(thread, anchor) {'));
+    expect(toggle).toContain('writeContactDisplayPreference(wallet, {');
+    expect(toggle).toContain('pinned,');
+    expect(toggle).toContain('renderThreads();');
+    // Every locale names the action.
+    const { I18N_STRINGS, I18N_LOCALES } = await import('../web/i18n-strings.mjs');
+    for (const { code } of I18N_LOCALES as Array<{ code: string }>) {
+      for (const key of ['chat.pinContact', 'chat.unpinContact', 'chat.pinHint']) {
+        expect(typeof (I18N_STRINGS as any)[code][key], `${code} ${key}`).toBe('string');
+      }
+    }
   });
 
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {

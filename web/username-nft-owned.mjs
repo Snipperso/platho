@@ -183,6 +183,12 @@ export async function collectOwnedUsernameNfts({
   }
 
   const owned = [];
+  // A verification that THREW is a name neither shown nor denied. It also makes the list INCOMPLETE — and `complete`
+  // has to say so, because a caller now acts on a complete list: it reconciles the device's remembered names against
+  // it (a transferred-away name is forgotten, a newly found one remembered). A transient read failure must never be
+  // able to forget a name the user still owns. [OWNER 2026-08-21: the row kept saying "5 names" after one was given
+  // away, reload after reload — the remembered list was never reconciled with the chain's answer.]
+  let unverified = 0;
   for (const [itemAddress, { label: proposedLabel, image }] of seen) {
     // SEQUENTIALLY. Concurrent chain reads are the iOS run-loop stall this codebase has paid for repeatedly, and a
     // wallet with a dozen names is not worth re-learning it.
@@ -192,6 +198,7 @@ export async function collectOwnedUsernameNfts({
     } catch {
       // A read that failed proves nothing either way, so the name is neither shown nor denied — it simply leaves the
       // list incomplete, which the caller already has to handle for the indexer.
+      unverified += 1;
       continue;
     }
     if (record?.authoritative !== true) continue;
@@ -214,5 +221,5 @@ export async function collectOwnedUsernameNfts({
     });
   }
 
-  return { owned, complete: indexerError === null && indexerAddresses !== null, indexerError };
+  return { owned, complete: indexerError === null && indexerAddresses !== null && unverified === 0, indexerError, unverified };
 }

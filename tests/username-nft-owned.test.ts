@@ -198,6 +198,10 @@ describe('username NFT — the owned list', () => {
       },
     });
     expect(result.owned.map((n) => n.itemAddress)).toEqual([ITEM_B]);
+    // And the list says it is SHORT: a caller that reconciles the device's remembered names against a complete list
+    // must not be handed a "complete" one with a read missing from it — it would forget a name the user still owns.
+    expect(result.complete, 'a failed verification leaves the list incomplete').toBe(false);
+    expect(result.unverified).toBe(1);
   });
 
   it('UNFT-10: the label normaliser does NOT carry a second copy of the charset rule', () => {

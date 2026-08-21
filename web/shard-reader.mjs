@@ -58,11 +58,34 @@ export function toWireAddress(address) {
 export async function readAccountStates(addresses, { request, includeBoc = false, chunkSize } = {}) {
   if (typeof request !== 'function') throw new Error('readAccountStates requires a `request` function');
   const out = new Map();
-  for (const group of chunkAddresses(addresses, chunkSize ?? ACCOUNT_STATES_MAX_PER_CALL)) {
+  const readGroup = async (group) => {
     const wire = group.map(toWireAddress);
     const qs = wire.map((a) => `address=${encodeURIComponent(a)}`).join('&');
     const path = `/accountStates?${qs}&include_boc=${includeBoc ? 'true' : 'false'}`;
-    const body = await request({ path, addresses: wire, includeBoc });
+    let body;
+    try {
+      body = await request({ path, addresses: wire, includeBoc });
+    } catch (error) {
+      // A 422 IS ABOUT THE REQUEST, NOT THE ENDPOINT. The owner's console, 2026-08-21: one probe over every
+      // conversation's shards answered 422, and the whole probe was abandoned — every shard then read the slow way,
+      // every pass. Whatever the endpoint refused (one address it will not take, a length it will not take), the
+      // rest of the batch is still answerable: split it and ask again, down to single addresses. A single address
+      // the endpoint still refuses is recorded as UNKNOWN — not omitted, because for the lanes that read this map
+      // an omitted address means "never written, skip it", and that is the silent-loss shape. An unknown row
+      // carries no marker, which every lane already treats as "read it, remember nothing".
+      if (error?.status === 422 && group.length > 1) {
+        const mid = Math.ceil(group.length / 2);
+        await readGroup(group.slice(0, mid));
+        await readGroup(group.slice(mid));
+        return;
+      }
+      if (error?.status === 422 && group.length === 1) {
+        console.warn('[states] the endpoint refused one address — left UNKNOWN, not absent', wire[0], error?.detail ?? '');
+        out.set(addrKey(wire[0]), { address: wire[0], status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });
+        return;
+      }
+      throw error;
+    }
     for (const account of body?.accounts ?? []) {
       if (!account?.address) continue;
       out.set(addrKey(account.address), {
@@ -75,7 +98,8 @@ export async function readAccountStates(addresses, { request, includeBoc = false
         dataBoc: account.data_boc ?? null,
       });
     }
-  }
+  };
+  for (const group of chunkAddresses(addresses, chunkSize ?? ACCOUNT_STATES_MAX_PER_CALL)) await readGroup(group);
   return out;
 }
 

@@ -114,7 +114,18 @@ export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, r
       if (strict) throw new Error('accountStates: the request did not run (rate-limited or dropped) — absence is not proven');
       return { accounts: [] };
     }
-    if (!response.ok) throw new Error(`accountStates failed with HTTP ${response.status}`);
+    if (!response.ok) {
+      // SAY WHY. The owner's console, 2026-08-21: "accountStates failed with HTTP 422" for a probe over every
+      // conversation's shards — and nothing more, so the cause (toncenter's own `detail`) was thrown away with the
+      // body. The status rides on the error too, so a reader can tell a 422 (the request itself was refused: the
+      // batch is bisected) from a 5xx/429 (the endpoint is unwell: the caller falls back).
+      let detail = '';
+      try { detail = typeof response.text === 'function' ? String(await response.text()).slice(0, 300) : ''; } catch { detail = ''; }
+      const error = new Error(`accountStates failed with HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+      error.status = response.status;
+      error.detail = detail;
+      throw error;
+    }
     return response.json();
   };
 }

@@ -52,6 +52,7 @@ import {
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
 } from './ton-rpc-transport.mjs?v=77';
+import { orderThreadsForList } from './thread-list-order.mjs?v=1';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -73,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=51';
+} from './public-channel-subscriptions.mjs?v=52';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -168,13 +169,13 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=34';
+import { createPublicLane } from './public-lane.mjs?v=35';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=19';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=27';
+import { createIntroLane } from './intro-lane.mjs?v=28';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
@@ -182,10 +183,10 @@ import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
 import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=18';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=23';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=20';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=19';
-import { readAccountStates } from './shard-reader.mjs?v=18';
+import { createConvReadLane } from './conv-lane.mjs?v=24';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=21';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=20';
+import { readAccountStates } from './shard-reader.mjs?v=19';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=18';
@@ -193,7 +194,7 @@ import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=18';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=20';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=21';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=18';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
@@ -203,9 +204,9 @@ import {
 } from './market-stability-read.mjs?v=1';
 import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=5';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=18';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=18';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=19';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=19';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=19';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=20';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -229,7 +230,7 @@ import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=4';
+} from './username-nft-owned.mjs?v=5';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,
@@ -248,7 +249,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=76';
+} from './i18n.mjs?v=77';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -3802,8 +3803,12 @@ function normalizeContactDisplayPreference(value) {
   const displayIdentity = normalizeRecipientIdentity(value.displayIdentity) ?? null;
   const rawLabel = typeof value.localLabel === 'string' ? value.localLabel.trim() : '';
   const localLabel = rawLabel.length > 0 ? rawLabel : null;
-  if (!displayIdentity && !localLabel) return null;
-  return { displayIdentity, localLabel };
+  // PINNED rides in the same per-counterparty record as the local name: a device-local choice about one contact,
+  // kept where the other device-local choices about that contact already live. [OWNER 2026-08-21: a Pin button in
+  // the chevron menu; pinned contacts sit at the top of the list and still reorder among themselves by freshness.]
+  const pinned = value.pinned === true;
+  if (!displayIdentity && !localLabel && !pinned) return null;
+  return { displayIdentity, localLabel, pinned };
 }
 
 function readContactDisplayPreference(counterpartyWallet) {
@@ -3829,7 +3834,13 @@ function writeContactDisplayPreference(counterpartyWallet, preference) {
     try { localStorageOrNull()?.removeItem(key); } catch { /* cosmetic self-heal; ignore */ }
     return;
   }
-  const normalized = normalizeContactDisplayPreference(preference);
+  // A caller that says nothing about `pinned` leaves it as it was: every writer of the display choice (select an
+  // identity, set a local name, the Private→Public mirror) predates the pin and must not quietly unpin.
+  const existingPinned = readContactDisplayPreference(counterpartyWallet)?.pinned === true;
+  const normalized = normalizeContactDisplayPreference({
+    ...(preference ?? {}),
+    pinned: typeof preference?.pinned === 'boolean' ? preference.pinned : existingPinned,
+  });
   try {
     if (!normalized) {
       localStorageOrNull()?.removeItem(key);
@@ -3837,6 +3848,7 @@ function writeContactDisplayPreference(counterpartyWallet, preference) {
       localStorageOrNull()?.setItem(key, JSON.stringify({
         displayIdentity: normalized.displayIdentity,
         localLabel: normalized.localLabel,
+        pinned: normalized.pinned === true,
       }));
     }
   } catch {
@@ -4389,6 +4401,7 @@ function renderWalletIdentity(status = null) {
     : t('wallet.addressMode'));
   setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional'));
   renderMyUsernamesStatus();
+  scheduleOwnedUsernamesBootCheck();   // once per wallet per session: the real count, not the remembered one
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
 }
@@ -5027,6 +5040,9 @@ function hydrateThreadDisplayFromContactStore(thread) {
   if (own && sameWalletAddress(wallet, own)) { thread.contactDisplaySynced = true; return false; }
   thread.contactDisplaySynced = true;
   const stored = readContactDisplayPreference(wallet);
+  // The pin is a fact about the CONTACT and lives only in the store — the thread carries it for the list order.
+  const pinnedChanged = Boolean(thread.pinned) !== (stored?.pinned === true);
+  thread.pinned = stored?.pinned === true;
   if (!stored) {
     if (thread.displayIdentity || thread.localLabel) {
       writeContactDisplayPreference(wallet, {
@@ -5034,11 +5050,11 @@ function hydrateThreadDisplayFromContactStore(thread) {
         localLabel: thread.localLabel ?? null,
       });
     }
-    return false;
+    return pinnedChanged;
   }
   const sameIdentity = identityKey(stored.displayIdentity) === identityKey(thread.displayIdentity ?? null);
   const sameLabel = (stored.localLabel ?? null) === (thread.localLabel ?? null);
-  if (sameIdentity && sameLabel) return false;
+  if (sameIdentity && sameLabel) return pinnedChanged;
   thread.displayIdentity = stored.displayIdentity ?? null;
   if (stored.localLabel) thread.localLabel = stored.localLabel;
   else delete thread.localLabel;
@@ -5485,7 +5501,7 @@ async function openEditChannelProfileDialog() {
 // Generic "Display as" popover used by BOTH the Private conversation header and the Public channel
 // detail header. The caller supplies the option list, the current selection, and what to do when an
 // option / the local-name action is picked.
-function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName }) {
+function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pin = null }) {
   if (!anchor) return;
   const popover = ensureIdentityPopover();
   popover.setAttribute('role', 'menu');
@@ -5512,6 +5528,26 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
     localNameRow.append(localNameLabel, localNameType);
     localNameRow.addEventListener('click', openEdit);
     popover.append(localNameRow);
+  }
+  // PIN / UNPIN — the second action, for a dialog that can be pinned (a Private contact; the Public channel header
+  // passes no `pin`). A labeled row, like "Set local name", not an icon: the owner's rule for actions. Toggling
+  // closes the menu; the list reorders under it. [OWNER 2026-08-21]
+  if (pin && typeof pin.onToggle === 'function') {
+    const pinRow = document.createElement('button');
+    pinRow.type = 'button';
+    pinRow.className = 'identity-variant identity-variant-action';
+    pinRow.setAttribute('role', 'menuitem');
+    pinRow.dataset.action = pin.pinned ? 'unpin' : 'pin';
+    const pinLabel = document.createElement('strong');
+    pinLabel.textContent = pin.pinned ? t('chat.unpinContact') : t('chat.pinContact');
+    const pinType = document.createElement('span');
+    pinType.textContent = t('chat.pinHint');
+    pinRow.append(pinLabel, pinType);
+    pinRow.addEventListener('click', () => {
+      hideIdentityPopover();
+      pin.onToggle();
+    });
+    popover.append(pinRow);
   }
   for (const option of options ?? []) {
     if (option.key === 'local-label') {
@@ -5595,12 +5631,32 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
   anchor.setAttribute('aria-expanded', 'true');
 }
 
+/**
+ * Pin or unpin a Private dialog. The flag lives in the per-counterparty display store (device-local, like the local
+ * name) and on the thread for the list order; nothing else moves. [OWNER 2026-08-21]
+ */
+function toggleThreadPinned(thread) {
+  const wallet = ownerWalletFromThread(thread);
+  if (!thread || !wallet || isSavedMessagesThread(thread)) return;
+  const pinned = !(thread.pinned === true);
+  thread.pinned = pinned;
+  writeContactDisplayPreference(wallet, {
+    displayIdentity: thread.displayIdentity ?? null,
+    localLabel: thread.localLabel ?? null,
+    pinned,
+  });
+  renderThreads();
+  renderConversation();
+}
+
 function showIdentityPopover(thread, anchor) {
   if (!thread || !anchor) return;
+  const pinnable = Boolean(ownerWalletFromThread(thread)) && !isSavedMessagesThread(thread);
   renderDisplayAsPopover({
     options: identityDisplayOptions(thread),
     selectedKey: selectedIdentityDisplayOptionKey(thread),
     localLabelExists: Boolean(thread.localLabel),
+    pin: pinnable ? { pinned: thread.pinned === true, onToggle: () => toggleThreadPinned(thread) } : null,
     anchor,
     onSelect: (selected) => {
       thread.displayIdentity = selected.identity ?? null;
@@ -7504,10 +7560,11 @@ function renderSharePostList() {
       onChoose: () => chooseShareTargetOwnChannel(),
     }));
   }
-  // Then private contacts by recency.
-  const contacts = visible
-    .filter((thread) => !isSavedMessagesThread(thread))
-    .sort((a, b) => threadLastActivityMs(b) - threadLastActivityMs(a));
+  // Then private contacts in the list's own order: pinned by recency, then the rest by recency (thread-list-order).
+  const contacts = orderThreadsForList(
+    visible.filter((thread) => !isSavedMessagesThread(thread)),
+    { isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs },
+  );
   for (const thread of contacts) {
     const wallet = threadPrimaryWalletRaw(thread);
     if (!wallet) continue;
@@ -18457,12 +18514,9 @@ function renderThreads() {
   // dormant one quietly drifts down — instead of the old insertion order where every NEW chat appeared LAST.
   // Display-order only (a sorted copy): the `threads` array keeps its structural invariants untouched. The sort is
   // stable, so dialogs with equal/unknown activity keep their relative order.
-  const ordered = [
-    ...visibleThreads.filter((thread) => isSavedMessagesThread(thread)),
-    ...visibleThreads
-      .filter((thread) => !isSavedMessagesThread(thread))
-      .sort((a, b) => threadLastActivityMs(b) - threadLastActivityMs(a)),
-  ];
+  // ...and since 2026-08-21 the user's own PINS sit between the two: My notes, then pinned dialogs by recency, then
+  // the rest by recency. ONE rule, in thread-list-order.mjs, shared with the share-to-contact sheet.
+  const ordered = orderThreadsForList(visibleThreads, { isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs });
   // F3 (scale): keyed reconciliation instead of innerHTML='' + a full O(chats) teardown/rebuild. renderThreads runs
   // on every sync tick AND every search keystroke, so a user with hundreds of chats otherwise rebuilt every row
   // (avatar + identity label + a fresh click listener each) on each. Now existing rows are REUSED (matched by
@@ -23282,7 +23336,52 @@ async function loadOwnedUsernameNfts() {
   // KEEP the answer. This is the only place in the app that knows how many names the chain will vouch for, and the
   // row above it used to go on quoting local storage regardless.
   ownedUsernameNftsVerified = { count: result.owned.length, complete: result.complete };
+  // AND RECONCILE WHAT THE DEVICE REMEMBERS. The row's cold number comes from the remembered list; this read is the
+  // chain's word on it. A COMPLETE read (indexer answered, every item verified) may forget a name that is no longer
+  // owned — transferred away from another device, or here before the transfer path learned to forget — and must
+  // remember one that was found. An incomplete read may only ADD. [OWNER 2026-08-21: "I had five names, gave one
+  // away; the dialog shows four and fixes the row, and after a reload the row says five again."]
+  reconcileKnownPlathoUsernames(result);
   return result;
+}
+
+function reconcileKnownPlathoUsernames(result) {
+  const owner = plathoWallet?.address;
+  if (!owner || !Array.isArray(result?.owned)) return;
+  const ownedLabels = new Set(result.owned.map((nft) => (typeof nft?.label === 'string' ? nft.label.trim() : '')).filter(Boolean));
+  for (const label of ownedLabels) addKnownPlathoUsername(label, owner);
+  if (result.complete !== true) return;
+  for (const label of readKnownPlathoUsernames(owner)) {
+    if (ownedLabels.has(label)) continue;
+    removeKnownPlathoUsername(label, owner);
+    // The linked name is a remembered name too: a complete read that no longer lists it means it was given away,
+    // and the client must stop stamping it onto what it sends (the transfer path's own rule, FM-4).
+    if (readLinkedPlathoUsername(owner)?.label === label) clearLinkedPlathoUsername(owner);
+  }
+}
+
+// ONE REAL CHECK PER SESSION, AT LOAD. [OWNER 2026-08-21: "at app load it would be good to check the real number
+// of usernames."] The row used to quote the remembered list until the dialog was opened, so a
+// name given away elsewhere stayed counted across reloads. This runs the same verified read the dialog runs, once
+// per wallet per session, after the first paint — not on every wallet refresh (two getters per name per refresh is
+// what the ATH-flush row cost, and it was deleted for it).
+let ownedUsernameNftsCheckedFor = null;
+function scheduleOwnedUsernamesBootCheck() {
+  const address = plathoWallet?.address ?? null;
+  if (!address || ownedUsernameNftsCheckedFor === address || ownedUsernameNftsInFlight) return;
+  ownedUsernameNftsCheckedFor = address;
+  setTimeout(() => {
+    if (plathoWallet?.address !== address || ownedUsernameNftsInFlight) return;
+    ownedUsernameNftsInFlight = true;
+    renderMyUsernamesStatus();
+    loadOwnedUsernameNfts()
+      .catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[username] boot check failed', error); })
+      .finally(() => {
+        ownedUsernameNftsInFlight = false;
+        renderMyUsernamesStatus();
+        renderWalletIdentity();
+      });
+  }, 1_500);
 }
 
 function usernameNftCardNode(nft, onTransfer) {

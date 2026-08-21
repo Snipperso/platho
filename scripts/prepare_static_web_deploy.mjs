@@ -42,6 +42,7 @@ const ROOT_RUNTIME_FILES = new Set([
   // watchdog. Caught here by WEB-GRAPH-01, which now also runs in the targeted gate for exactly this reason.
   'message-plain-text.mjs',
   'public-channel-subscriptions.mjs',
+  'thread-list-order.mjs',
   'recipient-identities.mjs',
   'encrypted-message-store.mjs',
   'pwa-contract-transactions.mjs',

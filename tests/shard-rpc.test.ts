@@ -86,6 +86,41 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
       .rejects.toThrow(/HTTP 503/);
   });
 
+  it('RPC-04C: a 422 is bisected — one refused address costs one UNKNOWN row, never the whole probe', async () => {
+    // OWNER'S CONSOLE 2026-08-21: "accountStates failed with HTTP 422" on the probe over every conversation's
+    // shards, then "reading every shard" — the whole batch abandoned for whatever the endpoint refused, and the
+    // reason thrown away with the body. MEASURED the same hour: 1024, 1025 and 1100 well-formed addresses in one
+    // request all answer 200, so a 422 is about SOMETHING in the batch, not its size. Bisect it: the rest of the
+    // addresses are still answerable, the refused one is recorded as UNKNOWN (an omitted address would read as
+    // "never written, skip it" to the lanes — the silent-loss shape), and the endpoint's own `detail` reaches the
+    // error text.
+    const good1 = '0:' + '51'.repeat(32);
+    const bad = '0:' + '52'.repeat(32);
+    const good2 = '0:' + '53'.repeat(32);
+    const urls: string[] = [];
+    const fetchImpl = async (url: string) => {
+      urls.push(String(url));
+      const asked = new URL(String(url)).searchParams.getAll('address');
+      if (asked.includes(bad)) {
+        return { ok: false, status: 422, text: async () => JSON.stringify({ detail: [{ loc: ['query', 'address', asked.indexOf(bad)], msg: 'invalid address' }] }) } as any;
+      }
+      return { ok: true, status: 200, json: async () => ({ accounts: asked.map((a) => ({ address: a, status: 'active', balance: '1', data_hash: 'h', last_transaction_lt: '9' })) }) } as any;
+    };
+    const request = createShardStatesRequest({ endpoint: ENDPOINT, fetch: fetchImpl, strict: true });
+    const states = await readAccountStates([good1, bad, good2], { request });
+    expect(states.get(good1)?.status, 'the first good address was read').toBe('active');
+    expect(states.get(good2)?.status, 'the second good address was read').toBe('active');
+    expect(states.get(bad)?.status, 'the refused address is UNKNOWN, present, unmarked').toBe('unknown');
+    expect(states.get(bad)?.refused).toBe(true);
+    expect(states.get(bad)?.lastLt ?? null, 'no marker — a lane reads it and remembers nothing').toBeNull();
+    // Bisected, not abandoned: [3] → [2] + [1]; [2] = [good1, bad] → [good1] + [bad]. Five requests, no throw.
+    expect(urls.length).toBe(5);
+    // And the reason is in the error text now, not only the status.
+    await expect(readAccountStates([bad], { request })).resolves.toBeTruthy();   // single refused → unknown, no throw
+    const plain = createShardStatesRequest({ endpoint: ENDPOINT, fetch: async () => ({ ok: false, status: 422, text: async () => '{"detail":"why"}' }) as any });
+    await expect(plain({ path: '/accountStates?address=x' })).rejects.toThrow(/HTTP 422: \{"detail":"why"\}/);
+  });
+
   it('RPC-04B: a STRICT reader refuses to turn a request that never ran into an empty account list', async () => {
     // RPC-03 is right for a background scan and WRONG for the self lanes. Those read absence as proof that a slot
     // was never written and then skip it, so an empty answer is a claim about the user's data — and manufacturing
