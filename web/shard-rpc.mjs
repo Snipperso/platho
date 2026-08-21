@@ -200,7 +200,7 @@ function rowIsForeign(row, opcode) {
 // which is how an INTRO that landed while the recipient was offline for hours stays readable (owner's console,
 // 2026-08-21: "entry 20685:0:375 is on chain but no message in its shard window reproduces the stored body_commit" —
 // the 375th of 648 that day, long past the newest 128). toncenter v3 `start_utime`/`end_utime`, MEASURED honoured.
-async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false, endLt = null, startUtime = null, endUtime = null }) {
+async function readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict = false, endLt = null, startUtime = null, endUtime = null, requestOptions = null }) {
   const headers = { Accept: 'application/json' };
   if (key) headers['X-API-Key'] = key;
   const rows = [];
@@ -224,7 +224,7 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     if (offset > 0) url.searchParams.set('offset', String(offset));
 
     const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), scanRequestOptions());
+      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), scanRequestOptions(requestOptions));
     if (!response) {
       // DECLINED BY THE PUMP (a 429 backoff, with skipIfRateLimited set) — the request never ran.
       //
@@ -325,13 +325,16 @@ export function createShardMessagesReader({ endpoint, apiKey, fetch: fetchImpl, 
 // `endLt` (second argument, optional) moves the window back in time — see readMessageRows. Each row carries its
 // `createdLt` (toncenter's created_lt, a decimal string, or null) so a reader can record where its window ended and
 // ask for what lies before it next time.
-export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8, strict = false } = {}) {
+// `requestOptions` overrides the pump coordinates for THIS reader (priority, skipIfRateLimited) — the same knob
+// createShardStatesRequest has, for the same reason: a reader built for something the user is looking at must not
+// queue behind a background sweep, nor be dropped by it.
+export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: fetchImpl, limit = 128, opcode = null, maxPages = 8, strict = false, requestOptions = null } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
   return async (address, { endLt = null, startUtime = null, endUtime = null } = {}) => {
     const base = resolveEndpoint('messages', endpoint);
     const key = resolveApiKey(apiKey);
-    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict, endLt, startUtime, endUtime });
+    const { rows } = await readMessageRows({ base, key, doFetch, address, limit, opcode, maxPages, strict, endLt, startUtime, endUtime, requestOptions });
     const out = [];
     for (const message of rows) {
       const raw = message?.message_content?.body;

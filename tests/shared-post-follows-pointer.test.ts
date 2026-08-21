@@ -126,7 +126,9 @@ describe('SHAREREF — a shared post resolves to its original', () => {
   it('SHAREREF-07: ONE decoder — the addressed read cannot drift from the sync walk', () => {
     // A second copy of the shard-post -> feed-post decode would be a slow-motion bug: the two would agree on the
     // day they were written and diverge on the first change to either.
-    expect((APP.match(/await publicPostPartsFromShardPosts\(/g) ?? []).length).toBe(2);
+    // THREE callers, ONE decoder: the sync walk, the addressed read, and (2026-08-21) the Discover card's latest-post
+    // read — which is the point of the pin: a new reader of shard posts joins this decoder, it does not copy it.
+    expect((APP.match(/await publicPostPartsFromShardPosts\(/g) ?? []).length).toBe(3);
     const decoder = functionBody('async function publicPostPartsFromShardPosts(');
     // The feed identity is what the SHARE block's entryId is compared against — it must be built in that one place.
     expect(decoder).toContain('const globalEntryId = `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`;');

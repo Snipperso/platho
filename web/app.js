@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=52';
+} from './public-channel-subscriptions.mjs?v=53';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -169,13 +169,13 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=36';
+import { createPublicLane } from './public-lane.mjs?v=37';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=19';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=29';
+import { createIntroLane } from './intro-lane.mjs?v=30';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
@@ -185,7 +185,7 @@ import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
 import { createConvReadLane } from './conv-lane.mjs?v=25';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=22';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=20';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=21';
 import { readAccountStates } from './shard-reader.mjs?v=20';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
 // clean-17 first-contact (INTRO) send.
@@ -249,7 +249,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=77';
+} from './i18n.mjs?v=78';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -9198,6 +9198,9 @@ async function openPublicDiscovery() {
   publicDiscoveryTagFilter = null;
   if (publicPane) publicPane.dataset.discoverOpen = 'true';
   const token = ++publicDiscoveryLoadToken;
+  // An open past the discovery cache TTL re-sweeps the catalogue; the latest posts it showed are as stale as the
+  // cards, so they are forgotten with them and re-read for whatever comes back on screen.
+  if (!publicDiscoveryCache || (Date.now() - publicDiscoveryCache.at) >= PUBLIC_DISCOVERY_CACHE_TTL_MS) resetDiscoveryLatestPosts();
   // Paint cached results immediately (fresh cache) or a loading line, then resolve.
   renderPublicDiscovery({ loading: !publicDiscoveryCache });
   try {
@@ -9229,6 +9232,11 @@ function closePublicDiscovery() {
   publicDiscoveryOpen = false;
   publicDiscoveryLoadToken += 1; // invalidate any in-flight scan so a stale result can't render
   if (publicPane) publicPane.dataset.discoverOpen = 'false';
+  // Cards not yet asked for their latest post are not asked after the panel is gone (pumpDiscoveryLatestPosts
+  // drains the queue on the next turn); the observer's detached targets are dropped with it. Answers already in
+  // hand are kept — a re-open within the discovery cache TTL paints them at once.
+  publicDiscoveryLatestObserver?.disconnect();
+  publicDiscoveryLatestObserver = null;
 }
 
 // --- Channel view (v753): one channel's posts on their own screen ---
@@ -9466,6 +9474,7 @@ async function refreshPublicDiscovery() {
   if (!publicDiscoveryOpen) return;
   const token = ++publicDiscoveryLoadToken;
   renderPublicDiscovery({ loading: true });
+  resetDiscoveryLatestPosts();                      // a refresh re-asks for the latest posts too, not only the cards
   try {
     const results = await discoverChannels({ force: true });
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
@@ -9482,6 +9491,8 @@ async function refreshPublicDiscovery() {
 function renderPublicDiscovery(options = {}) {
   if (!publicDiscoveryBody) return;
   publicDiscoveryBody.replaceChildren();
+  // The cards are rebuilt below and re-observe themselves; the observer must not keep the detached ones.
+  publicDiscoveryLatestObserver?.disconnect();
   if (options.loading === true) {
     const status = document.createElement('p');
     status.className = 'discovery-status';
@@ -9601,6 +9612,24 @@ function buildDiscoveryCard(channel) {
   const identityButton = discoveryCardIdentityButton(channel.authorWallet);
   if (identityButton) head.append(identityButton);
   card.append(head);
+  // The channel's NEWEST POST, next to its description [OWNER 2026-08-21: "the description is not quite it — good
+  // to see the last post"; "yes, alongside"]. The block is built empty-but-present, says it is loading, and is
+  // filled IN PLACE when the read lands (loadDiscoveryLatestPost finds it by wallet); a channel with no visible
+  // post loses the block. The read itself is asked for only once the card is on, or one screen from, the screen —
+  // see discoveryLatestObserver — so a list of 142 channels does not cost 142 channel reads up front.
+  const latest = document.createElement('div');
+  latest.className = 'discovery-card-latest';
+  latest.dataset.wallet = channel.authorWallet;
+  card.append(latest);
+  const latestState = publicDiscoveryLatestPosts.get(channel.authorWallet) ?? null;
+  if (latestState) {
+    fillDiscoveryLatestPost(latest, latestState);
+  } else {
+    fillDiscoveryLatestPost(latest, { status: 'loading' });
+    const observer = discoveryLatestObserver();
+    if (observer) observer.observe(latest);
+    else queueDiscoveryLatestPost(channel.authorWallet);
+  }
   if (channel.description) {
     const desc = document.createElement('p');
     desc.className = 'discovery-card-desc';
@@ -11841,6 +11870,125 @@ async function hydratePublicDiscoveryAvatars(results, token) {
   if (!changed || token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return changed;
   renderPublicDiscovery({ loading: false });
   return changed;
+}
+
+// ── Discover: the LATEST POST of a channel, on its card ───────────────────────────────────────────────────────
+// [OWNER 2026-08-21: "the description is not quite it — good to see the last post"; "yes, alongside".]
+//
+// LAZY, VISIBLE-ONLY, TWO AT A TIME. The Discover list is every described channel on the network (142 on
+// 2026-08-21), and a channel read per card up front is the ranking wall again — on the one serial pump, in front of
+// the user's own dialogs. So a card asks for its post only when it reaches the screen (an IntersectionObserver with
+// a screen of margin), the asks run two abreast, and a closed panel forgets what it had not yet asked. The read is
+// the lane's small tail read (public-lane.readLatestChannelPosts: one states batch, the newest live era, a 32-row
+// window), and its answer is kept for the panel's life, so the sweep streaming cards in and re-rendering the list
+// costs no read at all. A refresh, or an open past the discovery cache TTL, forgets the answers too.
+const PUBLIC_DISCOVERY_LATEST_CONCURRENCY = 2;
+const PUBLIC_DISCOVERY_LATEST_ERA_HOPS = 3;        // older eras tried when the newest era's tail holds no visible post
+const publicDiscoveryLatestPosts = new Map();      // raw wallet -> { status: 'loading'|'ready'|'none', text, createdAtMs }
+const publicDiscoveryLatestQueue = [];
+let publicDiscoveryLatestActive = 0;
+let publicDiscoveryLatestObserver = null;
+
+function discoveryLatestObserver() {
+  if (publicDiscoveryLatestObserver) return publicDiscoveryLatestObserver;
+  if (typeof IntersectionObserver !== 'function') return null;
+  publicDiscoveryLatestObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      publicDiscoveryLatestObserver?.unobserve(entry.target);
+      queueDiscoveryLatestPost(entry.target.dataset?.wallet);
+    }
+  }, { rootMargin: '100% 0px' });                  // this screen and the next one
+  return publicDiscoveryLatestObserver;
+}
+
+function resetDiscoveryLatestPosts() {
+  publicDiscoveryLatestObserver?.disconnect();
+  publicDiscoveryLatestObserver = null;
+  publicDiscoveryLatestQueue.length = 0;
+  publicDiscoveryLatestPosts.clear();
+}
+
+function queueDiscoveryLatestPost(wallet) {
+  if (!wallet || publicDiscoveryLatestPosts.has(wallet)) return;
+  publicDiscoveryLatestPosts.set(wallet, { status: 'loading' });
+  publicDiscoveryLatestQueue.push(wallet);
+  void pumpDiscoveryLatestPosts();
+}
+
+async function pumpDiscoveryLatestPosts() {
+  while (publicDiscoveryLatestActive < PUBLIC_DISCOVERY_LATEST_CONCURRENCY && publicDiscoveryLatestQueue.length > 0) {
+    if (!publicDiscoveryOpen) {
+      // The panel closed: what was queued but never asked is forgotten, so a re-open asks again for what it shows.
+      for (const wallet of publicDiscoveryLatestQueue.splice(0)) {
+        if (publicDiscoveryLatestPosts.get(wallet)?.status === 'loading') publicDiscoveryLatestPosts.delete(wallet);
+      }
+      return;
+    }
+    const wallet = publicDiscoveryLatestQueue.shift();
+    publicDiscoveryLatestActive += 1;
+    loadDiscoveryLatestPost(wallet).finally(() => {
+      publicDiscoveryLatestActive -= 1;
+      void pumpDiscoveryLatestPosts();
+    });
+  }
+}
+
+async function loadDiscoveryLatestPost(wallet) {
+  const lane = directPublicLaneReader();
+  let result = null;                                // null = could not read; the next sight of the card asks again
+  if (lane) {
+    try {
+      let beforeEra = null;
+      for (let hop = 0; hop < PUBLIC_DISCOVERY_LATEST_ERA_HOPS; hop += 1) {
+        const { posts: shardPosts, era, exhausted } = await lane.readLatestChannelPosts(wallet, beforeEra === null ? {} : { beforeEra });
+        if (era === null) { result = { status: 'none' }; break; }
+        // The SAME decode the feed uses: profile-only documents are diverted into the profile cache (the card's
+        // description gets warmer for free), parts are assembled, undecodable groups are skipped.
+        const parts = await publicPostPartsFromShardPosts(shardPosts, { id: `discover:${wallet}`, authorWallet: wallet });
+        const posts = assemblePublicParts(parts)
+          .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+        const newest = posts[0];
+        if (newest) {
+          const text = String(newest.text ?? '').trim() || (newest.imageUrl ? tPlural('chat.previewImages', 1) : '');
+          result = text
+            ? { status: 'ready', text, createdAtMs: new Date(newest.createdAt ?? 0).getTime() }
+            : { status: 'none' };
+          break;
+        }
+        if (exhausted) { result = { status: 'none' }; break; }
+        beforeEra = era;                             // the newest era's tail was profile updates only — look one era back
+      }
+      if (!result) result = { status: 'none' };      // every hop was profile-only: nothing visible to show
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) console.warn('[public] latest post read failed', wallet, error);
+      result = null;
+    }
+  }
+  if (result) publicDiscoveryLatestPosts.set(wallet, result);
+  else publicDiscoveryLatestPosts.delete(wallet);
+  if (!publicDiscoveryOpen || !publicDiscoveryBody) return;
+  for (const node of publicDiscoveryBody.querySelectorAll('.discovery-card-latest')) {
+    if (node.dataset?.wallet === wallet) fillDiscoveryLatestPost(node, result);
+  }
+}
+
+// Paint one card's latest-post block from its state. Loading: the label and a muted "loading" line, so the card
+// keeps its shape while the read is out; ready: "Latest post · when" over the text (the feed's one-line preview,
+// clamped by CSS); none (or a read that failed): the block is removed — an empty box under a name says nothing.
+function fillDiscoveryLatestPost(node, state) {
+  if (!node) return;
+  if (!state || state.status === 'none') { node.remove(); return; }
+  node.replaceChildren();
+  node.classList.toggle('is-loading', state.status === 'loading');
+  const label = document.createElement('span');
+  label.className = 'discovery-card-latest-label';
+  const when = state.status === 'ready' ? formatThreadListTimestamp(Number(state.createdAtMs)) : '';
+  label.textContent = when ? `${t('public.latestPost')} · ${when}` : t('public.latestPost');
+  const text = document.createElement('p');
+  text.className = 'discovery-card-latest-text';
+  text.textContent = state.status === 'ready' ? state.text : t('public.latestPostLoading');
+  node.append(label, text);
 }
 
 function base64UrlToBytes(value) {

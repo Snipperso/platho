@@ -3055,6 +3055,50 @@ button.feed-item:hover {
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  /* [OWNER 2026-08-21] The latest post moved in above the description; the description yields the room — three
+     lines on the card, the whole text in the channel's own about. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The channel's LATEST POST on a Discover card [OWNER 2026-08-21: "good to see the last post" — "alongside" the
+   description]. A quiet plate with an accent rule, a muted "Latest post · when" label, the feed's one-line preview
+   text clamped to four lines. While the read is out the same plate carries the label and a muted loading line, so the
+   card keeps its height when the post arrives. */
+.discovery-card-latest {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border-left: 2px solid rgba(48, 213, 176, 0.45);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+}
+
+.discovery-card-latest-label {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.discovery-card-latest-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.discovery-card-latest.is-loading .discovery-card-latest-text {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .discovery-card-actions {

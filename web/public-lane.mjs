@@ -23,7 +23,7 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole lane
 // runs against a stub transport and a fixed clock, the way the intro lane does.
 
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=20';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=21';
 import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=20';
 import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=5';
@@ -70,6 +70,13 @@ const PAGE_ROWS = 96;
 const PUBLIC_CHANNEL_ERA_WINDOW = 14;
 
 /**
+ * How many tail rows a "latest post" read takes from a channel's newest live shard. A post is at most 16 parts,
+ * so 32 rows hold the newest post whole with a spare for the straddle case (readPosts extends one page back when
+ * a stream in the window is incomplete). Small on purpose: this window is read for a CARD, not for the channel.
+ */
+const PUBLIC_LATEST_POST_WINDOW = 32n;
+
+/**
  * Build the PUBLIC read lane.
  *
  * `runGetMethod` is the app's existing transport method, passed in (not imported) so this stays testable.
@@ -102,6 +109,17 @@ export function createPublicLane({
   const provider = createPublicShardTonRpcProvider({ transport: { runGetMethod } });
 
   const readStates = (addresses) => readAccountStates(addresses, { request: statesRequest });
+
+  // THE CARD READ'S OWN TRANSPORT SHAPE (readLatestChannelPosts). A Discover card's latest-post read is asked for
+  // a card the user is LOOKING AT, while the sweep that produced the card is still reading buckets behind it at
+  // background priority. On the one strict-priority pump the card read goes ahead of the sweep ('profile' outranks
+  // 'background') and behind the user's own messages and wallet. It is STRICT and NOT skippable, because its answer
+  // is kept for the panel's life: a request the pump dropped must throw (the card is simply asked again the next
+  // time it is seen), never read as "this channel has no posts".
+  const LATEST_READ_OPTIONS = Object.freeze({ priority: 'profile', skipIfRateLimited: false });
+  const latestStatesRequest = createShardStatesRequest({ ...rpc, strict: true, requestOptions: LATEST_READ_OPTIONS });
+  const readLatestStates = (addresses) => readAccountStates(addresses, { request: latestStatesRequest });
+  const readLatestMessagesWithSource = createShardMessagesWithSourceReader({ ...rpc, strict: true, opcode: PUBLIC_PUBLISH_OPCODE, requestOptions: LATEST_READ_OPTIONS });
 
   // ─────────────────────────────────────────────────────────────────────────────────────────────────────
   // SHARD SNAPSHOT CACHE — re-reading a shard that cannot have changed must cost nothing.
@@ -145,6 +163,29 @@ export function createPublicLane({
       shardSnapshots.delete(oldest.value);
     }
   }
+  // THE LATEST-WINDOW CACHE — a SECOND, smaller map on purpose. A "latest post" read takes PUBLIC_LATEST_POST_WINDOW
+  // tail rows of a shard, and the shared snapshot above is keyed only by (shard, marker): had the small window been
+  // written there, the next full channel read with the same marker would have been served those few rows as the
+  // whole shard, and a channel screen would have lost its older posts to a card. The small read therefore reads the
+  // shared cache when it can (a full snapshot IS the answer, and free) but writes only here.
+  const latestSnapshots = new Map();              // addrKey -> { marker, posts }
+  function readLatestSnapshot(key, marker) {
+    const hit = latestSnapshots.get(key);
+    if (!hit || hit.marker !== marker) return null;
+    latestSnapshots.delete(key);
+    latestSnapshots.set(key, hit);
+    return hit.posts;
+  }
+  function writeLatestSnapshot(key, marker, posts) {
+    latestSnapshots.delete(key);
+    latestSnapshots.set(key, { marker, posts });
+    while (latestSnapshots.size > SHARD_SNAPSHOT_MAX) {
+      const oldest = latestSnapshots.keys().next();
+      if (oldest.done) break;
+      latestSnapshots.delete(oldest.value);
+    }
+  }
+
   /** posts of one shard, authenticated: get_page + /messages(+source) matched by commit. */
   // Reads the shard's NEWEST window (readPosts anchors at the tail and extends one page back when a multipart
   // post straddles the boundary). `entryCount` lets a caller that already read get_view skip the probe getter.
@@ -279,6 +320,69 @@ export function createPublicLane({
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
       return posts;
+    },
+
+    /**
+     * A channel's NEWEST posts, cheaply — for a card that shows "the latest post" and nothing else.
+     *
+     * [OWNER 2026-08-21: the Discover card's description "is not quite it — good to see the last post".] A card
+     * cannot afford readChannelPosts: that is every era's live shard, each read whole, and the Discover list is
+     * 142 channels of them. This read asks the same ONE batched accountStates over the channel's era/overflow
+     * coordinates (cheap, and it is what says which shards are live at all), then reads ONLY the newest era that
+     * has a live shard, and only PUBLIC_LATEST_POST_WINDOW tail rows of it. Three requests for a card, not thirty.
+     *
+     * Returns { posts, era, exhausted }: posts are the tail rows of that era's live shards, newest first, tagged
+     * exactly like readChannelPosts tags them (the app decodes them with the same assembler); era is the era they
+     * came from, null when the window holds no live shard; exhausted says no older era is left in the window. A
+     * caller that finds no VISIBLE post in them (the era's tail was a profile update) asks again with
+     * `beforeEra: era` and walks back one era at a time — profile-only shards are rare, so the loop is short.
+     *
+     * A full snapshot of a shard (a feed or channel read left it) is served as-is and costs nothing; the small
+     * window is cached in its own map, keyed by the same change marker, so a re-render or a re-open is free and
+     * the shared snapshot keeps its full window (see latestSnapshots above).
+     */
+    async readLatestChannelPosts(channelWallet, { eraWindow = PUBLIC_CHANNEL_ERA_WINDOW, seqProbe = PUBLIC_SEQ_PROBE, maxCount = PUBLIC_LATEST_POST_WINDOW, beforeEra = null } = {}) {
+      const nowUnix = now();
+      const hash = publicWalletHash(channelWallet);
+      const era = publicEraOf(PS_KIND_CHANNEL, nowUnix);
+      const top = beforeEra === null ? era : Math.min(era, Number(beforeEra) - 1);
+      const coords = [];
+      for (let e = top; e > era - eraWindow && e >= 0; e -= 1) {
+        const epochTag = publicEpochTag(PS_KIND_CHANNEL, e);
+        for (let seq = 0; seq < seqProbe; seq += 1) {
+          const address = rawAddress(await publicShardAddressBytes(await publicChannelPartitionKey(hash, seq), epochTag));
+          coords.push({ address, epochTag, seq, era: e });
+        }
+      }
+      if (coords.length === 0) return { posts: [], era: null, exhausted: true };
+      const live = await readLatestStates(coords.map((c) => c.address));
+      // coords run newest era first, so the first live coordinate names the newest live era.
+      let newestEra = null;
+      for (const coord of coords) {
+        if (live.get(addrKey(coord.address))) { newestEra = coord.era; break; }
+      }
+      if (newestEra === null) return { posts: [], era: null, exhausted: true };
+      const posts = [];
+      for (const coord of coords) {
+        if (coord.era !== newestEra) continue;
+        const state = live.get(addrKey(coord.address));
+        if (!state) continue;
+        const key = addrKey(coord.address);
+        const marker = changeMarkerOf(state);
+        const full = readShardSnapshot(key, marker);
+        let shardPosts = full ? full.posts : readLatestSnapshot(key, marker);
+        if (!shardPosts) {
+          shardPosts = (await provider.readPosts(state.address, {
+            readMessagesWithSource: readLatestMessagesWithSource,
+            maxCount: BigInt(maxCount),
+            callOptions: { priority: LATEST_READ_OPTIONS.priority },   // get_page rides the same lane as the bodies
+          })).posts;
+          writeLatestSnapshot(key, marker, shardPosts);
+        }
+        for (const p of shardPosts) posts.push({ ...p, channelWallet, channelEpochTag: coord.epochTag, channelShardSeq: coord.seq });
+      }
+      posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+      return { posts, era: newestEra, exhausted: !coords.some((c) => c.era < newestEra) };
     },
 
     /**

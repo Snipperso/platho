@@ -270,6 +270,68 @@ describe('PUBLIC-LANE — the read assembly', () => {
     expect(wallets.includes(addrKey(chanA.address.toString())), 'the genuine channel keeps its catalogue entry').toBe(true);
   }, 300_000);
 
+  it('PL-LATEST-01: readLatestChannelPosts reads only the newest live era, a small tail window, and never shrinks the shared snapshot', async () => {
+    // [OWNER 2026-08-21] Discover cards show the channel's latest post, "alongside" the description. 142 cards times
+    // a whole-channel read is the ranking wall again, so the card read is ONE states batch plus the newest live
+    // era's tail. Three things proven here:
+    //   (1) only the newest era is read (one /messages), and an older era is reachable on request (beforeEra);
+    //   (2) the window is small and honoured (maxCount), newest first, and a repeat is free;
+    //   (3) the small window does NOT poison the shared snapshot: a full readChannelPosts afterwards still returns
+    //       every post of the same shard under the same marker — the loss this guards against is a channel screen
+    //       showing two posts because a card read that shard first.
+    const ERA_SECONDS = 2_592_000;
+    const era = publicEraOf(KIND.CHANNEL, CLOCK);
+    const oldEra = era - 2;
+    const oldEraStart = oldEra * ERA_SECONDS + 1000;
+    const bc = await Blockchain.create();
+    bc.now = oldEraStart;
+    await deployFeeSink(bc, { funderSeed: 'pl-latest-sink' });
+    const owner = await bc.treasury('pl-latest-owner');
+    const pk = await publicChannelPartitionKey(publicWalletHash(owner.address), 0);
+    const old = await seedShard(bc, owner, KIND.CHANNEL, oldEra, pk, 0n, 2, 3, oldEraStart);   // two posts, two eras ago
+    bc.now = CLOCK;
+    const cur = await seedShard(bc, owner, KIND.CHANNEL, era, pk, 0n, 5, 5);                   // five posts this era
+    const rowsOf = (built: Array<{ header: any; body: any }>) => built.slice().reverse().map(({ header, body }) => ({
+      bodyCell: publicPublishBody(KIND.CHANNEL, 0n, header, body), source: owner.address.toString(),
+    }));
+    const oldKey = addrKey(old.shard.address.toString());
+    const curKey = addrKey(cur.shard.address.toString());
+    let messageReads = 0;
+    const lane = makeLane(bc, {
+      pages: new Map([[oldKey, old.shard], [curKey, cur.shard]]),
+      messages: new Map([[oldKey, rowsOf(old.built)], [curKey, rowsOf(cur.built)]]),
+      liveShards: [old.shard.address.toString(), cur.shard.address.toString()],
+      onMessages: () => { messageReads += 1; },
+    });
+
+    const latest = await lane.readLatestChannelPosts(owner.address.toString(), { maxCount: 2n });
+    expect(latest.era, 'the newest live era').toBe(era);
+    expect(latest.posts.length, 'the tail window only, not the shard').toBe(2);
+    expect(latest.posts[0].created_at > latest.posts[1].created_at, 'newest first').toBe(true);
+    expect(String(latest.posts[0].channelEpochTag), 'tagged like readChannelPosts tags').toBe(String(publicEpochTag(KIND.CHANNEL, era)));
+    expect(messageReads, 'ONE history read — the older era was not touched').toBe(1);
+    expect(latest.exhausted, 'an older era remains in the window').toBe(false);
+
+    const again = await lane.readLatestChannelPosts(owner.address.toString(), { maxCount: 2n });
+    expect(again.posts.length).toBe(2);
+    expect(messageReads, 'a repeat is served from the small cache').toBe(1);
+
+    const older = await lane.readLatestChannelPosts(owner.address.toString(), { maxCount: 2n, beforeEra: era });
+    expect(older.era, 'one era back on request').toBe(oldEra);
+    expect(older.posts.length).toBe(2);
+    expect(messageReads).toBe(2);
+
+    // (3) The shared snapshot was not shrunk by the card read: the full channel read still sees all five.
+    const full = await lane.readChannelPosts(owner.address.toString());
+    const thisEra = full.filter((p: any) => String(p.channelEpochTag) === String(publicEpochTag(KIND.CHANNEL, era)));
+    expect(thisEra.length, 'all five posts — not the two-row card window').toBe(5);
+    // And once a full snapshot exists, the card read is served from it: no extra history read, the whole shard.
+    const reads = messageReads;
+    const served = await lane.readLatestChannelPosts(owner.address.toString(), { maxCount: 2n });
+    expect(served.posts.length, 'a full snapshot IS the answer').toBe(5);
+    expect(messageReads).toBe(reads);
+  }, 300_000);
+
   it('PL-03: readThreadComments returns [] for a post whose thread shard was never deployed (no comments)', async () => {
     // The ordinary case: a post nobody has commented on has no THREAD shard, so a bare get_page would hit an
     // uninitialised account and throw exit -13. The liveness guard must turn that into a clean empty list. With the
