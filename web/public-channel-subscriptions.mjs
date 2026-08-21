@@ -356,6 +356,33 @@ function shortTime(value) {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * The feed's ORDER: every followed channel's posts in one list, by the post's own time, oldest first — the renderer
+ * reverses it, so the newest post of ANY channel sits at the top.
+ *
+ * OWNER 2026-08-21: "I follow many people; one of them posted, and the new post appeared at the BOTTOM next to his
+ * old one, while silent channels I follow stayed on top. I want the new post on top, then other people's older posts,
+ * then his old post." The feed items used to come out grouped by channel in thread order — the newest post of a
+ * channel that was followed late could never rise above a silent channel that was followed early.
+ *
+ * Ties (same millisecond) break by entryId, then by position, so the order is stable across renders. A post with no
+ * parseable time sinks to the OLD end rather than jumping to the top: unknown is not new.
+ */
+export function sortPublicFeedItemsByTime(items) {
+  const keyed = (items ?? []).map((item, index) => ({ item, index, at: Date.parse(String(item?.createdAt ?? '')) }));
+  const entryOf = (item) => { try { return BigInt(String(item?.entryId ?? '')); } catch { return null; } };
+  keyed.sort((a, b) => {
+    const ta = Number.isFinite(a.at) ? a.at : -Infinity;
+    const tb = Number.isFinite(b.at) ? b.at : -Infinity;
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    const ea = entryOf(a.item);
+    const eb = entryOf(b.item);
+    if (ea !== null && eb !== null && ea !== eb) return ea < eb ? -1 : 1;
+    return a.index - b.index;
+  });
+  return keyed.map((entry) => entry.item);
+}
+
 export function publicChannelFeedToThread(channel, feed) {
   const normalizedChannel = normalizeRegistryChannel(channel);
   if (!normalizedChannel) throw new Error('Invalid public channel');
@@ -392,6 +419,9 @@ export function publicChannelFeedToThread(channel, feed) {
       publicAvatarHash: post.avatarHash,
       publicAvatarImageUrl: post.avatarImageUrl,
       publicChannelId: normalizedChannel.id,
+      // The post's own time (ISO, from the shard's created_at; a pending local post carries its publish moment). It is
+      // what orders the FEED across channels — see sortPublicFeedItemsByTime.
+      publicCreatedAt: post.createdAt ?? null,
       publicEntryId: post.entryId,
       publicReadEntryId: post.readEntryId,
       publicBodyHash: post.bodyHash,
@@ -440,6 +470,7 @@ export function publicChannelThreadsToFeedItems(threads) {
       items.push({
         id: message.publicPostId,
         channelId: thread.publicChannelId,
+        createdAt: message.publicCreatedAt ?? null,
         entryId: message.publicEntryId,
         readEntryId: message.publicReadEntryId,
         bodyHash: message.publicBodyHash,

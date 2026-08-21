@@ -7343,6 +7343,19 @@ describe('PWA runtime config guard', () => {
     expect(sync, 'the live global must not be dereferenced after the first await').not.toMatch(/await convKeyStore\./);
   });
 
+  it('PWA-FEEDORDER-01: the feed is ordered by POST TIME across channels, not grouped by channel', () => {
+    // OWNER 2026-08-21: a followed person's new post landed at the bottom next to his old one; silent channels stayed
+    // on top. publicFeedItemsChronological was the threads' items reversed — grouped by channel in thread order. The
+    // order now comes from sortPublicFeedItemsByTime (PUBLIC-SUB-ORDER-01 proves the rule); this pins that the app
+    // actually uses it and no longer reverses the grouped list.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function publicFeedItemsChronological\(\) \{\s*\n\s*return sortPublicFeedItemsByTime\(publicChannelThreadsToFeedItems\(publicChannelThreads\)\);\s*\n\}/);
+    expect(app, 'the grouped-then-reversed list is gone').not.toContain('publicChannelThreadsToFeedItems(publicChannelThreads).slice().reverse()');
+    expect(app).toMatch(/import \{[\s\S]{0,600}?sortPublicFeedItemsByTime,[\s\S]{0,600}?\} from '\.\/public-channel-subscriptions\.mjs/);
+    // The renderer still treats the list as oldest→newest and reverses for display — the contract the sort relies on.
+    expect(app).toContain('for (const item of windowItems.slice().reverse()) {');
+  });
+
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {
     // Owner, 2026-08-04: "скорость важна". Two large images landed 22s and 37s apart on chain — both published, but
     // far past the 1-5s of index lag the seqno fix was expected to cost. Guessing the owner phase is the mistake

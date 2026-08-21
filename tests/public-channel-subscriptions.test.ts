@@ -9,6 +9,7 @@ import {
   normalizePublicChannelFeed,
   normalizePublicChannelSubscriptions,
   publicChannelThreadsToFeedItems,
+  sortPublicFeedItemsByTime,
   publicChannelSubscriptionsToThreads,
   readPublicChannelFeedCache,
   publicChannelThreadId,
@@ -152,6 +153,37 @@ describe('PWA public channel subscriptions', () => {
       }),
     ]);
     expect(publicChannelThreadsToFeedItems(threads)[0]).not.toHaveProperty('threadId');
+  });
+
+  it('PUBLIC-SUB-ORDER-01: the feed is ONE list by post time — a late follow\'s new post outranks an early follow\'s old one', () => {
+    // OWNER 2026-08-21: "I follow many people; one of them posted, and the new post appeared at the BOTTOM next to
+    // his old one, while silent channels stayed on top." The feed items came out grouped by channel in thread order.
+    // The order now belongs to the posts: oldest first here (the renderer reverses), ties by entryId then position,
+    // and a post without a parseable time sinks to the OLD end — unknown is not new.
+    const mk = (channelId: string, id: string, createdAt: string | null, entryId: string) => ({ id, channelId, createdAt, entryId });
+    const quiet = [mk('quiet', 'q1', '2026-08-01T10:00:00.000Z', '1'), mk('quiet', 'q2', '2026-08-10T10:00:00.000Z', '2')];
+    const talker = [mk('talker', 't1', '2026-08-05T10:00:00.000Z', '1'), mk('talker', 't2', '2026-08-20T10:00:00.000Z', '2')];
+    // Thread order: the quiet channel was followed first, the talker later — the grouping the owner saw.
+    const grouped = [...quiet, ...talker];
+    const sorted = sortPublicFeedItemsByTime(grouped);
+    expect(sorted.map((i: any) => i.id), 'interleaved by time, oldest first').toEqual(['q1', 't1', 'q2', 't2']);
+    // Displayed newest-first that is: t2 (his new post), q2, t1 (his old post), q1 — exactly the owner's wish.
+    expect(sorted.slice().reverse().map((i: any) => i.id)).toEqual(['t2', 'q2', 't1', 'q1']);
+    // Ties: same instant → entryId decides; no time → the old end; the input is not mutated and the sort is stable.
+    const tied = [mk('a', 'late-id', '2026-08-20T10:00:00.000Z', '9'), mk('b', 'early-id', '2026-08-20T10:00:00.000Z', '3'), mk('c', 'no-time', null, '7'), mk('d', 'bad-time', 'not a date', '8')];
+    const tiedSorted = sortPublicFeedItemsByTime(tied);
+    expect(tiedSorted.map((i: any) => i.id)).toEqual(['no-time', 'bad-time', 'early-id', 'late-id']);
+    expect(tied.map((i: any) => i.id), 'the input array is left alone').toEqual(['late-id', 'early-id', 'no-time', 'bad-time']);
+    expect(sortPublicFeedItemsByTime([])).toEqual([]);
+    expect(sortPublicFeedItemsByTime(null as any)).toEqual([]);
+    // And the item carries the time it is sorted by, straight from the cached post.
+    const state = normalizePublicChannelSubscriptions(null, PLATHO_APP_CONFIG.publicChannels);
+    const feed = normalizePublicChannelFeed({
+      version: 1, channelId: 'platho.app',
+      posts: [{ id: 'p', createdAt: '2026-08-19T09:00:00.000Z', author: 'platho.app', authorWallet: `0:${'11'.repeat(32)}`, text: 'x', entryId: '4', bodyHash: `0x${'cc'.repeat(32)}` }],
+    }, 'platho.app');
+    const threads = publicChannelSubscriptionsToThreads(state, PLATHO_APP_CONFIG.publicChannels, { 'platho.app': { feed } });
+    expect(publicChannelThreadsToFeedItems(threads)[0].createdAt).toBe('2026-08-19T09:00:00.000Z');
   });
 
   it('PUBLIC-SUB-03B: block posts keep ordered text and images through thread/feed conversion', () => {

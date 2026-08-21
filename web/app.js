@@ -62,6 +62,7 @@ import {
   publicChannelSubscriptionsToThreads,
   publicChannelsToThreads,
   publicChannelThreadsToFeedItems,
+  sortPublicFeedItemsByTime,
   readPublicChannelFeedCache,
   readPublicChannelSubscriptions,
   subscribedPublicChannels,
@@ -72,7 +73,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=50';
+} from './public-channel-subscriptions.mjs?v=51';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -6947,8 +6948,14 @@ function isUnreadPublicItem(item) {
   return entryId > publicChannelCursor(item.channelId ?? 'platho.app');
 }
 
+// ONE LIST, BY POST TIME, oldest first (renderPublicFeed and the channel view reverse it for display, newest on top).
+//
+// OWNER 2026-08-21: a followed person's NEW post appeared at the bottom next to his old one while silent channels
+// stayed on top. The list used to be the threads' items reversed — grouped by channel in thread order, which is
+// what a reader who follows many channels saw as "the feed never reorders". The order now belongs to the posts, not
+// to the channels: see sortPublicFeedItemsByTime.
 function publicFeedItemsChronological() {
-  return publicChannelThreadsToFeedItems(publicChannelThreads).slice().reverse();
+  return sortPublicFeedItemsByTime(publicChannelThreadsToFeedItems(publicChannelThreads));
 }
 
 function markVisiblePublicFeedRead(items = publicFeedItemsChronological()) {

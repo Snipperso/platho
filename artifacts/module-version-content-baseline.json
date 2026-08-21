@@ -176,8 +176,8 @@
     "sha256": "383e761adc8a0b41129355a993a38146d484f1a6cd0aa71762c004d8038ec7d2"
   },
   "public-channel-subscriptions.mjs": {
-    "version": "50",
-    "sha256": "5dd9ebbd00bbd59056c52a7759fb0bb0023117e9034407ae8d2fb260a1104d45"
+    "version": "51",
+    "sha256": "6f66f418a8b79cbba914af51765fe7b6d10625be6c915ca1a895e385e9219077"
   },
   "public-lane-send.mjs": {
     "version": "19",
