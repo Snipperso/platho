@@ -7123,6 +7123,39 @@ describe('PWA runtime config guard', () => {
       .toMatch(/PUBLIC_REBROADCAST_MIN_INTERVAL_MS/);
   });
 
+  it('PWA-PUBLIC-RETAIN-01: a SUCCESSFUL public broadcast keeps its signed external, re-sends it, reads the door verdict and settles in seconds', () => {
+    // [OWNER 2026-08-22] The release post: accepted by a door (200 = queued), never run by the chain (its seqno was
+    // taken by another external of the same wallet, from a second device), and because only an AMBIGUOUS throw kept
+    // the bytes, nothing re-sent it and nothing read the chain's verdict — "confirming" for six silent minutes, then
+    // "failed". Four things, mirrored from the CONV lane:
+    //   (1) the post AND the comment path persist the retained external on success (pendingBoc/seqno/validUntil);
+    //   (2) the re-broadcast reads the door's verdict: exit 133 = consumed → consumedAt, said once in the console;
+    //   (3) the resume never re-sends a consumed external and pronounces it after a short settle;
+    //   (4) the settle is seconds, and the post/comment terminal labels are kept apart.
+    const app = readFileSync('web/app.js', 'utf8');
+    // (1)
+    const helper = app.slice(app.indexOf('function publicRetainedExternalFromSend(result)'), app.indexOf('const PUBLIC_CONSUMED_SETTLE_MS'));
+    expect(helper).toMatch(/const boc = result\?\.result\?\.pendingBoc \?\? null;\s*if \(!boc\) return null;/);
+    expect(helper).toMatch(/seqno: result\?\.result\?\.pendingSeqno \?\? null,\s*validUntil: result\?\.result\?\.pendingValidUntil \?\? null,/);
+    expect(helper).toMatch(/consumedAt: null,/);
+    expect(app).toMatch(/publishStatus: 'public published, confirming',\s*publicDirectSend: publicRetainedExternalFromSend\(result\),/);
+    expect(app).toMatch(/publishStatus: 'comment published, confirming',\s*publicDirectSend: publicRetainedExternalFromSend\(result\),/);
+    // (2)
+    const rebroadcast = app.slice(app.indexOf('async function rebroadcastPublicPublish(job, retained)'), app.indexOf('function resumePendingPublicPublishConfirmations()'));
+    expect(rebroadcast).toMatch(/const answer = await broadcastThroughNextDoor\(retained\.boc\);/);
+    expect(rebroadcast).toMatch(/if \(answer\?\.rejectedByChain && Number\(answer\.chainExitCode\) === 133 && !retained\.consumedAt\) \{/);
+    expect(rebroadcast).toMatch(/consumedAt: Date\.now\(\) \} \}\);/);
+    // The keyless fallback stays on the line right after the rotation (DOORS-07 reads exactly that adjacency).
+    expect(rebroadcast).toMatch(/const answer = await broadcastThroughNextDoor\(retained\.boc\);\s*\n\s*if \(!answer\) await transport\.sendBoc\(/);
+    // (3)
+    const resume = app.slice(app.indexOf('function resumePendingPublicPublishConfirmations()'), app.indexOf('function resumePendingPublicPublishConfirmations()') + 4000);
+    expect(resume).toMatch(/if \(retained\?\.consumedAt\) \{\s*if \(Date\.now\(\) - Number\(retained\.consumedAt\) >= PUBLIC_CONSUMED_SETTLE_MS\) \{/);
+    expect(resume.indexOf('retained?.consumedAt'), 'the consumed check comes BEFORE the re-broadcast window').toBeLessThan(resume.indexOf('retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS'));
+    // (4)
+    expect(app).toMatch(/const PUBLIC_CONSUMED_SETTLE_MS = 10_000;/);
+    expect(resume).toMatch(/publishStatus: kind === 'comment' \? 'comment failed' : 'public publish failed'/);
+  });
+
   it('persists and revives the INTRO send state, and never rebuilds a send that reached the wallet', () => {
     // The two halves of the first-contact fix, pinned where they are wired rather than where they are defined.
     // Persisting without reviving stores a K_root that comes back as an index-keyed object; reviving without

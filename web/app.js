@@ -26165,6 +26165,31 @@ function publicAmbiguousPublishPatch(error, status) {
 }
 
 /**
+ * The retained external of a SUCCESSFUL broadcast — the last chunk's signed bytes, the seqno they are bound to and
+ * when they stop being re-sendable. Read off the send result the way the CONV lane reads it (`pendingBoc` is set by
+ * platho-wallet on the RPC result; the response itself carries no boc). Null when the wallet handed back nothing to
+ * retain — then the resume has only the deadline, as before.
+ */
+function publicRetainedExternalFromSend(result) {
+  const boc = result?.result?.pendingBoc ?? null;
+  if (!boc) return null;
+  return {
+    boc,
+    seqno: result?.result?.pendingSeqno ?? null,
+    validUntil: result?.result?.pendingValidUntil ?? null,
+    at: Date.now(),
+    rebroadcastAt: null,
+    consumedAt: null,
+  };
+}
+
+// Once a door has said the chain will not take these bytes again (exit 133: the wallet seqno moved past them), the
+// external is either RUN — the feed merge then retires the record on the next read — or replaced by another external
+// of the same wallet. Ten seconds is what a landed post needs to show up in a read; past that, "failed" is honest,
+// and it is said in seconds instead of after the six-minute deadline. The CONV lane's settle, same number.
+const PUBLIC_CONSUMED_SETTLE_MS = 10_000;
+
+/**
  * Re-send a retained external. Stamps the attempt BEFORE sending so a failure cannot turn the next focus into a
  * broadcast loop, and swallows transport errors: the next pass retries while the window is open, and the deadline
  * terminal closes it out afterwards.
@@ -26177,8 +26202,17 @@ async function rebroadcastPublicPublish(job, retained) {
     // The public lane rotates too. Every lane that re-sends already-signed bytes goes through the carousel: the
     // external is seqno-bound so the chain runs it at most once whichever door accepts it, and the door that already
     // failed to deliver is the least promising place to knock again.
-    const rotated = await broadcastThroughNextDoor(retained.boc);
-    if (!rotated) await transport.sendBoc({ boc: retained.boc, walletAddress: plathoWallet.address });
+    const answer = await broadcastThroughNextDoor(retained.boc);
+    if (!answer) await transport.sendBoc({ boc: retained.boc, walletAddress: plathoWallet.address });
+    // READ THE DOOR'S VERDICT. A 406 / 500-with-exit-code is the CHAIN refusing these bytes, and exit 133 says why:
+    // the wallet's seqno has moved past them — the external was either run (the feed merge will retire the record)
+    // or replaced by another external of the same wallet, e.g. from a second device. Either way re-sending is noise
+    // from here; the resume settles it in seconds instead of waiting out the deadline. Said once, in the console,
+    // because until now this case was silent for six minutes and then "failed" [OWNER 2026-08-22].
+    if (answer?.rejectedByChain && Number(answer.chainExitCode) === 133 && !retained.consumedAt) {
+      console.warn('[public] the chain will not take this external again (seqno consumed) — waiting briefly for its twin, then giving up', answer.detail ?? '');
+      persistPublicPublishProgress(job, { publicDirectSend: { ...retained, rebroadcastAt: Date.now(), consumedAt: Date.now() } });
+    }
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[public] re-broadcast of a retained external failed', error);
   }
@@ -26305,6 +26339,16 @@ function resumePendingPublicPublishConfirmations() {
         // that may be on chain. Same seqno, so the chain runs it at most once; if it had already landed, the feed
         // merge retires this record when the twin appears.
         const retained = item.publicDirectSend;
+        // A CONSUMED external is never re-sent: the chain has moved past its seqno. If it ran, the feed merge retires
+        // this record within the settle (the visibility ladder reads the channel right before this); if it did not,
+        // "failed" is said now — seconds after the verdict, not after the six-minute deadline.
+        if (retained?.consumedAt) {
+          if (Date.now() - Number(retained.consumedAt) >= PUBLIC_CONSUMED_SETTLE_MS) {
+            persistPublicPublishProgress({ channelId, localId: item.id, publishState: null },
+              { publishStatus: kind === 'comment' ? 'comment failed' : 'public publish failed' });
+          }
+          continue;
+        }
         const retainedAgeMs = retained?.boc ? Date.now() - Number(retained.at ?? 0) : null;
         if (retainedAgeMs !== null && retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
           if (Date.now() - Number(retained.rebroadcastAt ?? 0) >= PUBLIC_REBROADCAST_MIN_INTERVAL_MS) {
@@ -26637,8 +26681,19 @@ async function submitPublicPostDirect(draft = null) {
   // pending nor chain-anchored (publicFeedPostHasChainAnchor), so the next background sync silently dropped
   // the just-published post from the feed. The pending copy retires by itself: the merge drops it once the
   // chain twin with the same bodyHash appears.
-  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'public published, confirming' });
-  // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
+  // KEEP THE SIGNED EXTERNAL ON SUCCESS TOO. A 200 from a door means "queued", not "executed" — and the owner's
+  // release post of 2026-08-22 was exactly that: accepted by the door, never run by the chain (its seqno was taken
+  // by another external of the same wallet from another device), and because only an AMBIGUOUS throw used to keep the
+  // bytes, nothing re-sent it and nothing could read the chain's verdict; the record sat "confirming" for six silent
+  // minutes and then said "failed". The CONV lane has kept its external on success since the door-verdict fix; this
+  // is the same line for the public lane: the resume re-broadcasts these bytes while they are valid, the door's
+  // refusal is read (rebroadcastPublicPublish), and a consumed external is pronounced in seconds, not minutes.
+  if (ref) {
+    persistPublicPublishProgress({ ...ref, publishState: null }, {
+      publishStatus: 'public published, confirming',
+      publicDirectSend: publicRetainedExternalFromSend(result),
+    });
+  }
   // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
   schedulePublicPublishVisibilityChecks();
   // Match the RECORD, which correctly says 'public published, confirming' one line above. The composer used to
@@ -26750,7 +26805,12 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
     setPublicStatus(ambiguous ? 'comment unconfirmed, retrying' : 'comment failed');
     throw error;
   }
-  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment published, confirming' });
+  if (ref) {
+    persistPublicPublishProgress({ ...ref, publishState: null }, {
+      publishStatus: 'comment published, confirming',
+      publicDirectSend: publicRetainedExternalFromSend(result),   // the same retained bytes as a post — see the post path
+    });
+  }
   schedulePublicPublishVisibilityChecks();   // same clock as a post — a comment is the twin that gets forgotten
   // MATCH THE RECORD, which says "confirming" one line above. A broadcast is not a confirmation: toncenter's 200
   // means QUEUED, and an external whose seqno the chain has not reached is dropped outright. The post path was
