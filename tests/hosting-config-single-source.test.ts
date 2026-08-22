@@ -65,4 +65,60 @@ describe('HOSTING — the web server config has ONE source of truth', () => {
         .not.toContain('log_skip');
     }
   });
+
+  it('HOSTCFG-04: the stand (stage.platho.app) IS the production site body — one snippet, two roots, one extra header', () => {
+    // [OWNER 2026-08-21: "сделай копию сайта для тестирования … по безопасности сделай также как на основном
+    // сайте".] A stand that served a build under different headers, a different cache policy or a different
+    // route chain would prove nothing about production, and a second copy of the body would drift the way the
+    // two files in HOSTCFG-01 drifted. So the body is written ONCE as a snippet whose only argument is the root,
+    // and each site is nothing but "the headers, the snippet with my root" — the stand adds exactly one header
+    // of its own, noindex, because a test build must not be indexed as the product.
+    const caddy = readFileSync('scripts/server/Caddyfile', 'utf8');
+    const block = (name: string) => {
+      const start = caddy.indexOf(`\n${name} {\n`);
+      expect(start, `${name} site block present`).toBeGreaterThan(-1);
+      const end = caddy.indexOf('\n}\n', start);
+      return caddy.slice(start + name.length + 4, end).split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+    };
+    // The shared body holds the whole cache policy and route chain (the things HOSTCFG-02 asserts), under the
+    // argument root.
+    expect(caddy).toContain('(platho_app_site) {\n\troot * {args[0]}\n');
+    const snippetStart = caddy.indexOf('(platho_app_site) {');
+    const snippetEnd = caddy.indexOf('\n}\n', snippetStart);
+    const snippet = caddy.slice(snippetStart, snippetEnd);
+    for (const must of ['@service_worker path /sw.js', 'header @shell Cache-Control "no-cache"', 'file_server @real_files', 'try_files {path} /index.html', 'respond @sensitive_paths 404']) {
+      expect(snippet, `the shared body carries: ${must}`).toContain(must);
+    }
+    // Production: EXACTLY the headers and the body with its root. Nothing else — a directive added here alone
+    // would make the stand lie about production.
+    expect(block('platho.app')).toEqual(['import security_headers', 'import platho_app_site /srv/platho/current']);
+    // The stand: the same two lines plus noindex, a different root, in that order.
+    expect(block('stage.platho.app')).toEqual([
+      'import security_headers',
+      'header X-Robots-Tag "noindex, nofollow"',
+      'import platho_app_site /srv/platho-stage/current',
+    ]);
+    // The body must not be written twice anywhere (the drift shape).
+    expect((caddy.match(/@service_worker path \/sw\.js/g) ?? []).length).toBe(1);
+    expect((caddy.match(/try_files \{path\} \/index\.html/g) ?? []).length).toBe(1);
+  });
+
+  it('HOSTCFG-05: the stand is deployed by the SAME receiver and the SAME script, addressed by a site prefix', () => {
+    // One deploy path: "stage <release>" over the same forced command maps to /srv/platho-stage and changes
+    // nothing else (release-name rules, archive checks, ownership, the atomic switch); the client script names
+    // the site, asks the stand's own vhost in SNI/Host, and never refuses a same-version ship to a stand.
+    const receiver = readFileSync('scripts/server/platho-deploy-receive.sh', 'utf8');
+    expect(receiver).toMatch(/^base=\/srv\/platho\n/m);
+    expect(receiver).toMatch(/case "\$command" in\n\s*stage\\ \*\)\n\s*base=\/srv\/platho-stage\n\s*command="\$\{command#stage \}"/);
+    // The derived paths come AFTER the site is chosen, or the prefix would choose nothing.
+    expect(receiver.indexOf('base=/srv/platho-stage')).toBeLessThan(receiver.indexOf('releases="$base/releases"'));
+    const deploy = readFileSync('scripts/deploy_static_web.mjs', 'utf8');
+    expect(deploy).toMatch(/const SITE = arg\('--site', 'production'\);/);
+    expect(deploy).toMatch(/const SITE_HOST = SITE === 'stage' \? 'stage\.platho\.app' : 'platho\.app';/);
+    expect(deploy).toMatch(/const HOST = arg\('--host', SITE === 'stage' \? '45\.142\.140\.101' : '45\.142\.141\.141'\);/);
+    expect(deploy).toMatch(/`\$\{SITE === 'stage' \? 'stage ' : ''\}\$\{release\}`/);
+    expect(deploy).toMatch(/live === shipping && SITE === 'stage'/);
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(pkg.scripts['web:deploy:stage']).toBe('node scripts/deploy_static_web.mjs --site stage');
+  });
 });

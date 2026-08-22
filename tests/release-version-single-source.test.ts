@@ -87,9 +87,24 @@ describe('RELVER — the product version is one number', () => {
     const guard = deploy.slice(deploy.indexOf("!process.argv.includes('--same-version')"));
     const body = guard.slice(0, guard.indexOf('\n}'));
     expect(body).toContain('JSON.stringify(HOST)');
-    expect(body).toContain("servername: 'platho.app'");
-    expect(body).toMatch(/Host:\s*'platho\.app'/);
+    // The name presented is the SITE's (2026-08-21: the stand stage.platho.app shares the machine and the
+    // script), resolved once above the guard — production is still asked as platho.app.
+    expect(body).toContain('servername: ${JSON.stringify(SITE_HOST)}');
+    expect(body).toContain('Host: ${JSON.stringify(SITE_HOST)}');
+    expect(deploy).toMatch(/const SITE_HOST = SITE === 'stage' \? 'stage\.platho\.app' : 'platho\.app';/);
     // Unreachable target still ships, and the note names WHICH machine could not be read.
     expect(body).toContain('could not read the version on');
+  });
+
+  it('RELVER-06: the stand takes the same version again without a bump — it is not a release', () => {
+    // A build under test carries the number it would ship with, so re-shipping 1.2.4 to stage.platho.app while
+    // 1.2.4 is already there is the normal case. The guard says so and ships; only PRODUCTION refuses.
+    const guard = deploy.slice(deploy.indexOf("!process.argv.includes('--same-version')"));
+    const body = guard.slice(0, guard.indexOf('\n}'));
+    const standBranch = body.indexOf("live === shipping && SITE === 'stage'");
+    const refuseBranch = body.indexOf('live === shipping) {');
+    expect(standBranch, 'the stand branch exists').toBeGreaterThan(-1);
+    expect(standBranch, 'and is tested BEFORE the refusal, or it never runs').toBeLessThan(refuseBranch);
+    expect(body).toContain('a stand takes the same version again');
   });
 });

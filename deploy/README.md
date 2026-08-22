@@ -70,6 +70,25 @@ sudo systemctl reload caddy
 
 Point DNS `A` and `AAAA` records for `platho.app` at the server before expecting HTTPS issuance to work.
 
+### Stage (stage.platho.app)
+
+The stand is the production site body under a second root. In `deploy/Caddyfile` the whole app site — cache
+policy, route chain, `@real_files`, the shell fallback — is ONE snippet, `(platho_app_site)`, whose only argument
+is the document root; `platho.app` and `stage.platho.app` each import `security_headers` and that snippet, and the
+stand adds exactly one header of its own, `X-Robots-Tag: noindex, nofollow`. Nothing else may differ (gate
+HOSTCFG-04): a stand with its own headers or cache policy proves nothing about production.
+
+Server side (done on A, 2026-08-22): `/srv/platho-stage/{releases,.uploads}` with the same ownership and modes
+as `/srv/platho`, the same receiver (`scripts/server/platho-deploy-receive.sh`) — a command prefixed with
+`stage ` is the same command against `/srv/platho-stage`. DNS `A stage.platho.app -> 45.142.140.101`.
+
+Ship a build to the stand (any version, including the one already live — a stand is not a release):
+
+```sh
+npm run web:deploy:prepare
+npm run web:deploy:stage            # = node scripts/deploy_static_web.mjs --site stage  (host A by default)
+```
+
 ## Platho RPC gateway (RETIRED)
 
 `rpc.platho.app` has been decommissioned. The PWA is **client-direct**: each client talks to TON itself via the user's own optional free TonCenter API key (with keyless TonCenter as a last-resort fallback), so there is no central gateway to block or DoS. Transport is TonCenter-only — the former Orbs (TON Access) path has been removed. The former gateway code (`deploy/platho-rpc-gateway.*`) and its tests have been removed, and `validatePlathoAppConfig` now actively forbids any provider routing through `rpc.platho.app`.

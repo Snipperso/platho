@@ -25,7 +25,15 @@ const arg = (name, fallback) => {
 const die = (message) => { console.error(`ABORT: ${message}`); process.exit(1); };
 
 const MODE = arg('--mode', 'production');
-const HOST = arg('--host', '45.142.141.141');
+// WHICH SITE ON THE MACHINE. `production` is platho.app (/srv/platho on the server); `stage` is the stand,
+// stage.platho.app (/srv/platho-stage) — the same bundle, the same receiver, the same Caddy site body, a different
+// root, so a build can be tried under the exact production headers and cache policy before it is released
+// [OWNER 2026-08-21: "копия сайта для тестирования … по безопасности сделай также как на основном сайте"].
+// The stand lives on the machine its DNS names (A); production defaults to the second machine as before.
+const SITE = arg('--site', 'production');
+if (!['production', 'stage'].includes(SITE)) die(`--site must be production or stage, got ${SITE}`);
+const SITE_HOST = SITE === 'stage' ? 'stage.platho.app' : 'platho.app';
+const HOST = arg('--host', SITE === 'stage' ? '45.142.140.101' : '45.142.141.141');
 const USER = arg('--user', 'platho-deploy');
 const KEY = arg('--key', resolve(process.env.HOME ?? process.env.USERPROFILE ?? '.', '.ssh/platho_deploy_ed25519'));
 const KNOWN_HOSTS = arg('--known-hosts', 'artifacts/local/njalla_known_hosts');
@@ -69,13 +77,13 @@ if (MODE === 'production' && !process.argv.includes('--same-version')) {
   //
   // fetch() cannot be pinned to an address (it silently drops a Host header, and there is no connect override),
   // so this speaks https directly: connect to the target, but present the real name in SNI and Host, or Caddy
-  // answers for a vhost that does not exist.
+  // answers for a vhost that does not exist. The name is the SITE's: the stand is asked as stage.platho.app.
   const probe = spawnSync(process.execPath, ['-e', `
     const https = require('node:https');
     const done = (v) => { process.stdout.write(v); process.exit(0); };
     const req = https.request({
-      host: ${JSON.stringify(HOST)}, port: 443, path: '/', method: 'GET', servername: 'platho.app',
-      headers: { Host: 'platho.app', 'Cache-Control': 'no-store' },
+      host: ${JSON.stringify(HOST)}, port: 443, path: '/', method: 'GET', servername: ${JSON.stringify(SITE_HOST)},
+      headers: { Host: ${JSON.stringify(SITE_HOST)}, 'Cache-Control': 'no-store' },
     }, (res) => {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
@@ -87,7 +95,11 @@ if (MODE === 'production' && !process.argv.includes('--same-version')) {
   `], { encoding: 'utf8', timeout: 20_000 });
   const live = (probe.stdout ?? '').trim();
   if (!live) {
-    console.error(`note: could not read the version on ${HOST} — shipping without the same-version check`);
+    console.error(`note: could not read the version on ${HOST} (${SITE_HOST}) — shipping without the same-version check`);
+  } else if (live === shipping && SITE === 'stage') {
+    // THE STAND IS NOT A RELEASE. Re-shipping the same version number to it is the normal case — a build under
+    // test carries the number it would ship with — so the guard only says so here and never refuses.
+    console.error(`note: ${SITE_HOST} already shows ${shipping} — a stand takes the same version again`);
   } else if (live === shipping) {
     die(`version ${shipping} is already live on ${HOST}. Bump it first:\n`
       + '  node scripts/bump_release_version.mjs            (a fix)\n'
@@ -121,7 +133,9 @@ try {
     '-o', 'BatchMode=yes',
     '-o', `UserKnownHostsFile=${KNOWN_HOSTS}`,
     `${USER}@${HOST}`,
-    release,
+    // The receiver's command: the release name, prefixed with the site for the stand ("stage release-…") —
+    // see scripts/server/platho-deploy-receive.sh, which maps that prefix to /srv/platho-stage.
+    `${SITE === 'stage' ? 'stage ' : ''}${release}`,
   ], { stdio: [fd, 'inherit', 'inherit'] });
   if (ssh.error) die(`could not run ssh: ${ssh.error.message}`);
   if (ssh.status !== 0) die(`deploy failed with exit code ${ssh.status}`);
@@ -129,5 +143,5 @@ try {
   closeSync(fd);
 }
 
-console.log(`deployed ${release}`);
+console.log(`deployed ${release} to ${SITE_HOST} (${HOST})`);
 console.log(`tarball: ${tarPath}`);

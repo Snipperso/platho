@@ -46,9 +46,14 @@ www.platho.app {
 	redir https://platho.app{uri} permanent
 }
 
-platho.app {
-	import security_headers
-	root * /srv/platho/current
+# THE APP SITE, ONCE. platho.app and stage.platho.app are the SAME configuration with a different document root,
+# and the only way to keep that true is to write it once: the stand exists to try a build before it is released,
+# and a stand that served the build under a different cache policy, a different CSP or a different route chain
+# would prove nothing about production. The root is the one argument; security_headers is imported by each
+# site beside it so the stand can add its own header (noindex) without touching the shared body.
+# [OWNER 2026-08-21: "сделай также как на основном сайте".]
+(platho_app_site) {
+	root * {args[0]}
 
 	# NO ACCESS LOG, and it is not an oversight — see PERMA-05. A permalink path reaches this server, so the only
 	# reason it leaks nothing about who read what is that nothing is written down.
@@ -125,6 +130,20 @@ platho.app {
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+platho.app {
+	import security_headers
+	import platho_app_site /srv/platho/current
+}
+
+# THE STAND. The same body, the same headers, a different root — plus one header of its own: search engines
+# must not index a test build as the product. Nothing else may differ; a directive that belongs on the stand
+# alone is a directive that makes the stand lie about production.
+stage.platho.app {
+	import security_headers
+	header X-Robots-Tag "noindex, nofollow"
+	import platho_app_site /srv/platho-stage/current
 }
 
 about.platho.app {

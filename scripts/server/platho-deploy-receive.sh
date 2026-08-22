@@ -2,11 +2,22 @@
 set -eu
 umask 0027
 
+command="${SSH_ORIGINAL_COMMAND:-}"
+
+# WHICH SITE. The same receiver serves production and the stand (stage.platho.app, 2026-08-21): a command that
+# begins with "stage " is the same command against /srv/platho-stage, and nothing else about it changes — same
+# release-name rules, same archive checks, same ownership, same atomic switch. One receiver, two roots, so the
+# stand cannot be deployed to by a different (and untested) path than production.
 base=/srv/platho
+case "$command" in
+    stage\ *)
+        base=/srv/platho-stage
+        command="${command#stage }"
+        ;;
+esac
 releases="$base/releases"
 uploads="$base/.uploads"
 current="$base/current"
-command="${SSH_ORIGINAL_COMMAND:-}"
 
 valid_release_name() {
     case "$1" in
