@@ -2709,6 +2709,77 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/let statesBatchCeilingPersistenceArmed = false;\s*function installConfiguredTonRuntime\(/);
   });
 
+  it('PWA-CONVRESTORE-02: an own capsule read back off the outgoing shard MERGES into its local echo, never stands beside it', () => {
+    // [OWNER 2026-08-22, on the stand] "the message doubled with different statuses" — the echo the composer inserts
+    // carries no capsule id (no capsule exists yet), so the chain copy, deduplicated by id, was inserted a second time
+    // under 'received'. Four things close it:
+    //   (1) the send stamps the echo with the shard address beside the seq — (shard, seq) IS the chain identity;
+    //   (2) the append matches an own chain copy to an 'out' message by (shard, seq), or by seq + signed time for
+    //       echoes from before (1), and merges into it (the echo gains the capsule id);
+    //   (3) the meta of an own copy is 'published', not 'received';
+    //   (4) outside the loaded window the store's clear headers (type + createdAt) say whether an own send is stored
+    //       within seconds of the capsule's signed time — handled, not inserted.
+    const app = readFileSync('web/app.js', 'utf8');
+    // (1)
+    expect(app).toMatch(/message\.chainEntryId = String\(Math\.min\(\.\.\.parts\.map\(\(part\) => part\.seq\)\)\);[\s\S]{0,900}?message\.convShardAddress = route\.address;/);
+    // (2)
+    const echo = app.slice(app.indexOf('function findOwnEchoForChainCopy(thread, entry, opened)'), app.indexOf('function findMessageByCapsuleId(capsuleId)'));
+    expect(echo).toMatch(/if \(!thread \|\| seq === null \|\| opened\?\.openedAs !== 'sender'\) return null;/);
+    expect(echo).toMatch(/if \(message\?\.type !== 'out' \|\| String\(message\.chainEntryId \?\? ''\) !== seq\) continue;/);
+    expect(echo).toMatch(/if \(message\.convShardAddress === address\) return \{ thread, message \};/);
+    expect(echo).toMatch(/Math\.abs\(echoMs - chainMs\) <= 5_000\) return \{ thread, message \};/);
+    const single = app.slice(app.indexOf('async function appendOpenedCapsuleMessage('), app.indexOf('async function appendOpenedPrivatePartsMessage('));
+    expect(single).toMatch(/const existing = findMessageByCapsuleId\(opened\.capsule\?\.id\) \?\? findOwnEchoForChainCopy\(targetThread, entry, opened\);/);
+    const multi = app.slice(app.indexOf('async function appendOpenedPrivatePartsMessage('), app.indexOf('function isPrivateOpenKeyMismatchError('));
+    expect(multi).toMatch(/\?\? \(anchor \? findOwnEchoForChainCopy\(targetThread, anchor\.entry, anchor\.opened\) : null\);/);
+    // (3)
+    expect(app).toMatch(/const meta = parts\[0\]\?\.opened\?\.openedAs === 'sender' \? 'published' : 'received';/);
+    // (4)
+    expect(app).toMatch(/const OWN_SEND_TIME_SLACK_MS = 5_000;/);
+    expect(app).toMatch(/function rememberStoredOwnSend\(threadId, message, createdAtMs = null\)/);
+    expect(app).toMatch(/function ownSendStoredNear\(threadId, createdAtMs\)/);
+    expect(app).toMatch(/if \(header\?\.type === 'out' && header\?\.threadId\) rememberStoredOwnSend\(header\.threadId, \{ type: 'out' \}, Number\(header\.createdAt\)\);/);
+    expect(app).toMatch(/rememberStoredCapsuleIds\(message\);\s*rememberStoredOwnSend\(thread\.id, message, stored\.createdAt\);/);
+    expect(single).toMatch(/if \(opened\?\.openedAs === 'sender' && ownSendStoredNear\(targetThread\.id, capsuleSenderCreatedAtMs\(opened\)\)\) return true;/);
+    expect(multi).toMatch(/if \(anchor\?\.opened\?\.openedAs === 'sender' && ownSendStoredNear\(targetThread\.id, capsuleSenderCreatedAtMs\(anchor\.opened\)\)\) return true;/);
+    // The echo match runs BEFORE the store checks, the store checks BEFORE the insert.
+    expect(single.indexOf('findOwnEchoForChainCopy(')).toBeLessThan(single.indexOf('capsuleAlreadyStored(opened.capsule?.id)'));
+    expect(single.indexOf('ownSendStoredNear(')).toBeLessThan(single.indexOf('insertThreadMessage(targetThread, message)'));
+  });
+
+  it('PWA-CLEAR-01: "Clear local data" deletes EVERY platho IndexedDB store — the conversation keys and cursors included', () => {
+    // [OWNER 2026-08-22, on the stand] "cleared it, imported the key again, still five messages; a manual sync brings
+    // them all." The wipe deleted the message history and the replay store only; the conversation KEY store survived
+    // with this device's scan cursors, so the re-imported wallet was not a fresh device: the recovery restore stood
+    // down ("already holds conversations"), every conversation kept its cursor, and the first sync read the steady
+    // window. The wipe now names every store this wallet and deployment can have created, and — where the browser
+    // enumerates — everything under the `platho-` prefix.
+    const app = readFileSync('web/app.js', 'utf8');
+    const names = app.slice(app.indexOf('async function plathoLocalIndexedDbNames()'), app.indexOf('async function clearPlathoLocalData()'));
+    expect(names.length, 'the wipe routine is found').toBeGreaterThan(0);
+    for (const must of [
+      'currentMessageHistoryDbName()',
+      'currentReplayDbName()',
+      'currentConvKeyDbName()',
+      'currentIntroReplayDbName()',
+      "scopedIndexedDbName('platho-profile-avatar-media-v1')",
+      "scopedIndexedDbName('platho-public-comments-v1')",
+      "scopedIndexedDbName('platho-public-post-media-v1')",
+    ]) {
+      expect(names, `the wipe names ${must}`).toContain(must);
+    }
+    expect(app).toMatch(/const PLATHO_INDEXED_DB_PREFIX = 'platho-';/);
+    expect(names).toMatch(/if \(name\.startsWith\(PLATHO_INDEXED_DB_PREFIX\)\) names\.add\(name\);/);
+    // Every store the app opens is under that prefix, or the enumeration would miss it.
+    const opened = [...app.matchAll(/(?:walletScopedIndexedDbName|scopedIndexedDbName)\('([^']+)'/g)].map((m) => m[1]);
+    expect(opened.length).toBeGreaterThan(3);
+    for (const name of opened) expect(name.startsWith('platho-'), `${name} is under the platho- prefix`).toBe(true);
+    expect(app).toMatch(/const LEGACY_MESSAGE_HISTORY_DB_NAME = 'platho-/);
+    expect(app).toMatch(/const LEGACY_REPLAY_DB_NAME = 'platho-/);
+    // And the conversation key store is wallet-scoped under the prefix too.
+    expect(app).toMatch(/walletScopedIndexedDbName\('platho-conv-keys-v1'/);
+  });
+
   it('PWA-DELIVERY-01: "Synced" is never reported while messages are pending, skipped, or dropped', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The 'synced' phase requires genuinely nothing pending/skipped/dropped — a
@@ -4238,7 +4309,10 @@ describe('PWA runtime config guard', () => {
     // a chat message. The pre-thread divert inside the CapsuleHub walk went with that walk.
     const convScan = app.slice(app.indexOf('async function syncConvCapsulesFromShards'), app.indexOf('async function syncPrivateCapsulesFromChain('));
     expect(convScan).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, localRecipientKeyPair/);
-    expect(app).toMatch(/appendOpenedCapsuleMessage\(parts\[0\]\.opened, targetThread, 'received', parts\[0\]\.entry\)/);
+    // (2026-08-22: the meta is 'received' for a peer's capsule and 'published' for an own capsule read back off the
+    // outgoing shard — decided per group right above the call.)
+    expect(app).toMatch(/const meta = parts\[0\]\?\.opened\?\.openedAs === 'sender' \? 'published' : 'received';/);
+    expect(app).toMatch(/appendOpenedCapsuleMessage\(parts\[0\]\.opened, targetThread, meta, parts\[0\]\.entry\)/);
     // Defensive divert at the top of the append path too.
     const appendSrc = app.slice(app.indexOf('async function appendOpenedCapsuleMessage('), app.indexOf('async function appendOpenedPrivatePartsMessage('));
     expect(appendSrc).toMatch(/const prefsBytes = prefsBytesFromOpenedCapsule\(opened\);\s*if \(prefsBytes\) \{ collectRestoredPrefsSnapshot\(prefsBytes\); return true; \}/);

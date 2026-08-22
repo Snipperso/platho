@@ -1,12 +1,12 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-1e2a49f9ebcb';
+const CACHE_NAME = 'platho-pwa-98c8f4f46413';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=340',
-  './app.js?v=bbca70df5',
+  './app.js?v=b4883a617',
   './i18n.mjs?v=78',
   './i18n-strings.mjs?v=80',
   './boot-signal-field.mjs?v=1',
@@ -51,12 +51,12 @@ const ASSETS = [
   './intro-codec.mjs?v=2',
   './intro-cursor-store.mjs?v=1',
   './intro-lane-send.mjs?v=19',
-  './intro-lane.mjs?v=34',
+  './intro-lane.mjs?v=35',
   './intro-publish-browser.mjs?v=19',
   './intro-receive-handler.mjs?v=6',
   './intro-receive.mjs',
   './intro-scan-policy.mjs?v=1',
-  './intro-scan-runner.mjs?v=20',
+  './intro-scan-runner.mjs?v=21',
   './intro-scan.mjs',
   './intro-send-coords.mjs?v=19',
   './intro-transport.mjs?v=26',
@@ -244,7 +244,7 @@ async function navigationResponse(event) {
     // This used to cache every fresh shell it fetched, which quietly broke the one property the cache exists
     // for. The shell and the asset URLs it names are versioned together and precached together under one
     // CACHE_NAME; writing a NEWER shell into the CURRENT cache leaves the pair mismatched — a shell asking for
-    // ./app.js?v=bbca70df5 while the cache holds ./app.js?v=bbca70df5. Online nobody notices, the network fills the gap.
+    // ./app.js?v=b4883a617 while the cache holds ./app.js?v=b4883a617. Online nobody notices, the network fills the gap.
     // Offline the app will not start at all: MEASURED 2026-08-20, during the outage, the owner's own device
     // showed "resource failed: app.js?v=bf36260a7" from the boot guard while every byte it needed to run sat in
     // the cache under the previous version's URL.
@@ -296,7 +296,7 @@ async function cachedIgnoringVersion(request) {
  * This was stale-while-revalidate: serve the cached copy, then fetch the same file again in the background "in
  * case it changed". For this app that background fetch can never find anything, and it is not free.
  *
- * Every module URL here carries its content's version (./app.js?v=bbca70df5<hash>, ./conv-lane.mjs?v=30). A changed file
+ * Every module URL here carries its content's version (./app.js?v=b4883a617<hash>, ./conv-lane.mjs?v=30). A changed file
  * gets a changed URL — that is the whole point of the scheme — so a cached response for a given URL cannot go
  * stale. The unversioned entries (icons, the manifest, the docs) do not need revalidating either: they are
  * refreshed by the INSTALL, which re-fetches the whole list with cache:'reload' whenever CACHE_NAME moves.

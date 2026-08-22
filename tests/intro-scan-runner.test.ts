@@ -403,8 +403,11 @@ describe('INTRO-SCAN-RUNNER — the loop a user actually experiences', () => {
     });
     await runner.start();
     expect(attempts, 'the replay was attempted once').toBe(1);
-    expect(errors.length, 'and reported once').toBe(1);
-    expect(runner.lastStats!.replays, 'and counted as a replay').toBe(1);
+    // NOT reported: a replay is a contact already adopted, not a failure. 2026-08-22, after a restore, the owner's
+    // console carried 108 "[intro] scan error … INTRO replay detected" — one per conversation whose nonce the
+    // restored key store already held, every one of them benign. The counter below is how it is accounted for.
+    expect(errors.length, 'and not reported as an error').toBe(0);
+    expect(runner.lastStats!.replays, 'but counted as a replay').toBe(1);
 
     for (let i = 0; i < 6; i += 1) await advance(5 * 60_000);
     expect(attempts, 'a replay is never re-delivered — the hit is in the ledger').toBe(1);

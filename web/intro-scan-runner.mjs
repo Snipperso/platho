@@ -168,16 +168,19 @@ export function createIntroScanRunner({
           delivered.set(key, hit.epoch);
           deliveries += 1;
         } catch (error) {
-          onError(error);
           // A REPLAY is not a failed delivery, it is a second copy of a contact already delivered (the guard keeps the
           // nonce for good, so the refusal is permanent). Record the hit like a delivery and move on: re-reading it
           // every pass could only throw again — which is exactly what it did, once a minute, for entries 375 and 376
-          // of one bucket on 2026-08-21. The first copy was adopted; the second is noise the runner now absorbs.
+          // of one bucket on 2026-08-21. The first copy was adopted; the second is noise the runner now absorbs —
+          // QUIETLY: it is not reported as an error either (the owner's console, 2026-08-22, after a restore: 108
+          // "[intro] scan error ... INTRO replay detected" for 108 conversations whose nonces the restored key
+          // store already held — every one of them a contact already adopted, not one of them a failure).
           if (error?.code === 'INTRO_REPLAY') {
             delivered.set(key, hit.epoch);
             replays += 1;
             continue;
           }
+          onError(error);
           // NOT recorded — and its shard's cursor must not advance either, or the next pass will never re-read
           // the entry and the first contact is lost for good. Leaving the cursor alone costs one re-read.
           undelivered.add(hit.key);

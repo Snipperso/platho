@@ -45,7 +45,11 @@ describe('private history loads a window, not everything', () => {
     expect(app).toMatch(/function capsuleAlreadyStored\(capsuleId\)/);
     expect(app).toMatch(/storedCapsuleIds\.has\(capsuleId\)/);
     // Both append paths must consult it BEFORE inserting.
-    const single = app.slice(app.indexOf('const existing = findMessageByCapsuleId(opened.capsule?.id);'), app.indexOf('const existing = findMessageByCapsuleId(opened.capsule?.id);') + 700);
+    // (2026-08-22: the id lookup falls back to the own-echo match for a capsule read back off the own outgoing shard —
+    // the store check still follows, BEFORE the insert.)
+    const singleAnchor = 'const existing = findMessageByCapsuleId(opened.capsule?.id) ?? findOwnEchoForChainCopy(targetThread, entry, opened);';
+    expect(app.indexOf(singleAnchor), 'the single-part append keeps the id lookup first').toBeGreaterThan(-1);
+    const single = app.slice(app.indexOf(singleAnchor), app.indexOf(singleAnchor) + 900);
     expect(single).toMatch(/capsuleAlreadyStored\(opened\.capsule\?\.id\)[\s\S]{0,40}return true;/);
     const multi = app.slice(app.indexOf('const existing = parts.map((part) => findMessageByCapsuleId'), app.indexOf('const existing = parts.map((part) => findMessageByCapsuleId') + 700);
     expect(multi).toMatch(/parts\.some\(\(part\) => capsuleAlreadyStored\(part\.opened\?\.capsule\?\.id\)\)[\s\S]{0,40}return true;/);

@@ -175,7 +175,7 @@ import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMess
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=7';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=19';
-import { createIntroLane } from './intro-lane.mjs?v=34';
+import { createIntroLane } from './intro-lane.mjs?v=35';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
@@ -12080,6 +12080,34 @@ async function verifiedPlathoUsernameIdentityForWallet(label, walletAddress) {
   }
 }
 
+/**
+ * THE LOCAL ECHO OF AN OWN SEND, matched WITHOUT a capsule id.
+ *
+ * The composer inserts an 'out' message before any capsule exists, so the echo never carried the capsule id that
+ * findMessageByCapsuleId keys on — and once the sync began reading this device's own outgoing shards back, the same
+ * message was inserted a second time, under 'received' [OWNER 2026-08-22: "the message doubled with different
+ * statuses"]. The echo DOES carry the publish seq (chainEntryId, stamped before the broadcast) and, from the same
+ * day on, the shard address; an older echo has the seq and a send time within seconds of the capsule's own signed
+ * time. Either pair says "this is mine, and it is already here" — the chain copy then MERGES into the echo (which
+ * gains the capsule id, so the next pass matches by id like everything else) instead of standing beside it.
+ */
+function findOwnEchoForChainCopy(thread, entry, opened) {
+  const seq = privateEntryIdText(entry);
+  if (!thread || seq === null || opened?.openedAs !== 'sender') return null;
+  const address = typeof entry?.address === 'string' && entry.address ? entry.address : null;
+  const chainMs = capsuleSenderCreatedAtMs(opened);
+  for (const message of thread.messages ?? []) {
+    if (message?.type !== 'out' || String(message.chainEntryId ?? '') !== seq) continue;
+    if (address && message.convShardAddress) {
+      if (message.convShardAddress === address) return { thread, message };
+      continue;                                              // same seq in ANOTHER shard (seq restarts per epoch)
+    }
+    const echoMs = messageCreatedAtMs(message);
+    if (chainMs !== null && echoMs !== null && Math.abs(echoMs - chainMs) <= 5_000) return { thread, message };
+  }
+  return null;
+}
+
 function findMessageByCapsuleId(capsuleId) {
   if (!capsuleId) return null;
   for (const thread of threads) {
@@ -13138,11 +13166,14 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
   if (prefsBytes) { collectRestoredPrefsSnapshot(prefsBytes); return true; }
   if (!targetThread) throw new Error('Private chain message target thread could not be resolved');
   const message = messageFromOpenedCapsule(opened, meta, entry);
-  const existing = findMessageByCapsuleId(opened.capsule?.id);
+  const existing = findMessageByCapsuleId(opened.capsule?.id) ?? findOwnEchoForChainCopy(targetThread, entry, opened);
   if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
   // Loaded threads did not have it, but the STORE might: this capsule can be older than the loaded window, and a
   // manual sync re-delivers on purpose. Inserting here would duplicate it on screen and then persist the duplicate.
   if (capsuleAlreadyStored(opened.capsule?.id)) return true;
+  // An OWN capsule whose echo is in the store but outside the window: the send-time index says so (see
+  // storedOwnSendTimes). Handled, not inserted — the echo is the message.
+  if (opened?.openedAs === 'sender' && ownSendStoredNear(targetThread.id, capsuleSenderCreatedAtMs(opened))) return true;
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
@@ -13167,11 +13198,20 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
 async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   if (!targetThread) throw new Error('Private chain multipart target thread could not be resolved');
   const message = messageFromOpenedPrivateParts(parts, meta);
-  const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean);
+  // The echo of an own multipart send is anchored by its FIRST record (min seq) on both sides — see the send path.
+  const anchor = parts.reduce((best, part) => {
+    const seq = Number(privateEntryIdText(part?.entry));
+    if (!Number.isFinite(seq)) return best;
+    return best === null || seq < Number(privateEntryIdText(best.entry)) ? part : best;
+  }, null);
+  const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean)
+    ?? (anchor ? findOwnEchoForChainCopy(targetThread, anchor.entry, anchor.opened) : null);
   if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
   // Same reasoning as the single-part path: ANY part already on disk means this message was stored before the
   // window that is currently loaded.
   if (parts.some((part) => capsuleAlreadyStored(part.opened?.capsule?.id))) return true;
+  // Same as the single-part path: an own multipart whose echo is stored outside the window is handled, not inserted.
+  if (anchor?.opened?.openedAs === 'sender' && ownSendStoredNear(targetThread.id, capsuleSenderCreatedAtMs(anchor.opened))) return true;
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
@@ -13335,10 +13375,13 @@ async function appendConvOpenedCapsules(collected, targetThread) {
   for (const parts of groups.values()) {
     const partCount = Number(parts[0]?.opened?.payload?.partCount ?? 1);
     try {
+      // An OWN capsule read back off this device's outgoing shard is a PUBLISHED message, not a received one: the
+      // status under the bubble must say so [OWNER 2026-08-22: a doubled message "with different statuses"].
+      const meta = parts[0]?.opened?.openedAs === 'sender' ? 'published' : 'received';
       if (partCount > 1) {
         if (parts.length < partCount) continue; // incomplete — wait for the remaining parts on a later tick
-        if (await appendOpenedPrivatePartsMessage(parts, targetThread, 'received')) appended += 1;
-      } else if (await appendOpenedCapsuleMessage(parts[0].opened, targetThread, 'received', parts[0].entry)) {
+        if (await appendOpenedPrivatePartsMessage(parts, targetThread, meta)) appended += 1;
+      } else if (await appendOpenedCapsuleMessage(parts[0].opened, targetThread, meta, parts[0].entry)) {
         appended += 1;
       }
     } catch (error) {
@@ -14082,6 +14125,7 @@ async function writeMessageToEncryptedHistory(thread, message) {
     // Keep the dedup set current: it is built from headers at boot, and without this a capsule stored during THIS
     // session would look unknown to the next re-delivery of the same sync.
     rememberStoredCapsuleIds(message);
+    rememberStoredOwnSend(thread.id, message, stored.createdAt);
     const state = historyWindowState.get(thread.id);
     if (state) historyWindowState.set(thread.id, { ...state, stored: state.stored + 1, loaded: state.loaded + 1 });
     setText(localStateLabel, historyStatusLabel());
@@ -14205,6 +14249,42 @@ const PRIVATE_HISTORY_WINDOW = 96;
  */
 let storedCapsuleIds = new Set();
 
+// WHEN this device sent something, per thread — the OWN-SEND index the echo match falls back to OUTSIDE the loaded
+// window. findOwnEchoForChainCopy can only see the messages in memory (the newest PRIVATE_HISTORY_WINDOW per thread);
+// an own capsule older than that, read back off the outgoing shard on a manual full sync or a long catch-up, would
+// otherwise be inserted beside an echo that is in the store but not on screen. The clear header of every stored
+// record already carries type and createdAt, so the index costs no decryption: the send times of every 'out' record,
+// per thread, sorted. A chain copy of an own capsule whose signed time lands within a few seconds of a stored send in
+// the same thread IS that send (the echo and the capsule are stamped from the same clock, seconds apart at most).
+const OWN_SEND_TIME_SLACK_MS = 5_000;
+let storedOwnSendTimes = new Map();              // threadId -> sorted createdAt ms of stored 'out' messages
+
+function rememberStoredOwnSend(threadId, message, createdAtMs = null) {
+  if (!threadId || message?.type !== 'out') return;
+  const at = Number(createdAtMs ?? messageCreatedAtMs(message));
+  if (!Number.isFinite(at)) return;
+  const list = storedOwnSendTimes.get(threadId) ?? [];
+  let i = list.length;
+  while (i > 0 && list[i - 1] > at) i -= 1;
+  list.splice(i, 0, at);
+  storedOwnSendTimes.set(threadId, list);
+}
+
+function ownSendStoredNear(threadId, createdAtMs) {
+  const at = Number(createdAtMs);
+  if (!threadId || !Number.isFinite(at)) return false;
+  const list = storedOwnSendTimes.get(threadId);
+  if (!list || list.length === 0) return false;
+  let lo = 0;
+  let hi = list.length - 1;
+  while (lo < hi) {                                // first index with list[i] >= at - slack
+    const mid = (lo + hi) >> 1;
+    if (list[mid] < at - OWN_SEND_TIME_SLACK_MS) lo = mid + 1; else hi = mid;
+  }
+  return Math.abs(list[lo] - at) <= OWN_SEND_TIME_SLACK_MS
+    || (lo > 0 && Math.abs(list[lo - 1] - at) <= OWN_SEND_TIME_SLACK_MS);
+}
+
 /**
  * Per thread: how much the store holds, how much is loaded, and the timestamp to page back from.
  *
@@ -14290,6 +14370,11 @@ function storedCountsByThread(headers) {
  */
 async function restoreHistoryWindows(headers) {
   storedCapsuleIds = new Set(headers.map((header) => header?.capsuleId).filter(Boolean));
+  // The own-send index, from the same clear headers (type + createdAt), for the echo match outside the window.
+  storedOwnSendTimes = new Map();
+  for (const header of headers) {
+    if (header?.type === 'out' && header?.threadId) rememberStoredOwnSend(header.threadId, { type: 'out' }, Number(header.createdAt));
+  }
   const counts = storedCountsByThread(headers);
   const messages = [];
   const failed = [];
@@ -18446,11 +18531,26 @@ function deleteIndexedDbDatabase(name) {
   });
 }
 
+// EVERY DATABASE THIS APP OWNS, and nothing short of it. "Clear local data" used to delete the message history and
+// the replay store only — and left the conversation KEY store (K_roots AND this device's scan cursors), the intro
+// replay store and the media caches in place. So a "cleared" device that imported its key again was not a fresh
+// device at all: the key store was non-empty, the recovery restore stood down as "authoritative", every
+// conversation kept its old cursor, and the first sync read the steady window — five messages, while a manual full
+// sync (which ignores cursors) brought the whole history [OWNER 2026-08-22, on the stand, after several rounds of
+// "cleared it, imported again, still five"]. Every store is prefixed `platho-`, so where the browser can enumerate,
+// everything under that prefix goes; where it cannot, the explicit list below names every store this wallet and
+// deployment can have created.
+const PLATHO_INDEXED_DB_PREFIX = 'platho-';
 async function plathoLocalIndexedDbNames() {
   const names = new Set([
     ...PLATHO_LOCAL_INDEXED_DB_NAMES,
     currentMessageHistoryDbName(),
     currentReplayDbName(),
+    currentConvKeyDbName(),
+    currentIntroReplayDbName(),
+    scopedIndexedDbName('platho-profile-avatar-media-v1'),
+    scopedIndexedDbName('platho-public-comments-v1'),
+    scopedIndexedDbName('platho-public-post-media-v1'),
   ]);
   if (globalThis.indexedDB?.databases) {
     try {
@@ -18458,20 +18558,13 @@ async function plathoLocalIndexedDbNames() {
       for (const database of databases ?? []) {
         const name = database?.name;
         if (typeof name !== 'string') continue;
-        if (
-          name === LEGACY_MESSAGE_HISTORY_DB_NAME
-          || name === LEGACY_REPLAY_DB_NAME
-          || name.startsWith(`${LEGACY_MESSAGE_HISTORY_DB_NAME}.`)
-          || name.startsWith(`${LEGACY_REPLAY_DB_NAME}.`)
-        ) {
-          names.add(name);
-        }
+        if (name.startsWith(PLATHO_INDEXED_DB_PREFIX)) names.add(name);
       }
     } catch {
       // Some browsers expose IndexedDB but do not allow database enumeration.
     }
   }
-  return [...names];
+  return [...names].filter(Boolean);
 }
 
 function clearDocumentCookies() {
@@ -25706,6 +25799,11 @@ async function attemptConvMessagePublishDirect(context) {
   // does not have the quoted message either, so the quote strip falls back to its snippet, which is the honest
   // rendering of "I am answering something you never received".
   message.chainEntryId = String(Math.min(...parts.map((part) => part.seq)));
+  // And WHICH shard: the echo's identity on chain is (shard address, seq). The sync reads this device's own outgoing
+  // shards back (openedAs 'sender'), and the chain copy has no capsule id to match the echo by — the composer inserts
+  // the echo before the capsule exists — so it matches on exactly this pair [OWNER 2026-08-22: "the message doubled,
+  // with different statuses"]. Persisted with the message (history whitelist), so a reload keeps the pairing.
+  message.convShardAddress = route.address;
 
   // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
   // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a

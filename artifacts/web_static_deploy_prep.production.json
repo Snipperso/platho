@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-22T11:57:01.180Z",
+  "generatedAt": "2026-08-22T12:31:56.895Z",
   "mode": "production",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-production",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 257,
-    "totalBytes": 6075159,
-    "bundleSha256": "1a202a7bb9edbf035bc45a46f87d5334afdd0a8f6ca1a8d20b1aa87910b3c976",
+    "totalBytes": 6082565,
+    "bundleSha256": "9f0dea56541fd4469392ec00b5e8a55a1205c5ffc9c9bd913d810a9f817b7a71",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -24,8 +24,8 @@
       },
       {
         "path": "app.js",
-        "bytes": 1503650,
-        "sha256": "bca70df507bfe7eddbfb1455718b6bf9e49a1366d4a45833cb51dd16af4b2d65"
+        "bytes": 1510714,
+        "sha256": "4883a617c8d49e6c1b7e6e40f369d04ccc631ae2c5931cfd51a30718a6d1d96f"
       },
       {
         "path": "assets/icons/about.svg",
@@ -630,7 +630,7 @@
       {
         "path": "index.html",
         "bytes": 66318,
-        "sha256": "bc19906cd66978424fa38d665dd63136b5170f2cf967820d133856423c8d5f00"
+        "sha256": "f78c6e19515dc5c378089f9ae652a4a657fb62e928be7d2d2565cde7f3c6a5b1"
       },
       {
         "path": "intro-bucket.mjs",
@@ -655,7 +655,7 @@
       {
         "path": "intro-lane.mjs",
         "bytes": 6029,
-        "sha256": "16c7bf96200fd350f7ccb0fb6f110888416be6eae0e6fc2336884329c15259ff"
+        "sha256": "d963adcb94161ecef0c8fc36d395562bdd9191a4c532449492e71b5acaea5445"
       },
       {
         "path": "intro-publish-browser.mjs",
@@ -679,8 +679,8 @@
       },
       {
         "path": "intro-scan-runner.mjs",
-        "bytes": 14927,
-        "sha256": "d7837606f92a5f6c45661a63504b2e5c87c6447647a26a259ad4087159a5d426"
+        "bytes": 15269,
+        "sha256": "da4c3e03cd128b003a1f9bf74fa81bc9a87f1e8f8c7b1122a6b5bd02803a8517"
       },
       {
         "path": "intro-scan.mjs",
@@ -880,7 +880,7 @@
       {
         "path": "sw.js",
         "bytes": 15513,
-        "sha256": "a34d2f1306eaac251eb97b4cf4fd7bb7106ca10c4053b84bdea1f4546850a959"
+        "sha256": "e0cdd68f40bbdccd61f2686b4560a661d31b31823ed7e2604f94adc95679f8c8"
       },
       {
         "path": "terms.html",
