@@ -19,7 +19,7 @@ import { selfRecoveryShard } from './conv-discovery.mjs?v=19';
 import { sealNotesBlob, openNotesBlob } from './recovery-blob.mjs?v=6';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=19';
 import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=20';
-import { probeActiveAddresses } from './shard-reader.mjs?v=21';
+import { probeActiveAddresses } from './shard-reader.mjs?v=22';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS (gate 13560). Mirrored, not imported, for the same reason the
 // recovery lane mirrors it: an over-cap blob BOUNCES on chain, and a fire-and-forget caller would record the bounce

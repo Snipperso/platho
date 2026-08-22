@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { beginCell } from '@ton/core';
 import { createShardStatesRequest, createShardMessagesReader, createShardMessagesWithSourceReader } from '../web/shard-rpc.mjs';
-import { readAccountStates, refusedIndexFromDetail, isDeadlineDetail, __resetRefusedAddressesForTests, __statesBatchCeilingForTests } from '../web/shard-reader.mjs';
+import { readAccountStates, refusedIndexFromDetail, isDeadlineDetail, seedStatesBatchCeiling, subscribeStatesBatchCeiling, __resetRefusedAddressesForTests, __statesBatchCeilingForTests } from '../web/shard-reader.mjs';
 import { toncenterScanLaneOptions } from '../web/ton-rpc-transport.mjs';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 
@@ -222,6 +222,50 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     expect(one.get(lone)?.lastLt ?? null, 'no marker — the lane reads it the slow way').toBeNull();
     await readAccountStates([lone], { request: slowOne });
     expect(calls, 'asked again — a deadline is not a refusal to remember').toBe(2);
+    __resetRefusedAddressesForTests();
+  });
+
+  it('RPC-04F: the learned batch ceiling can be seeded and is reported on every change — so a device can remember it across reloads', async () => {
+    // OWNER'S CONSOLE 2026-08-22, after RPC-04E shipped: the deadline still fired once per session, on the first and
+    // biggest batch (666 addresses), because the ceiling lived in memory. The module owns no storage, so it exposes
+    // the two halves: seed (the app reads its stored value at boot) and subscribe (the app writes every change).
+    __resetRefusedAddressesForTests();
+    const seen: number[] = [];
+    const unsubscribe = subscribeStatesBatchCeiling((c) => seen.push(c));
+    // Seeding clamps to [floor, maximum] and does not notify (nothing changed on the wire yet).
+    expect(seedStatesBatchCeiling(100)).toBe(100);
+    expect(seedStatesBatchCeiling(5)).toBe(32);
+    expect(seedStatesBatchCeiling(99_999)).toBe(1024);
+    expect(seedStatesBatchCeiling('nonsense')).toBe(1024);
+    expect(seen).toEqual([]);
+    seedStatesBatchCeiling(200);
+    // A seeded device builds its FIRST batch under the seed — the deadline is not paid to relearn it.
+    const addrs = Array.from({ length: 400 }, (_, i) => '0:' + (0x200 + i).toString(16).padStart(2, '0').repeat(32).slice(0, 64));
+    const sizes: number[] = [];
+    let tooSlowAbove = 1024;
+    const deadline = () => Object.assign(new Error('accountStates failed with HTTP 422: {"error":"context deadline exceeded"}'), { status: 422, detail: '{"error":"context deadline exceeded"}' });
+    const request = async ({ path }: { path: string }) => {
+      const asked = new URL('https://x' + path).searchParams.getAll('address');
+      sizes.push(asked.length);
+      if (asked.length > tooSlowAbove) throw deadline();
+      return { accounts: asked.map((a) => ({ address: a, status: 'active', balance: '1', data_hash: 'h', last_transaction_lt: '9' })) };
+    };
+    await readAccountStates(addrs, { request });
+    expect(sizes, 'batches built under the seeded ceiling').toEqual([200, 200]);
+    // A timeout lowers it and is reported; a clean run raises it and is reported.
+    tooSlowAbove = 100;
+    sizes.length = 0;
+    await readAccountStates(addrs, { request });
+    expect(__statesBatchCeilingForTests()).toBe(100);
+    expect(seen).toEqual([100]);
+    tooSlowAbove = 1024;
+    for (let i = 0; i < 4; i += 1) await readAccountStates(addrs, { request });   // 16 clean batches of 100
+    expect(__statesBatchCeilingForTests()).toBe(200);
+    expect(seen).toEqual([100, 200]);
+    unsubscribe();
+    seedStatesBatchCeiling(50); tooSlowAbove = 10;
+    await readAccountStates(addrs.slice(0, 20), { request });
+    expect(seen, 'an unsubscribed listener hears nothing more').toEqual([100, 200]);
     __resetRefusedAddressesForTests();
   });
 

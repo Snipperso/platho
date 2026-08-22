@@ -83,8 +83,11 @@ let statesBatchCeiling = ACCOUNT_STATES_MAX_PER_CALL;
 let statesBatchCleanRun = 0;
 let deadlineReported = false;
 function noteBatchTimedOut(size) {
-  statesBatchCeiling = Math.max(STATES_BATCH_FLOOR, Math.min(statesBatchCeiling, Math.floor(size / 2)));
+  const next = Math.max(STATES_BATCH_FLOOR, Math.min(statesBatchCeiling, Math.floor(size / 2)));
   statesBatchCleanRun = 0;
+  if (next === statesBatchCeiling) return;
+  statesBatchCeiling = next;
+  publishCeiling();
 }
 function noteBatchAnswered() {
   if (statesBatchCeiling >= ACCOUNT_STATES_MAX_PER_CALL) return;
@@ -92,15 +95,44 @@ function noteBatchAnswered() {
   if (statesBatchCleanRun >= STATES_BATCH_RECOVERY_AFTER) {
     statesBatchCeiling = Math.min(ACCOUNT_STATES_MAX_PER_CALL, statesBatchCeiling * 2);
     statesBatchCleanRun = 0;
+    publishCeiling();
   }
 }
 export function __statesBatchCeilingForTests() { return statesBatchCeiling; }
+
+// THE CEILING OUTLIVES THE TAB — through the caller. The owner's console, 2026-08-22, after the ceiling shipped: the
+// deadline still fired once per session, on the FIRST batch (666 addresses: every conversation, both directions),
+// because the ceiling was learned in memory and every reload started again at the measured maximum. This module
+// owns no storage, so it hands the value to whoever does: `seedStatesBatchCeiling` sets the starting ceiling (an
+// app reads it back from its storage at boot), and `subscribeStatesBatchCeiling` reports every change (the app
+// writes it). The clean-run recovery above still doubles it back towards the maximum, so a transient slow spell
+// does not pin a device to small batches forever; it just stops paying the deadline to relearn it.
+const ceilingListeners = new Set();
+function publishCeiling() {
+  for (const listener of ceilingListeners) {
+    try { listener(statesBatchCeiling); } catch { /* a listener's failure is its own */ }
+  }
+}
+export function seedStatesBatchCeiling(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return statesBatchCeiling;
+  statesBatchCeiling = Math.max(STATES_BATCH_FLOOR, Math.min(ACCOUNT_STATES_MAX_PER_CALL, Math.floor(n)));
+  statesBatchCleanRun = 0;
+  return statesBatchCeiling;
+}
+export function subscribeStatesBatchCeiling(listener) {
+  if (typeof listener !== 'function') return () => {};
+  ceilingListeners.add(listener);
+  return () => ceilingListeners.delete(listener);
+}
+
 export function __resetRefusedAddressesForTests() {
   refusedWire.clear();
   unnamedRefusalReported = false;
   statesBatchCeiling = ACCOUNT_STATES_MAX_PER_CALL;
   statesBatchCleanRun = 0;
   deadlineReported = false;
+  ceilingListeners.clear();
 }
 
 const refusedRow = (wire) => ({ address: wire, status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });

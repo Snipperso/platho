@@ -169,13 +169,13 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=38';
+import { createPublicLane } from './public-lane.mjs?v=39';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=19';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=31';
+import { createIntroLane } from './intro-lane.mjs?v=32';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
@@ -183,10 +183,10 @@ import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
 import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=19';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=27';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=23';
+import { createConvReadLane } from './conv-lane.mjs?v=28';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=24';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=21';
-import { readAccountStates } from './shard-reader.mjs?v=21';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=22';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=18';
@@ -194,7 +194,7 @@ import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=18';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=23';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=24';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=18';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
@@ -204,9 +204,9 @@ import {
 } from './market-stability-read.mjs?v=1';
 import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=5';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=23';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=23';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=22';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=24';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=24';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=23';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -302,6 +302,7 @@ window.addEventListener('unhandledrejection', (event) => {
   document.documentElement.dataset.plathoAppError = String(event.reason?.message ?? event.reason ?? 'unhandled rejection').slice(0, 180);
 });
 
+let statesBatchCeilingPersistenceArmed = false;
 function installConfiguredTonRuntime(config = appConfig) {
   const rpc = config?.network?.tonRpc ?? {};
   const primaryRpcProvider = Array.isArray(rpc.providers)
@@ -319,6 +320,23 @@ function installConfiguredTonRuntime(config = appConfig) {
   }
   if (apiKey && !globalThis.plathoTonRpcApiKey) {
     globalThis.plathoTonRpcApiKey = apiKey;
+  }
+  // THE LEARNED STATES-BATCH CEILING, ACROSS RELOADS. shard-reader halves its batch when toncenter answers a batch
+  // with its own deadline (HTTP 422, "context deadline exceeded") and doubles it back after a clean run — but it
+  // learned that in memory, and every reload started again at the measured maximum, so the owner paid the deadline
+  // once per session on the first, biggest batch (666 addresses, 2026-08-22). The device remembers it now; the
+  // recovery still carries it back up when toncenter is well. Best-effort storage: a device that cannot store starts
+  // at the maximum as before. Armed once, however many times the runtime is (re)installed.
+  if (!statesBatchCeilingPersistenceArmed) {
+    statesBatchCeilingPersistenceArmed = true;
+    const STATES_BATCH_CEILING_STORAGE_KEY = 'platho.toncenter.statesBatchCeiling.v1';
+    try {
+      const storedCeiling = Number(globalThis.localStorage?.getItem(STATES_BATCH_CEILING_STORAGE_KEY));
+      if (Number.isFinite(storedCeiling) && storedCeiling > 0) seedStatesBatchCeiling(storedCeiling);
+    } catch { /* no storage — start at the maximum */ }
+    subscribeStatesBatchCeiling((ceiling) => {
+      try { globalThis.localStorage?.setItem(STATES_BATCH_CEILING_STORAGE_KEY, String(ceiling)); } catch { /* best effort */ }
+    });
   }
   // Client-direct RPC: load the user's own toncenter API key (if saved) BEFORE building the transport,
   // so the user-toncenter provider (useUserApiKey) captures it; anonymous until the user adds one.

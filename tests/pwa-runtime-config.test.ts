@@ -2695,6 +2695,20 @@ describe('PWA runtime config guard', () => {
     expect(fromOpened).toMatch(/const isOutgoing = opened\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(opened\);/);
   });
 
+  it('PWA-STATESCEIL-01: the learned states-batch ceiling is remembered on the device and seeded before the first read', () => {
+    // [OWNER 2026-08-22] The deadline still fired once per session on the first, biggest batch because the ceiling
+    // lived in memory. The app seeds shard-reader from localStorage inside installConfiguredTonRuntime — BEFORE the
+    // transports are built and before any lane reads — and writes every change back; armed once per module.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/import \{ readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling \} from '\.\/shard-reader\.mjs\?v=\d+';/);
+    const runtime = app.slice(app.indexOf('function installConfiguredTonRuntime('), app.indexOf('// Client-direct RPC: load the user\'s own toncenter API key'));
+    expect(runtime).toMatch(/if \(!statesBatchCeilingPersistenceArmed\) \{\s*statesBatchCeilingPersistenceArmed = true;/);
+    expect(runtime).toMatch(/const STATES_BATCH_CEILING_STORAGE_KEY = 'platho\.toncenter\.statesBatchCeiling\.v1';/);
+    expect(runtime).toMatch(/if \(Number\.isFinite\(storedCeiling\) && storedCeiling > 0\) seedStatesBatchCeiling\(storedCeiling\);/);
+    expect(runtime).toMatch(/subscribeStatesBatchCeiling\(\(ceiling\) => \{\s*try \{ globalThis\.localStorage\?\.setItem\(STATES_BATCH_CEILING_STORAGE_KEY, String\(ceiling\)\); \}/);
+    expect(app).toMatch(/let statesBatchCeilingPersistenceArmed = false;\s*function installConfiguredTonRuntime\(/);
+  });
+
   it('PWA-DELIVERY-01: "Synced" is never reported while messages are pending, skipped, or dropped', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The 'synced' phase requires genuinely nothing pending/skipped/dropped — a
