@@ -280,8 +280,8 @@
     "sha256": "7031e619544b06e40dbabee8f7669edec08bbf65256296fb9fc854ef79b26bed"
   },
   "username-nft-owned.mjs": {
-    "version": "6",
-    "sha256": "b06ee99048bb769e3d9d0b69fd12800b24e5acaef27999b7d873d21c951302a4"
+    "version": "7",
+    "sha256": "793d65a4f0f115c7c3b81333e59f30c8eec43d1674dc81ee6593b6fc481d37c1"
   },
   "username-nft-transfer.mjs": {
     "version": "1",

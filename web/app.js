@@ -230,7 +230,7 @@ import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=6';
+} from './username-nft-owned.mjs?v=7';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,
@@ -23650,12 +23650,23 @@ async function loadOwnedUsernameNfts() {
   const registryProvider = await resolveUsernameRegistryProvider();
 
   // The floor: names this device already knows. Derived to item addresses locally, then confirmed like any other.
+  // A DERIVATION THAT FAILED IS NOT A NAME THAT IS GONE. This used to swallow the failure (`.catch(() => null)`)
+  // and carry on: the name was simply absent from the list, the list still said "complete", and the reconcile below
+  // forgot the name — and unlinked it if it was the linked one. [OWNER 2026-08-22: "sometimes at unlock the linked
+  // username does not load" — the boot check, 1.5 s after the first paint, on a transient read.] A failed
+  // derivation now leaves the list INCOMPLETE, the way a failed verification already does.
   const candidateAddresses = [];
+  let candidateFailures = 0;
   for (const label of readKnownPlathoUsernames()) {
-    const candidate = await usernameNftCandidateFromLabel(label, {
-      registryProvider,
-      callOptions: { address: registryAddress, ...criticalChainReadOptions() },
-    }).catch(() => null);
+    let candidate = null;
+    try {
+      candidate = await usernameNftCandidateFromLabel(label, {
+        registryProvider,
+        callOptions: { address: registryAddress, ...criticalChainReadOptions() },
+      });
+    } catch {
+      candidateFailures += 1;
+    }
     if (candidate?.itemAddress) candidateAddresses.push(candidate);
   }
 
@@ -23670,13 +23681,14 @@ async function loadOwnedUsernameNfts() {
     console.warn('username nft discovery unavailable', error);
   }
 
-  const result = await collectOwnedUsernameNfts({
+  const collected = await collectOwnedUsernameNfts({
     ownerWallet: wallet,
     candidateAddresses,
     indexerAddresses,
     indexerError,
     verifyItem: verifyOwnedUsernameNft,
   });
+  const result = candidateFailures > 0 ? { ...collected, complete: false, candidateFailures } : collected;
   // KEEP the answer. This is the only place in the app that knows how many names the chain will vouch for, and the
   // row above it used to go on quoting local storage regardless.
   ownedUsernameNftsVerified = { count: result.owned.length, complete: result.complete };
@@ -23694,12 +23706,19 @@ function reconcileKnownPlathoUsernames(result) {
   if (!owner || !Array.isArray(result?.owned)) return;
   const ownedLabels = new Set(result.owned.map((nft) => (typeof nft?.label === 'string' ? nft.label.trim() : '')).filter(Boolean));
   for (const label of ownedLabels) addKnownPlathoUsername(label, owner);
+  // FORGET ONLY ON PROOF. A name is forgotten — and unlinked, if it was the linked one — only when the chain showed
+  // its item authoritative and OWNED BY ANOTHER WALLET (`transferred`), never on mere absence from the list:
+  // absence has transient causes (a derivation that failed, an item read as not initialised, a mismatch on a
+  // lagging replica), and on 2026-08-22 one of them cost the owner his linked name at unlock "sometimes". The
+  // 2026-08-21 case this exists for — a name given away from another device — is exactly a transferred item, so
+  // it is still forgotten; a complete list is still required, so half an answer forgets nothing.
   if (result.complete !== true) return;
+  const transferredLabels = new Set((result.transferred ?? []).map((nft) => (typeof nft?.label === 'string' ? nft.label.trim() : '')).filter(Boolean));
   for (const label of readKnownPlathoUsernames(owner)) {
-    if (ownedLabels.has(label)) continue;
+    if (ownedLabels.has(label) || !transferredLabels.has(label)) continue;
     removeKnownPlathoUsername(label, owner);
-    // The linked name is a remembered name too: a complete read that no longer lists it means it was given away,
-    // and the client must stop stamping it onto what it sends (the transfer path's own rule, FM-4).
+    // The linked name is a remembered name too: the chain says it is someone else's now, and the client must stop
+    // stamping it onto what it sends (the transfer path's own rule, FM-4).
     if (readLinkedPlathoUsername(owner)?.label === label) clearLinkedPlathoUsername(owner);
   }
 }

@@ -7558,9 +7558,18 @@ describe('PWA runtime config guard', () => {
     const load = app.slice(app.indexOf('async function loadOwnedUsernameNfts('), app.indexOf('function usernameNftCardNode('));
     // 1. A complete read forgets what is gone and remembers what was found; an incomplete read may only add.
     expect(load).toContain('reconcileKnownPlathoUsernames(result);');
-    expect(load).toMatch(/function reconcileKnownPlathoUsernames\(result\) \{[\s\S]*?for \(const label of ownedLabels\) addKnownPlathoUsername\(label, owner\);\s*\n\s*if \(result\.complete !== true\) return;/);
+    expect(load).toMatch(/function reconcileKnownPlathoUsernames\(result\) \{[\s\S]*?for \(const label of ownedLabels\) addKnownPlathoUsername\(label, owner\);[\s\S]*?if \(result\.complete !== true\) return;/);
     expect(load).toContain('removeKnownPlathoUsername(label, owner);');
     expect(load).toContain("if (readLinkedPlathoUsername(owner)?.label === label) clearLinkedPlathoUsername(owner);");
+    // FORGET ONLY ON PROOF [OWNER 2026-08-22: "sometimes at unlock the linked username does not load"]. A name is
+    // forgotten (and unlinked) only when the chain named it TRANSFERRED — authoritative, another owner, label proven
+    // — never on mere absence from a complete list; and a candidate derivation that failed leaves the list incomplete
+    // instead of silently dropping the name from it.
+    expect(load).toMatch(/const transferredLabels = new Set\(\(result\.transferred \?\? \[\]\)\.map/);
+    expect(load).toMatch(/if \(ownedLabels\.has\(label\) \|\| !transferredLabels\.has\(label\)\) continue;/);
+    expect(load).toMatch(/let candidateFailures = 0;[\s\S]*?\} catch \{\s*candidateFailures \+= 1;\s*\}/);
+    expect(load).toMatch(/const result = candidateFailures > 0 \? \{ \.\.\.collected, complete: false, candidateFailures \} : collected;/);
+    expect(load).not.toMatch(/usernameNftCandidateFromLabel\([\s\S]{0,200}?\)\.catch\(\(\) => null\)/);
     // 2. "Complete" is honest about a verification that threw — otherwise a transient read failure could forget a name.
     const owned = readFileSync('web/username-nft-owned.mjs', 'utf8');
     expect(owned).toContain('complete: indexerError === null && indexerAddresses !== null && unverified === 0');

@@ -189,6 +189,12 @@ export async function collectOwnedUsernameNfts({
   // able to forget a name the user still owns. [OWNER 2026-08-21: the row kept saying "5 names" after one was given
   // away, reload after reload — the remembered list was never reconciled with the chain's answer.]
   let unverified = 0;
+  // NAMES THE CHAIN SAYS ARE SOMEBODY ELSE'S NOW — the one positive proof that a remembered name was given away.
+  // The reconcile that forgets names used to act on ABSENCE from a complete list; absence has more than one cause
+  // (a candidate whose derivation failed, an item read as not initialised, a derivation mismatch), and on
+  // 2026-08-22 a transient one cost the owner his linked name at unlock "sometimes". Forgetting now needs THIS:
+  // an authoritative item, owned by another wallet, whose name_hash the label reproduces.
+  const transferred = [];
   for (const [itemAddress, { label: proposedLabel, image }] of seen) {
     // SEQUENTIALLY. Concurrent chain reads are the iOS run-loop stall this codebase has paid for repeatedly, and a
     // wallet with a dozen names is not worth re-learning it.
@@ -202,7 +208,6 @@ export async function collectOwnedUsernameNfts({
       continue;
     }
     if (record?.authoritative !== true) continue;
-    if (rawAddress(record.owner_wallet) !== mine) continue;
     // THE NAME IS SETTLED BY ARITHMETIC, not by whoever proposed it. The item carries a name_hash; a label is shown
     // only when hashing it reproduces that number. So a local label proves itself the same way an indexer's does,
     // and a name nobody could prove is shown as what it honestly is — an item at an address.
@@ -210,6 +215,10 @@ export async function collectOwnedUsernameNfts({
     if (proposedLabel) {
       const hash = await nameHashOrNull(proposedLabel);
       if (hash !== null && BigInt(hash) === BigInt(record.name_hash ?? 0n)) label = proposedLabel;
+    }
+    if (rawAddress(record.owner_wallet) !== mine) {
+      if (label) transferred.push({ itemAddress, label, ownerWallet: rawAddress(record.owner_wallet) });
+      continue;
     }
     owned.push({
       itemAddress,
@@ -221,5 +230,5 @@ export async function collectOwnedUsernameNfts({
     });
   }
 
-  return { owned, complete: indexerError === null && indexerAddresses !== null && unverified === 0, indexerError, unverified };
+  return { owned, transferred, complete: indexerError === null && indexerAddresses !== null && unverified === 0, indexerError, unverified };
 }

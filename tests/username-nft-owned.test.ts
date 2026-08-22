@@ -213,4 +213,38 @@ describe('username NFT — the owned list', () => {
     const fn = source.slice(source.indexOf('export function normalizeUsernameLabel'), source.indexOf('async function nameHashOrNull'));
     expect(fn, 'the charset rule belongs to normalizeUsername alone').not.toMatch(/a-z0-9/);
   });
+
+  it('UNFT-11: a name is reported TRANSFERRED only on proof — authoritative, another owner, the label proven by hash', async () => {
+    // [OWNER 2026-08-22: "sometimes at unlock the linked username does not load".] The reconcile used to forget (and
+    // unlink) a remembered name on mere ABSENCE from a complete list, and absence has transient causes. It now acts
+    // on `transferred`: the chain showed the item authoritative and owned by someone else, and the label reproduces
+    // the item's name_hash. Anything weaker is neither owned nor transferred — it is simply not in either list.
+    const hash = await computeUsernameNameHash('platho');
+    const second = await computeUsernameNameHash('second');
+    const result = await collectOwnedUsernameNfts({
+      ownerWallet: OWNER,
+      candidateAddresses: [
+        { itemAddress: ITEM_A, label: 'platho' },        // given away: authoritative, OTHER owns it
+        { itemAddress: ITEM_B, label: 'second' },        // still mine
+      ],
+      indexerAddresses: [],
+      verifyItem: async (address: string) => (address === ITEM_A ? authoritative(hash, OTHER) : authoritative(second, OWNER)),
+    });
+    expect(result.owned.map((n) => n.label)).toEqual(['second']);
+    expect(result.transferred.map((n) => n.label), 'the given-away name is named as transferred').toEqual(['platho']);
+    expect(result.complete).toBe(true);
+    // NOT transferred: an impostor / not-initialised / mismatched item (authoritative false) — and a foreign-owned
+    // item whose proposed label does NOT hash to its name_hash (we cannot say WHICH name moved).
+    const weak = await collectOwnedUsernameNfts({
+      ownerWallet: OWNER,
+      candidateAddresses: [{ itemAddress: ITEM_A, label: 'platho' }, { itemAddress: ITEM_B, label: 'second' }],
+      indexerAddresses: [],
+      verifyItem: async (address: string) => (address === ITEM_A
+        ? { authoritative: false, reason: 'item_not_initialized', owner_wallet: null, name_hash: null }
+        : authoritative(hash, OTHER)),                   // ITEM_B: other owner, but name_hash is 'platho', label 'second' — no proof
+    });
+    expect(weak.owned).toEqual([]);
+    expect(weak.transferred, 'nothing proven transferred').toEqual([]);
+    expect(weak.complete, 'and nothing here made the list incomplete either — it is simply not an answer about those names').toBe(true);
+  });
 });
