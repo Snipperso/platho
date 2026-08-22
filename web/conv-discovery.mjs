@@ -7,7 +7,7 @@
 // key-ids (outgoingDir for A == incomingDir for B), and the RecordShard address is a pure function of (bucketKey,
 // epoch). So delivery works with no directory — proven in tests/conv-discovery.test.ts.
 
-import { outgoingBucketKey, incomingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=2';
+import { outgoingBucketKey, incomingBucketKeys, outgoingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=3';
 import {
   recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey, RECOVERY_MAX_SLOTS,
 } from './shard-discovery.mjs?v=20';
@@ -21,6 +21,20 @@ const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | Bi
  */
 export async function incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) {
   const buckets = await incomingBucketKeys({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
+  const out = [];
+  for (const { epoch, dir, bucketKey, writePublicKey } of buckets) {
+    out.push({ epoch, dir, bucketKey, writePublicKey, address: await recordShardAddress(bytesToInt(writePublicKey), epoch) });
+  }
+  return out;
+}
+
+/**
+ * The RecordShard addresses a client must READ to get its OWN sent messages back: its outgoing buckets across the
+ * window [epochNow-W .. epochNow] — the exact shards outgoingRecordShard wrote into, one per epoch. The mirror of
+ * incomingRecordShards; a restored device reads both sides of every conversation (gate CONV-DISC-05).
+ */
+export async function outgoingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) {
+  const buckets = await outgoingBucketKeys({ kRoot, selfKeyId, peerKeyId, epochNow, windowW });
   const out = [];
   for (const { epoch, dir, bucketKey, writePublicKey } of buckets) {
     out.push({ epoch, dir, bucketKey, writePublicKey, address: await recordShardAddress(bytesToInt(writePublicKey), epoch) });

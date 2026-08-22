@@ -100,17 +100,30 @@ describe('CONV-KEY-STORE', () => {
     await backup.advanceConvScanCursor(A, B, 19005);
     const backupMap = backup.snapshot();
 
-    // import into a FRESH device store — the conversation (K_root + cursor + wallet) comes back.
+    // import into a FRESH device store — the conversation (K_root + wallet) comes back, and it ARRIVES COLD: the
+    // backing-up device's scan cursor is not this device's knowledge. [OWNER 2026-08-22, a device restored from the
+    // slots: "only the peer's latest replies came" — the imported cursor made the receive lane read only the steady
+    // window; with no cursor it scans the conversation from its birth, once.]
     const fresh = createMemoryConvKeyStore();
     expect(await fresh.importConversations(backupMap), 'one record imported').toBe(1);
     expect(hx(fresh.getConversation(A, B)!.kRootCurrent)).toBe(hx(kroot(1)));
-    expect(fresh.getConversation(A, B)!.lastScannedEpoch).toBe(19005);
+    expect(fresh.getConversation(A, B)!.lastScannedEpoch, 'a restored record has NO cursor on this device').toBeNull();
     expect(fresh.getConversation(A, B)!.peerWallet).toBe('w-A');
+    expect(backupMap.get(conversationId(A, B))!.lastScannedEpoch, 'the backup itself still carries its own cursor').toBe(19005);
 
     // NEWER-WINS: a device already holding a newer root (createdAt 300) ignores the older backup (createdAt 100).
     const live = createMemoryConvKeyStore();
     await live.upsertConversationKRoot(A, B, { kRoot: kroot(9), createdAt: 300, introNonce: nonce(9) });
     expect(await live.importConversations(backupMap), 'older backup does not overwrite a newer live root').toBe(0);
     expect(hx(live.getConversation(A, B)!.kRootCurrent), 'the live (rotated) root stays current').toBe(hx(kroot(9)));
+
+    // And when a NEWER backup replaces a local root, the cursor is dropped with it: the new root's history was never
+    // scanned here, so the lane must go back to its birth.
+    const stale = createMemoryConvKeyStore();
+    await stale.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 50, introNonce: nonce(1) });
+    await stale.advanceConvScanCursor(A, B, 19010);
+    expect(await stale.importConversations(backupMap), 'newer backup replaces the older local root').toBe(1);
+    expect(hx(stale.getConversation(A, B)!.kRootCurrent)).toBe(hx(kroot(1)));
+    expect(stale.getConversation(A, B)!.lastScannedEpoch, 'replaced root → no cursor').toBeNull();
   });
 });

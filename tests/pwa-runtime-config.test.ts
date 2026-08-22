@@ -2609,6 +2609,86 @@ describe('PWA runtime config guard', () => {
     expect(walletChange).toMatch(/plathoAccountActivationPending = false;/);
   });
 
+  it('PWA-ACTIVATION-04: an activation read that learned nothing re-asks on its own until a definitive answer', () => {
+    // [OWNER 2026-08-22, on the stand with a freshly imported key] "the balance loaded, but the app kept saying the
+    // wallet was not connected; a few minutes later it sorted itself out." The ONE activation read at unlock failed
+    // on a transient (15 s RPC timeouts and an unanswering verifier were in the console), the catch preserved the
+    // binding — correctly — and nothing asked again: the auto-refresh re-reads the balance only. So:
+    //   (1) the transient catch schedules a re-read on a rising ladder, for THIS wallet;
+    //   (2) both DEFINITIVE outcomes clear the ladder (registered / not registered), and a wallet switch drops it;
+    //   (3) a hidden tab does not climb; a switched wallet stops the timer;
+    //   (4) refreshVaultNow no longer hands a caller who asked for activation a balance-only refresh in flight.
+    const app = readFileSync('web/app.js', 'utf8');
+    const fn = app.slice(app.indexOf('async function refreshVaultActivationStatus('), app.indexOf('// ── Boot screen'));
+    // (1) the transient catch re-arms.
+    const transient = fn.slice(fn.lastIndexOf('} catch (error) {'));
+    expect(transient).toMatch(/schedulePlathoActivationReread\(rawWalletAddress\(plathoWallet\?\.address\)\);/);
+    // (2) both definitive branches clear it — after the binding is WRITTEN, so a clear cannot precede the answer.
+    const notRegistered = fn.slice(fn.indexOf('if (!registeredMine) {'), fn.indexOf("setText(vaultRecordStatus, t('vault.activationRequired'))"));
+    expect(notRegistered).toMatch(/globalThis\.plathoVaultBinding = \{ walletAddress: forWallet, user: \{ exists: view\?\.exists === true, current_key_id: 0n \}, keyRecord: null \};\s*clearPlathoActivationReread\(\);/);
+    const registered = fn.slice(fn.indexOf('const user = {'), fn.indexOf("setText(vaultRecordStatus, t('vault.activated'))"));
+    expect(registered).toMatch(/globalThis\.plathoVaultBinding = \{ walletAddress: forWallet, user, keyRecord: null \};\s*clearPlathoActivationReread\(\);/);
+    const walletChange = app.slice(app.indexOf('function queueVaultRefreshAfterWalletChange()'), app.indexOf('async function resolveUsernameRegistryProvider()'));
+    expect(walletChange).toMatch(/clearPlathoActivationReread\(\);/);
+    // (3) the ladder itself: rising, one per wallet, hidden tab re-arms the same rung, a switched wallet stops it.
+    const ladder = app.slice(app.indexOf('const PLATHO_ACTIVATION_REREAD_DELAYS_MS'), app.indexOf('async function refreshVaultActivationStatus('));
+    const delays = /const PLATHO_ACTIVATION_REREAD_DELAYS_MS = \[([^\]]+)\];/.exec(ladder)?.[1]?.split(',').map((s) => Number(s.replace(/_/g, '').trim())) ?? [];
+    expect(delays.length).toBeGreaterThanOrEqual(6);
+    for (let i = 1; i < delays.length; i += 1) expect(delays[i], 'rising').toBeGreaterThanOrEqual(delays[i - 1]);
+    expect(delays[0], 'the first rung is quick — the first re-ask usually lands').toBeLessThanOrEqual(5_000);
+    expect(ladder).toMatch(/if \(plathoActivationRereadWallet !== forWalletRaw\) \{\s*clearPlathoActivationReread\(\);/);
+    expect(ladder).toMatch(/if \(plathoActivationRereadTimer\) return;/);
+    expect(ladder).toMatch(/if \(!plathoWallet\?\.address \|\| rawWalletAddress\(plathoWallet\.address\) !== forWalletRaw\) \{ clearPlathoActivationReread\(\); return; \}/);
+    expect(ladder).toMatch(/if \(document\.hidden\) \{ schedulePlathoActivationReread\(forWalletRaw\); return; \}/);
+    expect(ladder).toMatch(/refreshVaultActivationStatus\(\)\.catch\(\(\) => \{\}\);/);
+    // (4) a caller's flags are honoured against the refresh in flight.
+    const refreshNow = app.slice(app.indexOf('async function refreshVaultNow('), app.indexOf('function queueVaultPostTransactionRefresh('));
+    expect(refreshNow).toMatch(/const covered = vaultRefreshInFlightFlags\s*&& \(!includeActivation \|\| vaultRefreshInFlightFlags\.includeActivation\)\s*&& \(!includeStats \|\| vaultRefreshInFlightFlags\.includeStats\);/);
+    expect(refreshNow).toMatch(/return vaultRefreshPromise\.then\(\(\) => refreshVaultNow\(wanted\), \(\) => refreshVaultNow\(wanted\)\);/);
+    expect(refreshNow).toMatch(/vaultRefreshInFlightFlags = \{ includeActivation, includeStats \};/);
+    expect(refreshNow).toMatch(/vaultRefreshPromise = null;\s*vaultRefreshInFlightFlags = null;/);
+  });
+
+  it('PWA-CONVRESTORE-01: a never-scanned conversation scans from its birth, and the sync reads BOTH sides of it', () => {
+    // [OWNER 2026-08-22, on the stand with a key restored from the recovery slots] "only the peer's replies synced,
+    // mine did not; in some conversations only the peer's latest replies came." Two causes, one function:
+    //   (1) a record with no cursor (restored, never scanned here) read only the steady W-epoch window — the
+    //       conversation's birth (adoptedCreatedAt; a retired root's adoptedAt) was in the record and unused;
+    //   (2) the pass derived, probed and read only the INCOMING shards; the device's own sent capsules sit in the
+    //       OUTGOING shards and open as sender (openedAs 'sender' → an 'out' message, deduped by capsule id).
+    const app = readFileSync('web/app.js', 'utf8');
+    const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('if (imported > 0) { renderThreads(); renderConversation(); }'));
+    // (1) birth, from the record's own stamps, seconds (a ms stamp tolerated), earliest of current + retired roots.
+    expect(sync).toMatch(/const birthSeconds = \[record\.adoptedCreatedAt, \.\.\.\(record\.kRootsForRead \?\? \[\]\)\.map\(\(entry\) => entry\.adoptedAt\)\]/);
+    expect(sync).toMatch(/\.map\(\(value\) => \(value > 1e12 \? Math\.floor\(value \/ 1000\) : value\)\);/);
+    expect(sync).toMatch(/const birthFrom = birthSeconds\.length > 0 \? epochFromCreatedAtSeconds\(Math\.min\(\.\.\.birthSeconds\)\) : steadyFrom;/);
+    expect(sync).toMatch(/const cursorFrom = \(record\.lastScannedEpoch == null \|\| fullRescan\)\s*\? Math\.min\(steadyFrom, birthFrom\)\s*: Math\.min\(steadyFrom, Number\(record\.lastScannedEpoch\)\);/);
+    // A manual "Sync messages" (forceIndexRescan) is a full re-walk: every conversation reads from its birth this pass.
+    expect(sync).toMatch(/const fullRescan = options\?\.forceIndexRescan === true;/);
+    expect(app).toMatch(/async function syncConvCapsulesFromShards\(options = \{\}\)/);
+    const button = app.slice(app.indexOf('forceHistoryRetry: true,') - 400, app.indexOf('forceHistoryRetry: true,') + 120);
+    expect(button).toMatch(/forceIndexRescan: true/);
+    // Still capped at retention, still at least the steady window.
+    expect(sync).toMatch(/const scanFrom = Math\.max\(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, cursorFrom\);/);
+    // (2) both directions derived per root, both probed, both read through the same lane call and marks.
+    expect(sync).toMatch(/shards: await incomingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\),\s*outgoing: await outgoingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\),/);
+    const probe = app.slice(app.indexOf('async function readConvShardStates(plans)'), app.indexOf('async function syncConvCapsulesFromShards('));
+    expect(probe).toMatch(/for \(const shard of \[\.\.\.root\.shards, \.\.\.\(root\.outgoing \?\? \[\]\)\]\)/);
+    expect(sync).toMatch(/shardGroups\.push\(\{ kRoot, shards, side: 'incoming' \}\);\s*if \(outgoing\?\.length\) shardGroups\.push\(\{ kRoot, shards: outgoing, side: 'outgoing' \}\);/);
+    expect(sync).toMatch(/for \(const \{ kRoot, shards, side \} of shardGroups\) \{/);
+    // The OWN capsule must be opened AS SENDER: CONV header0 carries no sender label, so without openAsSenderKeyId the
+    // recipient path runs, the tag fails, and the own message is dropped as "someone else's" (the first stand build).
+    expect(sync).toMatch(/\.\.\.\(side === 'outgoing' \? \{ openAsSenderKeyId: localRecipientKeyPair\.keyId \} : \{\}\),/);
+    // And a cold pass says what it did, per conversation, so a restore that came back short is diagnosable.
+    expect(sync).toMatch(/console\.info\('\[conv\] cold conversation'/);
+    expect(sync).toMatch(/console\.info\('\[conv\] cold scan this pass:'/);
+    expect(app).toMatch(/import \{ outgoingRecordShard, incomingRecordShards, outgoingRecordShards \} from '\.\/conv-discovery\.mjs\?v=\d+';/);
+    // The opened capsule decides the side: the sender's own copy renders 'out' (this is what makes the restore
+    // agree with the local echo instead of duplicating it).
+    const fromOpened = app.slice(app.indexOf('function messageFromOpenedCapsule(opened, meta, entry)'), app.indexOf('function messageFromOpenedPrivateParts('));
+    expect(fromOpened).toMatch(/const isOutgoing = opened\?\.openedAs === 'sender' \|\| isSelfOpenedCapsule\(opened\);/);
+  });
+
   it('PWA-DELIVERY-01: "Synced" is never reported while messages are pending, skipped, or dropped', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The 'synced' phase requires genuinely nothing pending/skipped/dropped — a

@@ -13,6 +13,10 @@
 // outgoingSeq (cold-floored from the RecordShard's on-chain last_seq on the next send). Short JSON keys, since the field
 // names repeat once per conversation. [recovery-wiring review #3/#4]
 //
+// lastScannedEpoch is CARRIED but a restore does not adopt it: it is the backing-up device's scan cursor, not this
+// device's — conv-key-store.importConversations lands every restored record with no cursor, so the receive lane scans
+// it from its birth once [OWNER 2026-08-22: a restored device showed only the peer's latest replies].
+//
 // The recovery digest the owner signs commits to h0/h1/bh (bh = body.hash, derived by the builder). h0/h1 must be
 // NON-ZERO (gate 13571); h0 is a fixed version-domain marker and h1 is the blob content hash — integrity markers the
 // reader can cross-check. tests/recovery-blob.test.ts pins the seed round-trip, the wrong-seed refusal, the essentials

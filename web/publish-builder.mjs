@@ -28,7 +28,7 @@ import { storeCapsulePublish, RecordShard } from '../build/RecordShard/RecordSha
 import { storeIntroPublish, IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { storeRecoveryStore, RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { storePublicPublish, PublicShard } from '../build/PublicShard/PublicShard_PublicShard';
-import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=2';
+import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=3';
 
 const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
 

@@ -296,6 +296,25 @@ export async function incomingBucketKeys({ kRoot, selfKeyId, peerKeyId, epochNow
   return out;
 }
 
+// Convenience: the set of OUTGOING bucketKeys this party PUBLISHED into over the window [epochNow-W .. epochNow] —
+// the mirror of incomingBucketKeys, for reading one's OWN sent messages back off the chain. [OWNER 2026-08-22, on a
+// freshly restored device: "only the peer's replies synced, not mine".] The capsules there carry a sender-recovery
+// section the publisher can open (openedAs 'sender'), so this is the set a restore reads to get its own side back.
+export async function outgoingBucketKeys({ kRoot, selfKeyId, peerKeyId, epochNow, windowW = CONV_RECV_WINDOW_W }) {
+  const { outgoingDir } = conversationOrder(selfKeyId, peerKeyId);
+  const now = Number(epochNow);
+  const out = [];
+  for (let e = Math.max(0, now - windowW); e <= now; e += 1) {
+    const kEpoch = await computeKEpoch(kRoot, e);
+    out.push({
+      epoch: e, dir: outgoingDir,
+      bucketKey: await computeBucketKey(kEpoch, outgoingDir, e),
+      writePublicKey: await convWritePublicKey(kEpoch, outgoingDir, e),
+    });
+  }
+  return out;
+}
+
 // ---- self-recovery lane (§12): deterministic from the seed, epoch-independent, bypasses genuine KEM ----
 // self==self creates no inter-user graph, so there is no PQ-privacy to lose; determinism from the seed is exactly what
 // lets a reinstalled client re-find its PREFS/recovery capsule with only the mnemonic.

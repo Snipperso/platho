@@ -64,9 +64,49 @@ const refusedWire = new Set();
 // endpoint's own words: the owner reads the console by its red rows, and a handled-but-unexplained refusal that
 // only ever warned in yellow stayed invisible to them (2026-08-21, twice).
 let unnamedRefusalReported = false;
-export function __resetRefusedAddressesForTests() { refusedWire.clear(); unnamedRefusalReported = false; }
+
+// THE ENDPOINT'S OWN DEADLINE, WEARING THE STATUS OF A BAD REQUEST. The owner's console, 2026-08-22: HTTP 422 on
+// a batch of 342 conversation shards, body {"error":"context deadline exceeded"}. toncenter answers a query it
+// could not finish in time with the same 422 it uses for an address it cannot parse — and that is NOT a verdict
+// about any address, it is the size of the batch against their clock, right now. Three consequences, all here:
+//   * a timed-out batch is SPLIT (the halves fit the deadline — the owner's halves did), never refused;
+//   * a single address that times out is UNKNOWN this pass (the lane reads it the slow way) and is asked again
+//     next pass — it is never memoised as refused, because nothing was refused;
+//   * the NEXT batches are built smaller up front, so the deadline is not paid again every pass; after a run of
+//     clean reads the ceiling doubles back towards the measured URL limit.
+export function isDeadlineDetail(detail) {
+  return /deadline exceeded|timed? ?out/i.test(String(detail ?? ''));
+}
+const STATES_BATCH_FLOOR = 32;                      // below this a timeout is the endpoint's problem, not the batch's
+const STATES_BATCH_RECOVERY_AFTER = 16;             // clean batches at a lowered ceiling before it doubles back
+let statesBatchCeiling = ACCOUNT_STATES_MAX_PER_CALL;
+let statesBatchCleanRun = 0;
+let deadlineReported = false;
+function noteBatchTimedOut(size) {
+  statesBatchCeiling = Math.max(STATES_BATCH_FLOOR, Math.min(statesBatchCeiling, Math.floor(size / 2)));
+  statesBatchCleanRun = 0;
+}
+function noteBatchAnswered() {
+  if (statesBatchCeiling >= ACCOUNT_STATES_MAX_PER_CALL) return;
+  statesBatchCleanRun += 1;
+  if (statesBatchCleanRun >= STATES_BATCH_RECOVERY_AFTER) {
+    statesBatchCeiling = Math.min(ACCOUNT_STATES_MAX_PER_CALL, statesBatchCeiling * 2);
+    statesBatchCleanRun = 0;
+  }
+}
+export function __statesBatchCeilingForTests() { return statesBatchCeiling; }
+export function __resetRefusedAddressesForTests() {
+  refusedWire.clear();
+  unnamedRefusalReported = false;
+  statesBatchCeiling = ACCOUNT_STATES_MAX_PER_CALL;
+  statesBatchCleanRun = 0;
+  deadlineReported = false;
+}
 
 const refusedRow = (wire) => ({ address: wire, status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });
+// An address the endpoint did not get to this pass: unknown like a refused one (the lanes read it the slow way),
+// but NOT refused — nothing was said about it, and it goes back on the wire next pass.
+const unansweredRow = (wire) => ({ address: wire, status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: false, unanswered: true });
 
 /**
  * Which address a 422 is about, when the endpoint says. toncenter v3 names the culprit by position:
@@ -117,6 +157,22 @@ export async function readAccountStates(addresses, { request, includeBoc = false
           if (wire.length > 1) await readGroup([...wire.slice(0, index), ...wire.slice(index + 1)]);
           return;
         }
+        if (isDeadlineDetail(error?.detail)) {
+          // Their clock, not our addresses: split, remember to ask smaller, refuse nothing. See the note above.
+          noteBatchTimedOut(wire.length);
+          if (!deadlineReported) {
+            deadlineReported = true;
+            console.warn(`[states] the endpoint ran out of time on a batch of ${wire.length} addresses — splitting it and asking in smaller batches from now on; it said:`, error?.detail ?? '');
+          }
+          if (wire.length > 1) {
+            const mid = Math.ceil(wire.length / 2);
+            await readGroup(wire.slice(0, mid));
+            await readGroup(wire.slice(mid));
+            return;
+          }
+          out.set(addrKey(wire[0]), unansweredRow(wire[0]));
+          return;
+        }
         if (wire.length > 1) {
           if (!unnamedRefusalReported) {
             unnamedRefusalReported = true;
@@ -132,6 +188,7 @@ export async function readAccountStates(addresses, { request, includeBoc = false
       }
       throw error;
     }
+    noteBatchAnswered();
     for (const account of body?.accounts ?? []) {
       if (!account?.address) continue;
       out.set(addrKey(account.address), {
@@ -145,7 +202,8 @@ export async function readAccountStates(addresses, { request, includeBoc = false
       });
     }
   };
-  for (const group of chunkAddresses(addresses, chunkSize ?? ACCOUNT_STATES_MAX_PER_CALL)) await readGroup(group);
+  // The caller's chunk size, capped by what the endpoint has shown it can answer in time this session.
+  for (const group of chunkAddresses(addresses, Math.min(chunkSize ?? ACCOUNT_STATES_MAX_PER_CALL, statesBatchCeiling))) await readGroup(group);
   return out;
 }
 

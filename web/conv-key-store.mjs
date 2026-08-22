@@ -21,7 +21,7 @@
 // encrypted-message-store; the memory store does not persist). The ADOPTION and SEQ logic is pure and testable
 // independent of storage — tests/conv-key-store.test.ts pins both, including the mutation that removes the compare.
 
-import { conversationOrder, base64urlDecode } from './crypto/conv-routing.mjs?v=2';
+import { conversationOrder, base64urlDecode } from './crypto/conv-routing.mjs?v=3';
 
 // [CORRECTED 2026-08-02] Strings arrive in TWO forms and this accepted only one.
 //
@@ -195,7 +195,14 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
         if (!incoming?.kRootCurrent) continue;
         const existing = byConv.get(id);
         if (!existing || Number(incoming.adoptedCreatedAt ?? 0) > Number(existing.adoptedCreatedAt ?? 0)) {
-          byConv.set(id, incoming);
+          // A RESTORED RECORD ARRIVES COLD. lastScannedEpoch is "the highest epoch THIS DEVICE has fully scanned for
+          // this conversation" — the backing-up device's cursor says nothing about what this one holds. Importing it
+          // made a fresh device believe it had already read everything up to the other device's cursor, so its sync
+          // took only the steady W-epoch window and the conversation came back as its last three days [OWNER
+          // 2026-08-22, on a device restored from the slots: "only the peer's latest replies came"]. A record new to
+          // this store, or a record whose root a newer backup replaces, starts with no cursor and the receive lane
+          // scans it from its birth (adoptedCreatedAt), once; the cursor is written after the first clean pass.
+          byConv.set(id, { ...incoming, lastScannedEpoch: null });
           changed += 1;
         }
       }

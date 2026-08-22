@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { beginCell } from '@ton/core';
 import { createShardStatesRequest, createShardMessagesReader, createShardMessagesWithSourceReader } from '../web/shard-rpc.mjs';
-import { readAccountStates, refusedIndexFromDetail, __resetRefusedAddressesForTests } from '../web/shard-reader.mjs';
+import { readAccountStates, refusedIndexFromDetail, isDeadlineDetail, __resetRefusedAddressesForTests, __statesBatchCeilingForTests } from '../web/shard-reader.mjs';
 import { toncenterScanLaneOptions } from '../web/ton-rpc-transport.mjs';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 
@@ -169,6 +169,59 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     }, strict: true });
     const viaBisect = await readAccountStates(addrs.slice(0, 2), { request: lying });
     expect(viaBisect.size).toBe(2);
+    __resetRefusedAddressesForTests();
+  });
+
+  it('RPC-04E: a 422 that is the endpoint\'s DEADLINE splits the batch, refuses nothing, and makes the next batches smaller', async () => {
+    // OWNER'S CONSOLE 2026-08-22: "[states] HTTP 422 on a batch of 342 addresses … the endpoint said:
+    // {"error":"context deadline exceeded"}". toncenter wears its own timeout as a 422. That is about the batch
+    // against their clock, not about any address, so: split it (the halves fit), memoise NOTHING as refused, and
+    // build the next batches under a lowered ceiling so the deadline is not paid again every pass — then double
+    // the ceiling back after a clean run. A single address that times out is UNKNOWN this pass, unrefused, and
+    // goes back on the wire next time.
+    __resetRefusedAddressesForTests();
+    expect(isDeadlineDetail('{"error":"context deadline exceeded"}')).toBe(true);
+    expect(isDeadlineDetail('{"error":"request timed out"}')).toBe(true);
+    expect(isDeadlineDetail('{"error":"failed to decode: schema: error converting value for index 3 of \\"address\\""}')).toBe(false);
+    const addrs = Array.from({ length: 200 }, (_, i) => '0:' + (0x100 + i).toString(16).padStart(2, '0').repeat(32).slice(0, 64));
+    const sizes: number[] = [];
+    let tooSlowAbove = 100;                     // the endpoint answers batches of ≤ 100 in time, larger ones time out
+    // Driven DIRECTLY (no pump: it spaces real requests ~1 s apart and this gate makes two dozen), with errors
+    // shaped exactly as createShardStatesRequest shapes them — status and detail on the Error (RPC-04C proves that).
+    const deadline = () => Object.assign(new Error('accountStates failed with HTTP 422: {"error":"context deadline exceeded"}'), { status: 422, detail: '{"error":"context deadline exceeded"}' });
+    const request = async ({ path }: { path: string }) => {
+      const asked = new URL('https://x' + path).searchParams.getAll('address');
+      sizes.push(asked.length);
+      if (asked.length > tooSlowAbove) throw deadline();
+      return { accounts: asked.map((a) => ({ address: a, status: 'active', balance: '1', data_hash: 'h', last_transaction_lt: '9' })) };
+    };
+    const first = await readAccountStates(addrs, { request });
+    expect(sizes, 'the full batch timed out, its halves answered').toEqual([200, 100, 100]);
+    expect(first.size).toBe(200);
+    expect([...first.values()].every((row) => row.status === 'active'), 'every address read, none refused').toBe(true);
+    expect(__statesBatchCeilingForTests(), 'the ceiling dropped to half the batch that timed out').toBe(100);
+    // Next pass: built under the ceiling up front — two requests, no deadline paid.
+    sizes.length = 0;
+    await readAccountStates(addrs, { request });
+    expect(sizes).toEqual([100, 100]);
+    // After a clean run the ceiling doubles back (towards the measured URL limit), so a transient slow spell does
+    // not cost the small batches forever.
+    tooSlowAbove = 1024;
+    for (let i = 0; i < 8; i += 1) await readAccountStates(addrs, { request });   // 16 clean batches of 100
+    expect(__statesBatchCeilingForTests()).toBe(200);
+    sizes.length = 0;
+    await readAccountStates(addrs, { request });
+    expect(sizes, 'one batch again').toEqual([200]);
+    // A SINGLE address that times out is unknown and unrefused — and asked again next pass.
+    __resetRefusedAddressesForTests();
+    let calls = 0;
+    const slowOne = async () => { calls += 1; throw deadline(); };
+    const lone = addrs[0];
+    const one = await readAccountStates([lone], { request: slowOne });
+    expect(one.get(lone)).toMatchObject({ status: 'unknown', refused: false, unanswered: true });
+    expect(one.get(lone)?.lastLt ?? null, 'no marker — the lane reads it the slow way').toBeNull();
+    await readAccountStates([lone], { request: slowOne });
+    expect(calls, 'asked again — a deadline is not a refusal to remember').toBe(2);
     __resetRefusedAddressesForTests();
   });
 

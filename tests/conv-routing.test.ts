@@ -9,6 +9,7 @@ import {
   computeBucketKey,
   outgoingBucketKey,
   incomingBucketKeys,
+  outgoingBucketKeys,
   computeConvKRootSelf,
   selfRecoveryBucketKey,
   CONV_ROOT_SALT_DOMAIN,
@@ -184,5 +185,29 @@ describe('conv-routing (CONV lane key schedule — clean-16 hybrid)', () => {
   it('CONV-ROUTE-09: conversationOrder rejects self==peer (self-pair uses the self lane)', async () => {
     const A = await identity();
     expect(() => conversationOrder(A.keyId, A.keyId)).toThrow(/self keyId equals peer/i);
+  });
+
+  it('CONV-ROUTE-10: outgoingBucketKeys is the window of exactly the buckets outgoingBucketKey published into', async () => {
+    // [OWNER 2026-08-22, restored device: "only the peer's replies synced, mine did not".] A restore reads its own
+    // sent messages back from the OUTGOING buckets, so the window derivation must name, per epoch, the very bucket
+    // (and write key) the per-send derivation used — and it must be the peer's INCOMING set, bucket for bucket.
+    const A = await identity();
+    const B = await identity();
+    const kRoot = new Uint8Array(32).fill(0x3c);
+    const epochNow = 20_000;
+    const mine = await outgoingBucketKeys({ kRoot, selfKeyId: A.keyId, peerKeyId: B.keyId, epochNow, windowW: 2 });
+    expect(mine.map((b) => b.epoch)).toEqual([19_998, 19_999, 20_000]);
+    for (const bucket of mine) {
+      const sent = await outgoingBucketKey({ kRoot, selfKeyId: A.keyId, peerKeyId: B.keyId, createdAtSec: bucket.epoch * CONV_EPOCH_SECONDS + 7 });
+      expect(hex(bucket.bucketKey), `epoch ${bucket.epoch}: the bucket a send of that day went into`).toBe(hex(sent.bucketKey));
+      expect(hex(bucket.writePublicKey), `epoch ${bucket.epoch}: under the same write key`).toBe(hex(sent.writePublicKey));
+      expect(bucket.dir).toBe(sent.dir);
+    }
+    // The mirror: A's outgoing window IS B's incoming window.
+    const theirs = await incomingBucketKeys({ kRoot, selfKeyId: B.keyId, peerKeyId: A.keyId, epochNow, windowW: 2 });
+    expect(mine.map((b) => hex(b.bucketKey))).toEqual(theirs.map((b) => hex(b.bucketKey)));
+    // And never A's own incoming set (the other direction of the pair).
+    const myIncoming = await incomingBucketKeys({ kRoot, selfKeyId: A.keyId, peerKeyId: B.keyId, epochNow, windowW: 2 });
+    expect(mine.map((b) => hex(b.bucketKey))).not.toEqual(myIncoming.map((b) => hex(b.bucketKey)));
   });
 });

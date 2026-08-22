@@ -169,32 +169,32 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=37';
+import { createPublicLane } from './public-lane.mjs?v=38';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=19';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=30';
+import { createIntroLane } from './intro-lane.mjs?v=31';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
-import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=2';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=4';
+import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards } from './conv-discovery.mjs?v=18';
+import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=19';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=25';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=22';
+import { createConvReadLane } from './conv-lane.mjs?v=27';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=23';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=21';
-import { readAccountStates } from './shard-reader.mjs?v=20';
-import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=2';
+import { readAccountStates } from './shard-reader.mjs?v=21';
+import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=18';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=18';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=22';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=23';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=18';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
@@ -204,9 +204,9 @@ import {
 } from './market-stability-read.mjs?v=1';
 import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=5';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=20';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=20';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=21';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=23';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=23';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=22';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -13383,7 +13383,8 @@ async function readConvShardStates(plans) {
   const seen = new Set();
   for (const plan of plans) {
     for (const root of plan.rootShards) {
-      for (const shard of root.shards) {
+      // Incoming AND outgoing: the probe answers for every shard the pass may read, in one request.
+      for (const shard of [...root.shards, ...(root.outgoing ?? [])]) {
         if (!shard?.address || seen.has(shard.address)) continue;
         seen.add(shard.address);
         addresses.push(shard.address);
@@ -13400,7 +13401,13 @@ async function readConvShardStates(plans) {
   }
 }
 
-async function syncConvCapsulesFromShards() {
+async function syncConvCapsulesFromShards(options = {}) {
+  // A MANUAL "Sync messages" is a FULL re-walk — the button has always promised that (it passes forceIndexRescan),
+  // and under the sharded lane that means: this pass, every conversation is treated as never scanned here, so it
+  // reads from its birth again (both directions). Capsules already stored are deduplicated by id, shards read this
+  // session are served by their marks, so the cost is the cold epochs only — which is exactly what the user who
+  // presses the button is asking for [OWNER 2026-08-22: a restored device whose first passes had the narrow window].
+  const fullRescan = options?.forceIndexRescan === true;
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
@@ -13438,7 +13445,22 @@ async function syncConvCapsulesFromShards() {
     // NOTE: the cursor lives on the in-memory conv key store today, so full cross-reload offline resilience also needs
     // the persistent K_root store (a message is only lost if BOTH the store and the cursor are dropped on reload).
     const steadyFrom = epochNow - CONV_RECV_WINDOW_W;
-    const cursorFrom = record.lastScannedEpoch == null ? steadyFrom : Math.min(steadyFrom, Number(record.lastScannedEpoch));
+    // A CONVERSATION THIS DEVICE HAS NEVER SCANNED STARTS FROM ITS BIRTH, not from the steady window. [OWNER
+    // 2026-08-22, on a device restored from the recovery slots: "in some conversations only the peer's latest replies
+    // came".] A restored record carries no cursor (lastScannedEpoch null), and the old rule read that as "scan the
+    // last W epochs" — three days of a conversation that may be months old, with everything before it on chain, paid
+    // for and unread. The record DOES know when the conversation began: adoptedCreatedAt is the INTRO's own stamp,
+    // and a retired root's adoptedAt the re-INTRO's. So a cold record scans from the earliest of those (capped at
+    // retention below, the same as any catch-up); once one pass is clean the cursor is written and this never runs
+    // again for that conversation. Seconds on the wire; a millisecond stamp is tolerated rather than trusted.
+    const birthSeconds = [record.adoptedCreatedAt, ...(record.kRootsForRead ?? []).map((entry) => entry.adoptedAt)]
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => (value > 1e12 ? Math.floor(value / 1000) : value));
+    const birthFrom = birthSeconds.length > 0 ? epochFromCreatedAtSeconds(Math.min(...birthSeconds)) : steadyFrom;
+    const cursorFrom = (record.lastScannedEpoch == null || fullRescan)
+      ? Math.min(steadyFrom, birthFrom)
+      : Math.min(steadyFrom, Number(record.lastScannedEpoch));
     const scanFrom = Math.max(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, cursorFrom);
     const windowW = Math.max(CONV_RECV_WINDOW_W, epochNow - scanFrom);
     // The current root plus any retired roots (a re-INTRO minted a new K_root; old messages still in the window
@@ -13446,9 +13468,21 @@ async function syncConvCapsulesFromShards() {
     const roots = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry.kRoot)];
     const rootShards = [];
     for (const kRoot of roots) {
-      rootShards.push({ kRoot, shards: await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
+      // BOTH DIRECTIONS. The incoming shards are the peer's messages to this device; the OUTGOING shards are this
+      // device's own messages to the peer — the capsules it published carry a sender-recovery section the publisher
+      // can open (openedAs 'sender' → an 'out' message, deduplicated against the local echo by capsule id), so a
+      // restored device reads its own side of every conversation back off the chain, the way it always could have.
+      // [OWNER 2026-08-22: "only the peer's replies synced, mine did not".] Same reader, same gate, same marks.
+      rootShards.push({
+        kRoot,
+        shards: await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }),
+        outgoing: await outgoingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }),
+      });
     }
-    plans.push({ peerKeyId, windowW, rootShards });
+    // `cold` = this pass reads further back than the steady window for this conversation (a restore, a long
+    // offline stretch, a manual full re-walk); the pass reports those, once each, so a restore that came back short
+    // can be read off the console instead of guessed at.
+    plans.push({ peerKeyId, windowW, rootShards, cold: cursorFrom < steadyFrom, scanFrom });
     // Deriving one conversation's window is HKDF plus an ed25519 public key per bucket, and a conversation in full
     // offline catch-up derives up to CONV_SCAN_CATCHUP_CAP_EPOCHS of them. That burst is not new — readIncoming did
     // exactly the same work — but it used to be separated by each conversation's network reads, and this pass runs
@@ -13456,6 +13490,11 @@ async function syncConvCapsulesFromShards() {
     await cooperativeYield();
   }
   const conversations = plans.length;
+  const coldPlans = plans.filter((plan) => plan.cold);
+  if (coldPlans.length > 0) {
+    console.info('[conv] cold scan this pass:', coldPlans.length, 'of', conversations, 'conversations read back to their birth;',
+      coldPlans.reduce((sum, plan) => sum + (epochNow - plan.scanFrom + 1), 0), 'epochs in all (both directions)');
+  }
 
   // PASS 2 — ONE batched accountStates over every address of every conversation, so the pass can tell which shards
   // were written to at all. 1024 addresses fit a single request, so this is one request for the whole device, not
@@ -13473,7 +13512,14 @@ async function syncConvCapsulesFromShards() {
     const bucketBlocked = new Set();  // shard address -> a transient failure: do not advance its mark at all
     let seqSkipped = 0;
     let convClean = true; // every shard read for this conversation succeeded — only then may the cursor advance
-    for (const { kRoot, shards } of plan.rootShards) {
+    // Each root's INCOMING shards (the peer's messages) and OUTGOING shards (this device's own, re-opened as sender)
+    // go through the same reader, the same gate and the same marks — the lane does not care which side it reads.
+    const shardGroups = [];
+    for (const { kRoot, shards, outgoing } of plan.rootShards) {
+      shardGroups.push({ kRoot, shards, side: 'incoming' });
+      if (outgoing?.length) shardGroups.push({ kRoot, shards: outgoing, side: 'outgoing' });
+    }
+    for (const { kRoot, shards, side } of shardGroups) {
       let entries;
       try {
         entries = await lane.readIncoming({
@@ -13486,7 +13532,7 @@ async function syncConvCapsulesFromShards() {
       } catch (error) {
         convClean = false; allClean = false;
         if (noteTonRpcRateLimit(error)) rateLimited = true;
-        else console.warn('[conv] incoming shard read failed', error);
+        else console.warn(`[conv] ${side} shard read failed`, error);
         continue;
       }
       for (const found of entries) {
@@ -13507,7 +13553,15 @@ async function syncConvCapsulesFromShards() {
         if (seqUsable && foundSeq <= convBucketSeqHighWater(bucket)) { seqSkipped += 1; continue; }
         let opened;
         try {
-          opened = await openPrivateCapsuleChainEntry(found.entry, localRecipientKeyPair, { enforceExpiry: false });
+          // An OUTGOING capsule is this device's own: CONV header0 carries no sender label (privacy), so the opener
+          // must be TOLD it is the sender — openAsSenderKeyId routes decryptCompactBodyBytes to the sender-recovery
+          // section. Without it the recipient path runs, the AES tag fails, and the capsule reads as "someone else's"
+          // — permanently unreadable, mark advanced, own message silently dropped [OWNER 2026-08-22, on the stand:
+          // "I do not see my own messages" — the first build of this read did exactly that].
+          opened = await openPrivateCapsuleChainEntry(found.entry, localRecipientKeyPair, {
+            enforceExpiry: false,
+            ...(side === 'outgoing' ? { openAsSenderKeyId: localRecipientKeyPair.keyId } : {}),
+          });
         } catch (error) {
           if (isPrivateUnreadableCapsuleError(error)) {
             // PERMANENTLY unreadable (someone else's capsule in a shared bucket). Counts as handled: re-trying it
@@ -13539,6 +13593,16 @@ async function syncConvCapsulesFromShards() {
     // The reads above are where a teardown lands; nothing of this wallet's may be written past it.
     if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
     const appendedNow = await appendConvOpenedCapsules(collected, targetThread);
+    if (plan.cold) {
+      // One line per cold conversation, so a restore that came back short says WHY in the console: how many of its
+      // shards exist on chain at all (per direction), how many capsules were opened, how many were new.
+      const liveOf = (list) => (list ?? []).filter((shard) => Boolean(shardStates?.get(publicAddrKey(shard.address)))).length;
+      const liveIn = plan.rootShards.reduce((sum, root) => sum + liveOf(root.shards), 0);
+      const liveOut = plan.rootShards.reduce((sum, root) => sum + liveOf(root.outgoing), 0);
+      console.info('[conv] cold conversation', introKeyIdString(peerKeyId).slice(0, 12), 'epochs', plan.scanFrom, '..', epochNow,
+        'roots', plan.rootShards.length, 'live shards in/out', shardStates ? `${liveIn}/${liveOut}` : 'unknown (no probe)',
+        'opened', collected.length, 'new', appendedNow, 'skipped', seqSkipped, convClean ? 'clean' : 'INCOMPLETE');
+    }
     // Advance the per-shard marks ONLY here — after the append actually stored them. Moving the mark before this
     // line would lose every collected message if the append threw.
     for (const [bucket, seq] of bucketMaxSeq) {
@@ -23192,8 +23256,22 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
   }, effectiveDelayMs);
 }
 
+// What the refresh in flight was asked for. A caller who asks for MORE than that (activation, stats) must not be
+// handed the running promise as if it covered them — that was how a return-to-tab activation read could be
+// swallowed by a balance-only auto-refresh already running: the caller got "done", and activation was never read.
+let vaultRefreshInFlightFlags = null;
+
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
-  if (vaultRefreshPromise) return vaultRefreshPromise;
+  if (vaultRefreshPromise) {
+    const covered = vaultRefreshInFlightFlags
+      && (!includeActivation || vaultRefreshInFlightFlags.includeActivation)
+      && (!includeStats || vaultRefreshInFlightFlags.includeStats);
+    if (covered) return vaultRefreshPromise;
+    // Not covered: run the wanted jobs AFTER the one in flight settles (still one refresh at a time).
+    const wanted = { includeActivation, includeStats };
+    return vaultRefreshPromise.then(() => refreshVaultNow(wanted), () => refreshVaultNow(wanted));
+  }
+  vaultRefreshInFlightFlags = { includeActivation, includeStats };
   const vaultWork = (async () => {
     const results = [];
     // clean-17 direct-pay: the custodial dashboard read (Vault get_user + get_global) is gone. What the tab shows is
@@ -23228,6 +23306,7 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
     return outcome;
   } finally {
     vaultRefreshPromise = null;
+    vaultRefreshInFlightFlags = null;
     scheduleVaultAutoRefresh();
   }
 }
@@ -23281,6 +23360,7 @@ function queueVaultRefreshAfterWalletChange() {
   // A pending activation belongs to the previous wallet; never carry the in-flight
   // lock across a wallet switch (the new wallet's activation state is read fresh).
   plathoAccountActivationPending = false;
+  clearPlathoActivationReread();                           // the re-read ladder was for the previous wallet
   // The WRITTEN marker is deliberately left alone: it names the wallet that sent the external, so it cannot bleed
   // onto the new one, and switching back inside the horizon must still find its activation protected.
   markNavVaultBalancePending('wallet changed', {
@@ -26553,6 +26633,50 @@ globalThis.plathoVaultTransactions = {
   syncPrivateCapsulesFromChain,
 };
 
+// ── A READ THAT LEARNED NOTHING ASKS AGAIN ON ITS OWN ────────────────────────────────────────────────────────────
+//
+// [OWNER 2026-08-22, on the stand with a freshly imported key: "the balance loaded, but the app kept saying the
+// wallet was not connected; a few minutes later it sorted itself out".] The ONE activation read at unlock had
+// failed on a transient — a 15 s RPC timeout, a verifier that did not answer (both were in his console that hour)
+// — and the catch below preserved the binding, correctly: a bad read must never flip a registered user to
+// "activate". But then nothing asked again. The background refresh re-reads the BALANCE only; activation is re-read
+// by a transaction, a return to the Wallet view, a wallet switch — so the app sat on "activate your account" for
+// as long as nothing else happened to it. A read that learned nothing is not an answer. It re-asks on its own, on a
+// rising ladder, until a DEFINITIVE answer is written for THIS wallet (registered, or a never-deployed shard), and
+// a wallet switch drops the ladder with the binding it was climbing for. Cheap: one critical read per rung, and
+// the first rung usually lands. A hidden tab does not climb (the wallet locks in the background anyway; the unlock
+// on return reads afresh) — it re-arms the same rung.
+const PLATHO_ACTIVATION_REREAD_DELAYS_MS = [3_000, 6_000, 12_000, 24_000, 45_000, 60_000, 90_000, 120_000, 180_000, 240_000];
+let plathoActivationRereadTimer = null;
+let plathoActivationRereadStep = 0;
+let plathoActivationRereadWallet = null;
+
+function clearPlathoActivationReread() {
+  if (plathoActivationRereadTimer) clearTimeout(plathoActivationRereadTimer);
+  plathoActivationRereadTimer = null;
+  plathoActivationRereadStep = 0;
+  plathoActivationRereadWallet = null;
+}
+
+function schedulePlathoActivationReread(forWalletRaw) {
+  if (!forWalletRaw) return;
+  if (plathoActivationRereadWallet !== forWalletRaw) {
+    clearPlathoActivationReread();                         // a ladder belongs to ONE wallet
+    plathoActivationRereadWallet = forWalletRaw;
+  }
+  if (plathoActivationRereadTimer) return;                 // one ladder, already climbing
+  const step = Math.min(plathoActivationRereadStep, PLATHO_ACTIVATION_REREAD_DELAYS_MS.length - 1);
+  const delayMs = PLATHO_ACTIVATION_REREAD_DELAYS_MS[step];
+  plathoActivationRereadTimer = setTimeout(() => {
+    plathoActivationRereadTimer = null;
+    if (!plathoWallet?.address || rawWalletAddress(plathoWallet.address) !== forWalletRaw) { clearPlathoActivationReread(); return; }
+    if (document.hidden) { schedulePlathoActivationReread(forWalletRaw); return; }   // same rung, later
+    plathoActivationRereadStep = step + 1;
+    // Its own catch re-arms the ladder if this rung learns nothing again; a definitive answer clears it.
+    refreshVaultActivationStatus().catch(() => {});
+  }, delayMs);
+}
+
 async function refreshVaultActivationStatus(options = {}) {
   if (!plathoWallet?.address || !localVaultDraft?.message) {
     setText(vaultRecordStatus, plathoWallet ? t('vault.keysPending') : t('common.walletRequiredStatus'));
@@ -26593,6 +26717,7 @@ async function refreshVaultActivationStatus(options = {}) {
       && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
     if (!registeredMine) {
       globalThis.plathoVaultBinding = { walletAddress: forWallet, user: { exists: view?.exists === true, current_key_id: 0n }, keyRecord: null };
+      clearPlathoActivationReread();                       // a definitive answer: not registered (yet)
       setText(vaultRecordStatus, t('vault.activationRequired'));
       refreshMessageActionStatuses();
       refreshMessagingControls();
@@ -26609,6 +26734,7 @@ async function refreshVaultActivationStatus(options = {}) {
       scan_pubkey: BigInt(view.scan_pubkey ?? 0n),
     };
     globalThis.plathoVaultBinding = { walletAddress: forWallet, user, keyRecord: null };
+    clearPlathoActivationReread();                         // a definitive answer: registered
     setText(vaultRecordStatus, t('vault.activated'));
     // The chain has just confirmed this wallet's keys are registered. Once per wallet, this is where the welcome
     // comes from — see maybeShowActivationWelcome for why the trigger is here and not at the activation send.
@@ -26620,6 +26746,7 @@ async function refreshVaultActivationStatus(options = {}) {
   } catch (error) {
     // A transient read must NOT flip a registered user to "activate" — leave the binding untouched and show pending.
     if (!noteTonRpcRateLimit(error)) console.warn('[keyshard] activation status read failed', error);
+    schedulePlathoActivationReread(rawWalletAddress(plathoWallet?.address));   // and ask again — the ladder above
     setText(vaultRecordStatus, t('vault.keysPending'));
     refreshMessageActionStatuses();
     refreshComposerPublishPolicy();
