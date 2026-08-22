@@ -5552,12 +5552,29 @@ button.feed-item:hover {
   overflow: hidden;
 }
 
+/* A SQUARE ART BOX ON EVERY ENGINE, aspect-ratio or not. The on-chain SVG has a viewBox but no width/height, so on a
+   WebView that ignores `aspect-ratio` on an <img> (Chrome < 88 / the WebView many Telegram clients ship) `width:100%`
+   gave it ZERO height and the art collapsed to a strip [OWNER 2026-08-22]. padding-bottom:100% has forced a square
+   box since long before aspect-ratio existed; the image fills it absolutely, so nothing here depends on aspect-ratio. */
+.nft-card-art-frame {
+  position: relative;
+  width: 100%;
+  padding-bottom: 100%;
+  background: var(--panel-3);
+  overflow: hidden;
+}
+
+.nft-card-art-frame[hidden] {
+  display: none;
+}
+
 .nft-card-art {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
   object-fit: cover;
-  background: var(--panel-3);
 }
 
 .nft-card-foot {

@@ -3303,6 +3303,32 @@ describe('PWA runtime config guard', () => {
     expect(offenders, 'a styled block that cannot hide is a block that stays on screen').toEqual([]);
   });
 
+  it('PWA-NFTART-01: the username art box is square WITHOUT aspect-ratio — it collapsed on WebViews that ignore it', () => {
+    // [OWNER 2026-08-22] The "My .ath names" list rendered as thin strips on an Android/Telegram WebView. REPRODUCED
+    // in the harness: an engine that does not honour `aspect-ratio` on an <img> gives the on-chain SVG (viewBox, no
+    // width/height → no intrinsic pixel height) a height of ZERO under width:100%, and the art collapses. The frame's
+    // height must come from padding-bottom:100% — honoured everywhere, forever — with the image filling it absolutely.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // The card wraps the <img> in a frame, and the frame (not the img) carries the hidden toggle.
+    const card = app.slice(app.indexOf('function usernameNftCardNode('), app.indexOf('async function openMyUsernamesDialog('));
+    expect(card).toMatch(/frame\.className = 'nft-card-art-frame';/);
+    expect(card).toMatch(/frame\.hidden = !nft\.image;/);
+    expect(card).toMatch(/frame\.append\(art\);\s*card\.append\(frame\);/);
+    expect(card).not.toMatch(/art\.hidden = /);
+    // The frame is a padding-bottom square, and it does NOT lean on aspect-ratio.
+    const frame = /(^|[,}])\s*\.nft-card-art-frame\s*\{([^}]*)\}/m.exec(css)?.[2] ?? '';
+    expect(frame).toMatch(/padding-bottom:\s*100%/);
+    expect(frame).toMatch(/position:\s*relative/);
+    expect(frame).not.toMatch(/aspect-ratio/);
+    // The image fills the frame absolutely — no aspect-ratio, no reliance on intrinsic height.
+    const art = /(^|[,}])\s*\.nft-card-art\s*\{([^}]*)\}/m.exec(css)?.[2] ?? '';
+    expect(art).toMatch(/position:\s*absolute/);
+    expect(art).toMatch(/inset:\s*0/);
+    expect(art).toMatch(/object-fit:\s*cover/);
+    expect(art).not.toMatch(/aspect-ratio/);
+  });
+
   it('PWA-DIALOG-CLOSE-ICON-01: the dialog close control is a mask icon, not a text glyph', () => {
     const html = readFileSync('web/index.html', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');

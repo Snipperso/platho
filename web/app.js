@@ -23752,6 +23752,15 @@ function usernameNftCardNode(nft, onTransfer) {
   card.className = 'nft-card';
   // THE ART LEADS. It is the reason this screen exists — the names are drawn on chain by the registry itself, and a
   // list that renders them as lines of text throws away the entire point of having them.
+  // A SQUARE FRAME, not a bare <img> sized by aspect-ratio. [OWNER 2026-08-22: the names list rendered as thin
+  // strips on his Android/Telegram WebView.] REPRODUCED: an engine that does not honour `aspect-ratio` on an <img>
+  // (Chrome < 88, the WebView many Telegram clients ship) gives the on-chain SVG — which carries a viewBox but no
+  // width/height, so it has no intrinsic pixel height — a height of ZERO under `width:100%`, and the art collapses
+  // to a sliver. The frame's height comes from padding-bottom:100% instead, which every engine has always honoured,
+  // and the <img> fills it absolutely; nothing depends on aspect-ratio any more.
+  const frame = document.createElement('div');
+  frame.className = 'nft-card-art-frame';
+  frame.hidden = !nft.image;
   const art = document.createElement('img');
   // A data: URI only — see safeInlineImage. Never a remote URL: img-src forbids it, and naming a host would hand
   // that host the wallet's identity.
@@ -23759,8 +23768,8 @@ function usernameNftCardNode(nft, onTransfer) {
   art.alt = '';
   art.className = 'nft-card-art';
   art.loading = 'lazy';
-  art.hidden = !nft.image;
-  card.append(art);
+  frame.append(art);
+  card.append(frame);
 
   const foot = document.createElement('div');
   foot.className = 'nft-card-foot';
