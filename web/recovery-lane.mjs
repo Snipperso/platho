@@ -7,7 +7,7 @@ import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?
 import { sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob } from './recovery-blob.mjs?v=6';
 import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=20';
 import { RECOVERY_MAX_SLOTS, PREFS_NAMED_SLOT_INDEX, addrKey } from './shard-discovery.mjs?v=21';
-import { probeActiveAddresses } from './shard-reader.mjs?v=23';
+import { probeActiveAddresses } from './shard-reader.mjs?v=24';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS — the immutable on-chain cap on the blob's cell tree (gate 13560).
 // Mirrored (not imported) so an over-cap backup is refused CLIENT-SIDE before it bounces on chain and is mis-recorded.

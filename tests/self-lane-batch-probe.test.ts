@@ -127,6 +127,21 @@ describe('SELF-LANE BATCH PROBE', () => {
     expect(await probeActiveAddresses(['0:' + '11'.repeat(32)], async () => undefined as any)).toBeNull();
     // No addresses is not an untrustworthy answer — it is nothing to ask about.
     expect(await probeActiveAddresses([], async () => new Map())).toEqual(new Set());
+    // AN UNKNOWN ROW IS AN INCOMPLETE ANSWER. readAccountStates records an address the endpoint did not answer (its
+    // deadline) or refused as status 'unknown' instead of throwing — and a restore that read that as "not active"
+    // would skip a bound slot and latch as clean: a conversation silently missing. One unknown row → null → the
+    // slow, complete probe. [2026-08-22: the deadline-at-the-floor path made this reachable on the stand.]
+    const live = '0:' + '11'.repeat(32);
+    const unknown = '0:' + '12'.repeat(32);
+    const mixed = new Map([
+      [addrKey(live), { status: 'active', lastLt: '5' }],
+      [addrKey(unknown), { status: 'unknown', lastLt: null, dataHash: null, unanswered: true, refused: false }],
+    ]);
+    expect(await probeActiveAddresses([live, unknown], async () => mixed), 'one unanswered row poisons completeness').toBeNull();
+    const refused = new Map([[addrKey(unknown), { status: 'unknown', lastLt: null, dataHash: null, refused: true }]]);
+    expect(await probeActiveAddresses([unknown], async () => refused), 'a refused row too').toBeNull();
+    // And a complete answer with only real rows is still a Set.
+    expect(await probeActiveAddresses([live], async () => new Map([[addrKey(live), { status: 'active', lastLt: '5' }]]))).toEqual(new Set([addrKey(live)]));
   });
 
   it('BATCH-05: the notes restore skips absent chunks and stays clean; a bound chunk still opens', async () => {

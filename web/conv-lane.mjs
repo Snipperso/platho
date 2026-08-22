@@ -15,8 +15,8 @@
 // runs against a stub transport and fixed key-ids, the way the public and intro lanes do.
 
 import { incomingRecordShards } from './conv-discovery.mjs?v=20';
-import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=25';
-import { changeMarkerOf } from './shard-reader.mjs?v=23';
+import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=26';
+import { changeMarkerOf } from './shard-reader.mjs?v=24';
 import { addrKey } from './shard-discovery.mjs?v=21';
 
 // Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,

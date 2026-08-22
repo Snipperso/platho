@@ -1,12 +1,12 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-d6971c5bbc44';
+const CACHE_NAME = 'platho-pwa-1e2a49f9ebcb';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=340',
-  './app.js?v=bb1be2fff',
+  './app.js?v=bbca70df5',
   './i18n.mjs?v=78',
   './i18n-strings.mjs?v=80',
   './boot-signal-field.mjs?v=1',
@@ -40,9 +40,9 @@ const ASSETS = [
   './conv-discovery.mjs?v=20',
   './conv-key-persist.mjs?v=6',
   './conv-key-store.mjs?v=4',
-  './conv-lane-read.mjs?v=25',
+  './conv-lane-read.mjs?v=26',
   './conv-lane-send.mjs?v=19',
-  './conv-lane.mjs?v=29',
+  './conv-lane.mjs?v=30',
   './conv-publish-browser.mjs?v=4',
   './conv-reply-bundle.mjs?v=5',
   './crypto/conv-routing.mjs?v=3',
@@ -51,7 +51,7 @@ const ASSETS = [
   './intro-codec.mjs?v=2',
   './intro-cursor-store.mjs?v=1',
   './intro-lane-send.mjs?v=19',
-  './intro-lane.mjs?v=33',
+  './intro-lane.mjs?v=34',
   './intro-publish-browser.mjs?v=19',
   './intro-receive-handler.mjs?v=6',
   './intro-receive.mjs',
@@ -59,25 +59,25 @@ const ASSETS = [
   './intro-scan-runner.mjs?v=20',
   './intro-scan.mjs',
   './intro-send-coords.mjs?v=19',
-  './intro-transport.mjs?v=25',
+  './intro-transport.mjs?v=26',
   './key-shard-register-browser.mjs?v=4',
   './key-shard-register-send.mjs?v=19',
   './key-shard-ton-rpc-provider.mjs?v=4',
   './market-stability-buy-send.mjs?v=6',
   './market-stability-read.mjs?v=1',
-  './notes-lane.mjs?v=25',
+  './notes-lane.mjs?v=26',
   './public-lane-send.mjs?v=20',
-  './public-lane.mjs?v=40',
+  './public-lane.mjs?v=41',
   './public-publish-browser.mjs?v=5',
   './public-shard-ton-rpc-provider.mjs?v=5',
   './publish-price.mjs?v=1',
   './recovery-blob.mjs?v=6',
-  './recovery-lane.mjs?v=25',
+  './recovery-lane.mjs?v=26',
   './recovery-publish-browser.mjs?v=20',
-  './recovery-transport.mjs?v=24',
+  './recovery-transport.mjs?v=25',
   './shard-address.mjs?v=7',
   './shard-discovery.mjs?v=21',
-  './shard-reader.mjs?v=23',
+  './shard-reader.mjs?v=24',
   './shard-rpc.mjs?v=22',
   './ton-stack-num.mjs?v=1',
   './wallet-send-fee.mjs?v=7',
@@ -244,7 +244,7 @@ async function navigationResponse(event) {
     // This used to cache every fresh shell it fetched, which quietly broke the one property the cache exists
     // for. The shell and the asset URLs it names are versioned together and precached together under one
     // CACHE_NAME; writing a NEWER shell into the CURRENT cache leaves the pair mismatched — a shell asking for
-    // ./app.js?v=bb1be2fff while the cache holds ./app.js?v=bb1be2fff. Online nobody notices, the network fills the gap.
+    // ./app.js?v=bbca70df5 while the cache holds ./app.js?v=bbca70df5. Online nobody notices, the network fills the gap.
     // Offline the app will not start at all: MEASURED 2026-08-20, during the outage, the owner's own device
     // showed "resource failed: app.js?v=bf36260a7" from the boot guard while every byte it needed to run sat in
     // the cache under the previous version's URL.
@@ -296,7 +296,7 @@ async function cachedIgnoringVersion(request) {
  * This was stale-while-revalidate: serve the cached copy, then fetch the same file again in the background "in
  * case it changed". For this app that background fetch can never find anything, and it is not free.
  *
- * Every module URL here carries its content's version (./app.js?v=bb1be2fff<hash>, ./conv-lane.mjs?v=29). A changed file
+ * Every module URL here carries its content's version (./app.js?v=bbca70df5<hash>, ./conv-lane.mjs?v=30). A changed file
  * gets a changed URL — that is the whole point of the scheme — so a cached response for a given URL cannot go
  * stale. The unversioned entries (icons, the manifest, the docs) do not need revalidating either: they are
  * refreshed by the INSTALL, which re-fetches the whole list with cache:'reload' whenever CACHE_NAME moves.

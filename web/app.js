@@ -169,13 +169,13 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=60';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=40';
+import { createPublicLane } from './public-lane.mjs?v=41';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=20';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=7';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=19';
-import { createIntroLane } from './intro-lane.mjs?v=33';
+import { createIntroLane } from './intro-lane.mjs?v=34';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
@@ -183,10 +183,10 @@ import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
 import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=20';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=19';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=29';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=25';
+import { createConvReadLane } from './conv-lane.mjs?v=30';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=26';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=22';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=23';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=24';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=19';
@@ -194,7 +194,7 @@ import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=19';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=25';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=26';
 import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=19';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
@@ -204,9 +204,9 @@ import {
 } from './market-stability-read.mjs?v=1';
 import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=6';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=25';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=25';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=24';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=26';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=26';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=25';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,

@@ -303,6 +303,14 @@ export async function probeActiveAddresses(addresses, readStates) {
   }
   if (!(states instanceof Map)) return null;
   const active = new Set();
-  for (const [key, state] of states) if (isActiveAccountState(state)) active.add(key);
+  for (const [key, state] of states) {
+    // AN UNKNOWN ROW MEANS THE ANSWER IS NOT COMPLETE. readAccountStates now records an address the endpoint did not
+    // answer (its deadline) or refused as status 'unknown' instead of throwing — right for the lanes that then read
+    // the shard the slow way, and WRONG here if it were read as "not active": a recovery slot skipped on an unknown
+    // row is a conversation silently missing from a restore that then latches as clean [2026-08-22, the floor-bounded
+    // split made this reachable]. Completeness is the whole contract of this function, so one unknown row is null.
+    if (state?.status === 'unknown') return null;
+    if (isActiveAccountState(state)) active.add(key);
+  }
   return active;
 }
