@@ -14,7 +14,7 @@ import {
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=15';
 import { tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=77';
+import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=78';
 
 const {
   beginCell,

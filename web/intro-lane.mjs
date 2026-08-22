@@ -13,12 +13,12 @@
 // been wrong twice in ways that cost real money on a phone, and app.js cannot be tested without a browser. Here
 // the whole thing runs against a fake clock and a stub transport.
 
-import { createIntroScanRunner } from './intro-scan-runner.mjs?v=19';
+import { createIntroScanRunner } from './intro-scan-runner.mjs?v=20';
 import { createIntroCursorStore } from './intro-cursor-store.mjs?v=1';
-import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './intro-transport.mjs?v=24';
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=21';
-import { readAccountStates } from './shard-reader.mjs?v=22';
-import { introShardAddress } from './shard-discovery.mjs?v=20';
+import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './intro-transport.mjs?v=25';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=22';
+import { readAccountStates } from './shard-reader.mjs?v=23';
+import { introShardAddress } from './shard-discovery.mjs?v=21';
 import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=2';
 
 /**

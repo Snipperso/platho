@@ -83,6 +83,16 @@ const TONCENTER_REQUEST_PRIORITY_WEIGHTS = Object.freeze({
   profile: 3,
   background: 4,
 });
+// THE HARD CEILING ON ONE REQUEST'S TIME ON THE PUMP. The pump is ONE serial queue for every read the app makes,
+// and it awaited each thunk with no deadline of its own: a get-method carried its own 15 s timeout, but a shard
+// read (accountStates, /messages) was a bare fetch — and a connection the far side accepts and then abandons holds
+// a bare fetch for as long as the browser allows (minutes). One such connection held the whole queue: sync spinner
+// forever, balance "RPC busy", every lane waiting behind one dead socket [OWNER 2026-08-22, on the stand, after the
+// connection resets of that morning: "the sync never finishes"]. Every request now carries an AbortSignal from the
+// pump and is cut at this ceiling (a caller's own requestTimeoutMs may be shorter); the cut is an ordinary
+// transport error the callers already handle as transient. 30 s: above any honest answer (the largest /messages
+// window answers in ~1-3 s), below the browser's own socket limit by an order of magnitude.
+const TONCENTER_REQUEST_HARD_TIMEOUT_MS = 30_000;
 const toncenterRequestStates = new Map();
 const toncenterRunGetMethodInFlight = new Map();
 const toncenterRunGetMethodCache = new Map();
@@ -660,7 +670,24 @@ async function drainToncenterRequestQueue(state) {
           }
           await delay(waitMs);
         }
-        const response = await task.request();
+        // BOUNDED, ALWAYS — see TONCENTER_REQUEST_HARD_TIMEOUT_MS. The thunk receives the AbortSignal (a fetch
+        // that takes it is cancelled, not merely abandoned); the race below is what frees the queue either way.
+        // A caller may ask for LESS time, never for more (and never for none): the ceiling is the pump's promise.
+        const requestedTimeoutMs = finiteNonNegativeMs(task.options.requestTimeoutMs, TONCENTER_REQUEST_HARD_TIMEOUT_MS);
+        const requestTimeoutMs = requestedTimeoutMs > 0
+          ? Math.min(requestedTimeoutMs, TONCENTER_REQUEST_HARD_TIMEOUT_MS)
+          : TONCENTER_REQUEST_HARD_TIMEOUT_MS;
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        let requestTimer = null;
+        const response = await Promise.race([
+          task.request(controller?.signal),
+          new Promise((_, rejectTimeout) => {
+            requestTimer = setTimeout(() => {
+              try { controller?.abort(); } catch { /* already settled */ }
+              rejectTimeout(tonRpcTimeoutError(requestTimeoutMs));
+            }, requestTimeoutMs);
+          }),
+        ]).finally(() => { if (requestTimer !== null) clearTimeout(requestTimer); });
         state.nextAt = Date.now() + spacingMs;
         if (response?.status === 429) {
           // GROWING, NOT FLAT. A flat 60s park was the whole cost of ONE stray 429: sends waited up to a minute and
@@ -891,6 +918,8 @@ export async function scheduleToncenterHttpRequest(endpoint, apiKey, request, op
         skipIfRateLimited: options.skipIfRateLimited,
         priority: options.priority,
         queueTimeoutMs: options.queueTimeoutMs,
+        // A caller's own per-request deadline (shorter than the pump's hard ceiling, never longer in effect).
+        requestTimeoutMs: options.requestTimeoutMs,
       },
     );
     if (response?.status === 429) {

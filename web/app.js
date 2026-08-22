@@ -31,7 +31,7 @@ import {
   getPlathoWalletSeqno,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=35';
+} from './platho-wallet.mjs?v=36';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createInlineFormatRegex, messagePreviewText,
@@ -42,7 +42,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=123';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=124';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -51,7 +51,7 @@ import {
   tonRpcRequestCounters,
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
-} from './ton-rpc-transport.mjs?v=77';
+} from './ton-rpc-transport.mjs?v=78';
 import { orderThreadsForList } from './thread-list-order.mjs?v=1';
 import {
   DEFAULT_PUBLIC_CHANNELS,
@@ -165,48 +165,48 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=10';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=56';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=59';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=57';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=60';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=39';
+import { createPublicLane } from './public-lane.mjs?v=40';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=19';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=20';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=6';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=18';
-import { createIntroLane } from './intro-lane.mjs?v=32';
+import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=7';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=19';
+import { createIntroLane } from './intro-lane.mjs?v=33';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=19';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=18';
+import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=20';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=19';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=28';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=24';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=21';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=22';
+import { createConvReadLane } from './conv-lane.mjs?v=29';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=25';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=22';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=23';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=18';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=19';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=18';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=24';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=18';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=19';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=25';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=19';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=1';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=5';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=6';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=24';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=24';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=23';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=25';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=25';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=24';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -218,19 +218,19 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=20';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=55';
+} from './shard-discovery.mjs?v=21';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=56';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=61';
+} from './username-ton-rpc-provider.mjs?v=62';
 import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=5';
+} from './username-nft-owned.mjs?v=6';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,

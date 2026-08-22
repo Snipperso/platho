@@ -269,6 +269,50 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     __resetRefusedAddressesForTests();
   });
 
+  it('RPC-04G: a deadline that recurs at every size splits down to the floor and no further — bounded, not 2N requests', async () => {
+    // OWNER 2026-08-22: "maybe after that 422 everything stops". A deadline about the endpoint's LOAD recurs at
+    // every batch size; halving to single addresses would then cost 2N requests, each waiting out the endpoint's
+    // deadline, with the one serial pump held for all of it. So the split stops at the floor (32): a batch at or
+    // below it that still times out has its addresses marked UNANSWERED this pass, and the next pass starts small
+    // from the remembered ceiling. 256 addresses, every batch timing out: 256, 128x2, 64x4, 32x8 — 15 requests, not 511.
+    __resetRefusedAddressesForTests();
+    const addrs = Array.from({ length: 256 }, (_, i) => '0:' + (0x300 + i).toString(16).padStart(2, '0').repeat(32).slice(0, 64));
+    let requests = 0;
+    const request = async () => { requests += 1; throw Object.assign(new Error('accountStates failed with HTTP 422: {"error":"context deadline exceeded"}'), { status: 422, detail: '{"error":"context deadline exceeded"}' }); };
+    const states = await readAccountStates(addrs, { request });
+    expect(requests, '1 + 2 + 4 + 8 — split stops at the floor').toBe(15);
+    expect(states.size, 'every address answered in the map').toBe(256);
+    expect([...states.values()].every((row) => row.status === 'unknown' && row.unanswered === true && row.refused === false), 'all unanswered, none refused').toBe(true);
+    expect(__statesBatchCeilingForTests(), 'the ceiling sits at the floor for the next pass').toBe(32);
+    __resetRefusedAddressesForTests();
+  });
+
+  it('RPC-PUMP-01: a request that never answers is cut by the pump, with its signal aborted, and the queue goes on', async () => {
+    // The pump awaited each thunk with no deadline: a shard read was a bare fetch, and a connection the far side
+    // accepts and abandons held the WHOLE serial queue — sync spinner forever, every lane behind one dead socket
+    // [OWNER 2026-08-22, on the stand after that morning's connection resets]. Every request is bounded now; the
+    // thunk gets an AbortSignal; a caller may set requestTimeoutMs lower than the 30 s ceiling.
+    let signalSeen: AbortSignal | null = null;
+    let hung = 0;
+    const fetchImpl = async (url: string, init: any) => {
+      if (String(url).includes('address=0%3A' + '77'.repeat(32))) {
+        hung += 1;
+        signalSeen = init?.signal ?? null;
+        return new Promise<never>(() => {});                                  // never answers
+      }
+      return { ok: true, status: 200, json: async () => ({ accounts: [] }) } as any;
+    };
+    const request = createShardStatesRequest({ endpoint: ENDPOINT, fetch: fetchImpl, strict: true, requestOptions: { requestTimeoutMs: 80, skipIfRateLimited: false } });
+    const t0 = Date.now();
+    await expect(readAccountStates(['0:' + '77'.repeat(32)], { request })).rejects.toThrow(/timed out after 80 ms/);
+    expect(Date.now() - t0, 'cut by the request deadline, not by a longer one').toBeLessThan(5_000);
+    expect(hung).toBe(1);
+    expect(signalSeen?.aborted, 'the fetch was told to stop').toBe(true);
+    // The queue is free: the next request on the same pump runs and answers.
+    const next = await readAccountStates(['0:' + '78'.repeat(32)], { request });
+    expect(next.size).toBe(0);
+  });
+
   it('RPC-04B: a STRICT reader refuses to turn a request that never ran into an empty account list', async () => {
     // RPC-03 is right for a background scan and WRONG for the self lanes. Those read absence as proof that a slot
     // was never written and then skip it, so an empty answer is a claim about the user's data — and manufacturing

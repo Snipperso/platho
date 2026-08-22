@@ -30,7 +30,7 @@ import {
   PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET,
   PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
   PLATHO_WALLET_MESSAGE_FRAMING_BYTES,
-} from './platho-wallet.mjs?v=35';
+} from './platho-wallet.mjs?v=36';
 
 /**
  * Fixed cost of ONE EXTERNAL: importing it plus the wallet's own compute.

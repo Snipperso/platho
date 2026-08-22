@@ -24,7 +24,7 @@
 //   4. include_boc is all-or-nothing: with it on you also download code_boc, which is identical for every shard.
 //      The cheap pass therefore runs with it OFF and uses data_hash / last_transaction_lt to spot changes.
 
-import { addrKey } from './shard-discovery.mjs?v=20';
+import { addrKey } from './shard-discovery.mjs?v=21';
 
 // One request covers a full 1024-bucket read space with headroom under the measured 1149 ceiling. Deliberately
 // NOT set to 1149: the limit is in bytes, so a longer address form or an extra query parameter would silently
@@ -196,13 +196,20 @@ export async function readAccountStates(addresses, { request, includeBoc = false
             deadlineReported = true;
             console.warn(`[states] the endpoint ran out of time on a batch of ${wire.length} addresses — splitting it and asking in smaller batches from now on; it said:`, error?.detail ?? '');
           }
-          if (wire.length > 1) {
+          // SPLIT DOWN TO THE FLOOR, NOT TO ONE. A deadline that is about the endpoint's LOAD rather than the
+          // batch's size recurs at every size, and halving all the way to single addresses then turns one slow
+          // minute into 2N requests, each waiting out the endpoint's deadline — hours for a 666-address probe,
+          // with the one serial pump held the whole time [OWNER 2026-08-22: "after that 422 everything seems to
+          // stop"]. Below the floor the batch is small enough that a timeout says nothing about it; its addresses
+          // are UNANSWERED this pass (the lanes read them the slow way) and go back on the wire next pass, when
+          // the remembered ceiling already keeps the batches small.
+          if (wire.length > STATES_BATCH_FLOOR) {
             const mid = Math.ceil(wire.length / 2);
             await readGroup(wire.slice(0, mid));
             await readGroup(wire.slice(mid));
             return;
           }
-          out.set(addrKey(wire[0]), unansweredRow(wire[0]));
+          for (const w of wire) out.set(addrKey(w), unansweredRow(w));
           return;
         }
         if (wire.length > 1) {

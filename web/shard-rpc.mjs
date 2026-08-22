@@ -17,7 +17,7 @@
 // user's toncenter budget, and the whole per-client-key rate model (8 rps under one key, one queue inside one
 // client) depends on there being exactly one queue.
 
-import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=77';
+import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=78';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=37';
 
 /**
@@ -106,8 +106,10 @@ export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, r
     url.search = path.includes('?') ? path.slice(path.indexOf('?')) : '';
     const headers = { Accept: 'application/json' };
     if (key) headers['X-API-Key'] = key;
+    // The pump hands the thunk an AbortSignal tied to its request deadline — a hung connection is cancelled, not
+    // waited on for as long as the browser cares to.
     const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), options);
+      base, key, (signal) => doFetch(url.toString(), { method: 'GET', headers, signal }), options);
     if (!response) {
       // The request never ran. For a scan that is an empty pass; for a strict caller it must NOT look like
       // "these accounts do not exist" — that is the exact shape of a silent data loss.
@@ -224,7 +226,7 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     if (offset > 0) url.searchParams.set('offset', String(offset));
 
     const response = await scheduleToncenterHttpRequest(
-      base, key, () => doFetch(url.toString(), { method: 'GET', headers }), scanRequestOptions(requestOptions));
+      base, key, (signal) => doFetch(url.toString(), { method: 'GET', headers, signal }), scanRequestOptions(requestOptions));
     if (!response) {
       // DECLINED BY THE PUMP (a 429 backoff, with skipIfRateLimited set) — the request never ran.
       //
