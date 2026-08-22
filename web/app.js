@@ -21787,10 +21787,15 @@ async function importEncryptedWalletKeyFile(file) {
   });
   if (!wallet) return false;
   if (!(await confirmWalletReplacement(t('wallet.importWalletKey')))) return false;
-  const restored = await activateImportedEncryptedWalletRecord(wallet, record);
-  // v2+ backups also carry the user's own toncenter API key — restore it so importing the wallet key on a
-  // new device brings the RPC key too. v1 backups (no key) skip this. Keyless toncenter works either way.
-  if (restored && parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND) {
+  // THE KEY FIRST, THEN THE BOOT. v2+ backups carry the user's own toncenter API key, and it used to be restored
+  // AFTER activateImportedEncryptedWalletRecord returned — which is the whole first boot: the activation read, the
+  // recovery restore, the cold sync of every conversation, all of it knocking on toncenter KEYLESS while a key sat
+  // in the very file being imported, and the Profile field stayed empty until that boot was over (minutes, on a
+  // restored device). [OWNER 2026-08-22: "the RPC key did not show up after importing the wallet key; it should be
+  // applied as early as possible so the app does not hit toncenter keyless when it has one".] The wallet is already
+  // decrypted here, so the key can be too — applyToncenterApiKey stores it, rebuilds the transports and paints the
+  // field before a single chain read of this wallet is made. v1 backups (no key) skip this; keyless works either way.
+  if (parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND) {
     let restoredApiKey = null;
     if (parsed.toncenterApiKeyEnc) {
       // v3: encrypted under the wallet seed — decrypt with the just-unlocked wallet.
@@ -21801,7 +21806,7 @@ async function importEncryptedWalletKeyFile(file) {
     }
     if (restoredApiKey && restoredApiKey.trim()) applyToncenterApiKey(restoredApiKey.trim());
   }
-  return restored;
+  return activateImportedEncryptedWalletRecord(wallet, record);
 }
 
 /**

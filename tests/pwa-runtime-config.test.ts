@@ -2420,11 +2420,17 @@ describe('PWA runtime config guard', () => {
 
     expect(prepareIndex).toBeGreaterThanOrEqual(0);
     expect(assignIndex).toBeGreaterThan(prepareIndex);
-    // v472: the call is captured (const restored = await ...) so the bundled toncenter key can be restored
-    // AFTER the wallet activates; the wallet-switch still goes through activateImportedEncryptedWalletRecord.
-    expect(importSource).toMatch(/const restored = await activateImportedEncryptedWalletRecord\(wallet, record\)/);
+    // THE BUNDLED TONCENTER KEY IS RESTORED BEFORE THE WALLET ACTIVATES [OWNER 2026-08-22]. v472 restored it after
+    // activateImportedEncryptedWalletRecord returned — i.e. after the whole first boot (activation read, recovery
+    // restore, the cold sync of every conversation) had run keyless, with the key sitting in the very file being
+    // imported, and the Profile field empty until that boot ended. The wallet is decrypted by then, so the key is
+    // decrypted and applied first; the wallet-switch still goes through activateImportedEncryptedWalletRecord.
     expect(importSource).toMatch(/decryptToncenterApiKeyFromBackup\(parsed\.toncenterApiKeyEnc, wallet\)/);
     expect(importSource).toMatch(/applyToncenterApiKey\(restoredApiKey\.trim\(\)\)/);
+    expect(importSource).toMatch(/return activateImportedEncryptedWalletRecord\(wallet, record\);/);
+    expect(importSource.indexOf('applyToncenterApiKey(restoredApiKey.trim())'), 'the key is applied BEFORE the boot')
+      .toBeLessThan(importSource.indexOf('activateImportedEncryptedWalletRecord(wallet, record)'));
+    expect(importSource).not.toMatch(/const restored = await activateImportedEncryptedWalletRecord/);
     expect(importSource).not.toMatch(/plathoWallet = wallet/);
   });
 
