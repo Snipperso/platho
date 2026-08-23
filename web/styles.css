@@ -73,6 +73,7 @@
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28);
   --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.35);
   --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-lift: rgba(0, 0, 0, 0.5);          /* the maximized composer's edge, fading in with its plate */
   --modal-outline: rgba(48, 213, 176, 0.32);
   --shared-post-embed-bg: #121b21;
   --scrollbar: rgba(148, 165, 162, 0.38);
@@ -130,6 +131,7 @@
     --shadow-1: 0 1px 2px rgba(23, 49, 44, 0.1);
     --shadow-2: 0 8px 28px rgba(23, 49, 44, 0.14);
     --shadow-pop: 0 24px 60px rgba(23, 49, 44, 0.25);
+    --shadow-lift: rgba(23, 49, 44, 0.22);
     --modal-outline: rgba(15, 157, 129, 0.3);
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
@@ -188,6 +190,7 @@
     --shadow-1: 0 1px 2px rgba(23, 49, 44, 0.1);
     --shadow-2: 0 8px 28px rgba(23, 49, 44, 0.14);
     --shadow-pop: 0 24px 60px rgba(23, 49, 44, 0.25);
+    --shadow-lift: rgba(23, 49, 44, 0.22);
     --modal-outline: rgba(15, 157, 129, 0.3);
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
@@ -1924,15 +1927,26 @@ a .avatar.has-image,
   padding-top: calc(12px + var(--app-safe-area-top, env(safe-area-inset-top)));
 }
 
-/* THE PLATE FADES IN AND OUT [OWNER 2026-08-23: "expanding/collapsing the composer, it snaps to fully opaque —
-   at least fade the opacity in on the way out and back on the way in"]. The overlay MUST end up opaque: maximized it
-   covers the whole screen, and a translucent one would show the messages, the header and the tab bar sliding behind
-   the text being written. What was jarring is the STEP — the class flips and the fill appears in one frame. So the
-   fill is a transition, in both directions: expanding it washes in over the plasma, collapsing it washes back out
-   and the composer is transparent again. Only the COLOUR animates — the geometry (fixed, full height) is the state
-   itself and has to switch at once, or the field would be typing into a box that is still travelling. */
+/* THE PLATE FADES IN AND OUT, AND ITS EDGE FADES WITH IT [OWNER 2026-08-23: "expanding/collapsing the composer, it
+   snaps to fully opaque"; then, with the fade in place: "the frame is still ugly — it should become opaque smoothly
+   while expanding and transparent smoothly while collapsing, right during the resize"].
+   MEASURED: the colour transition does run, in both directions, 300ms (getAnimations reports it on the add AND on
+   the remove). What stayed hard was the BOUNDARY: a full-bleed rectangle of --panel meeting the messages along a
+   straight line, arriving in the same instant the box does. So the edge is now part of the fade — a soft lift above
+   the plate instead of a cut — and the whole thing eases over a slightly longer curve, which is what reads as
+   "during the resize" when the geometry itself cannot be animated (it must switch at once, or the field would be
+   typed into while it is still travelling).
+   The overlay MUST still END opaque: maximized it covers the screen, and a translucent one would show the messages,
+   the header and the tab bar sliding behind the text being written. */
 .composer {
-  transition: background-color 0.3s ease;
+  transition: background-color 0.42s cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 0.42s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.42s cubic-bezier(0.2, 0.8, 0.3, 1);
+  box-shadow: 0 0 0 0 transparent;
+}
+
+.composer.is-maximized {
+  box-shadow: 0 -18px 40px -12px var(--shadow-lift, rgba(0, 0, 0, 0.35));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3547,12 +3561,33 @@ button.feed-item:hover {
 /* Restore native [hidden] for elements given a display by author rules (contract — full list). */
 .action-grid button[hidden],
 .settings-list button[hidden],
+.settings-list[hidden],
 .action-summary[hidden],
 .action-footnotes[hidden],
 .wallet-ton-group[hidden],
 .discovery-cta-action[hidden],
+.appearance-group[hidden],
+.aurora-canvas[hidden],
 .nft-card-art[hidden] {
   display: none;
+}
+
+/* APPEARANCE DIALOG (owner): theme + which animation paints behind the app + that animation's own sliders. The card,
+   its header and the rows are the shared .action-dialog / .settings-select-row chrome; only the per-background groups
+   need anything of their own — a heading, and the [hidden] above, since .settings-list gives them a display. */
+.appearance-group h3 {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.appearance-note {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 12px;
 }
 
 .ledger-row {
@@ -5606,21 +5641,12 @@ button.feed-item:hover {
   --mask: var(--theme-icon);
 }
 
-/* Armed by app.js for ~550ms around a theme flip: color-ish properties cross-fade so the whole
-   surface melts into the other theme instead of snapping. Scoped by class. */
-@keyframes themeSpin {
-  from { transform: rotate(-150deg) scale(0.55); opacity: 0; }
-}
-
 /* Cross-fade rework (owner: text blinked ~0.5s after the switch, and gradients snapped while text faded).
    Curated container list instead of the `* !important` blanket: removing the class no longer restyles the
    whole document (the blink), text follows via inherited color, every surface fades at ONE speed, and the
    gradient layers (background-image never animates in CSS) are suppressed for the window so their flat
    underlay colors carry the fade. */
 @media (prefers-reduced-motion: no-preference) {
-  .theme-anim .theme-toggle-button .icon {
-    animation: themeSpin 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
-  }
   .theme-anim body,
   .theme-anim .app-shell,
   .theme-anim .sidebar,
@@ -5678,14 +5704,6 @@ button.feed-item:hover {
   .theme-anim .boot-screen,
   .theme-anim .message.out .bubble {
     background-image: none;
-  }
-}
-
-/* The narrow conversation header already carries identity + docs + sync - the theme toggle
-   stays on the main tab headers there (same treatment as the install button). */
-@media (max-width: 900px) {
-  .conversation-header .theme-toggle-button {
-    display: none;
   }
 }
 
@@ -6056,21 +6074,32 @@ button.feed-item:hover {
   }
 }
 
-/* Profile identity (owner): avatar centered, the name/wallet under it — laconic vertical stack. */
+/* Profile identity [OWNER 2026-08-23: "this stands in a column and takes too much room — better the avatar on
+   the left and the platho name on the right"]. The redesign stacked avatar-over-name and centred it; with an 86px
+   avatar that block ran ~150px tall before the first setting. Back to a ROW: the avatar keeps its size, the name
+   and wallet line ride beside it, and the block costs only the avatar's own height. Left-aligned, not centred —
+   a centred name beside a left avatar would drift with the name's length. */
 .identity-block {
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  text-align: center;
-  padding: 10px 0 4px;
+  gap: 14px;
+  text-align: left;
+  padding: 6px 0 4px;
+}
+
+/* The avatar is a flex ITEM again, so it must be told not to shrink: `width` is only a starting basis and the
+   name/wallet column beside it was squeezing an 86px square down to 77px wide (measured). The column layout hid
+   this — nothing competed for the row's width there. */
+.identity-block > .avatar.large {
+  flex: 0 0 auto;
 }
 
 .identity-copy-layout {
-  justify-items: center;
+  justify-items: start;
 }
 
 .identity-title-row {
-  justify-content: center;
+  justify-content: start;
 }
 
 /* Balance cards (owner): flat, no corner gradient; ticker and amount centered in the box. */
@@ -6201,6 +6230,24 @@ button.feed-item:hover {
 /* The Saved-notes avatar keeps its flat tint — the glow layer painted over it. */
 .avatar.avatar-saved::before {
   display: none;
+}
+
+/* THE ANONYMITY MASK for a contact with no name and no picture (app.js ANONYMOUS_AVATAR_SVG) — every basechain
+   address a user sees begins with the same two characters, so the monogram it produced was identical for everyone.
+   Muted, not accent: it marks the ABSENCE of an identity, and must not compete with the contacts that have one. */
+.avatar.avatar-anonymous {
+  color: var(--muted);
+}
+
+.avatar.avatar-anonymous svg {
+  width: 24px;
+  height: 24px;
+}
+
+.feed-avatar.avatar-anonymous svg,
+.share-target-avatar.avatar-anonymous svg {
+  width: 19px;
+  height: 19px;
 }
 
 /* Reduced motion: the appended overlay entrances and modal close animations must obey it too. */

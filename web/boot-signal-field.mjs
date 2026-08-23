@@ -2,14 +2,31 @@
 // ported from web-about/main.js. Pure and context-based so it runs on EITHER the main thread (HTMLCanvas ctx)
 // OR inside a worker (OffscreenCanvas ctx) — the caller drives the loop and resize. No requestAnimationFrame
 // here (workers don't have it): tick(now) self-gates to ~33fps. English-only (OPSEC): no user-facing text.
-export function createBootSignalField(ctx, { reduceMotion = false } = {}) {
+// EVERY KNOB DEFAULTS TO THE BOOT SCREEN AS IT SHIPS [OWNER 2026-08-23: "for the nodes, set the defaults to exactly
+// what we have on the loading screen now"], so a caller that passes nothing gets today's field, byte for byte. The
+// app's Appearance settings pass multipliers around 1: brightness (the dots), runners (how many routes travel at
+// once), speed (the hop tempo) and lights (how strongly the two roaming flashlights lift the lattice).
+export function createBootSignalField(ctx, {
+  reduceMotion = false,
+  brightness = 1,
+  runners = 1,
+  speed = 1,
+  lights: lightLevel = 1,
+} = {}) {
   const TEAL = '48, 213, 176';
   const TWO_PI = Math.PI * 2;
   const GAP = 38;
-  const AMBIENT = 0.11;
-  const BOOST = 0.34;
-  const HOP = 170;
-  const TAU = 620;
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : 1));
+  const brightnessK = clamp(brightness, 0, 4);
+  const runnersK = clamp(runners, 0, 4);
+  const lightsK = clamp(lightLevel, 0, 4);
+  const AMBIENT = 0.11 * brightnessK;
+  const BOOST = 0.34 * brightnessK * lightsK;
+  // The hop is a DURATION, so a faster tempo is a SHORTER hop; the trail decays on the same clock, or a fast field
+  // would leave permanent tracks and a slow one would go dark between hops.
+  const speedK = clamp(speed, 0.1, 4);
+  const HOP = 170 / speedK;
+  const TAU = 620 / speedK;
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
   let W = 0; let H = 0; let dpr = 1; let cols = 0; let rows = 0; let ox = 0; let oy = 0; let cx = 0; let cy = 0;
@@ -92,7 +109,9 @@ export function createBootSignalField(ctx, { reduceMotion = false } = {}) {
       if (L.y < 0) { L.y = 0; L.ang = -L.ang; } else if (L.y > H) { L.y = H; L.ang = -L.ang; }
     }
   }
-  const maxSignals = () => Math.min(24, Math.max(12, Math.round((W * H) / 26000)));
+  // The count follows the AREA (a phone gets 12, a desktop 24), scaled by the caller's runners knob — so the default
+  // is exactly the shipped field on every screen size, and the setting reads as "more/fewer than usual".
+  const maxSignals = () => Math.max(0, Math.round(Math.min(24, Math.max(12, Math.round((W * H) / 26000))) * runnersK));
   function spawn() {
     const path = [{ c: Math.floor(Math.random() * cols), r: Math.floor(Math.random() * rows) }];
     const len = 6 + Math.floor(Math.random() * 7);

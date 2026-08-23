@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=56';
+} from './public-channel-subscriptions.mjs?v=57';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -250,8 +250,8 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=80';
-import { createBootSignalField } from './boot-signal-field.mjs?v=1';
+} from './i18n.mjs?v=81';
+import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
 // Locale resolves BEFORE any rendering (stored choice -> Telegram profile -> browser); static HTML gets its
@@ -416,11 +416,12 @@ const panels = [...document.querySelectorAll('.view-panel')];
 const docsButtons = [...document.querySelectorAll('.docs-header-button')];
 const installButtons = [...document.querySelectorAll('.install-header-button')];
 
-// ── Theme toggle (header control beside the docs button on every surface). Forced theme rides
-// html[data-theme] (styles.css overrides prefers-color-scheme for it); boot-guard.js re-applies the
-// persisted choice before first paint. The .theme-anim class arms the CSS color cross-fade for the flip.
+// ── Theme. Forced theme rides html[data-theme] (styles.css overrides prefers-color-scheme for it); boot-guard.js
+// re-applies the persisted choice before first paint. The .theme-anim class arms the CSS colour cross-fade.
+// CHOSEN IN THE APPEARANCE DIALOG [OWNER 2026-08-23: "the theme button can come out of the header"] — the header
+// carried a toggle on every surface, which is a lot of chrome for a setting that is now one row of the one modal
+// that decides how the app looks. The mechanism below is unchanged; only the door moved.
 const THEME_STORAGE_KEY = 'platho.theme.v1';
-const themeToggleButtons = [...document.querySelectorAll('.theme-toggle-button')];
 let themeAnimTimer = 0;
 
 function currentEffectiveTheme() {
@@ -447,12 +448,6 @@ function applyForcedTheme(next) {
   reflectThemeColorMeta();
   clearTimeout(themeAnimTimer);
   themeAnimTimer = setTimeout(() => root.classList.remove('theme-anim'), 550);
-}
-
-for (const button of themeToggleButtons) {
-  button.addEventListener('click', () => {
-    applyForcedTheme(currentEffectiveTheme() === 'dark' ? 'light' : 'dark');
-  });
 }
 
 // Boot-guard may have applied a persisted forced theme before this module ran — align the meta pair once.
@@ -3847,6 +3842,25 @@ function setAvatarNode(node, fallback, imageUrl = null) {
   node.textContent = String(fallback ?? 'P').slice(0, 2).toUpperCase();
 }
 
+/**
+ * A contact who has neither a name nor a picture wears an ANONYMITY MASK, not two letters.
+ *
+ * [OWNER 2026-08-23: "I don't like that everyone has this UQ. For contacts with no username and no avatar, put an
+ * anonymity icon in the contact's picture — an anonymous sort of thing."] The letters came from the first two
+ * characters of whatever labelled the row, and for a bare wallet that is the ADDRESS — every basechain address a
+ * user sees starts with the same "UQ", so every unnamed contact wore the same monogram. A monogram that is identical
+ * for everyone is worse than none: it looks like an identity and identifies nobody.
+ *
+ * Static markup only — never interpolate user data into this.
+ */
+const ANONYMOUS_AVATAR_SVG =
+  '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+  + '<path d="M12 3a4.2 4.2 0 0 1 4.2 4.2A4.2 4.2 0 0 1 12 11.4a4.2 4.2 0 0 1-4.2-4.2A4.2 4.2 0 0 1 12 3Z" opacity="0.55"/>'
+  + '<path d="M3.6 15.4c0-.7.35-1.32.95-1.63C6.2 12.9 8.9 12.3 12 12.3s5.8.6 7.45 1.47c.6.31.95.93.95 1.63v1.1H3.6v-1.1Z" opacity="0.55"/>'
+  + '<path d="M3.2 17.9h17.6c.44 0 .8.36.8.8s-.36.8-.8.8H3.2a.8.8 0 0 1 0-1.6Z"/>'
+  + '<path d="M7.4 17.9c-.5 1.6-1.4 2.6-2.7 2.6-1.2 0-2-.8-2-1.9 0-.3.05-.5.12-.7H7.4Zm9.2 0c.5 1.6 1.4 2.6 2.7 2.6 1.2 0 2-.8 2-1.9 0-.3-.05-.5-.12-.7H16.6Z"/>'
+  + '</svg>';
+
 // Static markup only — never interpolate user data into this.
 const SAVED_MESSAGES_AVATAR_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -3872,10 +3886,30 @@ function setThreadAvatarNode(node, thread) {
     return;
   }
   node.classList.remove('avatar-saved');
+  // NO PICTURE AND NO NAME -> THE MASK, not a monogram of the address (see ANONYMOUS_AVATAR_SVG). Checked on the
+  // same rule the rest of the app uses for "this contact is a bare wallet": no local label, and either no identity
+  // at all or one that IS the wallet address. The moment a .ath name, a local name or a picture arrives, the row
+  // goes back to the ordinary avatar — the mask means "nothing to show yet", never a state of its own.
+  if (!thread?.avatarImageUrl && threadIsBareWalletAddress(thread)) {
+    node.classList.remove('has-image');
+    node.classList.add('avatar-anonymous');
+    node.style.backgroundImage = '';
+    delete node.dataset.avatarUrl;
+    node.innerHTML = ANONYMOUS_AVATAR_SVG;
+    return;
+  }
+  node.classList.remove('avatar-anonymous');
   // The LETTER derives from the same string the row's title shows, AT RENDER TIME — the persisted
   // thread.avatar can carry a stale initial from an older label (history snapshot restore), which made the
   // letter flip between renders depending on which code path wrote it last (owner: "sometimes U, sometimes A").
   setAvatarNode(node, threadDisplayLabel(thread) || thread?.avatar, thread?.avatarImageUrl);
+}
+
+/** No local name, and no identity beyond the wallet address itself — the same test the channel-name resolver uses. */
+function threadIsBareWalletAddress(thread) {
+  if (!thread || thread.localLabel) return false;
+  const identity = threadSelectedIdentity(thread);
+  return !identity || identity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS;
 }
 
 // Thread-list side label: today -> clock time, this week -> weekday, else a date (year only when it differs).
@@ -9639,6 +9673,34 @@ let auroraLevel = readAuroraLevel();
 const AURORA_COUNT_KEY = 'platho.auroraCount.v1';
 const AURORA_SPEED_KEY = 'platho.auroraSpeed.v1';
 const AURORA_ENERGY_KEY = 'platho.auroraEnergy.v1';
+
+// ── WHICH ANIMATION PAINTS BEHIND THE APP [OWNER 2026-08-23: "background animation: none, plasma, nodes. Nodes is
+// the one on the loading screen — I want it on the app background too, if the user picks it"]. One persisted choice,
+// read at boot BEFORE anything is started, so the boot screen can obey it as well ("if the user picks plasma, let it
+// slosh on the loading screen too; if they turned the background off, there must be none there either").
+//
+// NONE IS THE DEFAULT [OWNER 2026-08-23: "set the default for users to 'none'"]. A background animation is a
+// preference, and the one thing it costs — a full-screen canvas repainting forever — is paid by every device that
+// never asked for it. So the app arrives quiet and the user turns it on; a device that already chose keeps its
+// choice, because the absence of the key is what means "not chosen", not the value of it.
+const BACKGROUND_KEY = 'platho.background.v1';
+const BACKGROUND_MODES = ['plasma', 'nodes', 'none'];
+function readBackgroundMode() {
+  try {
+    const stored = localStorage.getItem(BACKGROUND_KEY);
+    return BACKGROUND_MODES.includes(stored) ? stored : 'none';
+  } catch { return 'none'; }
+}
+let backgroundMode = readBackgroundMode();
+
+// THE NODES FIELD'S KNOBS, as PERCENTAGES of the boot screen's own field [OWNER: "for the nodes, set the defaults to
+// exactly what we have on the loading screen now"]. 100 means "the shipped field", on every screen size — the runner
+// count is derived from the area inside the field itself, so a percentage keeps that and reads as "more/fewer than
+// usual" rather than an absolute nobody can calibrate.
+const NODES_LEVEL_KEY = 'platho.nodesLevel.v1';       // the lattice's brightness
+const NODES_RUNNERS_KEY = 'platho.nodesRunners.v1';   // how many signal routes travel at once
+const NODES_SPEED_KEY = 'platho.nodesSpeed.v1';       // the hop tempo (the trail decays on the same clock)
+const NODES_LIGHTS_KEY = 'platho.nodesLights.v1';     // how strongly the two roaming flashlights lift the lattice
 function readAuroraSetting(key, fallback, min, max) {
   try {
     const stored = localStorage.getItem(key);
@@ -9650,6 +9712,20 @@ let auroraCount = readAuroraSetting(AURORA_COUNT_KEY, 5, 1, 16);       // suns o
 let auroraSpeed = readAuroraSetting(AURORA_SPEED_KEY, 175, 25, 600);   // percent of the base tempo (owner's pick: 175)
 let auroraEnergy = readAuroraSetting(AURORA_ENERGY_KEY, 50, 0, 200);   // 50 = shipped activity
 const auroraEnergyK = () => auroraEnergy / 50;                          // 0 .. 4, 1 = shipped
+// The nodes field's four, read the same way. 100 = the boot screen exactly.
+let nodesLevel = readAuroraSetting(NODES_LEVEL_KEY, 100, 0, 300);
+let nodesRunners = readAuroraSetting(NODES_RUNNERS_KEY, 100, 0, 300);
+let nodesSpeed = readAuroraSetting(NODES_SPEED_KEY, 100, 25, 300);
+let nodesLights = readAuroraSetting(NODES_LIGHTS_KEY, 100, 0, 300);
+/** What createBootSignalField takes: the four sliders as multipliers around 1. */
+function nodesFieldOptions() {
+  return {
+    brightness: nodesLevel / 100,
+    runners: nodesRunners / 100,
+    speed: nodesSpeed / 100,
+    lights: nodesLights / 100,
+  };
+}
 function bindAuroraRange(id, key, min, max, apply) {
   const range = document.querySelector(id);
   if (!range) return;
@@ -9878,6 +9954,12 @@ function drawAuroraView(view, t, rgb) {
 }
 function auroraTick(now) {
   if (document.hidden) { auroraLoopArmed = false; return; }   // resumed by visibilitychange below
+  // ANOTHER BACKGROUND IS ON (or none): the loop STOPS, it does not idle. Returning early after re-arming would
+  // still wake the main thread on every frame forever to decide to do nothing — which is exactly the cost the
+  // "none" setting exists to avoid [OWNER 2026-08-23: "the plasma and the nodes really aren't drawn when the
+  // background is set to none? or are you just hiding it while it keeps loading the processor"]. applyBackgroundMode
+  // arms it again when the plasma is chosen.
+  if (backgroundMode !== 'plasma') { auroraLoopArmed = false; return; }
   requestAnimationFrame(auroraTick);
   if (now - auroraLastFrameAt < AURORA_FRAME_MS) return;
   const dt = auroraLastFrameAt ? Math.min(0.1, (now - auroraLastFrameAt) / 1000) : 0;
@@ -9908,11 +9990,22 @@ function auroraTick(now) {
   }
 }
 let auroraRedrawStill = null;
+/** Start the frame loop, unless it is already running, the tab is away, or the plasma is not the chosen background. */
+function armAuroraLoop() {
+  if (auroraLoopArmed || document.hidden) return;
+  if (backgroundMode !== 'plasma' || auroraScenes.length === 0) return;
+  auroraLoopArmed = true;
+  requestAnimationFrame(auroraTick);
+}
+// ONE listener for the tab's life. startAuroraLoop is called again on every switch back to the plasma and once per
+// boot-screen plasma, and registering the listener inside it added one more every time.
+document.addEventListener('visibilitychange', armAuroraLoop);
 function startAuroraLoop() {
   if (auroraScenes.length === 0) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     // One still frame: the glow stays, the motion does not (redrawn when the brightness slider moves).
     auroraRedrawStill = () => {
+      if (backgroundMode !== 'plasma') return;   // nothing to paint — see applyBackgroundMode
       const rgb = auroraRgb(performance.now());
       for (const stage of auroraStages) { stage.bornAt = null; measureAuroraStage(stage, performance.now()); }
       for (const scene of auroraScenes) { scene.bornAt = null; scene.canvas.width = 240; scene.canvas.height = 160; if (scene.stage) drawAuroraView(scene, 0, rgb); else drawAuroraScene(scene, 0, rgb); }
@@ -9920,9 +10013,7 @@ function startAuroraLoop() {
     auroraRedrawStill();
     return;
   }
-  const arm = () => { if (auroraLoopArmed || document.hidden) return; auroraLoopArmed = true; requestAnimationFrame(auroraTick); };
-  document.addEventListener('visibilitychange', arm);
-  arm();
+  armAuroraLoop();
 }
 // AURORA CLIP LAYERS. The drifting glow of the shell and of every pane lives in its own absolutely positioned,
 // overflow-hidden child (.aurora-layer; the blobs are its ::before/::after). As pseudo-elements of the host they
@@ -9946,10 +10037,177 @@ function attachAuroraLayer(host) {
   const stage = createAuroraStage(auroraCount);
   for (const host of document.querySelectorAll('.app-shell')) auroraScenes.push(createAuroraView(attachAuroraLayer(host), stage, 'shell'));
 }
+
+// ── THE NODES FIELD AS AN APP BACKGROUND ────────────────────────────────────────────────────────────────────────
+// The same lattice the boot screen paints (createBootSignalField), on the shell's own aurora layer — so whichever
+// background is chosen, it lives in the same box, behind the same transparent panes, with no second stacking context
+// to reason about. ON THE MAIN THREAD, deliberately: the boot screen's worker exists because the boot runs during the
+// synchronous post-unlock crypto; the app's background has no such window, and a worker per canvas would cost a
+// thread for a backdrop. The loop pauses with the tab exactly as the plasma's does, and reduced motion gets one still
+// frame instead of a loop.
+let nodesScene = null;         // { canvas, ctx, field, layer, w, h }
+let nodesLoopArmed = false;
+function nodesHostLayer() {
+  const shell = document.querySelector('.app-shell');
+  return shell ? attachAuroraLayer(shell) : null;
+}
+function destroyNodesScene() {
+  if (!nodesScene) return;
+  nodesScene.canvas.remove();
+  nodesScene = null;
+}
+function buildNodesScene() {
+  const layer = nodesHostLayer();
+  if (!layer) return null;
+  destroyNodesScene();
+  const canvas = document.createElement('canvas');
+  canvas.className = 'aurora-canvas';   // same box as the plasma's: inset 0, full bleed, pointer-events off
+  canvas.setAttribute('aria-hidden', 'true');
+  layer.append(canvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) { canvas.remove(); return null; }
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  nodesScene = { canvas, ctx, layer, field: createBootSignalField(ctx, { reduceMotion, ...nodesFieldOptions() }), w: 0, h: 0 };
+  measureNodesScene();
+  nodesScene.field.start();
+  return nodesScene;
+}
+function measureNodesScene() {
+  if (!nodesScene) return false;
+  const { layer } = nodesScene;
+  if (!layer.isConnected || layer.offsetParent === null) return false;
+  const w = layer.clientWidth || 0;
+  const h = layer.clientHeight || 0;
+  if (w <= 0 || h <= 0) return false;
+  if (w !== nodesScene.w || h !== nodesScene.h) {
+    nodesScene.w = w; nodesScene.h = h;
+    // The lattice is drawn at CSS resolution (its dots are 1–3px): a dpr above 2 buys nothing visible and costs
+    // fourfold fill, which is the one thing a full-screen backdrop must not do on a phone.
+    nodesScene.field.resize(w, h, Math.min(window.devicePixelRatio || 1, 2));
+    nodesScene.field.paintOnce();
+  }
+  return true;
+}
+function nodesTick(now) {
+  if (document.hidden || backgroundMode !== 'nodes' || !nodesScene) { nodesLoopArmed = false; return; }
+  requestAnimationFrame(nodesTick);
+  if (!measureNodesScene()) return;
+  nodesScene.field.tick(now);
+}
+function armNodesLoop() {
+  if (nodesLoopArmed || document.hidden || backgroundMode !== 'nodes' || !nodesScene) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { measureNodesScene(); return; }
+  nodesLoopArmed = true;
+  requestAnimationFrame(nodesTick);
+}
+document.addEventListener('visibilitychange', armNodesLoop);
+window.addEventListener('resize', () => { if (backgroundMode === 'nodes') measureNodesScene(); });
+
+/**
+ * Put the chosen background on screen. Called at boot and on every change of the setting or of a nodes slider — it
+ * rebuilds rather than mutates, because the field's knobs are baked in when it is created (a rebuild of a lattice is
+ * one paint, and the setting changes at human speed).
+ */
+function applyBackgroundMode({ rebuildNodes = false } = {}) {
+  const plasmaOn = backgroundMode === 'plasma';
+  for (const scene of auroraScenes) {
+    scene.canvas.hidden = !plasmaOn;
+    // A canvas that is about to be hidden keeps its last frame; clear it so a later re-show cannot flash the old one.
+    if (!plasmaOn && scene.ctx) scene.ctx.clearRect(0, 0, scene.canvas.width, scene.canvas.height);
+  }
+  if (plasmaOn) { auroraLastFrameAt = 0; startAuroraLoop(); }
+  if (backgroundMode === 'nodes') {
+    if (rebuildNodes || !nodesScene) buildNodesScene();
+    armNodesLoop();
+  } else {
+    destroyNodesScene();
+  }
+}
+
 bindAuroraRange('#auroraCountRange', AURORA_COUNT_KEY, 1, 16, (v) => { auroraCount = v; rebuildAuroraSuns(); });
 bindAuroraRange('#auroraSpeedRange', AURORA_SPEED_KEY, 25, 600, (v) => { auroraSpeed = v; });
 bindAuroraRange('#auroraEnergyRange', AURORA_ENERGY_KEY, 0, 200, (v) => { auroraEnergy = v; });
 startAuroraLoop();
+// …and put the CHOSEN background on screen. startAuroraLoop above always arms the plasma's loop (it is also what
+// paints the reduced-motion still frame); applyBackgroundMode decides what that loop is allowed to paint.
+applyBackgroundMode();
+
+// ── APPEARANCE DIALOG ───────────────────────────────────────────────────────────────────────────────────────────
+// One door for everything that decides how the app looks: the theme, which animation paints behind it, and that
+// animation's own knobs. Every control writes through on `input`/`change` — the app IS the preview, and the user is
+// looking at it while they drag; a Save button would only add a way to lose the change.
+const appearanceDialog = document.querySelector('#appearanceDialog');
+const appearanceThemeSelect = document.querySelector('#appearanceThemeSelect');
+const appearanceBackgroundSelect = document.querySelector('#appearanceBackgroundSelect');
+const appearancePlasmaGroup = document.querySelector('#appearancePlasmaGroup');
+const appearanceNodesGroup = document.querySelector('#appearanceNodesGroup');
+const appearanceStatus = document.querySelector('#appearanceStatus');
+
+const BACKGROUND_LABEL_KEYS = {
+  plasma: 'appearance.backgroundPlasma',
+  nodes: 'appearance.backgroundNodes',
+  none: 'appearance.backgroundNone',
+};
+
+/** The profile row's trailing word, and which slider group the dialog shows: both are just the current choice. */
+function refreshAppearanceUi() {
+  if (appearanceStatus) {
+    const key = BACKGROUND_LABEL_KEYS[backgroundMode] ?? BACKGROUND_LABEL_KEYS.plasma;
+    appearanceStatus.textContent = t(key);
+    appearanceStatus.dataset.i18n = key;   // so a language switch re-translates it in place
+  }
+  if (appearancePlasmaGroup) appearancePlasmaGroup.hidden = backgroundMode !== 'plasma';
+  if (appearanceNodesGroup) appearanceNodesGroup.hidden = backgroundMode !== 'nodes';
+  if (appearanceThemeSelect) appearanceThemeSelect.value = currentEffectiveTheme();
+  if (appearanceBackgroundSelect) appearanceBackgroundSelect.value = backgroundMode;
+}
+
+function openAppearanceDialog() {
+  if (!appearanceDialog) return;
+  refreshAppearanceUi();
+  appearanceDialog.classList.remove('is-closing');
+  appearanceDialog.hidden = false;
+}
+function closeAppearanceDialog() {
+  hideDialogAnimated(appearanceDialog);
+}
+
+document.querySelector('#appearanceButton')?.addEventListener('click', openAppearanceDialog);
+document.querySelector('#appearanceCloseButton')?.addEventListener('click', closeAppearanceDialog);
+closeOnBackdropClick(appearanceDialog, closeAppearanceDialog);
+
+appearanceThemeSelect?.addEventListener('change', () => {
+  applyForcedTheme(appearanceThemeSelect.value === 'light' ? 'light' : 'dark');
+  refreshAppearanceUi();
+});
+appearanceBackgroundSelect?.addEventListener('change', () => {
+  const next = BACKGROUND_MODES.includes(appearanceBackgroundSelect.value) ? appearanceBackgroundSelect.value : 'plasma';
+  if (next === backgroundMode) return;
+  backgroundMode = next;
+  try { localStorage.setItem(BACKGROUND_KEY, backgroundMode); } catch { /* best-effort persist */ }
+  applyBackgroundMode({ rebuildNodes: true });
+  refreshAppearanceUi();
+});
+
+// The nodes field bakes its knobs in when it is built, so a slider REBUILDS it. That is one paint of a lattice, at
+// the speed a human drags a slider — and it keeps the field itself free of live-settings plumbing, which is what lets
+// the boot screen run the very same code inside a worker.
+function bindNodesRange(id, key, min, max, apply) {
+  const range = document.querySelector(id);
+  if (!range) return;
+  range.value = String(readAuroraSetting(key, Number(range.value) || 100, min, max));
+  range.addEventListener('input', () => {
+    const value = Math.max(min, Math.min(max, Math.round(Number(range.value) || 0)));
+    try { localStorage.setItem(key, String(value)); } catch { /* best-effort persist */ }
+    apply(value);
+    if (backgroundMode === 'nodes') applyBackgroundMode({ rebuildNodes: true });
+  });
+}
+bindNodesRange('#nodesLevelRange', NODES_LEVEL_KEY, 0, 300, (v) => { nodesLevel = v; });
+bindNodesRange('#nodesRunnersRange', NODES_RUNNERS_KEY, 0, 300, (v) => { nodesRunners = v; });
+bindNodesRange('#nodesSpeedRange', NODES_SPEED_KEY, 25, 300, (v) => { nodesSpeed = v; });
+bindNodesRange('#nodesLightsRange', NODES_LIGHTS_KEY, 0, 300, (v) => { nodesLights = v; });
+refreshAppearanceUi();
 
 // SEARCH inside the list (owner): narrows WITHIN what the sweep has found so far (name, resolved label, description,
 // tags, wallet). Cards that stop matching swim out, cards that start matching swim in — see renderPublicDiscovery.
@@ -28786,15 +29044,20 @@ function setBootDebug(step) {
 // falling back to a main-thread loop otherwise. Returns a stop() that tears the animation down.
 function startBootSignalField(canvas) {
   if (!canvas) return () => {};
+  // THE LOADING SCREEN WEARS THE SAME BACKGROUND THE APP DOES [OWNER 2026-08-23: "if the user picks plasma, let it
+  // slosh on the loading screen too; if they turned the background off, there must be none there either"]. The
+  // choice is in localStorage and is read before anything starts, so this needs no app state to be up yet.
+  if (backgroundMode === 'none') { canvas.hidden = true; return () => {}; }
+  if (backgroundMode === 'plasma') return startBootPlasmaField(canvas);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const reduceMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   // Preferred path: transfer the canvas to a worker and animate there, immune to main-thread jank.
   if (typeof Worker !== 'undefined' && typeof canvas.transferControlToOffscreen === 'function') {
     try {
-      const worker = new Worker('./boot-signal-worker.js?v=1', { type: 'module' });
+      const worker = new Worker('./boot-signal-worker.js?v=2', { type: 'module' });
       const offscreen = canvas.transferControlToOffscreen();
       worker.postMessage(
-        { type: 'init', canvas: offscreen, width: window.innerWidth, height: window.innerHeight, dpr, reduceMotion },
+        { type: 'init', canvas: offscreen, width: window.innerWidth, height: window.innerHeight, dpr, reduceMotion, ...nodesFieldOptions() },
         [offscreen],
       );
       const onResize = () => { try { worker.postMessage({ type: 'resize', width: window.innerWidth, height: window.innerHeight }); } catch { /* worker gone */ } };
@@ -28812,7 +29075,7 @@ function startBootSignalField(canvas) {
   // Fallback: main-thread loop (can jank under heavy crypto, but works everywhere).
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
-  const field = createBootSignalField(ctx, { reduceMotion });
+  const field = createBootSignalField(ctx, { reduceMotion, ...nodesFieldOptions() });
   field.resize(window.innerWidth, window.innerHeight, dpr);
   field.start();
   let raf = null;
@@ -28825,6 +29088,39 @@ function startBootSignalField(canvas) {
     stopped = true;
     if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
     window.removeEventListener('resize', onResize);
+  };
+}
+
+/**
+ * The plasma, on the loading screen, when that is the chosen background.
+ *
+ * It paints on the SAME element the nodes field would use — the boot screen's own canvas — through the app's aurora
+ * painter, on its own single-sun-set stage. ON THE MAIN THREAD, unlike the nodes worker: the plasma painter reads the
+ * live theme token and the user's four sliders, and lifting all of that into a worker to keep a backdrop moving
+ * during the crypto burst is a trade nobody asked for. The CSS spinner is composited and keeps turning either way.
+ */
+function startBootPlasmaField(canvas) {
+  const screen = canvas.closest('.boot-screen');
+  if (!screen) return () => {};
+  canvas.hidden = true;   // that canvas belongs to the nodes field; this mode paints on its own layer
+  // ITS OWN .aurora-layer, exactly as the app shell has one — NOT the boot canvas directly. The loop decides whether
+  // a scene is on screen by `layer.offsetParent`, and offsetParent is null for a POSITION: FIXED element, which the
+  // boot screen is: a scene hung on the screen itself was skipped on every frame and never painted a pixel
+  // (measured). A layer is `position: absolute` inside it, so its offsetParent is the screen and the check works —
+  // and z-index:-1 inside the screen's own stacking context puts the plasma above its background, under the brand
+  // and the spinner, which is where the app shell puts it too.
+  const layer = attachAuroraLayer(screen);
+  const stage = createAuroraStage(auroraCount);
+  const view = createAuroraView(layer, stage, 'shell');
+  auroraScenes.push(view);
+  auroraLastFrameAt = 0;
+  startAuroraLoop();
+  return () => {
+    const sceneAt = auroraScenes.indexOf(view);
+    if (sceneAt >= 0) auroraScenes.splice(sceneAt, 1);
+    const stageAt = auroraStages.indexOf(stage);
+    if (stageAt >= 0) auroraStages.splice(stageAt, 1);
+    layer.remove();
   };
 }
 
@@ -28847,7 +29143,9 @@ function initBootScreen() {
   setBootDebug('init');
   try {
     stopBootSignalField = startBootSignalField(bootSignalCanvas);
-    setBootDebug('init:field-ok');
+    // The chosen background rides the boot trace: which backdrop a boot ran with is the first thing to know when
+    // someone reports the loading screen looking wrong, and the screen is gone by the time anyone can inspect it.
+    setBootDebug(`init:field-ok:${backgroundMode}`);
   } catch (error) {
     setBootDebug(`init:field-err ${error?.message ?? error}`);
     console.error(error);

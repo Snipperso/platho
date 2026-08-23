@@ -2,7 +2,7 @@
 // OffscreenCanvas, so it stays smooth even while the main thread is blocked by the synchronous post-unlock
 // crypto. Workers have no requestAnimationFrame, so the loop is a self-scheduling setTimeout at ~33fps.
 // English-only (OPSEC); no user-facing text.
-import { createBootSignalField } from './boot-signal-field.mjs?v=1';
+import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 let field = null;
 let timer = null;
@@ -22,7 +22,14 @@ self.onmessage = (event) => {
     reduceMotion = Boolean(data.reduceMotion);
     const ctx = data.canvas.getContext('2d');
     if (!ctx) return;
-    field = createBootSignalField(ctx, { reduceMotion });
+    // The caller's Appearance settings ride in with the canvas; anything it omits falls back to the shipped field.
+    field = createBootSignalField(ctx, {
+      reduceMotion,
+      brightness: data.brightness,
+      runners: data.runners,
+      speed: data.speed,
+      lights: data.lights,
+    });
     field.resize(data.width, data.height, dpr);
     field.start();
     if (!reduceMotion) loop();

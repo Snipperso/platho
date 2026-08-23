@@ -16,12 +16,12 @@
     "sha256": "c837b3944ee9b7d27eb161465ad0f2b7c454fb93cb7926192a3a59d4fbdcb206"
   },
   "boot-signal-field.mjs": {
-    "version": "1",
-    "sha256": "df38b0ba36d5229fc43927d07aaea2f1e675e4e718c41088ab56089e332a6929"
+    "version": "2",
+    "sha256": "578605409205cd7fac9a9b3c70550607d387f8428bc312308ae9ed07ee56261e"
   },
   "boot-signal-worker.js": {
-    "version": "1",
-    "sha256": "2a2b6f383f0b0e50f594254c4bae6a111144584cb06ccb9730f9c5ec1a7daeb6"
+    "version": "2",
+    "sha256": "c7f9fcee6bee86ab0d1e30f6c51e84209577ed592cc3987b6be24ed8d1cade61"
   },
   "capsule-part-policy.mjs": {
     "version": "10",
@@ -68,12 +68,12 @@
     "sha256": "9c45e27d8b6a3bed431641d0e2d09af40271ddd82def381f69e6ac0210c31e9f"
   },
   "i18n-strings.mjs": {
-    "version": "82",
-    "sha256": "838b2c9d5a462b7476e29941b21e2586e4ba5ba485cfeb2acbe9e0c5d88546b5"
+    "version": "83",
+    "sha256": "d04b9bbc73a36c6421b565da160dcb6dc53b0c43b77d4c47a9bcbfdaea5ec33f"
   },
   "i18n.mjs": {
-    "version": "80",
-    "sha256": "fdbdc94d6036969e61af57b7e36376d3f81155a8f1f4b627c1f08bbab07dac73"
+    "version": "81",
+    "sha256": "a636e7f2944332d844ecf3f7e27ed878a68a22e50d8403ccd9afbae7d28d25e7"
   },
   "intro-bucket.mjs": {
     "version": "21",
@@ -176,8 +176,8 @@
     "sha256": "69c3ccf72c8f4542b93baca73a387db181803d4a310ab0590bbc26dc93df9216"
   },
   "public-channel-subscriptions.mjs": {
-    "version": "56",
-    "sha256": "1e7e8380623bfec35d19c65c0eca3166154db6161bb64c6f527bcb5467e578f1"
+    "version": "57",
+    "sha256": "30ae4b1032fee5769b24bbc5e57a04c41be49d0a79d7700f1682a708141416a6"
   },
   "public-lane-send.mjs": {
     "version": "22",
@@ -256,8 +256,8 @@
     "sha256": "f2206ca91724a6b58f4b98002f78999df2f1525300f8d40e2a840feba613c9ca"
   },
   "styles.css": {
-    "version": "347",
-    "sha256": "e9a2062828a40fbe6aea2cf09bab040120930115acfb445bc3fec8415bd50e49"
+    "version": "352",
+    "sha256": "1f149efff382c963ff4a891108ac3747b3d5e934cccb3a7286a0eed195d0994d"
   },
   "thread-list-order.mjs": {
     "version": "2",

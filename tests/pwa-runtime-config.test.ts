@@ -4099,6 +4099,139 @@ describe('PWA runtime config guard', () => {
     expect(render).not.toMatch(/time\.textContent = thread\.time;/);
   });
 
+  it('PWA-APPEARANCE-01: one modal owns the theme and the background, the app arrives quiet, and the boot screen agrees', () => {
+    // [OWNER 2026-08-23: "let's do centralised appearance. In the profile, an 'Appearance settings' button opening a
+    // modal: theme light/dark; background animation none/plasma/nodes — nodes is the one on the loading screen, I
+    // want it available as the app background too. Below, the settings for plasma and for nodes." Then: "if the user
+    // picks plasma, let it slosh on the loading screen too; if they turned the background off, there must be none
+    // there either", "for the nodes, set the defaults to exactly what we have on the loading screen now", "set the
+    // default for users to 'none'", and "the theme button can come out of the header".]
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+
+    // ONE DOOR. The profile row opens the modal; the sliders live in it, not in the profile column they used to grow.
+    expect(html).toMatch(/<button id="appearanceButton" type="button">/);
+    expect(html).toMatch(/<div class="modal-backdrop" id="appearanceDialog" hidden>/);
+    for (const control of ['appearanceThemeSelect', 'appearanceBackgroundSelect', 'appearancePlasmaGroup', 'appearanceNodesGroup']) {
+      expect(html, `${control} is in the dialog`).toContain(`id="${control}"`);
+    }
+    const dialogHtml = html.slice(html.indexOf('id="appearanceDialog"'), html.indexOf('id="docsDialog"'));
+    for (const slider of ['auroraLevelRange', 'auroraCountRange', 'auroraSpeedRange', 'auroraEnergyRange',
+      'nodesLevelRange', 'nodesRunnersRange', 'nodesSpeedRange', 'nodesLightsRange']) {
+      expect(dialogHtml, `${slider} moved into the dialog`).toContain(`id="${slider}"`);
+    }
+    const profileHtml = html.slice(html.indexOf('data-i18n="profile.appearance"'), html.indexOf('username.usernamesAndAvatars'));
+    expect(profileHtml, 'the profile keeps the door, not the sliders').not.toMatch(/type="range"/);
+
+    // NONE IS THE DEFAULT: a background animation is a preference, and a full-screen canvas repainting forever is
+    // paid by every device that never asked for it.
+    expect(app).toMatch(/const BACKGROUND_MODES = \['plasma', 'nodes', 'none'\];/);
+    const reader = app.slice(app.indexOf('function readBackgroundMode()'), app.indexOf('let backgroundMode ='));
+    expect(reader).toMatch(/return BACKGROUND_MODES\.includes\(stored\) \? stored : 'none';/);
+    expect(reader).toMatch(/catch \{ return 'none'; \}/);
+    expect(html, 'and the profile row says so before anything is chosen').toMatch(/id="appearanceStatus" data-i18n="appearance\.backgroundNone"/);
+
+    // THE PLASMA LOOP PAINTS ONLY WHEN IT IS THE CHOICE, and the nodes field exists only while it is.
+    expect(app).toMatch(/if \(backgroundMode !== 'plasma'\) return;/);
+    const apply = app.slice(app.indexOf('function applyBackgroundMode('), app.indexOf("bindAuroraRange('#auroraCountRange'"));
+    expect(apply).toMatch(/scene\.canvas\.hidden = !plasmaOn;/);
+    expect(apply, 'a hidden canvas must not keep its last frame').toMatch(/scene\.ctx\.clearRect\(0, 0, scene\.canvas\.width, scene\.canvas\.height\)/);
+    expect(apply).toMatch(/if \(backgroundMode === 'nodes'\) \{[\s\S]{0,200}?buildNodesScene\(\);[\s\S]{0,120}?\} else \{\s*destroyNodesScene\(\);/);
+    // The nodes background pauses with the tab, exactly as the plasma does.
+    expect(app).toMatch(/function nodesTick\(now\) \{\s*if \(document\.hidden \|\| backgroundMode !== 'nodes' \|\| !nodesScene\)/);
+
+    // "NONE" MEANS THE LOOP STOPS, NOT THAT IT PAINTS NOTHING [OWNER 2026-08-23: "the plasma and the nodes really
+    // aren't drawn when the background is none? or are you just hiding it while it keeps loading the processor"].
+    // Measured after this: 60 frame callbacks a second on plasma and on nodes, ZERO on none. The tick must therefore
+    // drop out BEFORE it re-arms — an early return under a requestAnimationFrame still wakes the main thread every
+    // frame, forever, to decide to do nothing.
+    const tick = app.slice(app.indexOf('function auroraTick(now) {'), app.indexOf('function auroraTick(now) {') + 900);
+    const bail = tick.indexOf("if (backgroundMode !== 'plasma') { auroraLoopArmed = false; return; }");
+    expect(bail, 'the plasma tick bails on any other background').toBeGreaterThan(-1);
+    expect(bail, 'and it bails BEFORE re-arming the next frame').toBeLessThan(tick.indexOf('requestAnimationFrame(auroraTick);'));
+    expect(app, 'the loop is armed from one place, which knows the mode').toMatch(/function armAuroraLoop\(\) \{[\s\S]{0,200}?if \(backgroundMode !== 'plasma' \|\| auroraScenes\.length === 0\) return;/);
+    // …and the visibility listener is registered ONCE, not on every re-arm (startAuroraLoop is called on every
+    // switch back to the plasma and once per boot-screen plasma).
+    expect((app.match(/addEventListener\('visibilitychange', armAuroraLoop\)/g) ?? []).length).toBe(1);
+    expect(app, 'even the reduced-motion still frame respects the choice').toMatch(/auroraRedrawStill = \(\) => \{\s*if \(backgroundMode !== 'plasma'\) return;/);
+
+    // The composer's plate AND its edge fade together, in both directions (the geometry cannot be animated — the
+    // field must not be typed into while it travels).
+    expect(css).toMatch(/\.composer \{\s*transition: background-color 0\.42s cubic-bezier\(0\.2, 0\.8, 0\.3, 1\),\s*box-shadow 0\.42s/);
+    expect(css).toMatch(/\.composer\.is-maximized \{\s*box-shadow: 0 -18px 40px -12px var\(--shadow-lift/);
+    expect((css.match(/--shadow-lift:/g) ?? []).length, 'themed: black over the dark palette, the palette\'s own over the light one').toBe(3);
+
+    // THE LOADING SCREEN WEARS THE SAME BACKGROUND — including nothing at all.
+    const bootStart = app.slice(app.indexOf('function startBootSignalField(canvas)'), app.indexOf('function startBootSignalField(canvas)') + 900);
+    expect(bootStart).toMatch(/if \(backgroundMode === 'none'\) \{ canvas\.hidden = true; return \(\) => \{\}; \}/);
+    expect(bootStart).toMatch(/if \(backgroundMode === 'plasma'\) return startBootPlasmaField\(canvas\);/);
+    // …and the plasma on it hangs on its OWN aurora layer: the loop skips a scene whose layer has a null
+    // offsetParent, which is what a position:fixed element has — a scene hung on the boot screen itself never
+    // painted a pixel (measured 2026-08-23).
+    const bootPlasma = app.slice(app.indexOf('function startBootPlasmaField(canvas)'), app.indexOf('// Hard idle failsafe'));
+    expect(bootPlasma).toMatch(/const layer = attachAuroraLayer\(screen\);/);
+    expect(bootPlasma).toMatch(/const view = createAuroraView\(layer, stage, 'shell'\);/);
+    expect(bootPlasma, 'and it is torn down with the screen').toMatch(/layer\.remove\(\);/);
+
+    // THE NODES KNOBS DEFAULT TO THE BOOT SCREEN, EXACTLY: multipliers of 1, and a field built with no options is
+    // the shipped field.
+    const field = readFileSync('web/boot-signal-field.mjs', 'utf8');
+    expect(field).toMatch(/brightness = 1,\s*runners = 1,\s*speed = 1,\s*lights: lightLevel = 1,/);
+    expect(field, 'the runner count still follows the screen area, scaled').toMatch(/Math\.min\(24, Math\.max\(12, Math\.round\(\(W \* H\) \/ 26000\)\)\) \* runnersK/);
+    expect(field, 'a faster tempo is a SHORTER hop, and the trail decays on the same clock')
+      .toMatch(/const HOP = 170 \/ speedK;\s*const TAU = 620 \/ speedK;/);
+    for (const [slider, key] of [['nodesLevel', 'NODES_LEVEL_KEY'], ['nodesRunners', 'NODES_RUNNERS_KEY'], ['nodesSpeed', 'NODES_SPEED_KEY'], ['nodesLights', 'NODES_LIGHTS_KEY']]) {
+      expect(app, `${slider} defaults to 100 = the boot screen`).toMatch(new RegExp(`let ${slider} = readAuroraSetting\\(${key}, 100,`));
+    }
+    expect(app).toMatch(/brightness: nodesLevel \/ 100,\s*runners: nodesRunners \/ 100,\s*speed: nodesSpeed \/ 100,\s*lights: nodesLights \/ 100,/);
+    // The worker gets them too, or the loading screen would ignore the user's settings.
+    expect(app).toMatch(/dpr, reduceMotion, \.\.\.nodesFieldOptions\(\) \}/);
+
+    // THE THEME BUTTON IS OUT OF THE HEADERS — it is a row of this modal now.
+    expect(html, 'no header carries a theme toggle').not.toMatch(/theme-toggle-button/);
+    expect(app).not.toMatch(/themeToggleButtons/);
+    expect(css, 'and its chrome went with it').not.toMatch(/theme-toggle-button|themeSpin/);
+    expect(app, 'the mechanism itself is untouched').toMatch(/function applyForcedTheme\(next\)/);
+    expect(app).toMatch(/appearanceThemeSelect\?\.addEventListener\('change'/);
+
+    // Every string of the dialog exists in EVERY locale (a missing one renders the raw key id).
+    const keys = ['appearance.open', 'appearance.title', 'appearance.lead', 'appearance.theme', 'appearance.themeDark',
+      'appearance.themeLight', 'appearance.background', 'appearance.backgroundPlasma', 'appearance.backgroundNodes',
+      'appearance.backgroundNone', 'appearance.nodesBrightness', 'appearance.nodesRunners', 'appearance.nodesSpeed',
+      'appearance.nodesLights', 'appearance.bootNote'];
+    const missing: string[] = [];
+    for (const locale of Object.keys(I18N_STRINGS)) {
+      for (const key of keys) {
+        const value = (I18N_STRINGS as Record<string, Record<string, string>>)[locale]?.[key];
+        if (typeof value !== 'string' || value.trim() === '') missing.push(`${locale}:${key}`);
+      }
+    }
+    expect(missing, missing.join(', ')).toEqual([]);
+  });
+
+  it('PWA-ANON-AVATAR-01: a contact with no name and no picture wears a mask, not the address monogram', () => {
+    // [OWNER 2026-08-23: "I don't like that everyone has this UQ. For contacts with no username and no avatar, put an
+    // anonymity icon in the contact's picture."] The monogram was the first two characters of whatever labelled the
+    // row, and for a bare wallet that is the ADDRESS — every basechain address a user sees starts with "UQ", so every
+    // unnamed contact wore the same one. A monogram identical for everyone looks like an identity and identifies
+    // nobody.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    expect(app).toMatch(/const ANONYMOUS_AVATAR_SVG =/);
+    const setter = app.slice(app.indexOf('function setThreadAvatarNode(node, thread) {'), app.indexOf('function threadIsBareWalletAddress('));
+    expect(setter).toMatch(/if \(!thread\?\.avatarImageUrl && threadIsBareWalletAddress\(thread\)\) \{/);
+    expect(setter).toMatch(/node\.innerHTML = ANONYMOUS_AVATAR_SVG;/);
+    expect(setter, 'a picture or a name takes it straight back off').toMatch(/node\.classList\.remove\('avatar-anonymous'\);/);
+    // The SAME test the rest of the app uses for "this contact is a bare wallet" — no second definition to drift.
+    const test = app.slice(app.indexOf('function threadIsBareWalletAddress(thread) {'), app.indexOf('function threadIsBareWalletAddress(thread) {') + 400);
+    expect(test).toMatch(/if \(!thread \|\| thread\.localLabel\) return false;/);
+    expect(test).toMatch(/return !identity \|\| identity\.type === RECIPIENT_IDENTITY_TYPES\.WALLET_ADDRESS;/);
+    // Muted, not accent: it marks the ABSENCE of an identity and must not outshine the contacts that have one.
+    expect(css).toMatch(/\.avatar\.avatar-anonymous \{\s*color: var\(--muted\);/);
+    expect(css).toMatch(/\.avatar\.avatar-anonymous svg \{/);
+  });
+
   it('PWA-NO-DIVIDERS-01: no surface of the shell draws a hairline across the plasma', () => {
     // THE OWNER SAW THE SAME ARTEFACT TWICE, a day apart: "I see a black strip under the nickname, remove it please"
     // (the conversation header's bottom rule) and then, pointing at the tab bar, "I see a strip here too" (the bar's
@@ -4163,6 +4296,40 @@ describe('PWA runtime config guard', () => {
     expect(badge, 'the count must not twitch as it grows').toMatch(/font-variant-numeric: tabular-nums;/);
     expect((css.match(/--badge-ring:/g) ?? []).length, 'dark + system-light + toggled-light').toBe(3);
     expect(css, 'and it is a green, never the panel plate').toMatch(/--badge-ring: #[0-9a-f]{6};/);
+  });
+
+  it('PWA-IDENTITY-ROW-01: the profile identity is a row — avatar left, name right — and the avatar stays square', () => {
+    // [OWNER 2026-08-23: "this stands in a column and takes too much room. Better the avatar on the left and the
+    // platho name on the right."] The redesign centred the 86px avatar with the name and wallet line stacked under
+    // it: 176px of identity before the first setting (measured in the pane), against 98px for the same content in a
+    // row. Our base rule was already a row; the redesign added a `flex-direction: column` override further down the
+    // file, so THE EFFECTIVE VALUE is what this gate reads — a second override would slip past a plain text search.
+    const css = readFileSync('web/styles.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    const effective = new Map<string, string>();
+    for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/(^|,)\s*\.identity-block\s*$/.test(match[1].trim().replace(/\s+/g, ' '))) continue;
+      for (const decl of match[2].matchAll(/(flex-direction|text-align|align-items):\s*([^;]+);/g)) {
+        effective.set(decl[1], decl[2].trim());
+      }
+    }
+    expect(effective.get('flex-direction'), 'the identity block is a row').toBe('row');
+    expect(effective.get('align-items'), 'and the copy sits centred against the avatar').toBe('center');
+    expect(effective.get('text-align'), 'left-aligned: centred text beside a left avatar drifts with the name length').toBe('left');
+    // THE ROW EXPOSED A SECOND BUG. `width` on a flex item is only a basis, so the name/wallet column beside it
+    // squeezed the 86px square to 77px wide (measured) — a visibly oval avatar. The column layout could never show
+    // this, because nothing competed for the row's width there.
+    expect(css, 'the avatar may not be shrunk by the text beside it').toMatch(
+      /\.identity-block > \.avatar\.large \{\s*flex: 0 0 auto;\s*\}/,
+    );
+    // The copy layout follows the block: start, not centre, on both axes it controls.
+    expect(css).toMatch(/\.identity-copy-layout \{\s*justify-items: start;\s*\}/);
+    expect(css).toMatch(/\.identity-title-row \{\s*justify-content: start;\s*\}/);
+    // And the markup really is avatar-then-copy, in that order — the CSS above assumes it and does not reorder.
+    const html = readFileSync('web/index.html', 'utf8');
+    const blockStart = html.indexOf('<div class="identity-block">');
+    expect(blockStart, 'the identity block is still in the profile pane').toBeGreaterThan(0);
+    const block = html.slice(blockStart, blockStart + 900);
+    expect(block.indexOf('id="profileAvatar"')).toBeLessThan(block.indexOf('identity-copy-layout'));
   });
 
   it('PWA-COPY-01: long-press copies message/comment text with a flash (touch); desktop gets a hover Copy button; avatars open the lightbox', () => {
@@ -5889,11 +6056,12 @@ describe('PWA runtime config guard', () => {
     // CSS overlay: fixed, sized to the UNFLOORED visual-viewport var (keyboard-safe on short viewports), z-index 30.
     expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?position: fixed;[\s\S]*?height: var\(--app-viewport-height-exact, var\(--app-viewport-height, 100dvh\)\);[\s\S]*?z-index: 30;/);
     expect(app).toMatch(/setProperty\('--app-viewport-height-exact'/); // the unfloored height var is published
-    // THE PLATE FADES, THE GEOMETRY DOES NOT [OWNER 2026-08-23: "expanding/collapsing, it snaps to fully opaque"].
-    // The overlay must END opaque (it covers the whole screen — a translucent one would show the app sliding behind
-    // the text being written), so what softens is the ARRIVAL: the fill transitions in both directions while
-    // position/height switch at once.
-    expect(css).toMatch(/\.composer \{\s*transition: background-color 0\.3s ease;\s*\}/);
+    // THE PLATE FADES, THE GEOMETRY DOES NOT [OWNER 2026-08-23: "expanding/collapsing, it snaps to fully opaque",
+    // and after the fade landed: "the frame is still ugly"]. The overlay must END opaque (it covers the whole screen
+    // — a translucent one would show the app sliding behind the text being written), so what softens is the ARRIVAL:
+    // the fill AND the edge transition in both directions while position/height switch at once. The exact curve is
+    // pinned once, in PWA-APPEARANCE-01; here it is enough that the fill is transitioned at all.
+    expect(css).toMatch(/\.composer \{\s*transition: background-color 0\.\d+s /);
     expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?background: var\(--panel\);/);
     expect(css, 'and it obeys reduced motion').toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.composer \{\s*transition: none;\s*\}/);
     expect(css).toMatch(/\.composer\.is-maximized \.composer-input-row \{[\s\S]*?flex: 1 1 auto;[\s\S]*?align-items: stretch;/);
@@ -7264,11 +7432,13 @@ describe('PWA runtime config guard', () => {
 
     // Signal field runs OFF the main thread on an OffscreenCanvas worker (owner: separate thread), with a
     // main-thread fallback; the engine is a shared module.
-    expect(app).toMatch(/import \{ createBootSignalField \} from '\.\/boot-signal-field\.mjs\?v=1';/);
-    expect(app).toMatch(/new Worker\('\.\/boot-signal-worker\.js\?v=1', \{ type: 'module' \}\)/);
+    // The version is the module system's, not this gate's business: pin the SHAPE, or every content bump of the
+    // field breaks a test that is about the boot screen's threading.
+    expect(app).toMatch(/import \{ createBootSignalField \} from '\.\/boot-signal-field\.mjs\?v=\d+';/);
+    expect(app).toMatch(/new Worker\('\.\/boot-signal-worker\.js\?v=\d+', \{ type: 'module' \}\)/);
     expect(app).toMatch(/canvas\.transferControlToOffscreen/);
     const worker = readFileSync('web/boot-signal-worker.js', 'utf8');
-    expect(worker).toMatch(/import \{ createBootSignalField \} from '\.\/boot-signal-field\.mjs\?v=1';/);
+    expect(worker).toMatch(/import \{ createBootSignalField \} from '\.\/boot-signal-field\.mjs\?v=\d+';/);
     expect(worker).toMatch(/setTimeout\(loop, 30\)/);
     const field = readFileSync('web/boot-signal-field.mjs', 'utf8');
     expect(field).toMatch(/export function createBootSignalField\(ctx/);
