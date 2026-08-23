@@ -4927,7 +4927,11 @@ button.feed-item:hover {
 @media (max-width: 900px) {
   :root {
     --header-actions-width: 204px;
-    --mobile-nav-bottom-reserve: 10px;
+    /* The gap under the tab plates. It used to be invisible inside the bar's panel plate; with the bar transparent
+       (see .sidebar below) an asymmetric floor — 6px above the tabs, 10px under them — reads as a band along the
+       bottom edge. Symmetric now. A home-indicator device still gets its full inset: the padding takes the LARGER
+       of this and the safe area. */
+    --mobile-nav-bottom-reserve: 6px;
     --gutter: 16px;
   }
 
@@ -4967,7 +4971,11 @@ button.feed-item:hover {
     padding: 6px 10px var(--mobile-nav-bottom-reserve);
     padding-bottom: max(var(--mobile-nav-bottom-reserve), var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
     border-right: 0;
-    border-top: 1px solid var(--line-soft);
+    /* NO HAIRLINE ABOVE IT EITHER [OWNER 2026-08-23, pointing at the bar right after the header's divider came out:
+       "I see a strip here too"]. It is the same artefact in the same place in the eye: a full-width --line-soft rule
+       on the plasma reads as a dark bar, not as a subtle separation. It was the last divider left; the composer's
+       own edge and the plates of the tabs are what separate the two surfaces now. */
+    border-top: 0;
     /* THE TAB BAR IS TRANSPARENT HERE TOO [OWNER 2026-08-23: "the tabs go opaque on mobile, while on desktop they
        are transparent"]. It was the one surface left with a panel plate, so the shell's plasma stopped dead at the
        composer and the bar read as a separate dark strip glued to the bottom. It can afford to: on this breakpoint

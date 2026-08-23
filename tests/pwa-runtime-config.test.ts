@@ -4099,6 +4099,49 @@ describe('PWA runtime config guard', () => {
     expect(render).not.toMatch(/time\.textContent = thread\.time;/);
   });
 
+  it('PWA-NO-DIVIDERS-01: no surface of the shell draws a hairline across the plasma', () => {
+    // THE OWNER SAW THE SAME ARTEFACT TWICE, a day apart: "I see a black strip under the nickname, remove it please"
+    // (the conversation header's bottom rule) and then, pointing at the tab bar, "I see a strip here too" (the bar's
+    // top rule). They are the same thing: the redesign put every surface on ONE plasma with zero-opacity fills — and
+    // on that plasma a full-width --line-soft rule does not read as a subtle separation, it reads as a dark bar
+    // painted across the screen. The vertical ones between the rail, the list and the pane were dropped for exactly
+    // this reason ("NO COLUMN SEPARATION"); these were the horizontal survivors.
+    //
+    // So the rule, not the two instances: a surface that sits directly on the plasma carries no border. Anything
+    // inside a plate (a dialog's tab strip, a card) is another matter and is not covered here.
+    // COMMENTS STRIPPED FIRST: the note above a rule is captured together with its selector by a brace-based scan,
+    // and a subject test anchored at the start of that text then silently misses every commented rule — which is
+    // most of them in this stylesheet, including the two this gate exists for.
+    const css = readFileSync('web/styles.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    const surfaces = ['.app-shell', '.content-pane', '.chat-pane', '.list-pane', '.sidebar', '.conversation-header', '.pane-header'];
+    // THE EFFECTIVE VALUE, not every declaration: several of these surfaces still DECLARE a border in their base rule
+    // and have it turned off further down (the redesign dropped the column hairlines that way). What must hold is
+    // what the browser ends up painting — the LAST declaration for each side wins, as it does in the cascade.
+    const effective = new Map<string, string>();
+    for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = match[1].trim().replace(/\s+/g, ' ');
+      const subject = surfaces.find((s) => new RegExp(`(^|,)\\s*${s.replace('.', '\\.')}\\s*$`).test(selector));
+      if (!subject) continue;
+      for (const decl of match[2].matchAll(/border(-top|-bottom|-right|-left)?:\s*([^;]+);/g)) {
+        const sides = decl[1] ? [decl[1]] : ['-top', '-bottom', '-right', '-left'];
+        for (const side of sides) effective.set(`${subject}${side}`, decl[2].trim());
+      }
+    }
+    const offenders = [...effective].filter(([, value]) => !/^0\b|^none\b/.test(value)).map(([key, value]) => `${key}: ${value}`);
+    expect(offenders, `a hairline is back on the plasma: ${offenders.join(' | ')}`).toEqual([]);
+    // The counter-case: the scan must actually be reading the two the owner named, or it proves nothing.
+    expect([...effective.keys()], 'the scan reaches the surfaces it polices').toEqual(
+      expect.arrayContaining(['.conversation-header-bottom', '.sidebar-top', '.sidebar-right']),
+    );
+    // And the two the owner named, stated positively so a re-add is loud.
+    expect(css).toMatch(/\.conversation-header \{[\s\S]{0,200}?border-bottom: 0;/);
+    expect(css).toMatch(/\.sidebar \{[\s\S]{0,900}?border-top: 0;/);
+    // The tab plates keep an even margin to the screen edge — an asymmetric floor under a transparent bar reads as a
+    // band of its own; a home-indicator device still gets its full inset through the max().
+    expect(css).toMatch(/--mobile-nav-bottom-reserve: 6px;/);
+    expect(css).toMatch(/padding: 6px 10px var\(--mobile-nav-bottom-reserve\);/);
+  });
+
   it('PWA-RAIL-BADGE-01: the tab label is addressed as the label, and the unread count is a thin green ring, centred', () => {
     // [OWNER 2026-08-23: "the font on the Private tab is bigger than on the other tabs", and "the black outline on the
     // message count looks far too heavy and foreign — thinner, dark green, and centre the number properly".]
