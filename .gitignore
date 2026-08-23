@@ -99,3 +99,7 @@ artifacts/*REGEN_RUNBOOK*
 # through vitest.admin.config.ts (`npm run admin:test`) on a machine that has the folder — never through the
 # canonical `npm test`, whose file count is recorded as release evidence and compared with tests/ on every machine.
 tools/admin/
+
+# The design working copy lives OUTSIDE the repo (C:\plathodesign) and must never be committed — even if copied in.
+plathodesign/
+/plathodesign/
