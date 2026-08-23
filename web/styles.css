@@ -77,6 +77,8 @@
   --shared-post-embed-bg: #121b21;
   --scrollbar: rgba(148, 165, 162, 0.38);
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+  --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
+  --badge-ring: #12564a;               /* the unread pill's outline: deep brand green, never the panel's black */
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -132,6 +134,8 @@
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+    --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
+    --badge-ring: #0b6a58;
     }
 }
 
@@ -188,6 +192,8 @@
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+    --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
+    --badge-ring: #0b6a58;
     }
 /* ── Base ───────────────────────────────────────────────────────────────── */
 * {
@@ -473,7 +479,13 @@ select,
   color: var(--muted);
 }
 
-.rail-item span:last-child {
+/* THE LABEL, ADDRESSED FOR WHAT IT IS — not as ":last-child" [OWNER 2026-08-23: "the font on the Private tab is
+   bigger than on the other tabs"]. It WAS the last child, until the unread badge started being appended after it
+   (app.js): from that moment the badge became :last-child, this rule stopped reaching the label, and the label fell
+   back to the button's inherited 16px — so the one tab with unread messages wore a bigger word than its neighbours.
+   The same slip styled the BADGE as a label (11px, line-height 1.25 inside an 18px pill), which is why its number
+   sat high. Both are the same one-line fix. */
+.rail-item > span:not(.icon):not(.rail-badge) {
   font-size: 11px;
   line-height: 1;
 }
@@ -954,14 +966,26 @@ html[data-platho-telegram="true"] .install-header-button {
   white-space: nowrap;
 }
 
-.thread-preview {
+/* Second row of a dialog: the send STATE (when there is one) and the preview, side by side — so a row is the same
+   height with the status and without it. See buildThreadRow. */
+.thread-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
   margin-top: 3px;
+}
+
+.thread-preview {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--muted);
   font-size: 13px;
 }
 
 .thread-state {
-  margin-top: 5px;
+  flex: 0 0 auto;
+  max-width: 45%;
   color: var(--accent);
   font-size: 11px;
   text-transform: uppercase;
@@ -1022,10 +1046,16 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 /* ── Conversation header ────────────────────────────────────────────────── */
+/* NO DIVIDER UNDER THE HEADER [OWNER 2026-08-23: "I see a black strip under the nickname, remove it please" — and,
+   pressed on it, "I see the strip clearly"]. It was the LAST horizontal hairline in the app: every other pane header
+   already floats on the shell's plasma (.pane-header carries no border), and the vertical ones between the rail, the
+   list and the pane were dropped for the same reason. On a dark plasma a full-width --line-soft rule does not read as
+   a subtle separation — it reads as a black bar drawn under the name. The header keeps its height, so nothing below
+   it moves; only the line goes. */
 .conversation-header {
   min-height: var(--header-height);
   padding: 0 var(--gutter);
-  border-bottom: 1px solid var(--line-soft);
+  border-bottom: 0;
   background: transparent;
 }
 
@@ -1892,6 +1922,23 @@ a .avatar.has-image,
   max-width: none;
   background: var(--panel);
   padding-top: calc(12px + var(--app-safe-area-top, env(safe-area-inset-top)));
+}
+
+/* THE PLATE FADES IN AND OUT [OWNER 2026-08-23: "expanding/collapsing the composer, it snaps to fully opaque —
+   at least fade the opacity in on the way out and back on the way in"]. The overlay MUST end up opaque: maximized it
+   covers the whole screen, and a translucent one would show the messages, the header and the tab bar sliding behind
+   the text being written. What was jarring is the STEP — the class flips and the fill appears in one frame. So the
+   fill is a transition, in both directions: expanding it washes in over the plasma, collapsing it washes back out
+   and the composer is transparent again. Only the COLOUR animates — the geometry (fixed, full height) is the state
+   itself and has to switch at once, or the field would be typing into a box that is still travelling. */
+.composer {
+  transition: background-color 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer {
+    transition: none;
+  }
 }
 
 /* Dock-toggle slide (contract keyframe name + --dock-shift var). */
@@ -4921,7 +4968,12 @@ button.feed-item:hover {
     padding-bottom: max(var(--mobile-nav-bottom-reserve), var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
     border-right: 0;
     border-top: 1px solid var(--line-soft);
-    background: var(--panel);
+    /* THE TAB BAR IS TRANSPARENT HERE TOO [OWNER 2026-08-23: "the tabs go opaque on mobile, while on desktop they
+       are transparent"]. It was the one surface left with a panel plate, so the shell's plasma stopped dead at the
+       composer and the bar read as a separate dark strip glued to the bottom. It can afford to: on this breakpoint
+       the bar is its OWN grid row (grid-row 2 of the shell), not an overlay — nothing scrolls under it, so there is
+       nothing for a fill to hide. The hairline above it stays: it is what separates the bar from the composer. */
+    background: transparent;
     overflow: hidden;
   }
 
@@ -4969,7 +5021,7 @@ button.feed-item:hover {
     overflow: hidden;
   }
 
-  .rail-item span:last-child {
+  .rail-item > span:not(.icon):not(.rail-badge) {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -5893,6 +5945,41 @@ button.feed-item:hover {
   line-height: 1;
 }
 
+/* A PINNED contact wears a pin in the corner of its avatar [OWNER 2026-08-23: "let's add some kind of pin icon in
+   the corner of the icon for pinned contacts"], so the order at the top of the list reads as a decision rather than
+   as freshness.
+
+   A PSEUDO-ELEMENT, NOT A CHILD NODE. The avatar's content is rewritten on every render — a letter (textContent),
+   the Saved pencil (innerHTML), or an image background — so a badge appended as a child would be wiped by the next
+   patch of the row, which happens on every sync tick. ::before is taken by the glow layer; ::after is free, and the
+   avatar already carries `position: relative`.
+
+   Plate + glyph on ONE element: the plate is the background COLOUR, the pin is a themed data-URI background IMAGE
+   (the same pattern --theme-icon and --select-chevron use, so light/dark switch with the rest of the tokens). A
+   mask would have replaced the plate rather than sat on it. The ring is a box-shadow in the same panel colour, so
+   the badge stays legible over a photo avatar of any brightness. */
+.avatar[data-pinned="true"]::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--panel-2) var(--pin-badge-icon) center / 10px 10px no-repeat;
+  box-shadow: 0 0 0 1.5px var(--panel);
+  pointer-events: none;
+}
+
+/* The share sheet's avatars are smaller (34px) — the badge follows, or it eats the face. */
+.share-target-avatar[data-pinned="true"]::after {
+  right: -1px;
+  bottom: -1px;
+  width: 14px;
+  height: 14px;
+  background-size: 9px 9px;
+}
+
 /* The add-contact plate in the private list: a small breather before the chat rows, and its action button
    centered instead of hugging the text column (owner). */
 .thread-list > .discovery-cta {
@@ -6164,8 +6251,9 @@ button.feed-item:hover {
 }
 
 /* Tab labels: line-height 1 + overflow:hidden clipped descenders (the "y" in a tab label like "Privacy") — give the line
-   box room for them. */
-.rail-item span:last-child {
+   box room for them. (Addressed by what it IS, not by ":last-child": the unread badge is appended after the label, and
+   under the old selector it took these label rules with it — see the label rule above.) */
+.rail-item > span:not(.icon):not(.rail-badge) {
   line-height: 1.25;
 }
 
@@ -6486,10 +6574,18 @@ button.feed-item:hover {
   position: relative;
 }
 
+/* THE COUNT [OWNER 2026-08-23: "the black outline on the message count looks far too heavy and foreign — make it
+   thinner and dark green, and centre the number properly"]. The ring exists to keep the bright pill legible where it
+   overlaps the icon, so it stays — at 1px, and in the deep green of the brand rather than the panel's near-black,
+   which read as a hard black stroke drawn around it. CENTRED BY THE BOX, not by a hand-set line-height: `display:
+   grid; place-items: center` puts the digits on the pill's optical middle whatever the font does with 800-weight
+   numerals (the old `line-height: 18px` was being overridden by the tab-label rule anyway — see the label rule). */
 .rail-badge {
   position: absolute;
   top: 5px;
   left: calc(50% + 6px);
+  display: grid;
+  place-items: center;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -6498,10 +6594,10 @@ button.feed-item:hover {
   color: var(--on-accent);
   font-size: 10px;
   font-weight: 800;
-  line-height: 18px;
-  text-align: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;   /* 11 and 99 are the same width — the pill does not twitch as the count changes */
   pointer-events: none;
-  box-shadow: 0 0 0 2px var(--panel);
+  box-shadow: 0 0 0 1px var(--badge-ring);
 }
 
 /* SKELETONS (owner): shimmering card outlines while a list is on its way (discovery before its first card, comments

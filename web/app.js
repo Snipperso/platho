@@ -3857,6 +3857,12 @@ const SAVED_MESSAGES_AVATAR_SVG =
 // branches fully undo the other's state.
 function setThreadAvatarNode(node, thread) {
   if (!node) return;
+  // THE PIN BADGE, on the avatar of a pinned contact (the corner pin in styles.css). Set here rather than in the
+  // row builder because this is the ONE place every thread avatar routes through — the list, the conversation
+  // header and the share sheet — so the badge cannot appear on one surface and not another. An attribute, not a
+  // child node: both branches below rewrite the avatar's content, and a child would be wiped on the next render.
+  if (isThreadPinned(thread) && !isSavedMessagesThread(thread)) node.dataset.pinned = 'true';
+  else delete node.dataset.pinned;
   if (isSavedMessagesThread(thread)) {
     node.classList.remove('has-image');
     node.classList.add('avatar-saved');
@@ -20444,7 +20450,15 @@ function buildThreadRow(threadId) {
   side.className = 'thread-side';
   side.append(time);
   top.append(name);
-  main.append(top, preview, state);
+  // THE STATE SHARES THE PREVIEW'S LINE, it does not add one [OWNER 2026-08-23: "the layout shifts when the status
+  // appears"]. As a third row it was 11px + its margin, so a row grew ~18px the moment a send started and shrank
+  // back when it settled — every row below it jumped, twice, per send. Side by side the row's height is the same
+  // whether the status is there or not, and both facts stay on screen: the status leads (short, accent, uppercase),
+  // the preview takes what is left and ellipsises.
+  const line = document.createElement('div');
+  line.className = 'thread-line';
+  line.append(state, preview);
+  main.append(top, line);
   item.append(avatar, main, side);
   item._refs = { avatar, name, preview, state, time, side };
   item.addEventListener('click', () => {

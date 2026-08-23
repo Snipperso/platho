@@ -1170,6 +1170,11 @@ describe('PWA runtime config guard', () => {
     expect(mobileBlock).toMatch(/\.composer\s*{[\s\S]{0,900}?padding: 8px \d+px 8px;/);
     expect(mobileBlock).toMatch(/\.public-composer\s*{[\s\S]{0,300}?padding: 8px \d+px 8px;/);
     expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,700}?padding-bottom: max\(var\(--mobile-nav-bottom-reserve\), var\(--app-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\);/);
+    // …AND THE BAR IS TRANSPARENT HERE TOO [OWNER 2026-08-23: "the tabs go opaque on mobile, transparent on desktop"].
+    // It was the last surface with a panel plate, so the shell's plasma stopped dead at the composer. It can afford
+    // to be transparent: on this breakpoint the bar is its own grid row, not an overlay — nothing scrolls under it.
+    expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,1400}?background: transparent;/);
+    expect(css, 'and the desktop rail it now matches').toMatch(/\.sidebar \{[\s\S]{0,220}?background: transparent;/);
     expect(css).toMatch(/\.message\[data-status="sending"\] \.bubble/);
     expect(app).toMatch(/function identityDisplayKey/);
     expect(app).toMatch(/function uniqueDisplayIdentityVariants/);
@@ -1190,7 +1195,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/privateSendRetryExhaustedStatusText/);
     expect(app).toMatch(/privateSendBlockedStatusText/);
     expect(app).not.toMatch(/message\.meta = 'send failed'/);
-    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.rail-item span:last-child\s*{[\s\S]*text-overflow: ellipsis;/);
+    // (the label is addressed as the label since 2026-08-23 — the unread badge used to steal `:last-child` from it;
+    //  see PWA-RAIL-BADGE-01)
+    expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.rail-item > span:not\(\.icon\):not\(\.rail-badge\)\s*{[\s\S]*text-overflow: ellipsis;/);
   });
 
   it('PWA-HISTORY-01: local encrypted history and replay stores are deployment- and wallet-scoped', () => {
@@ -4092,6 +4099,29 @@ describe('PWA runtime config guard', () => {
     expect(render).not.toMatch(/time\.textContent = thread\.time;/);
   });
 
+  it('PWA-RAIL-BADGE-01: the tab label is addressed as the label, and the unread count is a thin green ring, centred', () => {
+    // [OWNER 2026-08-23: "the font on the Private tab is bigger than on the other tabs", and "the black outline on the
+    // message count looks far too heavy and foreign — thinner, dark green, and centre the number properly".]
+    //
+    // ONE SLIP CAUSED BOTH. The tab label was styled as `.rail-item span:last-child`, which it was — until app.js
+    // started APPENDING the unread badge after it. From then on the badge was :last-child: the label lost its 11px
+    // and fell back to the button's inherited 16px (so the one tab with unread messages wore a bigger word), and the
+    // badge inherited the label's line-height 1.25 into an 18px pill (so its digits sat high). Addressing the label
+    // for what it IS fixes both at once — and the badge's own rule finally applies.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app, 'the badge really is appended after the label').toMatch(/badge\.className = 'rail-badge';[\s\S]{0,200}?item\.append\(badge\);/);
+    expect(css, 'no label rule may key on :last-child again').not.toMatch(/\.rail-item span:last-child/);
+    expect((css.match(/\.rail-item > span:not\(\.icon\):not\(\.rail-badge\)/g) ?? []).length, 'size, clamp and line-height').toBe(3);
+    // The pill: centred by its own box (not by a hand-set line-height), a 1px ring in the brand's deep green.
+    const badge = css.slice(css.indexOf('.rail-badge {'), css.indexOf('.rail-badge {') + 700);
+    expect(badge).toMatch(/display: grid;\s*place-items: center;/);
+    expect(badge).toMatch(/box-shadow: 0 0 0 1px var\(--badge-ring\);/);
+    expect(badge, 'the count must not twitch as it grows').toMatch(/font-variant-numeric: tabular-nums;/);
+    expect((css.match(/--badge-ring:/g) ?? []).length, 'dark + system-light + toggled-light').toBe(3);
+    expect(css, 'and it is a green, never the panel plate').toMatch(/--badge-ring: #[0-9a-f]{6};/);
+  });
+
   it('PWA-COPY-01: long-press copies message/comment text with a flash (touch); desktop gets a hover Copy button; avatars open the lightbox', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -5816,6 +5846,13 @@ describe('PWA runtime config guard', () => {
     // CSS overlay: fixed, sized to the UNFLOORED visual-viewport var (keyboard-safe on short viewports), z-index 30.
     expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?position: fixed;[\s\S]*?height: var\(--app-viewport-height-exact, var\(--app-viewport-height, 100dvh\)\);[\s\S]*?z-index: 30;/);
     expect(app).toMatch(/setProperty\('--app-viewport-height-exact'/); // the unfloored height var is published
+    // THE PLATE FADES, THE GEOMETRY DOES NOT [OWNER 2026-08-23: "expanding/collapsing, it snaps to fully opaque"].
+    // The overlay must END opaque (it covers the whole screen — a translucent one would show the app sliding behind
+    // the text being written), so what softens is the ARRIVAL: the fill transitions in both directions while
+    // position/height switch at once.
+    expect(css).toMatch(/\.composer \{\s*transition: background-color 0\.3s ease;\s*\}/);
+    expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?background: var\(--panel\);/);
+    expect(css, 'and it obeys reduced motion').toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.composer \{\s*transition: none;\s*\}/);
     expect(css).toMatch(/\.composer\.is-maximized \.composer-input-row \{[\s\S]*?flex: 1 1 auto;[\s\S]*?align-items: stretch;/);
     // v789 (owner): the reply/share quote strip must not overflow a narrow screen — the text-holder flex child gets
     // min-width:0 (a flex item defaults to min-width:auto = its nowrap min-content width, which pushed the Cancel button
@@ -7874,6 +7911,23 @@ describe('PWA runtime config guard', () => {
     expect(toggle).toContain('writeContactDisplayPreference(counterpartyWallet, {');
     expect(toggle).toContain('pinned: pinned === true,');
     expect(toggle).toContain('renderThreads();');
+
+    // THE BADGE [OWNER 2026-08-23: "a pin icon in the corner of the icon"] — so the top of the list reads as a
+    // decision rather than as freshness. Written where EVERY thread avatar routes through, so the list, the
+    // conversation header and the share sheet cannot disagree; "My notes" is never pinnable and never wears it.
+    const avatarFn = app.slice(app.indexOf('function setThreadAvatarNode(node, thread) {'), app.indexOf('function formatThreadListTimestamp('));
+    expect(avatarFn).toMatch(/if \(isThreadPinned\(thread\) && !isSavedMessagesThread\(thread\)\) node\.dataset\.pinned = 'true';\s*else delete node\.dataset\.pinned;/);
+    // AN ATTRIBUTE + A PSEUDO-ELEMENT, never a child node: both branches of that function rewrite the avatar's
+    // content (a letter, the Saved pencil's innerHTML, an image background), so a badge appended as a child would
+    // be wiped by the next patch of the row — which runs on every sync tick.
+    expect(avatarFn, 'the badge is not a child node').not.toMatch(/appendChild|\.append\(/);
+    const pinCss = readFileSync('web/styles.css', 'utf8');
+    expect(pinCss).toMatch(/\.avatar\[data-pinned="true"\]::after \{[\s\S]*?background: var\(--panel-2\) var\(--pin-badge-icon\)/);
+    // ::before is the glow layer — the badge must not take it (it would paint the pin behind the avatar, z-index -1).
+    expect(pinCss).not.toMatch(/\.avatar\[data-pinned="true"\]::before/);
+    // Themed like every other drawn glyph in this stylesheet: the token is defined for the dark default AND both
+    // light paths (the system scheme and the manual toggle), or the pin turns invisible in one of them.
+    expect((pinCss.match(/--pin-badge-icon: url\("data:image\/svg\+xml,/g) ?? []).length, 'dark + system-light + toggled-light').toBe(3);
     // Every locale names the action.
     const { I18N_STRINGS, I18N_LOCALES } = await import('../web/i18n-strings.mjs');
     for (const { code } of I18N_LOCALES as Array<{ code: string }>) {

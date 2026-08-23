@@ -22,8 +22,17 @@ describe('THREADSTATE — the private list says only what it can back up', () =>
     expect(APP).not.toContain('state.textContent = thread.state;');
     expect(APP).toContain('const stateLabel = threadStateLabel(thread);');
     expect(APP).toContain('state.textContent = stateLabel;');
-    // Hidden rather than blank: `.thread-state` carries a top margin, so an empty line still spaces the row out.
+    // Hidden rather than blank: an empty node still takes its slot on the line and pushes the preview across.
     expect(APP).toContain("state.hidden = stateLabel === '';");
+    // AND IT SHARES THE PREVIEW'S LINE [OWNER 2026-08-23: "the layout shifts when the status appears"]. As a third
+    // row the state added ~18px the moment a send started and took it back when it settled, so every row below
+    // jumped twice per send. Side by side, a row is the same height with the status and without it.
+    expect(APP).toMatch(/const line = document\.createElement\('div'\);\s*line\.className = 'thread-line';\s*line\.append\(state, preview\);\s*main\.append\(top, line\);/);
+    const css = readFileSync('web/styles.css', 'utf8');
+    expect(css).toMatch(/\.thread-line \{[\s\S]*?display: flex;/);
+    expect(css, 'the preview takes what is left and ellipsises').toMatch(/\.thread-preview \{\s*flex: 1 1 auto;\s*min-width: 0;/);
+    expect(css, 'the state keeps its width and never wraps').toMatch(/\.thread-state \{\s*flex: 0 0 auto;/);
+    expect(css, 'and no rule puts the state back on a line of its own').not.toMatch(/\.thread-state \{[^}]*margin-top:/);
   });
 
   it('THREADSTATE-02: only actionable states are labelled — the three noise words map to nothing', () => {
