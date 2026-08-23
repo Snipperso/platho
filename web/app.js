@@ -31,7 +31,7 @@ import {
   getPlathoWalletSeqno,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=36';
+} from './platho-wallet.mjs?v=38';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createInlineFormatRegex, messagePreviewText,
@@ -42,7 +42,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=124';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=126';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -51,8 +51,8 @@ import {
   tonRpcRequestCounters,
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
-} from './ton-rpc-transport.mjs?v=78';
-import { orderThreadsForList } from './thread-list-order.mjs?v=1';
+  BROADCAST_VERDICT,
+} from './ton-rpc-transport.mjs?v=80';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=53';
+} from './public-channel-subscriptions.mjs?v=56';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -165,48 +165,49 @@ import {
 import {
   MAX_BATCH_PARTS,
 } from './publish-batch-orchestration.mjs?v=10';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=57';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=60';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=59';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=62';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=41';
+import { createPublicLane } from './public-lane.mjs?v=43';
 import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=20';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=22';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=7';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=19';
-import { createIntroLane } from './intro-lane.mjs?v=35';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=6';
+import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=9';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=21';
+import { createIntroLane } from './intro-lane.mjs?v=37';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=7';
 import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=20';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=19';
+import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=22';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=21';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=30';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=26';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=22';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=24';
+import { createConvReadLane } from './conv-lane.mjs?v=32';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=28';
+import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=24';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=26';
+import { orderThreadsForList } from './thread-list-order.mjs?v=2';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=19';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=21';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
-} from './intro-send-state.mjs?v=1';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=19';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=26';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=19';
+} from './intro-send-state.mjs?v=2';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=21';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=28';
+import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=21';
 import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=1';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=6';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=8';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=26';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=26';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=25';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=28';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=28';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=27';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -218,19 +219,19 @@ import {
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=21';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=56';
+} from './shard-discovery.mjs?v=23';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=58';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=62';
+} from './username-ton-rpc-provider.mjs?v=64';
 import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=7';
+} from './username-nft-owned.mjs?v=4';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,
@@ -249,7 +250,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=78';
+} from './i18n.mjs?v=80';
 import { createBootSignalField } from './boot-signal-field.mjs?v=1';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -302,7 +303,14 @@ window.addEventListener('unhandledrejection', (event) => {
   document.documentElement.dataset.plathoAppError = String(event.reason?.message ?? event.reason ?? 'unhandled rejection').slice(0, 180);
 });
 
-let statesBatchCeilingPersistenceArmed = false;
+// The batched /accountStates ceiling SURVIVES A RELOAD. shard-reader halves it for the session when toncenter answers
+// "context deadline exceeded" and doubles it back after 16 clean batches — but the module has no storage of its own, so
+// without this every boot started again at 1024, paid the same timeout and the same split, and only then relearned what
+// the last session already knew. Seeded BEFORE the transports are built (the very first scan pass runs at the learned
+// size); every later change is written back as it happens. Sibling of platho.toncenter.apiKey.v1. [PWA-STATESCEIL-01]
+const TONCENTER_STATES_BATCH_CEILING_STORAGE_KEY = 'platho.toncenter.statesBatchCeiling.v1';
+let statesBatchCeilingPersistence = null;   // the unsubscribe handle — guards against a second subscription
+
 function installConfiguredTonRuntime(config = appConfig) {
   const rpc = config?.network?.tonRpc ?? {};
   const primaryRpcProvider = Array.isArray(rpc.providers)
@@ -321,23 +329,6 @@ function installConfiguredTonRuntime(config = appConfig) {
   if (apiKey && !globalThis.plathoTonRpcApiKey) {
     globalThis.plathoTonRpcApiKey = apiKey;
   }
-  // THE LEARNED STATES-BATCH CEILING, ACROSS RELOADS. shard-reader halves its batch when toncenter answers a batch
-  // with its own deadline (HTTP 422, "context deadline exceeded") and doubles it back after a clean run — but it
-  // learned that in memory, and every reload started again at the measured maximum, so the owner paid the deadline
-  // once per session on the first, biggest batch (666 addresses, 2026-08-22). The device remembers it now; the
-  // recovery still carries it back up when toncenter is well. Best-effort storage: a device that cannot store starts
-  // at the maximum as before. Armed once, however many times the runtime is (re)installed.
-  if (!statesBatchCeilingPersistenceArmed) {
-    statesBatchCeilingPersistenceArmed = true;
-    const STATES_BATCH_CEILING_STORAGE_KEY = 'platho.toncenter.statesBatchCeiling.v1';
-    try {
-      const storedCeiling = Number(globalThis.localStorage?.getItem(STATES_BATCH_CEILING_STORAGE_KEY));
-      if (Number.isFinite(storedCeiling) && storedCeiling > 0) seedStatesBatchCeiling(storedCeiling);
-    } catch { /* no storage — start at the maximum */ }
-    subscribeStatesBatchCeiling((ceiling) => {
-      try { globalThis.localStorage?.setItem(STATES_BATCH_CEILING_STORAGE_KEY, String(ceiling)); } catch { /* best effort */ }
-    });
-  }
   // Client-direct RPC: load the user's own toncenter API key (if saved) BEFORE building the transport,
   // so the user-toncenter provider (useUserApiKey) captures it; anonymous until the user adds one.
   if (globalThis.plathoToncenterApiKey === undefined) {
@@ -345,6 +336,15 @@ function installConfiguredTonRuntime(config = appConfig) {
       const savedToncenterKey = globalThis.localStorage?.getItem('platho.toncenter.apiKey.v1');
       globalThis.plathoToncenterApiKey = savedToncenterKey && savedToncenterKey.trim() ? savedToncenterKey.trim() : null;
     } catch { globalThis.plathoToncenterApiKey = null; }
+  }
+  if (!statesBatchCeilingPersistence) {
+    try {
+      seedStatesBatchCeiling(globalThis.localStorage?.getItem(TONCENTER_STATES_BATCH_CEILING_STORAGE_KEY));
+    } catch { /* no storage (private mode / sandbox): the session simply starts at the default ceiling */ }
+    statesBatchCeilingPersistence = subscribeStatesBatchCeiling((ceiling) => {
+      try { globalThis.localStorage?.setItem(TONCENTER_STATES_BATCH_CEILING_STORAGE_KEY, String(ceiling)); }
+      catch { /* best effort — the in-memory ceiling still applies for this session */ }
+    });
   }
   if (!globalThis.plathoTonRpcTransport && typeof globalThis.fetch === 'function') {
     globalThis.plathoTonRpcConfig = rpc;
@@ -415,6 +415,86 @@ const railItems = [...document.querySelectorAll('.rail-item[data-tab]')];
 const panels = [...document.querySelectorAll('.view-panel')];
 const docsButtons = [...document.querySelectorAll('.docs-header-button')];
 const installButtons = [...document.querySelectorAll('.install-header-button')];
+
+// ── Theme toggle (header control beside the docs button on every surface). Forced theme rides
+// html[data-theme] (styles.css overrides prefers-color-scheme for it); boot-guard.js re-applies the
+// persisted choice before first paint. The .theme-anim class arms the CSS color cross-fade for the flip.
+const THEME_STORAGE_KEY = 'platho.theme.v1';
+const themeToggleButtons = [...document.querySelectorAll('.theme-toggle-button')];
+let themeAnimTimer = 0;
+
+function currentEffectiveTheme() {
+  const forced = document.documentElement.getAttribute('data-theme');
+  if (forced === 'light' || forced === 'dark') return forced;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+// With a forced theme the media-gated <meta name="theme-color"> pair no longer matches reality — pin both
+// to the active background so the browser/PWA chrome follows the in-app theme.
+function reflectThemeColorMeta() {
+  // Read the --bg TOKEN, not the body's computed background: during the .theme-anim cross-fade the
+  // computed color is mid-transition, while the custom property already holds the target value.
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  if (!bg) return;
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', bg);
+}
+
+function applyForcedTheme(next) {
+  const root = document.documentElement;
+  root.classList.add('theme-anim');
+  root.setAttribute('data-theme', next);
+  try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* best-effort persist */ }
+  reflectThemeColorMeta();
+  clearTimeout(themeAnimTimer);
+  themeAnimTimer = setTimeout(() => root.classList.remove('theme-anim'), 550);
+}
+
+for (const button of themeToggleButtons) {
+  button.addEventListener('click', () => {
+    applyForcedTheme(currentEffectiveTheme() === 'dark' ? 'light' : 'dark');
+  });
+}
+
+// Boot-guard may have applied a persisted forced theme before this module ran — align the meta pair once.
+if (document.documentElement.getAttribute('data-theme')) reflectThemeColorMeta();
+
+// ── Post timestamp display mode: 'datetime' (default) shows "YYYY-MM-DD HH:MM", 'date' hides the time.
+// Applied at RENDER time (the pipeline always carries the full local datetime), so flipping the setting
+// only needs a re-render; the locale/mode terms in publicFeedItemRenderSignature force the card rebuild.
+const FEED_TIMESTAMP_MODE_KEY = 'platho.feedTimestampMode.v1';
+const feedTimestampModeSelect = document.querySelector('#feedTimestampModeSelect');
+
+function feedTimestampMode() {
+  try { return localStorage.getItem(FEED_TIMESTAMP_MODE_KEY) === 'date' ? 'date' : 'datetime'; } catch { return 'datetime'; }
+}
+
+// Meta labels are opaque strings (author names, statuses, timestamps); only a "YYYY-MM-DD HH:MM" shaped
+// label is a timestamp, so the date-only mode can strip the time without touching anything else.
+function displayMetaLabel(label) {
+  if (feedTimestampMode() === 'date' && typeof label === 'string') {
+    const match = /^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}$/.exec(label);
+    if (match) return match[1];
+  }
+  return label;
+}
+
+function formatMetaTimestamp(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return feedTimestampMode() === 'date' ? day : `${day} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+if (feedTimestampModeSelect) {
+  feedTimestampModeSelect.value = feedTimestampMode();
+  feedTimestampModeSelect.addEventListener('change', () => {
+    const mode = feedTimestampModeSelect.value === 'date' ? 'date' : 'datetime';
+    try { localStorage.setItem(FEED_TIMESTAMP_MODE_KEY, mode); } catch { /* best-effort persist */ }
+    renderPublicSurface({ anchorUnread: false });
+  });
+}
 const globalSyncIndicators = [...document.querySelectorAll('.global-sync-indicator')];
 const docsDialog = document.querySelector('#docsDialog');
 const docsCloseButton = document.querySelector('#docsCloseButton');
@@ -761,6 +841,7 @@ const publicChannelSearch = document.querySelector('#publicChannelSearch');
 const editChannelProfileButton = document.querySelector('#editChannelProfileButton');
 const publicDiscovery = document.querySelector('#publicDiscovery');
 const publicDiscoveryBody = document.querySelector('#publicDiscoveryBody');
+const publicDiscoverySearch = document.querySelector('#publicDiscoverySearch');
 const publicDiscoveryBackButton = document.querySelector('#publicDiscoveryBackButton');
 const publicChannelView = document.querySelector('#publicChannelView');
 const publicChannelViewBackButton = document.querySelector('#publicChannelViewBackButton');
@@ -1163,6 +1244,10 @@ let publicDiscoveryOpen = false;
 let publicDiscoveryResults = null;
 let publicDiscoveryTagFilter = null;
 let publicDiscoveryLoadToken = 0;
+// { done, total } while a beacon sweep is still painting partial frames; null once the final list (or an error) is
+// in. Read by renderPublicDiscovery so a repaint from elsewhere (avatar hydration, a tag chip) keeps the "still
+// looking" line instead of declaring the short list finished.
+let publicDiscoveryProgress = null;
 let publicPostDetailItem = null;
 let publicPostDetailChainComments = [];
 let publicPostDetailLoadToken = 0;
@@ -1195,6 +1280,31 @@ let publicPostDetailParentExists = null; // last clean read: true = post has a c
 let publicPostDetailCommentCursors = null;
 let publicPostDetailHasMoreComments = false;
 let publicPostDetailLoadingEarlier = false;
+// Newest-first thread paging (redesign): the list renders newest→oldest, the BOTTOM sentinel pages further back
+// via the cursors above. After a DATE JUMP the list also pages FORWARD (toward the present) from the TOP
+// sentinel; null = the tail window is already shown (normal mode, no forward paging).
+let publicPostDetailNewerCursor = null;
+let publicPostDetailLoadingNewer = false;
+let publicPostDetailJumpBusy = false;
+// The /messages body-retention wall was hit going back: older commits exist on chain but their bodies are
+// no longer served, so back-pagination stops and the thread says so instead of grinding empty windows.
+let publicPostDetailOlderTruncated = false;
+// A CLEAN 0-row page is AMBIGUOUS: real retention wall, or the pump silently dropping body requests inside
+// a 429 window (skipIfRateLimited) — the index read succeeds either way. So an empty window never advances
+// the cursor (it is re-read on the retry timer), and only the SAME window staying empty across several
+// clean attempts while the RPC is calm counts as the wall. (v1 declared the wall on the first empty page
+// AND advanced past the unread window — "loads once, then never again".)
+// PER-DIRECTION (review): after a jump both sentinels can sit at a retention edge; a single shared streak
+// let alternating empty results reset each other so neither wall was ever declared.
+const publicCommentsEmptyStreaks = {
+  earlier: { key: null, calmEmpties: 0 },
+  newer: { key: null, calmEmpties: 0 },
+};
+// One counter invalidates EVERY in-flight page read when the paging FRAME changes (a date jump rebuilds the
+// cursors, opening a post resets them, a jump-exit refresh replaces them): each loader captures it before
+// its await and drops a stale-frame result. Post identity alone is not enough — frames differ WITHIN one
+// post (review: a stale pre-jump page overwrote jump cursors and killed the sentinel for the session).
+let publicCommentsPagingGeneration = 0;
 let privateImageAttachments = [];
 // Swipe-to-reply drafts (v646): {refEntryId, author, snippet} | null — the quoted target for the NEXT send.
 // Composer block builders read these (default params) so the size plan, the optimistic echo and the wire agree.
@@ -1348,6 +1458,9 @@ let walletUnlockPromptTimer = null;
 let lastWalletUnlockAt = 0;
 let vaultAutoRefreshTimer = null;
 let vaultRefreshPromise = null;
+// { includeActivation, includeStats } of the refresh that holds vaultRefreshPromise — see refreshVaultNow, which
+// uses it to TOP UP a caller whose request the running refresh does not cover (PWA-ACTIVATION-04).
+let vaultRefreshInFlightFlags = null;
 let navVaultBalanceRetryTimer = null;
 let navVaultBalanceRefreshPromise = null;
 // ONE app-level Vault read mutex: at most ONE app-level Vault chain read runs at a time, across ALL drivers
@@ -2126,7 +2239,7 @@ function openInstallDialogIfUseful() {
     return;
   }
   installPromptDeferred = false;
-  installDialog.hidden = false;
+  installDialog.classList.remove('is-closing'); installDialog.hidden = false;
   refreshInstallButtons();
 }
 
@@ -2149,7 +2262,7 @@ function dropDeferredInstallPrompt() {
 
 function closeInstallDialog({ dismissed = true } = {}) {
   if (dismissed) markInstallPromptDismissed();
-  if (installDialog) installDialog.hidden = true;
+  hideDialogAnimated(installDialog);
 }
 
 let composerViewportMaxHeight = 0; // largest visible viewport height seen AT THE CURRENT WIDTH = the no-soft-keyboard baseline
@@ -2842,8 +2955,15 @@ function closeExternalLinkModal() {
   if (!activeExternalLinkModal) return;
   const { backdrop, onKeydown, previousFocus } = activeExternalLinkModal;
   document.removeEventListener('keydown', onKeydown, true);
-  backdrop.remove();
   activeExternalLinkModal = null;
+  // The same exit every other sheet has (owner): the backdrop fades and the card pops out BEFORE the node leaves
+  // the DOM; reduced motion removes it at once. The modal is built per open, so a reopen mid-exit gets a fresh node
+  // and the old one just finishes leaving (pointer-events are off while it does, see .is-closing).
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) backdrop.remove();
+  else {
+    backdrop.classList.add('is-closing');
+    window.setTimeout(() => backdrop.remove(), 200);
+  }
   try { previousFocus?.focus?.(); } catch { /* focus target detached */ }
 }
 function showExternalLinkConfirm(safeHref, host, displayText) {
@@ -2926,8 +3046,13 @@ function closeLinkComposerModal() {
   if (!activeLinkComposerModal) return;
   const { backdrop, onKeydown, previousFocus } = activeLinkComposerModal;
   if (onKeydown) document.removeEventListener('keydown', onKeydown, true);
-  backdrop.remove();
   activeLinkComposerModal = null;
+  // Same animated exit as the external-link sheet (the two were the only per-open modals that just vanished).
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) backdrop.remove();
+  else {
+    backdrop.classList.add('is-closing');
+    window.setTimeout(() => backdrop.remove(), 200);
+  }
   try { previousFocus?.focus?.(); } catch { /* detached */ }
 }
 function openLinkComposerDialog(targetInput, editChip = null) {
@@ -3432,7 +3557,7 @@ async function promptInstallApp() {
     if (installDialog?.hidden === false) {
       closeInstallDialog({ dismissed: false });
     } else if (installDialog) {
-      installDialog.hidden = false;
+      installDialog.classList.remove('is-closing'); installDialog.hidden = false;
     }
     refreshInstallButtons();
     return;
@@ -3741,7 +3866,10 @@ function setThreadAvatarNode(node, thread) {
     return;
   }
   node.classList.remove('avatar-saved');
-  setAvatarNode(node, thread?.avatar, thread?.avatarImageUrl);
+  // The LETTER derives from the same string the row's title shows, AT RENDER TIME — the persisted
+  // thread.avatar can carry a stale initial from an older label (history snapshot restore), which made the
+  // letter flip between renders depending on which code path wrote it last (owner: "sometimes U, sometimes A").
+  setAvatarNode(node, threadDisplayLabel(thread) || thread?.avatar, thread?.avatarImageUrl);
 }
 
 // Thread-list side label: today -> clock time, this week -> weekday, else a date (year only when it differs).
@@ -3821,9 +3949,8 @@ function normalizeContactDisplayPreference(value) {
   const displayIdentity = normalizeRecipientIdentity(value.displayIdentity) ?? null;
   const rawLabel = typeof value.localLabel === 'string' ? value.localLabel.trim() : '';
   const localLabel = rawLabel.length > 0 ? rawLabel : null;
-  // PINNED rides in the same per-counterparty record as the local name: a device-local choice about one contact,
-  // kept where the other device-local choices about that contact already live. [OWNER 2026-08-21: a Pin button in
-  // the chevron menu; pinned contacts sit at the top of the list and still reorder among themselves by freshness.]
+  // "Pin contact": a third LOCAL field next to the local label. Strictly boolean true — anything else (absent on
+  // every entry written before the flag existed) reads as unpinned, so old entries need no migration.
   const pinned = value.pinned === true;
   if (!displayIdentity && !localLabel && !pinned) return null;
   return { displayIdentity, localLabel, pinned };
@@ -3852,13 +3979,13 @@ function writeContactDisplayPreference(counterpartyWallet, preference) {
     try { localStorageOrNull()?.removeItem(key); } catch { /* cosmetic self-heal; ignore */ }
     return;
   }
-  // A caller that says nothing about `pinned` leaves it as it was: every writer of the display choice (select an
-  // identity, set a local name, the Private→Public mirror) predates the pin and must not quietly unpin.
-  const existingPinned = readContactDisplayPreference(counterpartyWallet)?.pinned === true;
-  const normalized = normalizeContactDisplayPreference({
-    ...(preference ?? {}),
-    pinned: typeof preference?.pinned === 'boolean' ? preference.pinned : existingPinned,
-  });
+  // The pin flag is CARRIED, never clobbered: every pre-existing writer (thread -> store sync, the Public "Display
+  // as" pick, the one-time hydrate seed) passes only { displayIdentity, localLabel }. Unless the caller says `pinned`
+  // explicitly (setContactPinned is the only one that does), the flag already in the store survives the write.
+  const pinned = typeof preference?.pinned === 'boolean'
+    ? preference.pinned
+    : (readContactDisplayPreference(counterpartyWallet)?.pinned === true);
+  const normalized = normalizeContactDisplayPreference({ ...(preference ?? {}), pinned });
   try {
     if (!normalized) {
       localStorageOrNull()?.removeItem(key);
@@ -3872,6 +3999,28 @@ function writeContactDisplayPreference(counterpartyWallet, preference) {
   } catch {
     // The cross-tab display preference is cosmetic; a failed write just means no sync this time.
   }
+}
+
+// "Pin contact" — the third per-counterparty LOCAL preference (next to the local label), shared by the Private dialog
+// and the Public wallet channel exactly like the display choice: one entry, one flag, both menus. Pinned dialogs sort
+// above the rest (thread-list-order.mjs) in the thread list AND the share sheet. Never for the own wallet:
+// writeContactDisplayPreference refuses it, and "My notes" is first by its own rule anyway.
+function isContactPinned(counterpartyWallet) {
+  return readContactDisplayPreference(counterpartyWallet)?.pinned === true;
+}
+
+function setContactPinned(counterpartyWallet, pinned) {
+  const stored = readContactDisplayPreference(counterpartyWallet);
+  writeContactDisplayPreference(counterpartyWallet, {
+    displayIdentity: stored?.displayIdentity ?? null,
+    localLabel: stored?.localLabel ?? null,
+    pinned: pinned === true,
+  });
+  // Mirror onto the live thread (if any) so the next render orders it without re-reading storage per row; a thread
+  // that materializes later picks the flag up in hydrateThreadDisplayFromContactStore.
+  const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
+  if (thread) thread.pinned = pinned === true;
+  renderThreads();
 }
 
 // Resolve how a counterparty wallet should be shown (name + identity tone) from the shared store.
@@ -4080,6 +4229,9 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // marks cost nothing to rebuild: one full pass.
   convReadLaneInstance = null;
   convBucketSeqMarks.clear();
+  // The own-send time index is derived from THIS wallet's history headers (restoreHistoryWindows rebuilds it for the
+  // next one); an inherited entry could only suppress an insert in the next wallet's dialog — the bleed class again.
+  storedOwnSendTimes = new Map();
   cancelAllConvDeliveryConfirms();   // drop pending delivery-confirm timers so none fires against a torn-down transport
   cancelPublicPublishVisibilityChecks();   // same rule for the public side: no tick may fire against a swapped wallet
   convKeyStore = null;
@@ -4118,6 +4270,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   localProfileAvatarPointer = null;
   profileAvatarLoadPromises.clear();
   delete globalThis.plathoVaultBinding;
+  clearPlathoActivationReread();   // the re-read ladder was climbing for the wallet being torn down (PWA-ACTIVATION-04)
   delete globalThis.plathoLastEncryptedHistoryRestore;
   globalThis.plathoLastWalletScopedRuntimeReset = {
     reason,
@@ -4419,7 +4572,6 @@ function renderWalletIdentity(status = null) {
     : t('wallet.addressMode'));
   setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional'));
   renderMyUsernamesStatus();
-  scheduleOwnedUsernamesBootCheck();   // once per wallet per session: the real count, not the remembered one
   if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
   if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
 }
@@ -4605,6 +4757,8 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   closeActionDialog(null);
   plathoWallet = null;
   localIdentity = null;
+  ownedUsernameNftsVerified = null;   // the chain count belongs to the wallet being torn down, not the next one
+  clearPlathoActivationReread();      // no wallet to re-read for; the re-unlock reads activation fresh (PWA-ACTIVATION-04)
   localVaultAuthKeyPair = null;
   localRecipientKeyPair = null;
   localSignedPublicBundle = null;
@@ -5058,23 +5212,24 @@ function hydrateThreadDisplayFromContactStore(thread) {
   if (own && sameWalletAddress(wallet, own)) { thread.contactDisplaySynced = true; return false; }
   thread.contactDisplaySynced = true;
   const stored = readContactDisplayPreference(wallet);
-  // The pin is a fact about the CONTACT and lives only in the store — the thread carries it for the list order.
-  const pinnedChanged = Boolean(thread.pinned) !== (stored?.pinned === true);
+  // The pin rides the same entry (runtime mirror on the thread, read by thread-list-order via isThreadPinned). Set it
+  // BEFORE the display compare: a pinned-only entry carries no display choice and must not count as one.
   thread.pinned = stored?.pinned === true;
-  if (!stored) {
+  const storedDisplay = stored && (stored.displayIdentity || stored.localLabel) ? stored : null;
+  if (!storedDisplay) {
     if (thread.displayIdentity || thread.localLabel) {
       writeContactDisplayPreference(wallet, {
         displayIdentity: thread.displayIdentity ?? null,
         localLabel: thread.localLabel ?? null,
       });
     }
-    return pinnedChanged;
+    return false;
   }
-  const sameIdentity = identityKey(stored.displayIdentity) === identityKey(thread.displayIdentity ?? null);
-  const sameLabel = (stored.localLabel ?? null) === (thread.localLabel ?? null);
-  if (sameIdentity && sameLabel) return pinnedChanged;
-  thread.displayIdentity = stored.displayIdentity ?? null;
-  if (stored.localLabel) thread.localLabel = stored.localLabel;
+  const sameIdentity = identityKey(storedDisplay.displayIdentity) === identityKey(thread.displayIdentity ?? null);
+  const sameLabel = (storedDisplay.localLabel ?? null) === (thread.localLabel ?? null);
+  if (sameIdentity && sameLabel) return false;
+  thread.displayIdentity = storedDisplay.displayIdentity ?? null;
+  if (storedDisplay.localLabel) thread.localLabel = storedDisplay.localLabel;
   else delete thread.localLabel;
   applyThreadDisplayFields(thread);
   return true;
@@ -5193,7 +5348,7 @@ function positionIdentityPopover(popover, anchor) {
 }
 
 function hideIdentityPopover() {
-  if (identityPopover) identityPopover.hidden = true;
+  hidePopoverAnimated(identityPopover);
   // Reset whichever button opened the popover (Private header or a Public channel detail button).
   if (identityPopoverAnchor) {
     identityPopoverAnchor.setAttribute('aria-expanded', 'false');
@@ -5408,6 +5563,7 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
     loading.textContent = t('public.loadingDescription');
     body.append(loading);
   }
+  popover.classList.remove('is-closing');   // a reopen mid-exit owns the node again (hidePopoverAnimated stands down)
   popover.hidden = false; // unhide FIRST so positionIdentityPopover can measure the real height (bounded by the CSS max-height)
   positionIdentityPopover(popover, anchor);
   if (identityPopoverAnchor && identityPopoverAnchor !== anchor) identityPopoverAnchor.setAttribute('aria-expanded', 'false');
@@ -5519,7 +5675,7 @@ async function openEditChannelProfileDialog() {
 // Generic "Display as" popover used by BOTH the Private conversation header and the Public channel
 // detail header. The caller supplies the option list, the current selection, and what to do when an
 // option / the local-name action is picked.
-function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pin = null }) {
+function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pinned = null, onTogglePin = null }) {
   if (!anchor) return;
   const popover = ensureIdentityPopover();
   popover.setAttribute('role', 'menu');
@@ -5532,6 +5688,28 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
     hideIdentityPopover();
     onSetLocalName();
   };
+  // "Pin contact" / "Unpin contact" — the SECOND row of the menu, right under the local-name row, in both menus
+  // (Private header chevron, Public channel chevron). `pinned === null` means the row is not offered at all (the own
+  // wallet / Saved). Same action-row markup as "Set local name": no new CSS, no inline styles.
+  let pinRow = null;
+  if (pinned !== null && typeof onTogglePin === 'function') {
+    pinRow = document.createElement('button');
+    pinRow.type = 'button';
+    pinRow.className = 'identity-variant identity-variant-action';
+    pinRow.setAttribute('role', 'menuitem');
+    const pinLabel = document.createElement('strong');
+    pinLabel.textContent = pinned ? t('chat.unpinContact') : t('chat.pinContact');
+    const pinType = document.createElement('span');
+    // Its OWN hint, not the local-name one: "Only shown on this device" is true of a label, and says nothing about
+    // what pinning does. chat.pinHint — "Kept at the top of your contacts — only on this device" — says both, and
+    // ships in every locale.
+    pinType.textContent = t('chat.pinHint');
+    pinRow.append(pinLabel, pinType);
+    pinRow.addEventListener('click', () => {
+      hideIdentityPopover();
+      onTogglePin(!pinned);
+    });
+  }
   // Local name at the very top: when none is set yet, the "Set local name" action sits above the identities. (When
   // one IS set it's the first option in the loop below, carrying an edit pencil — already at the top.)
   if (!localLabelExists) {
@@ -5546,26 +5724,7 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
     localNameRow.append(localNameLabel, localNameType);
     localNameRow.addEventListener('click', openEdit);
     popover.append(localNameRow);
-  }
-  // PIN / UNPIN — the second action, for a dialog that can be pinned (a Private contact; the Public channel header
-  // passes no `pin`). A labeled row, like "Set local name", not an icon: the owner's rule for actions. Toggling
-  // closes the menu; the list reorders under it. [OWNER 2026-08-21]
-  if (pin && typeof pin.onToggle === 'function') {
-    const pinRow = document.createElement('button');
-    pinRow.type = 'button';
-    pinRow.className = 'identity-variant identity-variant-action';
-    pinRow.setAttribute('role', 'menuitem');
-    pinRow.dataset.action = pin.pinned ? 'unpin' : 'pin';
-    const pinLabel = document.createElement('strong');
-    pinLabel.textContent = pin.pinned ? t('chat.unpinContact') : t('chat.pinContact');
-    const pinType = document.createElement('span');
-    pinType.textContent = t('chat.pinHint');
-    pinRow.append(pinLabel, pinType);
-    pinRow.addEventListener('click', () => {
-      hideIdentityPopover();
-      pin.onToggle();
-    });
-    popover.append(pinRow);
+    if (pinRow) popover.append(pinRow);
   }
   for (const option of options ?? []) {
     if (option.key === 'local-label') {
@@ -5588,6 +5747,7 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       editButton.addEventListener('click', openEdit);
       row.append(selectRow, editButton);
       popover.append(row);
+      if (pinRow && !pinRow.isConnected) popover.append(pinRow);
       continue;
     }
     if (option.identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS && option.identity.value) {
@@ -5638,6 +5798,8 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       onSelect(selected);
     }));
   }
+  if (pinRow && !pinRow.isConnected) popover.append(pinRow); // no local-name row to follow (defensive) — still offered
+  popover.classList.remove('is-closing');   // a reopen mid-exit owns the node again (hidePopoverAnimated stands down)
   popover.hidden = false; // unhide FIRST so positionIdentityPopover can measure the real height (bounded by the CSS max-height)
   positionIdentityPopover(popover, anchor);
   // Track the opening button so its aria-expanded reflects the open state and is reset on close
@@ -5649,32 +5811,17 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
   anchor.setAttribute('aria-expanded', 'true');
 }
 
-/**
- * Pin or unpin a Private dialog. The flag lives in the per-counterparty display store (device-local, like the local
- * name) and on the thread for the list order; nothing else moves. [OWNER 2026-08-21]
- */
-function toggleThreadPinned(thread) {
-  const wallet = ownerWalletFromThread(thread);
-  if (!thread || !wallet || isSavedMessagesThread(thread)) return;
-  const pinned = !(thread.pinned === true);
-  thread.pinned = pinned;
-  writeContactDisplayPreference(wallet, {
-    displayIdentity: thread.displayIdentity ?? null,
-    localLabel: thread.localLabel ?? null,
-    pinned,
-  });
-  renderThreads();
-  renderConversation();
-}
-
 function showIdentityPopover(thread, anchor) {
   if (!thread || !anchor) return;
-  const pinnable = Boolean(ownerWalletFromThread(thread)) && !isSavedMessagesThread(thread);
+  // The pin lives in the shared per-counterparty store (keyed by the peer's wallet); a dialog whose peer wallet is
+  // not resolved yet, or the Saved thread, gets no pin row.
+  const pinWallet = isSavedMessagesThread(thread) ? null : ownerWalletFromThread(thread);
   renderDisplayAsPopover({
     options: identityDisplayOptions(thread),
     selectedKey: selectedIdentityDisplayOptionKey(thread),
     localLabelExists: Boolean(thread.localLabel),
-    pin: pinnable ? { pinned: thread.pinned === true, onToggle: () => toggleThreadPinned(thread) } : null,
+    pinned: pinWallet ? isContactPinned(pinWallet) : null,
+    onTogglePin: pinWallet ? (next) => setContactPinned(pinWallet, next) : null,
     anchor,
     onSelect: (selected) => {
       thread.displayIdentity = selected.identity ?? null;
@@ -5697,10 +5844,15 @@ function showPublicChannelDisplayPopover(channel, anchor) {
   const wallet = channel?.authorWallet;
   if (!wallet || !anchor) return;
   const context = contactDisplayContextForWallet(wallet);
+  // No pin for the OWN channel: the store refuses own-wallet entries, and "My notes" already leads the list.
+  const ownAddress = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  const pinnable = !(ownAddress && sameWalletAddress(wallet, ownAddress));
   renderDisplayAsPopover({
     options: identityDisplayOptions(context),
     selectedKey: selectedIdentityDisplayOptionKey(context),
     localLabelExists: Boolean(context.localLabel),
+    pinned: pinnable ? isContactPinned(wallet) : null,
+    onTogglePin: pinnable ? (next) => setContactPinned(wallet, next) : null,
     anchor,
     onSelect: (selected) => {
       // Re-read the local label from the store at click time (not the captured context): the user may
@@ -5851,8 +6003,11 @@ function syncNowForCurrentScreen() {
     return;
   }
   // Public feed / post detail (and any future view): run the unified private+public sync cycle now
-  // (1s is the scheduler's floor delay).
-  scheduleMessageAutoSync(1_000);
+  // (1s is the scheduler's floor delay). Two gates would silently defeat an explicit tap and are reset
+  // for it: the public background-sync cadence window (it skips syncPublicChannels inside its interval)
+  // and the degraded-transport backoff (see scheduleMessageAutoSync's manual flag).
+  lastPublicBackgroundSyncAt = 0;
+  scheduleMessageAutoSync(1_000, { manual: true });
 }
 for (const indicator of globalSyncIndicators) {
   indicator.addEventListener('click', () => syncNowForCurrentScreen());
@@ -5933,12 +6088,12 @@ function openNewChatDialog() {
   if (recipientLocalLabel) recipientLocalLabel.value = '';
   recipientHint.textContent = t('chat.newChatRecipientHint');
   recipientHint.dataset.tone = 'muted';
-  newChatDialog.hidden = false;
+  newChatDialog.classList.remove('is-closing'); newChatDialog.hidden = false;
   requestAnimationFrame(() => recipientInput.focus());
 }
 
 function closeNewChatDialog() {
-  if (newChatDialog) newChatDialog.hidden = true;
+  hideDialogAnimated(newChatDialog);
 }
 
 function collectActionDialogValues() {
@@ -6162,19 +6317,72 @@ function openImageLightbox(src, meta = '') {
   imageLightboxImage.src = src;
   if (imageLightboxMeta) imageLightboxMeta.textContent = meta || t('common.finalCompressedImage');
   if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = false;
+  imageLightboxDialog.classList.remove('is-closing');
   imageLightboxDialog.hidden = false;
   imageLightboxCloseButton?.focus();
 }
 
+// Animated hide for every modal backdrop (owner: the QR/receive dialog and friends closed with no exit
+// animation, unlike the lightbox). The .is-closing class runs the shared CSS fade/pop-out; the real hidden
+// lands on a matched timer. A reopen clears the class first, so a stale close timer can never swallow a
+// dialog that was reopened meanwhile.
+// `onHidden` runs once the backdrop is actually hidden — immediately under reduced motion, after the exit
+// animation otherwise, and NOT AT ALL if the dialog was reopened mid-exit (the opener owns the content then).
+function hideDialogAnimated(backdrop, onHidden = null) {
+  if (!backdrop || backdrop.hidden) { if (typeof onHidden === 'function') onHidden(); return; }
+  if (backdrop.classList.contains('is-closing')) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    backdrop.hidden = true;
+    if (typeof onHidden === 'function') onHidden();
+    return;
+  }
+  backdrop.classList.add('is-closing');
+  window.setTimeout(() => {
+    if (!backdrop.classList.contains('is-closing')) return;   // reopened mid-animation
+    backdrop.classList.remove('is-closing');
+    backdrop.hidden = true;
+    if (typeof onHidden === 'function') onHidden();
+  }, 200);
+}
+
+// Popovers (the "display as" menu, the emoji picker) leave the way they came: popIn on open, popOut on close (owner:
+// every menu exits with motion, not a cut). Reopened mid-exit: the opener clears .is-closing and unhides, and the
+// timer stands down. Reduced motion hides at once.
+function hidePopoverAnimated(popover) {
+  if (!popover || popover.hidden) return;
+  if (popover.classList.contains('is-closing')) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { popover.hidden = true; return; }
+  popover.classList.add('is-closing');
+  window.setTimeout(() => {
+    if (!popover.classList.contains('is-closing')) return;   // reopened mid-animation
+    popover.classList.remove('is-closing');
+    popover.hidden = true;
+  }, 160);
+}
+
 function closeImageLightbox() {
   if (!imageLightboxDialog || imageLightboxDialog.hidden) return;
-  imageLightboxDialog.hidden = true;
-  imageLightboxImage?.removeAttribute('src');
-  resetImageLightboxZoom();
-  if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = true;
-  const focusTarget = imageLightboxPreviousFocus;
-  imageLightboxPreviousFocus = null;
-  focusTarget?.focus?.();
+  if (imageLightboxDialog.classList.contains('is-closing')) return;
+  // Mirror of the open animation (owner): display:none cannot animate, so the exit fade/pop runs first and
+  // the actual hide lands on a timer matched to the CSS duration (reduced motion closes instantly).
+  const finishClose = () => {
+    imageLightboxDialog.classList.remove('is-closing');
+    imageLightboxDialog.hidden = true;
+    imageLightboxImage?.removeAttribute('src');
+    resetImageLightboxZoom();
+    if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = true;
+    const focusTarget = imageLightboxPreviousFocus;
+    imageLightboxPreviousFocus = null;
+    focusTarget?.focus?.();
+  };
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    finishClose();
+    return;
+  }
+  imageLightboxDialog.classList.add('is-closing');
+  window.setTimeout(() => {
+    if (imageLightboxDialog.classList.contains('is-closing')) finishClose();
+  }, 200);
 }
 
 // --- Lightbox zoom/pan engine: pinch (touch), drag-pan when zoomed, double-tap / double-click toggle, wheel ---
@@ -6362,14 +6570,18 @@ function closeActionDialog(result = null) {
   const { resolve } = activeActionDialog;
   activeActionDialog = null;
   closeImageLightbox();
-  if (actionDialog) actionDialog.hidden = true;
-  actionFields?.replaceChildren();
-  if (actionCancelButton) {
-    actionCancelButton.hidden = false;
-    actionCancelButton.disabled = false;
-  }
+  // The fields stay on screen for the exit: clearing them first emptied the card a beat before it left (owner:
+  // the receive-GRAM QR vanished, then the sheet closed). A reopen mid-exit rebuilds fields and buttons itself
+  // (openActionDialog), so the deferred reset is skipped in that case — see hideDialogAnimated.
+  hideDialogAnimated(actionDialog, () => {
+    actionFields?.replaceChildren();
+    if (actionCancelButton) {
+      actionCancelButton.hidden = false;
+      actionCancelButton.disabled = false;
+    }
+    if (actionDismissButton) actionDismissButton.hidden = true;   // opt-in per dialog; never leaks to the next one
+  });
   if (actionSubmitButton) actionSubmitButton.disabled = false;
-  if (actionDismissButton) actionDismissButton.hidden = true;   // opt-in per dialog; never leaks to the next one
   resolve(result);
   // A dialog just left the screen, so an unlock prompt that was waiting for the way to clear may go ahead.
   //
@@ -6439,7 +6651,7 @@ async function openActionDialog(config = {}) {
     actionFields.replaceChildren(...(config.fields ?? []).map(createActionField));
     renderActionSummary(config.summary, collectActionDialogValues());
     renderActionFootnotes(config.footnotes);
-    actionDialog.hidden = false;
+    actionDialog.classList.remove('is-closing'); actionDialog.hidden = false;
     requestAnimationFrame(() => actionFields.querySelector('textarea, input:not([readonly]):not([type="hidden"]):not(.password-manager-username), select')?.focus());
   });
 }
@@ -6476,12 +6688,12 @@ function setDocsStatus(message, tone = 'muted') {
 }
 
 function closeDocsDialog() {
-  if (docsDialog) docsDialog.hidden = true;
+  hideDialogAnimated(docsDialog);
 }
 
 async function openDocsDialog(docId = activeDocId) {
   if (!docsDialog) return;
-  docsDialog.hidden = false;
+  docsDialog.classList.remove('is-closing'); docsDialog.hidden = false;
   await selectDoc(docId);
   requestAnimationFrame(() => docsContent?.focus());
 }
@@ -6489,10 +6701,27 @@ async function openDocsDialog(docId = activeDocId) {
 async function selectDoc(docId) {
   const doc = appDocById(docId);
   if (!doc || !docsContent) return;
+  // Directional slide (owner): the incoming document enters FROM the side of the tab the user pressed —
+  // a tab to the right slides in from the right, to the left from the left. CSSOM var (CSP-legal); the
+  // docSlideIn keyframe reads it, and a same-tab or first open degrades to a plain fade (0px).
+  const previousIndex = APP_DOCS.findIndex((entry) => entry.id === activeDocId);
+  const nextIndex = APP_DOCS.findIndex((entry) => entry.id === doc.id);
+  const shift = previousIndex >= 0 && nextIndex >= 0 && previousIndex !== nextIndex
+    ? (nextIndex > previousIndex ? '40px' : '-40px')
+    : '0px';
+  docsContent.style.setProperty('--doc-shift', shift);
   activeDocId = doc.id;
   renderDocsNav();
   if (docsTitle) docsTitle.textContent = doc.title;
   if (docsLead) docsLead.textContent = t('docs.lead');
+  // The header nodes are reused (textContent swap), so the entrance animation must be restarted by hand:
+  // drop the class, force a reflow, put it back (plain fade — owner asked for a simple appearance).
+  for (const node of [docsTitle, docsLead]) {
+    if (!node) continue;
+    node.classList.remove('docs-head-swap');
+    void node.offsetWidth;
+    node.classList.add('docs-head-swap');
+  }
   setDocsStatus(t('docs.loading'));
   try {
     // Docs are localized: cache per (doc, locale) so switching language serves the right translation. The main-app
@@ -7022,12 +7251,10 @@ function isUnreadPublicItem(item) {
   return entryId > publicChannelCursor(item.channelId ?? 'platho.app');
 }
 
-// ONE LIST, BY POST TIME, oldest first (renderPublicFeed and the channel view reverse it for display, newest on top).
-//
-// OWNER 2026-08-21: a followed person's NEW post appeared at the bottom next to his old one while silent channels
-// stayed on top. The list used to be the threads' items reversed — grouped by channel in thread order, which is
-// what a reader who follows many channels saw as "the feed never reorders". The order now belongs to the posts, not
-// to the channels: see sortPublicFeedItemsByTime.
+// ONE LIST BY TIME. publicChannelThreadsToFeedItems returns the posts grouped by channel (reversed, in subscription
+// order); sorting that by each post's createdAt is what makes the feed a feed rather than a stack of channels.
+// Oldest first — renderPublicFeed slices the newest window from the END and paints it reversed (newest on top);
+// publicChannelViewItems / markVisiblePublicFeedRead / the detail lookup are order-agnostic.
 function publicFeedItemsChronological() {
   return sortPublicFeedItemsByTime(publicChannelThreadsToFeedItems(publicChannelThreads));
 }
@@ -7109,6 +7336,7 @@ function updatePublicModeButtons() {
   // ([data-public-mode="feed"]) keeps matching.
   if (publicPane) publicPane.dataset.publicMode = 'feed';
   if (publicChannelSearch) publicChannelSearch.placeholder = t('public.searchPlaceholder');
+  if (publicDiscoverySearch) publicDiscoverySearch.placeholder = t('public.discoverSearchPlaceholder');
   updatePublicJumpDownVisibility();
   if (publicComposer) publicComposer.hidden = false;
 }
@@ -7140,6 +7368,32 @@ function publicFeedItemMatchesSearch(item, query) {
     ])),
   ].filter(Boolean).join(' ').toLowerCase();
   return haystack.includes(needle);
+}
+
+// SKELETON PLACEHOLDERS (owner): shimmering card outlines while a list is still on its way — the discovery sweep
+// before its first card, a comment thread before its first frame, the feed during the first sync. Purely decorative
+// (aria-hidden); the status line next to them keeps saying what is happening (and how many buckets are left).
+function buildSkeletonNodes(kind, count) {
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < count; i += 1) {
+    const card = document.createElement('div');
+    card.className = `skeleton-card skeleton-${kind}`;
+    card.setAttribute('aria-hidden', 'true');
+    const head = document.createElement('div');
+    head.className = 'skeleton-head';
+    const avatar = document.createElement('span');
+    avatar.className = 'skeleton skeleton-avatar';
+    const title = document.createElement('span');
+    title.className = 'skeleton skeleton-line skeleton-line-title';
+    head.append(avatar, title);
+    const line = document.createElement('span');
+    line.className = 'skeleton skeleton-line';
+    const short = document.createElement('span');
+    short.className = 'skeleton skeleton-line skeleton-line-short';
+    card.append(head, line, short);
+    fragment.append(card);
+  }
+  return fragment;
 }
 
 function renderPublicEmpty(titleText, bodyText) {
@@ -7222,14 +7476,21 @@ function appendPublicItemContent(container, item, embedDepth = 0) {
   }
 }
 
+// Comment keys already painted: a comment new to the screen surfaces (owner); cleared when a post detail opens so
+// its thread rises in again.
+const publicCommentSurfacedKeys = new Map();
 function appendPublicItemComments(article, item) {
   const comments = Array.isArray(item?.comments) ? item.comments : [];
   if (comments.length === 0) return;
   const commentList = document.createElement('div');
   commentList.className = 'comment-list';
+  let surfacing = 0;
   for (const comment of comments) {
     const row = document.createElement('article');
     row.className = 'comment-item';
+    const surfaceKey = comment?.id ?? comment?.entryId ?? null;
+    if (surfaceKey !== null && surfaceKey !== undefined
+      && surfaceRow(row, publicCommentSurfacedKeys, String(surfaceKey), surfacing)) surfacing += 1;
     // Chain anchor (parity with private .message rows): the swipe-to-reply gesture reads it as the reply ref and
     // reply quotes scroll to it. A local-pending comment has none — replying to it waits for the entry id.
     if (comment.entryId !== undefined && comment.entryId !== null && comment.entryId !== '') row.dataset.entryId = String(comment.entryId);
@@ -7242,7 +7503,7 @@ function appendPublicItemComments(article, item) {
     setAvatarNode(commentAvatar, String(comment.author ?? 'P').slice(0, 1), comment.avatarImageUrl ?? publicAvatarUrlForWallet(comment.authorWallet));
     const commentMeta = document.createElement('div');
     commentMeta.className = 'feed-meta';
-    commentMeta.textContent = [comment.author, comment.createdAt?.slice?.(0, 10)].filter(Boolean).join(' - ');
+    commentMeta.textContent = [comment.author, formatMetaTimestamp(comment.createdAt)].filter(Boolean).join(' - ');
     // Own pending comments show the SAME live private-style status badge as feed posts (publishStateMeta off
     // the streaming publishState; durable red on a failed terminal). CSS classes only (prod CSP).
     if (isPendingPublicFeedItem(comment) && comment.publishStatus) {
@@ -7462,12 +7723,12 @@ function openSharePostDialog(item) {
   if (!share) return;
   pendingSharePayload = share;
   renderSharePostList();
-  if (sharePostDialog) sharePostDialog.hidden = false;
+  if (sharePostDialog) { sharePostDialog.classList.remove('is-closing'); sharePostDialog.hidden = false; }
 }
 
 function closeSharePostDialog() {
   pendingSharePayload = null;
-  if (sharePostDialog) sharePostDialog.hidden = true;
+  hideDialogAnimated(sharePostDialog);
 }
 
 // Clipboard-copy glyph for the "copy to clipboard" share target (same inline-SVG style as the Saved pencil).
@@ -7539,8 +7800,9 @@ function renderSharePostList() {
   if (!sharePostList) return;
   sharePostList.replaceChildren();
   // Order: the two ways OUT of Platho first (link, then the text), then My notes, the own public channel, and
-  // private contacts by recency. The link leads because it is the only target that reaches someone who is not
-  // here yet — the others all need a Platho account on the other end.
+  // private contacts in the THREAD LIST's order (thread-list-order.mjs: pinned by recency, then the rest by recency).
+  // The link leads because it is the only target that reaches someone who is not here yet — the others all need a
+  // Platho account on the other end.
   const permalink = pendingSharePayload?.permalink ?? null;
   if (permalink) {
     sharePostList.append(buildShareTargetRow({
@@ -7578,11 +7840,14 @@ function renderSharePostList() {
       onChoose: () => chooseShareTargetOwnChannel(),
     }));
   }
-  // Then private contacts in the list's own order: pinned by recency, then the rest by recency (thread-list-order).
-  const contacts = orderThreadsForList(
-    visible.filter((thread) => !isSavedMessagesThread(thread)),
-    { isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs },
-  );
+  // Then private contacts — the SAME order as the thread list (pinned by recency, then the rest by recency). Saved is
+  // already out (rendered above), so only the tail of the shared ordering remains.
+  visible.forEach(hydrateThreadDisplayFromContactStore); // a thread never painted in the list still gets its pin flag (no-op once synced)
+  const contacts = orderThreadsForList(visible, {
+    isSaved: isSavedMessagesThread,
+    isPinned: isThreadPinned,
+    lastActivityMs: threadLastActivityMs,
+  }).filter((thread) => !isSavedMessagesThread(thread));
   for (const thread of contacts) {
     const wallet = threadPrimaryWalletRaw(thread);
     if (!wallet) continue;
@@ -7652,6 +7917,8 @@ function chooseShareCopyToClipboard() {
 sharePostCloseButton?.addEventListener('click', () => closeSharePostDialog());
 // v794: X-only — the share dialog closes ONLY via its ✕ (an outside/backdrop tap no longer dismisses it).
 
+// Ids the feed has already painted (session-long, see surfaceRow): only a post new to the screen rises in.
+const publicFeedSurfacedIds = new Map();
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
   publicFeed.dataset.publicMode = 'feed';
@@ -7668,6 +7935,7 @@ function renderPublicFeed(items, options = {}) {
     // for the whole feed, instead of once per silent channel. setPublicSyncPhase repaints this surface on every
     // transition, so the message settles by itself when the sync finishes.
     if (publicSyncPhase === 'syncing' && !publicChannelSearchQuery) {
+      publicFeed.append(buildSkeletonNodes('post', 2));
       renderPublicEmpty(t('public.previewWaitingFeed'), t('common.checking'));
     } else {
       renderPublicEmpty(publicChannelSearchQuery ? t('public.noPostsFound') : t('public.noPosts'), publicChannelSearchQuery ? t('public.tryAnotherSearch') : t('public.followOrPublishFirst'));
@@ -7709,6 +7977,7 @@ function renderPublicFeed(items, options = {}) {
   const avatarUrlMemo = new Map();
   const seen = new Set();
   let prev = null;
+  let surfacing = 0;
   // The discovery CTA stays at the very top (a newcomer sees it first).
   if (shouldShowDiscoveryCta()) {
     const cta = buildDiscoveryCtaCard();
@@ -7734,6 +8003,9 @@ function renderPublicFeed(items, options = {}) {
       article.dataset.itemId = key;
       article.dataset.sig = sig;
       existing.set(key, article);
+      // A post this feed has not shown yet SURFACES (owner) — the first paint, a newly landed post, a revealed older
+      // one; a rebuild for a changed signature (locale, timestamp mode) stays still. CSSOM delay: CSP, no style attr.
+      if (surfaceRow(article, publicFeedSurfacedIds, key, surfacing)) surfacing += 1;
     }
     const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
     if (article !== anchor) publicFeed.insertBefore(article, anchor);
@@ -8473,7 +8745,7 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
   meta.className = 'feed-meta';
   for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null].filter(Boolean)) {
     const span = document.createElement('span');
-    span.textContent = label;
+    span.textContent = displayMetaLabel(label);
     meta.append(span);
   }
   authorRow.append(authorAvatar, meta);
@@ -8548,6 +8820,12 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
 // signature-changing event.
 function publicFeedItemRenderSignature(item, avatarUrlMemo) {
   return [
+    // Cards bake t() output into their DOM (action buttons, statuses), so the locale is part of what the
+    // rendered node looks like: without this term a re-render after a language switch REUSED every card in
+    // the old language (the quick-start switch translates in place — only the profile switch reloads).
+    currentLocale(),
+    // Timestamp display mode changes what the meta line looks like the same way the locale does.
+    feedTimestampMode(),
     isUnreadPublicItem(item) ? 'u' : '',
     item.compact ? 'c' : '',
     // Expanded long posts rebuild expanded on EVERY surface: the click mutates only the tapped article's DOM,
@@ -8951,6 +9229,8 @@ function publicDetailStatusNode(text, { retry = false } = {}) {
 
 function renderPublicPostDetail() {
   if (!publicPostDetailBody || !publicPostDetailItem) return;
+  // Full rebuild ahead — stop observing the old sentinels (fresh ones re-register below).
+  if (publicCommentsSentinelObserver) publicCommentsSentinelObserver.disconnect();
   // Re-find the current feed item by IDENTITY (channel + entry) so a display change (e.g. relabelling the author
   // via the chevron) reflects here without re-opening; fall back to the captured item. Matching on entryId alone
   // painted a different channel's post over the opened one — see publicPostIdentity.
@@ -8990,6 +9270,21 @@ function renderPublicPostDetail() {
       || isOwnPublicAuthor(authorWallet)
       || item.channelId === DEFAULT_PUBLIC_CHANNEL_ID;
   }
+  // READING-POSITION ANCHOR (stability): every rebuild snapshots the topmost visible comment row and its
+  // viewport offset, and restores it after the rebuild. Newest-first means background syncs PREPEND fresh
+  // comments above a scrolled-down reader — without this every sync tick shoved the visible rows down
+  // (iOS/WebKit has no overflow-anchor; same pattern as the feed's topmost-article snapshot).
+  let detailScrollAnchor = null;
+  if (publicPostDetailBody.scrollTop > 0 || publicPostDetailNewerCursor) {
+    const bodyRect = publicPostDetailBody.getBoundingClientRect();
+    for (const row of publicPostDetailBody.querySelectorAll('.comment-item[data-entry-id]')) {
+      const rect = row.getBoundingClientRect();
+      if (rect.bottom > bodyRect.top) {
+        detailScrollAnchor = { id: row.dataset.entryId, offset: rect.top - bodyRect.top };
+        break;
+      }
+    }
+  }
   publicPostDetailBody.replaceChildren();
 
   // The post content, pinned at the top (no author row — the header already carries the author identity).
@@ -9000,7 +9295,7 @@ function renderPublicPostDetail() {
     const meta = document.createElement('div');
     meta.className = 'feed-meta public-detail-post-meta';
     const dateSpan = document.createElement('span');
-    dateSpan.textContent = dateLabel;
+    dateSpan.textContent = displayMetaLabel(dateLabel);
     meta.append(dateSpan);
     post.append(meta);
   }
@@ -9027,20 +9322,18 @@ function renderPublicPostDetail() {
     publicPostDetailBody.append(section);
     return;
   }
-  // OLDER COMMENTS ARE A PAGE AWAY, NOT GONE. get_page is capped at 96 rows by the contract and the read anchors at
-  // the tail, so a busy post shows its newest 96 and the rest sat on chain, paid for and unreachable — MEASURED at
-  // 120 comments in tests/public-comment-window. Above the list, because that is where the older ones will appear.
-  if (publicPostDetailHasMoreComments) {
-    const earlier = document.createElement('button');
-    earlier.type = 'button';
-    earlier.className = 'public-detail-earlier-comments';
-    earlier.disabled = publicPostDetailLoadingEarlier;
-    earlier.textContent = publicPostDetailLoadingEarlier ? t('public.loadingComments') : t('public.showEarlierComments');
-    earlier.addEventListener('click', () => { loadEarlierPublicPostComments(); });
-    section.append(earlier);
+  // NEWEST FIRST (owner): comments read like the feed — the freshest sits right under the heading and
+  // scrolling DOWN walks back through history. The BOTTOM sentinel auto-pages further back the moment it
+  // scrolls into view (IntersectionObserver; still a tappable button without it). The TOP sentinel exists
+  // only after a date jump and pages FORWARD toward the present. get_page stays capped at 96 rows.
+  if (publicPostDetailNewerCursor && !publicPostDetailJumpBusy) section.append(buildCommentsLoadSentinel('newer'));
+  if (comments.length > 0) appendPublicItemComments(section, { comments: comments.slice().reverse() });
+  if (publicPostDetailHasMoreComments && !publicPostDetailJumpBusy) section.append(buildCommentsLoadSentinel('earlier'));
+  else if (publicPostDetailOlderTruncated && comments.length > 0) {
+    section.append(publicDetailStatusNode(t('public.olderUnavailable')));
   }
-  if (comments.length > 0) appendPublicItemComments(section, { comments });
   if (publicPostDetailLoadState === 'loading') {
+    if (comments.length === 0) section.append(buildSkeletonNodes('comment', 3));
     section.append(publicDetailStatusNode(comments.length > 0 ? t('public.loadingMoreComments') : t('public.loadingComments')));
   } else if (publicPostDetailLoadState === 'error' && comments.length === 0) {
     // The read failed (rate-limited / unreachable) after retries — we do NOT know if there are comments.
@@ -9054,6 +9347,16 @@ function renderPublicPostDetail() {
       : publicDetailStatusNode(t('public.commentsNotLoadedYet'), { retry: true }));
   }
   publicPostDetailBody.append(section);
+  if (detailScrollAnchor) {
+    const row = publicPostDetailBody.querySelector(
+      `.comment-item[data-entry-id="${CSS.escape(detailScrollAnchor.id)}"]`,
+    );
+    if (row) {
+      const delta = (row.getBoundingClientRect().top - publicPostDetailBody.getBoundingClientRect().top)
+        - detailScrollAnchor.offset;
+      if (delta !== 0) publicPostDetailBody.scrollTop += delta;
+    }
+  }
   // Consumed by whichever render actually paints the new comment — the optimistic row, or the chain-confirmed one
   // that replaces it — rather than by the submit handler, which cannot know which render wins.
   if (publicPostDetailScrollToLatest) {
@@ -9070,15 +9373,20 @@ let publicPostDetailScrollToLatest = false;
 function scrollPublicPostDetailToLatest() {
   if (!publicPostDetailBody) return;
   const body = publicPostDetailBody;
-  const toBottom = () => { body.scrollTop = body.scrollHeight; };
-  // After layout: the row was appended THIS tick and scrollHeight is not final until the browser has laid it out.
-  requestAnimationFrame(toBottom);
-  // An image inside the new comment finishes loading a few frames later and grows the list under the scroll
-  // position, putting the row straight back under the fold. One re-scroll per pending image settles it.
+  // NEWEST FIRST: the freshest comment renders at the TOP of the thread, right under the heading — "latest"
+  // means the comments section's start now, not the scroller's bottom.
+  const toLatest = () => {
+    const section = body.querySelector('.public-detail-comments');
+    if (!section) { body.scrollTop = 0; return; }
+    body.scrollTop += section.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+  };
+  // After layout: the row was appended THIS tick; a post-card image decoding later shifts the section down,
+  // so re-anchor once per pending image.
+  requestAnimationFrame(toLatest);
   for (const image of body.querySelectorAll('img')) {
     if (image.complete) continue;
-    image.addEventListener('load', toBottom, { once: true });
-    image.addEventListener('error', toBottom, { once: true });
+    image.addEventListener('load', toLatest, { once: true });
+    image.addEventListener('error', toLatest, { once: true });
   }
 }
 
@@ -9144,6 +9452,7 @@ function publicPostHasChainCommentTarget(item) {
 function openPublicPostDetail(item) {
   if (!item || item.entryId === undefined || item.entryId === null) return;
   closePublicDiscovery();
+  publicCommentSurfacedKeys.clear();   // this thread's comments rise in afresh
   publicPostDetailItem = item;
   publicPostDetailOpen = true;
   // Stale-while-revalidate: paint the cached comments immediately (no re-download flash) if we have them, then
@@ -9157,6 +9466,16 @@ function openPublicPostDetail(item) {
   publicPostDetailCommentCursors = null;
   publicPostDetailHasMoreComments = false;
   publicPostDetailLoadingEarlier = false;
+  publicPostDetailNewerCursor = null;
+  publicPostDetailLoadingNewer = false;
+  publicPostDetailJumpBusy = false;
+  publicPostDetailOlderTruncated = false;
+  publicCommentsEmptyStreaks.earlier = { key: null, calmEmpties: 0 };
+  publicCommentsEmptyStreaks.newer = { key: null, calmEmpties: 0 };
+  publicCommentsPagingGeneration += 1;
+  // A late clean result from the PREVIOUS post's refresh must die here even when THIS post never starts a
+  // refresh of its own (comments-off posts don't) — the token otherwise bumps only inside refresh/close.
+  publicPostDetailLoadToken += 1;
   publicPostDetailLoadState = publicPostDetailChainComments.length > 0 ? 'ready' : 'loading';
   if (publicPane) publicPane.dataset.postOpen = 'true';
   // THE AUTHOR'S SETTING IS HONOURED HERE, not only by the feed button that usually guards the door — see
@@ -9208,38 +9527,536 @@ function closePublicPostDetail() {
 }
 
 // --- Newcomer discovery panel (Part B) ---
+// The per-bucket painter both the open and the refresh hand to the sweep. Built per load so it carries that load's
+// token: the sweep keeps running after this screen closes (and a reopen JOINS the running sweep, see
+// discoverChannelsFromBeacon), so a frame that belongs to a closed or superseded load must not repaint. EVERY
+// bucket repaints — the count under the cards is what tells the reader the sweep is alive between two cards — but
+// faces are only asked for when a card was actually added. Stale-while-revalidate: a previous sweep's cards stay on
+// screen until this sweep has a card of its own.
+// ONE REPAINT PER TASK, NOT ONE PER BUCKET. A warm sweep answers ~150 buckets from the snapshot LRU inside a single
+// task, and a full card rebuild per bucket froze the main thread for seconds (and on a cold sweep tore down an open
+// "display as" popover every second). Frames are folded into the globals as they arrive; the paint itself runs once
+// on the next tick — a full rebuild only if a card was added, otherwise just the counter line. [port review]
+let publicDiscoveryPaintTimer = 0;
+let publicDiscoveryPaintNeedsCards = false;
+// Wallets followed from the list during/after a sweep. The sweep decides "already followed" once, at its start, and
+// keeps handing over the same growing array — so without this a Follow was undone by the very next frame.
+const publicDiscoveryFollowedInSweep = new Set();
+// THE LATEST POST OF EACH CARD (Discover). A beacon card carries a description and nothing else; the channel's newest
+// post is what tells a reader whether it is alive and what it is like. Answers are keyed by the card's wallet and live
+// as long as the list does: the list is rebuilt on every sweep frame / query / avatar hydration, and a rebuilt card
+// re-attaches its line from here (buildDiscoveryCard) instead of asking again. Cleared by an explicit refresh and by
+// an open that starts a NEW sweep (the catalogue cache expired) — resetPublicDiscoveryLatestPosts.
+//   wallet -> { status: 'loading' | 'ready' | 'empty' | 'error', preview, createdAtMs, attempts }
+const publicDiscoveryLatestPosts = new Map();
+// THE PUMP. A card asks when it comes within a screen of the viewport (IntersectionObserver on the list's own
+// scroller), two reads in flight at a time: one card is ~4 requests on the shared pump (a state probe, two get_page,
+// one /messages) and the sweep is still running underneath — more in flight would only queue behind each other and
+// push the sweep back for nothing. Every read re-pumps when it ends, so the queue drains at the pump's pace.
+const PUBLIC_DISCOVERY_LATEST_CONCURRENCY = 2;
+const PUBLIC_DISCOVERY_LATEST_ERA_STEPS = 3;      // how many eras back a card looks when the newest holds only the channel's profile
+const PUBLIC_DISCOVERY_LATEST_RETRIES = 3;        // rate-limited reads are re-queued this many times; then the line waits for the next refresh
+const publicDiscoveryLatestQueue = [];            // wallets waiting for a slot, in the order they came into view
+const publicDiscoveryLatestInFlight = new Set();  // wallets being read right now
+let publicDiscoveryLatestGeneration = 0;          // bumped by a reset: an answer from before it is dropped on landing, not stored
+let publicDiscoveryLatestObserver = null;         // built lazily (ensureDiscoveryLatestObserver): publicDiscoveryBody is its root
+// SURFACING, shared by every list that rebuilds its rows (discovery cards, feed posts, comments, chat rows). The first
+// paint of a key starts the rise (staggered by `index`); a REBUILD while the rise is still running resumes it from
+// where it was (negative animation-delay) instead of cutting it short — lists here repaint often right after a first
+// paint (a comments refresh, a sweep frame, a sync). `registry`: Map/WeakMap key → { at, delay }. `fresh` lets a caller
+// decide newness itself (discovery: "was it on screen?"); by default a key unknown to the registry is fresh. Returns
+// true when a stagger slot was used (the caller advances its index). CSSOM delays — CSP forbids style attributes.
+const SURFACE_ANIM_MS = 420;
+const SURFACE_STEP_MS = 45;
+function surfaceRow(node, registry, key, index, fresh = null) {
+  const now = performance.now();
+  const prior = registry.get(key);
+  const isFresh = fresh === null ? !prior : fresh;
+  if (isFresh) {
+    const delay = Math.min(index, 8) * SURFACE_STEP_MS;
+    registry.set(key, { at: now, delay });
+    node.classList.add('is-surfacing');
+    node.style.animationDelay = `${delay}ms`;
+    return true;
+  }
+  if (prior) {
+    const remaining = prior.delay - (now - prior.at);
+    if (remaining > -SURFACE_ANIM_MS) {
+      node.classList.add('is-surfacing');
+      node.style.animationDelay = `${Math.round(remaining)}ms`;
+    }
+  }
+  return false;
+}
+const publicDiscoverySurfaceRegistry = new Map();
+// THE RISE IS ONE-SHOT: once cardSurface has run, the class and the CSSOM delay come off (the registry keeps the key,
+// so a rebuild still does not re-surface). Without this the forward fill pinned the end transform on the row for
+// good — swipe-to-reply's inline translateX was ignored, the reply/copy flashes never showed — and every display
+// toggle (Back from a post, a tab switch) replayed the rise of the whole list. [review] One delegated listener covers
+// every list; deliberately not {once} — a bubbling child animationend would consume it. Rows painted while hidden
+// keep the class and rise once when shown, then drop it (display:none cancels without animationend).
+document.addEventListener('animationend', (event) => {
+  if (event.animationName !== 'cardSurface') return;
+  const node = event.target;
+  if (!(node instanceof Element) || !node.classList.contains('is-surfacing')) return;
+  node.classList.remove('is-surfacing');
+  node.style.animationDelay = '';
+});
+// AURORA, third take (owner: "free-form, blurred, drifting across the screen without a cycle — like a sun spitting fire
+// into its own atmosphere"). Each .aurora-layer gets a TINY canvas (~96px wide, stretched over the layer — the upscale IS the
+// blur, no CSS filter) on which a few soft "suns" wander along sums of incommensurate sines (the path never repeats),
+// breathe, and now and then eject a flare that drifts out from the sun and dissolves. Additive blending, ~30 fps, one
+// rAF loop for every scene; a scene whose host is not displayed is skipped, the loop pauses while the tab is hidden,
+// and prefers-reduced-motion gets one still frame. Colour from --aurora-rgb (both palettes), so the palette swap and
+// the theme cross-fade (the layer's opacity) both just work.
+const AURORA_FRAME_MS = 1000 / 30;
+let auroraClock = 0;   // scene time in seconds, advanced per frame by the speed setting (so speed changes never jump)
+// Brightness is the owner's to set (Profile → "Background glow"): 0–50, persisted. The authored alphas correspond to
+// level 20 (AURORA_LEVEL_UNIT); the shipped default is 30 (the owner's pick), the cap is 100 (5×),
+// 0 switches the painting off. Live on input.
+const AURORA_LEVEL_KEY = 'platho.auroraLevel.v1';
+const AURORA_LEVEL_UNIT = 20;
+const AURORA_LEVEL_DEFAULT = 30;   // owner's pick
+const AURORA_LEVEL_MAX = 100;   // owner: wider limits (5×)
+function readAuroraLevel() {
+  try {
+    const stored = localStorage.getItem(AURORA_LEVEL_KEY);
+    const raw = Number(stored);
+    return stored !== null && Number.isFinite(raw) ? Math.max(0, Math.min(AURORA_LEVEL_MAX, Math.round(raw))) : AURORA_LEVEL_DEFAULT;
+  } catch { return AURORA_LEVEL_DEFAULT; }
+}
+let auroraLevel = readAuroraLevel();
+// The other three knobs of the Appearance section (owner): how MANY suns, how FAST the clock runs, and how ACTIVE the
+// motion is (the fast wobble amplitude, flare rate and flare reach — the rotations/turns of the piece). Each is a
+// persisted 0-based slider; defaults reproduce the shipped look. Speed scales an accumulated clock, so changing it
+// never makes the suns jump; a count change rebuilds the suns in place.
+const AURORA_COUNT_KEY = 'platho.auroraCount.v1';
+const AURORA_SPEED_KEY = 'platho.auroraSpeed.v1';
+const AURORA_ENERGY_KEY = 'platho.auroraEnergy.v1';
+function readAuroraSetting(key, fallback, min, max) {
+  try {
+    const stored = localStorage.getItem(key);
+    const raw = Number(stored);
+    return stored !== null && Number.isFinite(raw) ? Math.max(min, Math.min(max, Math.round(raw))) : fallback;
+  } catch { return fallback; }
+}
+let auroraCount = readAuroraSetting(AURORA_COUNT_KEY, 5, 1, 16);       // suns on the shared stage (owner: wider limits)
+let auroraSpeed = readAuroraSetting(AURORA_SPEED_KEY, 175, 25, 600);   // percent of the base tempo (owner's pick: 175)
+let auroraEnergy = readAuroraSetting(AURORA_ENERGY_KEY, 50, 0, 200);   // 50 = shipped activity
+const auroraEnergyK = () => auroraEnergy / 50;                          // 0 .. 4, 1 = shipped
+function bindAuroraRange(id, key, min, max, apply) {
+  const range = document.querySelector(id);
+  if (!range) return;
+  range.value = String(key === AURORA_COUNT_KEY ? auroraCount : key === AURORA_SPEED_KEY ? auroraSpeed : auroraEnergy);
+  range.addEventListener('input', () => {
+    const value = Math.max(min, Math.min(max, Math.round(Number(range.value) || 0)));
+    try { localStorage.setItem(key, String(value)); } catch { /* best-effort persist */ }
+    apply(value);
+    if (typeof auroraRedrawStill === 'function') auroraRedrawStill();
+  });
+}
+const auroraLevelRange = document.querySelector('#auroraLevelRange');
+if (auroraLevelRange) {
+  auroraLevelRange.value = String(auroraLevel);
+  auroraLevelRange.addEventListener('input', () => {
+    auroraLevel = Math.max(0, Math.min(AURORA_LEVEL_MAX, Math.round(Number(auroraLevelRange.value) || 0)));
+    try { localStorage.setItem(AURORA_LEVEL_KEY, String(auroraLevel)); } catch { /* best-effort persist */ }
+    if (typeof auroraRedrawStill === 'function') auroraRedrawStill();   // reduced-motion: the one still frame follows the slider
+  });
+}
+const auroraScenes = [];
+let auroraLoopArmed = false;
+let auroraLastFrameAt = 0;
+let auroraRgbCache = { at: 0, value: '48, 213, 176' };
+function auroraRgb(now) {
+  if (now - auroraRgbCache.at > 1000) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--aurora-rgb').trim();
+    auroraRgbCache = { at: now, value: v || '48, 213, 176' };
+  }
+  return auroraRgbCache.value;
+}
+function auroraSunsFor(kind) {
+  return kind === 'shell' ? auroraCount : Math.max(1, Math.round(auroraCount * 0.6));
+}
+function makeAuroraSuns(sunCount) {
+  const rnd = Math.random;
+  const suns = [];
+  for (let i = 0; i < sunCount; i += 1) {
+    suns.push({
+      // slow drift (periods ~14–25 s) + a smaller faster wobble (~6–10 s) on each axis; phases random
+      fx: 0.25 + rnd() * 0.2, fy: 0.22 + rnd() * 0.2, px: rnd() * 6.283, py: rnd() * 6.283,
+      gx: 0.6 + rnd() * 0.5, gy: 0.55 + rnd() * 0.5, qx: rnd() * 6.283, qy: rnd() * 6.283,
+      r: 0.38 + rnd() * 0.16, fr: 0.35 + rnd() * 0.3, pr: rnd() * 6.283,
+      // owner: barely there — about a fifth of the first cut's brightness
+      a: 0.065 + rnd() * 0.023, fa: 0.3 + rnd() * 0.3, pa: rnd() * 6.283,   // +15% (owner: a touch more visible)
+      // presence: a 30–60 s envelope along which the sun fades fully in, stays, and fades fully out
+      fp: 6.283 / (30 + rnd() * 30), pp: rnd() * 6.283,
+      nextFlare: auroraClock + 1 + rnd() * 3,
+    });
+  }
+  return suns;
+}
+function createAuroraScene(layer, kind) {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'aurora-canvas';
+  canvas.setAttribute('aria-hidden', 'true');
+  layer.append(canvas);
+  return { layer, kind, canvas, ctx: canvas.getContext('2d'), w: 96, h: 64, measuredAt: 0, suns: makeAuroraSuns(auroraSunsFor(kind)), flares: [], bornAt: auroraClock };
+}
+// STAGE (owner: the chat list and the chat are ONE continuous plasma, not two). A stage holds one set of suns/flares
+// for the union rectangle of several panes (the Private tab: .list-pane + .content-pane.chat-pane); every pane is a
+// VIEW that paints the part of the stage over its own box in shared viewport coordinates, so a sun crossing the seam
+// is seamless. A LENS sits over the list: a sun's radius grows to ×1.3 as it drifts into the list and shrinks back to
+// ×1 as it leaves (smooth over a band around the seam); both views apply the same lens, so nothing jumps. Flares are
+// spawned and pruned once per frame per stage (not per view), so a hidden pane never stalls them.
+const AURORA_LENS_ZOOM = 1;   // owner: no magnification over the list — one plasma, one scale (lens code kept, inert at 1)
+const AURORA_SIZE_SCALE = 1.3;   // owner: every sun ×1.3 larger by default, on the whole shared background
+const auroraStages = [];
+function createAuroraStage(sunCount) {
+  const stage = { suns: makeAuroraSuns(sunCount), flares: [], bornAt: auroraClock, views: [], rect: null, lens: null, measuredAt: 0, tickedAt: -1 };
+  auroraStages.push(stage);
+  return stage;
+}
+function createAuroraView(layer, stage, kind) {
+  const canvas = document.createElement('canvas');
+  canvas.className = 'aurora-canvas';
+  canvas.setAttribute('aria-hidden', 'true');
+  layer.append(canvas);
+  const view = { layer, kind, canvas, ctx: canvas.getContext('2d'), w: 96, h: 64, measuredAt: 0, stage, rect: null, bornAt: stage.bornAt };
+  stage.views.push(view);
+  return view;
+}
+function measureAuroraStage(stage, now) {
+  stage.measuredAt = now;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity, lens = null;
+  for (const view of stage.views) {
+    if (!view.layer.isConnected || view.layer.offsetParent === null) { view.rect = null; continue; }
+    const r = view.layer.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) { view.rect = null; continue; }
+    view.rect = { left: r.left, top: r.top, width: r.width, height: r.height };
+    left = Math.min(left, r.left); top = Math.min(top, r.top); right = Math.max(right, r.right); bottom = Math.max(bottom, r.bottom);
+    if (view.kind === 'list') lens = { left: r.left, right: r.right };
+  }
+  stage.rect = Number.isFinite(left) ? { left, top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) } : null;
+  stage.lens = lens;
+}
+// Spawn/prune flares for a holder of suns+flares (a plain scene or a stage) — once per frame.
+function auroraSpawnAndPruneFlares(holder, t) {
+  for (const sun of holder.suns) {
+    if (t < sun.nextFlare) continue;
+    const energy = auroraEnergyK();
+    if (energy > 0) {
+      const angle = Math.random() * 6.283;
+      holder.flares.push({ sun, t0: t, life: 2.6 + Math.random() * 2.4, dx: Math.cos(angle), dy: Math.sin(angle) * 0.7, dist: (0.22 + Math.random() * 0.2) * (0.6 + 0.4 * energy), r0: 0.3, r1: 0.85, a: 0.088 + Math.random() * 0.032 });
+    }
+    sun.nextFlare = t + (1.6 + Math.random() * 3.6) / Math.max(0.25, energy);
+  }
+  holder.flares = holder.flares.filter((f) => t - f.t0 < f.life);
+}
+function rebuildAuroraSuns() {
+  for (const scene of auroraScenes) {
+    if (scene.stage) continue;   // views follow their stage
+    scene.suns = makeAuroraSuns(auroraSunsFor(scene.kind));
+    scene.flares = [];
+  }
+  for (const stage of auroraStages) { stage.suns = makeAuroraSuns(auroraCount); stage.flares = []; }
+}
+const auroraSmooth = (x) => x * x * (3 - 2 * x);
+function auroraSunAt(sun, t) {
+  const presence = auroraSmooth(0.5 + 0.5 * Math.sin(t * sun.fp + sun.pp));
+  const wobble = 0.1 * auroraEnergyK();   // the quick turns; 0 = the suns glide on the slow path only
+  return {
+    x: 0.5 + 0.32 * Math.sin(t * sun.fx + sun.px) + wobble * Math.sin(t * sun.gx + sun.qx),
+    y: 0.5 + 0.3 * Math.sin(t * sun.fy + sun.py) + wobble * Math.sin(t * sun.gy + sun.qy),
+    r: sun.r * (1 + 0.18 * Math.sin(t * sun.fr + sun.pr)),
+    a: sun.a * (0.8 + 0.2 * Math.sin(t * sun.fa + sun.pa)) * presence,
+    presence,
+  };
+}
+// The glow painter shared by plain scenes and stage views: additive, blurred in canvas space, scaled by the level.
+function auroraGlowPainter(ctx, w, rgb, level) {
+  ctx.globalCompositeOperation = 'lighter';
+  // A soft blur in canvas space (cheap at this resolution; Safari < 18 ignores ctx.filter and just gets the higher
+  // resolution) smears the gradient dither and the 8-bit steps of a faint gradient into a clean glow.
+  if ('filter' in ctx) ctx.filter = `blur(${Math.max(2, Math.round(w / 64))}px)`;
+  return (x, y, radius, alpha) => {
+    alpha = Math.min(1, alpha * level);
+    if (radius <= 0 || alpha <= 0) return;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, `rgba(${rgb}, ${alpha.toFixed(3)})`);
+    g.addColorStop(0.3, `rgba(${rgb}, ${(alpha * 0.55).toFixed(3)})`);
+    g.addColorStop(0.6, `rgba(${rgb}, ${(alpha * 0.2).toFixed(3)})`);
+    g.addColorStop(1, `rgba(${rgb}, 0)`);
+    ctx.fillStyle = g;
+    const pad = radius * 1.15;
+    ctx.fillRect(x - pad, y - pad, pad * 2, pad * 2);
+  };
+}
+function auroraLevelFor(holder, t) {
+  // Everything arrives and leaves SOFTLY (owner): the scene warms up over its first two seconds, each sun has a slow
+  // presence envelope (it fades fully in and out over 30–60 s, never popping), and a flare eases in over the first
+  // third of its life before dissolving.
+  const warm = holder.bornAt === null ? 1 : Math.min(1, Math.max(0, (t - holder.bornAt) / 2));
+  return (auroraLevel / AURORA_LEVEL_UNIT) * warm;
+}
+// Plain scene: its own suns, normalised to its own canvas (the shell and the public/wallet/profile panes).
+function drawAuroraScene(scene, t, rgb) {
+  const { ctx, canvas } = scene;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, w, h);
+  const level = auroraLevelFor(scene, t);
+  if (level <= 0) return;
+  const glow = auroraGlowPainter(ctx, w, rgb, level);
+  auroraSpawnAndPruneFlares(scene, t);
+  for (const sun of scene.suns) {
+    const s = auroraSunAt(sun, t);
+    glow(s.x * w, s.y * h, s.r * w * AURORA_SIZE_SCALE, s.a);
+  }
+  for (const f of scene.flares) {
+    const k = (t - f.t0) / f.life;
+    if (k < 0 || k >= 1) continue;
+    const ease = 1 - (1 - k) * (1 - k);
+    const s = auroraSunAt(f.sun, t);
+    const x = (s.x + f.dx * f.dist * ease) * w;
+    const y = (s.y + f.dy * f.dist * ease) * h;
+    const radius = s.r * w * (f.r0 + (f.r1 - f.r0) * ease) * AURORA_SIZE_SCALE;
+    const envelope = k < 0.3 ? auroraSmooth(k / 0.3) : Math.pow((1 - k) / 0.7, 1.6);   // soft in, soft out
+    glow(x, y, radius, f.a * envelope * s.presence);
+  }
+  if ('filter' in ctx) ctx.filter = 'none';
+}
+// Stage view: paints the stage's suns/flares in shared viewport coordinates, clipped by its own box, with the lens.
+function drawAuroraView(view, t, rgb) {
+  const { ctx, canvas, stage } = view;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, w, h);
+  const R = stage.rect;
+  const V = view.rect;
+  if (!R || !V) return;
+  const level = auroraLevelFor(stage, t);
+  if (level <= 0) return;
+  const glow = auroraGlowPainter(ctx, w, rgb, level);
+  const kx = w / V.width;    // canvas px per viewport px
+  const ky = h / V.height;
+  const toX = (nx) => (R.left + nx * R.width - V.left) * kx;
+  const toY = (ny) => (R.top + ny * R.height - V.top) * ky;
+  const unit = 0.65 * AURORA_SIZE_SCALE * Math.sqrt(R.width * R.height);   // sun radius unit in viewport px (stage-sized; ×1.3 per owner)
+  // THE LENS over the list: ×1.3 deep inside the list, ×1 in the chat, eased across a band straddling the seam.
+  const lensAt = (nx) => {
+    if (!stage.lens) return 1;
+    const X = R.left + nx * R.width;
+    const band = Math.max(80, 0.12 * R.width);
+    const k = Math.max(0, Math.min(1, (stage.lens.right - X) / band + 0.5));
+    return 1 + (AURORA_LENS_ZOOM - 1) * auroraSmooth(k);
+  };
+  for (const sun of stage.suns) {
+    const s = auroraSunAt(sun, t);
+    glow(toX(s.x), toY(s.y), s.r * unit * lensAt(s.x) * kx, s.a);
+  }
+  for (const f of stage.flares) {
+    const k = (t - f.t0) / f.life;
+    if (k < 0 || k >= 1) continue;
+    const ease = 1 - (1 - k) * (1 - k);
+    const s = auroraSunAt(f.sun, t);
+    const nx = s.x + f.dx * f.dist * ease;
+    const ny = s.y + f.dy * f.dist * ease;
+    const radius = s.r * unit * (f.r0 + (f.r1 - f.r0) * ease) * lensAt(nx) * kx;
+    const envelope = k < 0.3 ? auroraSmooth(k / 0.3) : Math.pow((1 - k) / 0.7, 1.6);
+    glow(toX(nx), toY(ny), radius, f.a * envelope * s.presence);
+  }
+  if ('filter' in ctx) ctx.filter = 'none';
+}
+function auroraTick(now) {
+  if (document.hidden) { auroraLoopArmed = false; return; }   // resumed by visibilitychange below
+  requestAnimationFrame(auroraTick);
+  if (now - auroraLastFrameAt < AURORA_FRAME_MS) return;
+  const dt = auroraLastFrameAt ? Math.min(0.1, (now - auroraLastFrameAt) / 1000) : 0;
+  auroraLastFrameAt = now;
+  auroraClock += dt * (auroraSpeed / 100);
+  const t = auroraClock;
+  const rgb = auroraRgb(now);
+  for (const stage of auroraStages) {
+    if (now - stage.measuredAt > 2000) measureAuroraStage(stage, now);
+    if (stage.rect && stage.tickedAt !== now) { stage.tickedAt = now; auroraSpawnAndPruneFlares(stage, t); }
+  }
+  for (const scene of auroraScenes) {
+    if (!scene.layer.isConnected || scene.layer.offsetParent === null) continue;   // host not displayed
+    if (scene.stage && !scene.rect) continue;                                    // stage view measured as hidden
+    if (now - scene.measuredAt > 2000) {
+      scene.measuredAt = now;
+      const lw = scene.layer.clientWidth || 1;
+      const lh = scene.layer.clientHeight || 1;
+      // RIPPLE FIX (owner: "ripples"): at 96px the canvas was stretched 10–15×, so Skia's gradient dither and the 8-bit
+      // alpha steps of a very faint gradient became cm-sized crawling cells. Quarter resolution (160–360px) keeps
+      // the dither sub-visible, and the glow painter blurs the fills in canvas space on top of that.
+      const cw = Math.max(160, Math.min(360, Math.round(lw / 4)));
+      const ch = Math.max(64, Math.min(400, Math.round(cw * lh / lw)));
+      if (scene.canvas.width !== cw || scene.canvas.height !== ch) { scene.canvas.width = cw; scene.canvas.height = ch; }
+    }
+    if (scene.stage) drawAuroraView(scene, t, rgb);
+    else drawAuroraScene(scene, t, rgb);
+  }
+}
+let auroraRedrawStill = null;
+function startAuroraLoop() {
+  if (auroraScenes.length === 0) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // One still frame: the glow stays, the motion does not (redrawn when the brightness slider moves).
+    auroraRedrawStill = () => {
+      const rgb = auroraRgb(performance.now());
+      for (const stage of auroraStages) { stage.bornAt = null; measureAuroraStage(stage, performance.now()); }
+      for (const scene of auroraScenes) { scene.bornAt = null; scene.canvas.width = 240; scene.canvas.height = 160; if (scene.stage) drawAuroraView(scene, 0, rgb); else drawAuroraScene(scene, 0, rgb); }
+    };
+    auroraRedrawStill();
+    return;
+  }
+  const arm = () => { if (auroraLoopArmed || document.hidden) return; auroraLoopArmed = true; requestAnimationFrame(auroraTick); };
+  document.addEventListener('visibilitychange', arm);
+  arm();
+}
+// AURORA CLIP LAYERS. The drifting glow of the shell and of every pane lives in its own absolutely positioned,
+// overflow-hidden child (.aurora-layer; the blobs are its ::before/::after). As pseudo-elements of the host they
+// overshot the box (inset -30%) and gave the overflow:hidden host SCROLLABLE overflow — a reply-quote tap's
+// scrollIntoView then recentred the target in the shell itself and shifted the whole UI with no way back. [review]
+// Same construction as .discovery-cta-glow. Appended (not prepended) so :first-child rules on the hosts are untouched.
+function attachAuroraLayer(host) {
+  const existing = host.querySelector(':scope > .aurora-layer');
+  if (existing) return existing;
+  const layer = document.createElement('span');
+  layer.className = 'aurora-layer';
+  layer.setAttribute('aria-hidden', 'true');
+  host.append(layer);
+  return layer;
+}
+// ONE PLASMA FOR THE WHOLE APP (owner): a single stage, a single view on the shell. The rail, the chat list and every
+// pane have zero-opacity fills (styles: .content-pane/.list-pane background:transparent), so the shell's layer shows
+// through everywhere with no seams and no double painting. (Per-pane views — createAuroraView(…, 'pane'|'list') —
+// were needed only while the panes were opaque; the view kinds are kept for that case.)
+{
+  const stage = createAuroraStage(auroraCount);
+  for (const host of document.querySelectorAll('.app-shell')) auroraScenes.push(createAuroraView(attachAuroraLayer(host), stage, 'shell'));
+}
+bindAuroraRange('#auroraCountRange', AURORA_COUNT_KEY, 1, 16, (v) => { auroraCount = v; rebuildAuroraSuns(); });
+bindAuroraRange('#auroraSpeedRange', AURORA_SPEED_KEY, 25, 600, (v) => { auroraSpeed = v; });
+bindAuroraRange('#auroraEnergyRange', AURORA_ENERGY_KEY, 0, 200, (v) => { auroraEnergy = v; });
+startAuroraLoop();
+
+// SEARCH inside the list (owner): narrows WITHIN what the sweep has found so far (name, resolved label, description,
+// tags, wallet). Cards that stop matching swim out, cards that start matching swim in — see renderPublicDiscovery.
+let publicDiscoveryQuery = '';
+function discoveryChannelMatches(channel, needle) {
+  if (!needle) return true;
+  const hay = [
+    channel?.name,
+    publicAuthorLabel(channel?.authorWallet),
+    channel?.description,
+    ...((channel?.tags ?? []).map((tag) => `#${tag}`)),
+    channel?.authorWallet,
+  ].filter(Boolean).join('\n').toLowerCase();
+  return hay.includes(needle);
+}
+// The one status line of the list, derived from what the reader is looking at: a query with nothing on screen says
+// "looking for channels with «q» (done of total)" while the sweep runs and "no channel matches «q»" once it is over;
+// without a query it is the sweep counter / the empty line / the error line. Re-read between frames by
+// updatePublicDiscoveryStatusLine, so the counter keeps moving under a fruitless query.
+function publicDiscoveryStatusText(progress, { shownCount = 0, loading = false, error = false } = {}) {
+  const sweeping = loading || progress !== null;
+  const total = Number(progress?.total ?? 0);
+  if (publicDiscoveryQuery && shownCount === 0) {
+    if (!sweeping) return error ? t('public.discoverError') : t('public.discoverNotFound', { query: publicDiscoveryQuery });
+    return total > 0
+      ? t('public.discoverSearching', { query: publicDiscoveryQuery, done: Number(progress?.done ?? 0), total, left: Math.max(0, total - Number(progress?.done ?? 0)) })
+      : t('public.discoverLoading');
+  }
+  if (error && shownCount === 0) return t('public.discoverError');
+  if (sweeping) return publicDiscoverySweepStatusText(progress);
+  return t('public.discoverEmpty');
+}
+// A card on its way out: frozen at its height (CSSOM, not a style attribute — CSP) so the exit can fold it shut, then
+// dropped from the DOM once the animation is over. Re-rendering in between carries the ghost along (see the render).
+function beginDiscoveryCardLeave(node) {
+  node.style.height = `${node.offsetHeight}px`;
+  node.classList.remove('is-surfacing');   // a card still rising leaves on the fade's own clock, not the stagger's
+  node.style.animationDelay = '';
+  node.classList.add('is-leaving');
+  node.setAttribute('aria-hidden', 'true');
+  // Two phases (owner: the one-shot fold read as abrupt): first the card fades and settles, THEN its slot folds
+  // shut — the opacity is pinned through CSSOM so a repaint that moves the ghost mid-exit cannot replay the fade.
+  window.setTimeout(() => { node.style.opacity = '0'; node.classList.add('is-collapsing'); }, 240);
+  window.setTimeout(() => node.remove(), 600);
+}
+function updatePublicDiscoveryStatusLine() {
+  if (!publicDiscoveryBody || publicDiscoveryProgress === null) return;
+  const line = publicDiscoveryBody.querySelector('.discovery-status[data-sweep="true"]');
+  if (!line) return;
+  const shownCount = publicDiscoveryBody.querySelectorAll('.discovery-card:not(.is-leaving)').length;
+  line.textContent = publicDiscoveryStatusText(publicDiscoveryProgress, { shownCount });
+}
+function publicDiscoveryPartialPainter(token) {
+  // The first frame a painter receives repaints the cards regardless of `added`: a painter that JOINS a running
+  // sweep (refresh / reopen while the sweep is on) is handed the sweep's accumulated results with added=0 — without
+  // this the list stayed empty until a brand-new channel or the sweep's end. [review]
+  let first = true;
+  return (partial, progress) => {
+    if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    if (Array.isArray(partial) && partial.length > 0) publicDiscoveryResults = partial;
+    publicDiscoveryProgress = progress ? { done: Number(progress.done ?? 0), total: Number(progress.total ?? 0) } : null;
+    const added = Number(progress?.added ?? 0) > 0 || first;
+    first = false;
+    if (added) publicDiscoveryPaintNeedsCards = true;
+    if (!publicDiscoveryPaintTimer) {
+      publicDiscoveryPaintTimer = setTimeout(() => {
+        publicDiscoveryPaintTimer = 0;
+        // The sweep finished (final render already happened) or the screen closed: nothing left to paint.
+        if (!publicDiscoveryOpen || publicDiscoveryProgress === null) { publicDiscoveryPaintNeedsCards = false; return; }
+        if (publicDiscoveryPaintNeedsCards) { publicDiscoveryPaintNeedsCards = false; renderPublicDiscovery({ loading: false }); }
+        else updatePublicDiscoveryStatusLine();
+      }, 0);
+    }
+    if (added) void hydratePublicDiscoveryAvatarsOnce(partial, token);
+  };
+}
+
 async function openPublicDiscovery() {
   closePublicPostDetail();
   // reopenReturnTo:false — discovery is being opened EXPLICITLY here; the close must not re-open it (loop).
   closePublicChannelView({ reopenReturnTo: false });
   publicDiscoveryOpen = true;
   publicDiscoveryTagFilter = null;
+  publicDiscoveryProgress = null;
+  publicDiscoveryQuery = '';
+  publicDiscoverySurfaceRegistry.clear();
+  // The latest-post lines outlive a close/reopen while the catalogue is served from its cache OR while the running
+  // sweep is JOINED (discoverChannelsFromBeacon hands a reopen the same sweep: same cards, same answers — and the
+  // cache is written only when a sweep ENDS, so the cache gate alone reset on every Back of a cold sweep); only an
+  // open that will START a new sweep (no cache, or an expired one, and none in flight) starts the lines over with it.
+  if (!publicDiscoverySweepInFlight
+      && (!publicDiscoveryCache || (Date.now() - publicDiscoveryCache.at) >= PUBLIC_DISCOVERY_CACHE_TTL_MS)) {
+    resetPublicDiscoveryLatestPosts();
+  }
+  if (publicDiscoverySearch) publicDiscoverySearch.value = '';
   if (publicPane) publicPane.dataset.discoverOpen = 'true';
   const token = ++publicDiscoveryLoadToken;
-  // An open past the discovery cache TTL re-sweeps the catalogue; the latest posts it showed are as stale as the
-  // cards, so they are forgotten with them and re-read for whatever comes back on screen.
-  if (!publicDiscoveryCache || (Date.now() - publicDiscoveryCache.at) >= PUBLIC_DISCOVERY_CACHE_TTL_MS) resetDiscoveryLatestPosts();
   // Paint cached results immediately (fresh cache) or a loading line, then resolve.
   renderPublicDiscovery({ loading: !publicDiscoveryCache });
   try {
-    // Cards appear as the sweep finds them. The token guard is repeated inside the callback because the sweep
-    // keeps running after this screen closes — a late partial must not repaint a discovery panel the user left,
-    // nor one that a newer open has already taken over.
-    const results = await discoverChannels({
-      onPartial: (partial) => {
-        if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
-        publicDiscoveryResults = partial;
-        renderPublicDiscovery({ loading: false, partial: true });
-      },
-    });
+    // Cards appear as the sweep finds them — every live bucket is read, newest last_transaction_lt first, and the
+    // painter runs after each one (see publicDiscoveryPartialPainter for the token guard).
+    const results = await discoverChannels({ onPartial: publicDiscoveryPartialPainter(token) });
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    publicDiscoveryProgress = null;
     publicDiscoveryResults = results;
     renderPublicDiscovery({ loading: false });
     // Faces arrive AFTER the cards, never before them: the list must not wait on a profile read per wallet.
-    void hydratePublicDiscoveryAvatars(results, token);
+    void hydratePublicDiscoveryAvatarsOnce(results, token);
   } catch (error) {
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     noteTonRpcRateLimit(error);
+    publicDiscoveryProgress = null;
     publicDiscoveryResults = publicDiscoveryCache?.results ?? [];
     renderPublicDiscovery({ loading: false, error: true });
   }
@@ -9249,12 +10066,8 @@ function closePublicDiscovery() {
   if (!publicDiscoveryOpen && publicPane?.dataset?.discoverOpen !== 'true') return;
   publicDiscoveryOpen = false;
   publicDiscoveryLoadToken += 1; // invalidate any in-flight scan so a stale result can't render
+  stopDiscoveryLatestPump();     // nothing to look at: drop the waiting queue (answers already in the map stay for a reopen)
   if (publicPane) publicPane.dataset.discoverOpen = 'false';
-  // Cards not yet asked for their latest post are not asked after the panel is gone (pumpDiscoveryLatestPosts
-  // drains the queue on the next turn); the observer's detached targets are dropped with it. Answers already in
-  // hand are kept — a re-open within the discovery cache TTL paints them at once.
-  publicDiscoveryLatestObserver?.disconnect();
-  publicDiscoveryLatestObserver = null;
 }
 
 // --- Channel view (v753): one channel's posts on their own screen ---
@@ -9293,6 +10106,7 @@ function openPublicChannelView(source = {}) {
   publicChannelViewReturnTo = source.returnTo ?? null;
   publicChannelViewShownCap = PUBLIC_FEED_RENDER_CAP;
   publicChannelViewRenderSig = '';
+  publicChannelViewSurfacedIds.clear();   // the channel's posts rise in as they land (owner)
   const own = publicChannelViewWallet ? isOwnPublicAuthor(publicChannelViewWallet) : false;
   const followed = own || isPublicChannelSubscribed(channelId);
   publicChannelPreviewChannelId = followed ? null : channelId;
@@ -9357,6 +10171,9 @@ function closePublicChannelView(options = {}) {
   if (options.reopenReturnTo !== false && returnTo === 'discovery') openPublicDiscovery().catch(() => {});
 }
 
+// Posts the channel view has already painted (cleared when a channel opens): a post new to the screen — the first
+// paint after the panel opens, a post landing from the sync, a revealed older one — surfaces (owner).
+const publicChannelViewSurfacedIds = new Map();
 function renderPublicChannelView() {
   if (!publicChannelViewOpen || !publicChannelViewBody) return;
   const channel = publicChannelViewChannel();
@@ -9449,9 +10266,11 @@ function renderPublicChannelView() {
       publicChannelViewBody.append(status);
     } else {
       // Newest-first (the v752 feed model) with a local cap + "show older" at the bottom.
+      let surfacing = 0;
       for (const item of capped.slice().reverse()) {
         const node = buildPublicFeedArticle(item, avatarUrlMemo);
         node.dataset.itemId = String(item.id); // scroll-anchor key across rebuilds
+        if (surfaceRow(node, publicChannelViewSurfacedIds, String(item.id), surfacing)) surfacing += 1;
         publicChannelViewBody.append(node);
       }
       const hiddenOlder = items.length - capped.length;
@@ -9491,41 +10310,53 @@ function renderPublicChannelView() {
 async function refreshPublicDiscovery() {
   if (!publicDiscoveryOpen) return;
   const token = ++publicDiscoveryLoadToken;
+  publicDiscoveryProgress = null;
+  publicDiscoveryResults = [];   // an explicit refresh starts from a clean list; the sweep paints it back card by card
+  resetPublicDiscoveryLatestPosts();   // and re-reads the lines: that is what the button promises
   renderPublicDiscovery({ loading: true });
-  resetDiscoveryLatestPosts();                      // a refresh re-asks for the latest posts too, not only the cards
   try {
-    const results = await discoverChannels({ force: true });
+    const results = await discoverChannels({ force: true, onPartial: publicDiscoveryPartialPainter(token) });
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
+    publicDiscoveryProgress = null;
     publicDiscoveryResults = results;
     renderPublicDiscovery({ loading: false });
-    void hydratePublicDiscoveryAvatars(results, token);
+    void hydratePublicDiscoveryAvatarsOnce(results, token);
   } catch (error) {
     if (token !== publicDiscoveryLoadToken || !publicDiscoveryOpen) return;
     noteTonRpcRateLimit(error);
+    publicDiscoveryProgress = null;
     renderPublicDiscovery({ loading: false, error: true });
   }
 }
 
+// The sweep's "still looking" line: with the bucket count when the sweep reports one, the plain text otherwise.
+function publicDiscoverySweepStatusText(progress) {
+  const done = Number(progress?.done ?? 0);
+  const total = Number(progress?.total ?? 0);
+  return total > 0 ? t('public.discoverScanning', { done, total, left: Math.max(0, total - done) }) : t('public.discoverLoading');
+}
+
+// THE LIST IS REBUILT EVERY TIME (cards are cheap, and the name/avatar hydration repaints through here), but it is
+// rebuilt WITH MOTION: a card that was not on screen before surfaces (.is-surfacing, staggered), a card that stops
+// being shown — the query, a tag chip, a Follow — is kept as a ghost that folds and fades out (.is-leaving) at the
+// place it occupied, and a card that stays is simply replaced in place, with no animation. Ghosts survive a repaint
+// mid-animation (carried along in their old order) and are dropped once their exit timer fires. A ghost whose channel
+// comes back is discarded in favour of the fresh, surfacing card.
 function renderPublicDiscovery(options = {}) {
   if (!publicDiscoveryBody) return;
-  publicDiscoveryBody.replaceChildren();
-  // The cards are rebuilt below and re-observe themselves; the observer must not keep the detached ones.
-  publicDiscoveryLatestObserver?.disconnect();
-  if (options.loading === true) {
-    const status = document.createElement('p');
-    status.className = 'discovery-status';
-    status.textContent = t('public.discoverLoading');
-    publicDiscoveryBody.append(status);
-    return;
-  }
-  const results = publicDiscoveryResults ?? [];
-  if (results.length === 0) {
-    const status = document.createElement('p');
-    status.className = 'discovery-status';
-    status.textContent = options.error === true ? t('public.discoverError') : t('public.discoverEmpty');
-    publicDiscoveryBody.append(status);
-    return;
-  }
+  // A sweep still in progress is remembered in publicDiscoveryProgress, so a repaint from elsewhere (avatar
+  // hydration, a tag chip) keeps the "still looking" line instead of declaring the short list finished.
+  const progress = options.progress ?? publicDiscoveryProgress;
+  const partial = options.partial === true || progress !== null;
+  const loading = options.loading === true;
+  const results = loading
+    ? []
+    : (publicDiscoveryResults ?? []).filter((channel) => !publicDiscoveryFollowedInSweep.has(rawWalletAddress(channel.authorWallet)));
+  const needle = publicDiscoveryQuery.toLowerCase();
+  const shown = results.filter((channel) =>
+    (!publicDiscoveryTagFilter || channel.tags.includes(publicDiscoveryTagFilter))
+    && discoveryChannelMatches(channel, needle));
+  const fragment = document.createDocumentFragment();
   // Tag filter chips (tags present in the sampled set) — filtering narrows within the recent sample, not globally.
   const allTags = [...new Set(results.flatMap((channel) => channel.tags))].slice(0, 24);
   if (allTags.length > 0) {
@@ -9543,26 +10374,51 @@ function renderPublicDiscovery(options = {}) {
       });
       filterRow.append(chip);
     }
-    publicDiscoveryBody.append(filterRow);
+    fragment.append(filterRow);
   }
-  const shown = publicDiscoveryTagFilter
-    ? results.filter((channel) => channel.tags.includes(publicDiscoveryTagFilter))
-    : results;
-  if (shown.length === 0) {
+  // Diff against what is on screen: survivors / departures / ghosts still leaving, in their old order.
+  const shownByKey = new Map();
+  for (const channel of shown) shownByKey.set(rawWalletAddress(channel.authorWallet), channel);
+  const oldCards = [...publicDiscoveryBody.querySelectorAll('.discovery-card')];
+  const wasShown = new Set();
+  const ghostsBefore = new Map();   // survivor key → ghosts that sat right before it
+  let pendingGhosts = [];
+  for (const node of oldCards) {
+    const key = node.dataset.wallet ?? '';
+    const leaving = node.classList.contains('is-leaving');
+    if (!leaving) wasShown.add(key);
+    if (shownByKey.has(key)) {
+      if (leaving) continue;   // coming back mid-exit: the fresh card below surfaces instead of this ghost
+      if (pendingGhosts.length > 0) { ghostsBefore.set(key, pendingGhosts); pendingGhosts = []; }
+      continue;
+    }
+    if (!leaving) beginDiscoveryCardLeave(node);
+    pendingGhosts.push(node);
+  }
+  let surfacing = 0;
+  for (const channel of shown) {
+    const key = rawWalletAddress(channel.authorWallet);
+    const ghosts = ghostsBefore.get(key);
+    if (ghosts) fragment.append(...ghosts);
+    const card = buildDiscoveryCard(channel);
+    card.dataset.wallet = key;
+    if (surfaceRow(card, publicDiscoverySurfaceRegistry, key, surfacing, !wasShown.has(key))) surfacing += 1;
+    fragment.append(card);
+  }
+  if (pendingGhosts.length > 0) fragment.append(...pendingGhosts);
+  // The status line: under the cards while the sweep runs (the list reads as growing, not finished-and-short), alone
+  // when there is nothing to show — looking / looking for «q» / no match / empty / error.
+  if (loading || partial || shown.length === 0) {
+    if (shown.length === 0 && (loading || progress !== null) && !publicDiscoveryQuery && options.error !== true) fragment.append(buildSkeletonNodes('discovery', 3));
     const status = document.createElement('p');
     status.className = 'discovery-status';
-    status.textContent = t('public.discoverEmpty');
-    publicDiscoveryBody.append(status);
-    return;
+    status.textContent = publicDiscoveryStatusText(progress, { shownCount: shown.length, loading, error: options.error === true });
+    if (loading || progress !== null) status.dataset.sweep = 'true';
+    fragment.append(status);
   }
-  for (const channel of shown) publicDiscoveryBody.append(buildDiscoveryCard(channel));
-  // Still sweeping: say so UNDER the cards, so the list reads as growing rather than as finished-and-short.
-  if (options.partial === true) {
-    const more = document.createElement('p');
-    more.className = 'discovery-status';
-    more.textContent = t('public.discoverLoading');
-    publicDiscoveryBody.append(more);
-  }
+  publicDiscoveryBody.replaceChildren(fragment);
+  // Every card is a new node: the latest-post observer must be pointed at the ones that still have no line.
+  observeDiscoveryLatestCards();
 }
 
 // The discovery card's "Display as" chevron — same menu + selection semantics as a public post's chevron
@@ -9630,24 +10486,6 @@ function buildDiscoveryCard(channel) {
   const identityButton = discoveryCardIdentityButton(channel.authorWallet);
   if (identityButton) head.append(identityButton);
   card.append(head);
-  // The channel's NEWEST POST, next to its description [OWNER 2026-08-21: "the description is not quite it — good
-  // to see the last post"; "yes, alongside"]. The block is built empty-but-present, says it is loading, and is
-  // filled IN PLACE when the read lands (loadDiscoveryLatestPost finds it by wallet); a channel with no visible
-  // post loses the block. The read itself is asked for only once the card is on, or one screen from, the screen —
-  // see discoveryLatestObserver — so a list of 142 channels does not cost 142 channel reads up front.
-  const latest = document.createElement('div');
-  latest.className = 'discovery-card-latest';
-  latest.dataset.wallet = channel.authorWallet;
-  card.append(latest);
-  const latestState = publicDiscoveryLatestPosts.get(channel.authorWallet) ?? null;
-  if (latestState) {
-    fillDiscoveryLatestPost(latest, latestState);
-  } else {
-    fillDiscoveryLatestPost(latest, { status: 'loading' });
-    const observer = discoveryLatestObserver();
-    if (observer) observer.observe(latest);
-    else queueDiscoveryLatestPost(channel.authorWallet);
-  }
   if (channel.description) {
     const desc = document.createElement('p');
     desc.className = 'discovery-card-desc';
@@ -9665,6 +10503,10 @@ function buildDiscoveryCard(channel) {
     }
     card.append(tagRow);
   }
+  // The channel's newest post, loaded lazily (pumpDiscoveryLatestPosts) and re-attached on every rebuild from
+  // publicDiscoveryLatestPosts — a sweep frame or a query must never blank a line that was already on screen.
+  const latest = buildDiscoveryLatestNode(rawWalletAddress(channel.authorWallet));
+  if (latest) card.append(latest);
   const actions = document.createElement('div');
   actions.className = 'discovery-card-actions';
   // Browse-then-commit order: open (preview) first, follow second.
@@ -9741,6 +10583,7 @@ function followDiscoveredChannel(authorWallet) {
   setPublicChannelSubscribed(channelId, true);
   // Drop the now-followed channel from the discovery list + cache so it isn't suggested again, then re-render.
   const wallet = rawWalletAddress(authorWallet);
+  publicDiscoveryFollowedInSweep.add(wallet);   // survives the running sweep's next frame (it still lists this wallet)
   const drop = (list) => (list ?? []).filter((channel) => rawWalletAddress(channel.authorWallet) !== wallet);
   publicDiscoveryResults = drop(publicDiscoveryResults);
   if (publicDiscoveryCache) publicDiscoveryCache = { ...publicDiscoveryCache, results: drop(publicDiscoveryCache.results) };
@@ -9757,6 +10600,12 @@ function shouldShowDiscoveryCta() {
 function buildDiscoveryCtaCard() {
   const card = document.createElement('article');
   card.className = 'feed-item discovery-cta';
+  // The drifting glow lives in its own clipped layer so the plate itself stays overflow:visible — a clipped grid item
+  // has a ZERO automatic minimum height and its row collapsed in a short feed (owner: the plate was cut off).
+  const glow = document.createElement('span');
+  glow.className = 'discovery-cta-glow';
+  glow.setAttribute('aria-hidden', 'true');
+  card.append(glow);
 
   const head = document.createElement('div');
   head.className = 'discovery-cta-head';
@@ -9827,39 +10676,52 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null, onPart
   // But a published post whose address we cannot compute is UNKNOWN, not empty. Reporting parentExists:false here
   // printed "no comments yet" over a thread nobody had read — a claim we had no basis for.
   if (!coords) return { comments: [], degraded: true };
-  // PROGRESSIVE, like the channel search and the feed [OWNER 2026-08-21]. The lane reports after each live thread
-  // shard (one per 30-day era of the post's life, newest first); each report is turned into comments and handed
-  // to the caller while the older shards are still being read. Two disciplines keep the stream honest:
-  //   - ORDER. The conversion is async (a body hash per comment), so a later, fuller report can finish before an
-  //     earlier one. Each report takes a sequence number and a report that is no longer the newest is dropped,
-  //     and once the read has returned no partial may land at all — the final result is the authoritative whole.
-  //   - SUBSET. Every partial is a prefix of the same read, never a different answer; the consumer MERGES it
-  //     (mergePublicComments only adds), so nothing already on screen can disappear mid-stream.
-  let partialSeq = 0;
-  let partialsClosed = false;
-  const onProgress = typeof onPartial !== 'function' ? null : (partial) => {
-    const seq = (partialSeq += 1);
-    publicCommentsFromThreadPosts(item, partial.posts).then((comments) => {
-      if (partialsClosed || seq !== partialSeq) return;
-      onPartial({ comments, parentExists: Number(partial.shardsSeen ?? 0) > 0, cursors: partial.cursors ?? null, hasMore: partial.hasMore === true });
-    }).catch(() => { /* a partial that will not convert is simply not painted; the final result still arrives */ });
+  // PARTIAL FRAMES GO THROUGH THE SAME CONVERTER AS THE WHOLE (publicThreadPostsToComments) — one decoder, so a
+  // frame can never disagree with the final list about what a comment is. The conversions are CHAINED so frames
+  // reach the caller in the lane's order (each one hashes every body, so two in flight could overtake each other),
+  // and the chain is drained before this returns, so no frame can land after the result. The body-hash memo is
+  // shared across the frames and the final pass: a body is hashed once, not once per frame.
+  const hashMemo = new Map();
+  let partialChain = Promise.resolve();
+  // LATEST FRAME WINS. Frames are cumulative, and a warm open queues every snapshot frame synchronously — converting
+  // each one (hash every body, full re-render) only to paint the next a moment later is waste, so a frame that was
+  // superseded before its turn in the chain is skipped. [port review]
+  let pendingFrame = null;
+  const onProgress = typeof onPartial !== 'function' ? null : (frame) => {
+    pendingFrame = frame;
+    partialChain = partialChain.then(async () => {
+      const next = pendingFrame;
+      if (!next) return;
+      pendingFrame = null;
+      const comments = await publicThreadPostsToComments(item, next.posts ?? [], hashMemo);
+      onPartial({
+        comments,
+        degraded: false,
+        partial: true,
+        parentExists: Number(next.shardsSeen ?? 0) > 0,
+        latestLink: String(comments.length),
+        cursors: next.cursors ?? null,
+        hasMore: next.hasMore === true,
+      });
+    }).catch((error) => { console.warn('[public] partial comments frame dropped', error); });
   };
   let read;
   try {
     // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
     read = await lane.readThreadComments(coords.authorWallet, coords.epochTag, coords.shardEntryId, {
-      channelShardSeq: coords.shardSeq, olderThan, ...(onProgress ? { onProgress } : {}),
+      channelShardSeq: coords.shardSeq,
+      olderThan,
+      ...(onProgress ? { onProgress } : {}),
     });
   } catch (error) {
-    partialsClosed = true;
     // Feed a 429 into the shared rate-limit tracker before degrading, or the app keeps hammering at the same
     // cadence while every read fails (the Hub loader did this; the shard loader silently did not).
     if (!noteTonRpcRateLimit(error)) console.warn('[public] thread comments read failed', item.entryId, error);
+    await partialChain;
     return { comments: [], degraded: true };
-  } finally {
-    partialsClosed = true;
   }
-  const comments = await publicCommentsFromThreadPosts(item, read.posts);
+  await partialChain;
+  const comments = await publicThreadPostsToComments(item, read.posts, hashMemo);
   globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false, hasMore: read.hasMore === true };
   // parentExists = "somebody has commented on this post", and it is asked so the empty screen can tell the ordinary
   // case from a failed one. It used to be DERIVED FROM THE COUNT (comments.length > 0), which cannot tell those
@@ -9876,11 +10738,10 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null, onPart
   };
 }
 
-/**
- * Thread-shard posts → assembled, time-ordered comments. ONE conversion for the whole read and for every partial
- * report of it, so a streamed list can never differ from the final one except by being shorter.
- */
-async function publicCommentsFromThreadPosts(item, threadPosts) {
+// Thread-shard posts -> feed comments, assembled (multipart) and oldest-first. ONE converter for the whole read and
+// for each partial frame of it (loadPublicPostCommentsFromShards onPartial), so the two can never disagree.
+// `hashMemo` (Map keyed by the lane's post object) lets the frames and the final pass share one sha256 per body.
+async function publicThreadPostsToComments(item, threadPosts, hashMemo = null) {
   const commentParts = [];
   for (const tp of threadPosts) {
     let payload;
@@ -9888,7 +10749,11 @@ async function publicCommentsFromThreadPosts(item, threadPosts) {
     if (payload.type !== 'comment' && payload.type !== 'image_comment' && payload.type !== 'document_comment') continue;
     const authorWallet = tp.publisher ? (rawWalletAddress(publicAddrKey(tp.publisher)) ?? publicAddrKey(tp.publisher)) : item.authorWallet;
     const createdAtSec = Number(tp.created_at ?? 0n);
-    const bodyHashHex = await publicShardBodyHashHex(tp.body);
+    let bodyHashHex = hashMemo?.get(tp) ?? null;
+    if (!bodyHashHex) {
+      bodyHashHex = await publicShardBodyHashHex(tp.body);
+      hashMemo?.set(tp, bodyHashHex);
+    }
     // A thread's comments now come from MULTIPLE era shards (the era-window fix), whose entry_ids collide (0-based
     // per shard). A comment is a leaf (nothing derives from its id), so its feed identity is its unique body hash —
     // which also dedups the same comment on re-read. Multipart comments still group by streamId, not this id.
@@ -9928,6 +10793,230 @@ async function loadPublicPostComments(item, options = {}) {
 
 // Orchestrate the on-demand load with a generation token (so a close/reopen abandons stale results) and bounded
 // retries on a degraded (rate-limited) walk — keeping the partial result OUT of the authoritative list.
+// ── Newest-first comment paging (redesign; the date jump was removed 2026-08-22) ─────────────────────────────────────────────────────
+const PUBLIC_COMMENT_PAGE = 96;
+
+// ONE shared observer for the thread's load sentinels (feature-detected like feedPostClampObserver): the
+// BOTTOM sentinel pages further back, the TOP one (present only after a date jump) pages forward toward the
+// present. Without IntersectionObserver the sentinels remain plain tappable buttons.
+const publicCommentsSentinelObserver = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        if (entry.target.dataset.sentinel === 'newer') loadNewerPublicPostComments();
+        else loadEarlierPublicPostComments();
+      }
+    }, { root: publicPostDetailBody, rootMargin: '260px 0px' })
+  : null;
+
+// The private conversation twin: it just clicks the existing "show earlier" control, so every guard the
+// button already has (disabled while loading, store-backed hasMore) keeps working unchanged.
+const conversationEarlierObserver = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && !entry.target.disabled) entry.target.click();
+      }
+    }, { root: messageStrip, rootMargin: '200px 0px' })
+  : null;
+
+// KEEP TRYING, DON'T HAMMER (owner: paging must not give up on a keyless rate-limited RPC). A degraded page
+// read arms a short backoff + a retry timer; the retry fires only while the sentinel is still near the
+// viewport (the reader is still waiting there) — scrolling away cancels it, and the observer re-arms things
+// when they come back. Without a backoff the observer would re-fire on the rebuilt, still-visible sentinel and
+// hammer a 429-storming endpoint in a tight loop.
+let publicCommentsBackoffUntil = 0;
+const publicCommentsRetryTimers = { earlier: 0, newer: 0 };
+
+function schedulePublicCommentsRetry(direction) {
+  window.clearTimeout(publicCommentsRetryTimers[direction]);
+  publicCommentsRetryTimers[direction] = window.setTimeout(() => {
+    if (!publicPostDetailOpen || !publicPostDetailBody) return;
+    const sentinel = publicPostDetailBody.querySelector(`.comments-load-sentinel[data-sentinel="${direction}"]`);
+    if (!sentinel) return;
+    const bodyRect = publicPostDetailBody.getBoundingClientRect();
+    const rect = sentinel.getBoundingClientRect();
+    const near = rect.bottom > bodyRect.top - 260 && rect.top < bodyRect.bottom + 260;
+    if (!near) { console.info(`[comments] ${direction} retry skipped — sentinel out of view`); return; }
+    console.info(`[comments] retrying ${direction} page`);
+    if (direction === 'newer') loadNewerPublicPostComments();
+    else loadEarlierPublicPostComments();
+  }, 3000);
+}
+
+// SCROLL-DRIVEN twin of the sentinels: IntersectionObserver does not fire in every rendering environment
+// (a hidden/frozen compositor never produces the frames IO rides on — observed live in an embedded
+// preview), so paging must not depend on it. A cheap throttled proximity check on scroll covers the gap;
+// the loaders' own guards (loading flags, backoff, hasMore) make double-triggering harmless.
+let detailScrollCheckQueued = false;
+publicPostDetailBody?.addEventListener('scroll', () => {
+  if (detailScrollCheckQueued) return;
+  detailScrollCheckQueued = true;
+  window.setTimeout(() => {
+    detailScrollCheckQueued = false;
+    const body = publicPostDetailBody;
+    if (!body || !publicPostDetailOpen) return;
+    if (publicPostDetailJumpBusy) return;
+    if (body.scrollHeight - body.scrollTop - body.clientHeight < 320 && publicPostDetailHasMoreComments) {
+      loadEarlierPublicPostComments();
+    }
+    if (body.scrollTop < 320 && publicPostDetailNewerCursor) {
+      loadNewerPublicPostComments();
+    }
+  }, 120);
+}, { passive: true });
+
+let stripScrollCheckQueued = false;
+messageStrip?.addEventListener('scroll', () => {
+  if (stripScrollCheckQueued) return;
+  stripScrollCheckQueued = true;
+  window.setTimeout(() => {
+    stripScrollCheckQueued = false;
+    if (!messageStrip || messageStrip.scrollTop > 280) return;
+    const earlier = messageStrip.querySelector('.conversation-earlier-button');
+    if (earlier && !earlier.disabled) earlier.click();
+  }, 120);
+}, { passive: true });
+
+// "Is the reader still looking at THIS post's thread?" — the paging/jump guards use post identity, NOT the
+// load-generation token: refreshPublicPostDetailComments bumps that token on every background confirmation
+// pass, and a page read that was in flight over a slow rate-limited RPC (many seconds) came back only to be
+// dropped by the bump — pages silently vanished while the user was actively commenting (the instability).
+function publicPostDetailStillOn(item) {
+  return publicPostDetailOpen && !!publicPostDetailItem && samePublicPost(publicPostDetailItem, item);
+}
+
+function buildCommentsLoadSentinel(direction) {
+  const loading = direction === 'newer' ? publicPostDetailLoadingNewer : publicPostDetailLoadingEarlier;
+  const node = document.createElement('button');
+  node.type = 'button';
+  node.className = `comments-load-sentinel${loading ? ' is-loading' : ''}`;
+  node.dataset.sentinel = direction;
+  const label = direction === 'newer' ? t('public.loadingNewerComments') : t('public.showEarlierComments');
+  node.setAttribute('aria-label', label);
+  node.title = label;
+  for (let i = 0; i < 3; i += 1) {
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    node.append(dot);
+  }
+  node.addEventListener('click', () => {
+    if (direction === 'newer') loadNewerPublicPostComments();
+    else loadEarlierPublicPostComments();
+  });
+  if (publicCommentsSentinelObserver) publicCommentsSentinelObserver.observe(node);
+  return node;
+}
+
+// Read ONE window of a single era shard: rows [max(0, endRow-96), endRow-1]. Pure reuse of the lane's
+// olderThan contract — every other shard is passed from:0 so the lane skips it (random access costs exactly
+// one accountStates + one get_page + one /messages pass, all through the rate-limited pump).
+// SYNTHETIC CURSORS CARRY NO oldestLt, BY DESIGN (the same holds for loadNewerPublicPostComments): a probe is random
+// access, there is no "page just above it" whose oldest body lt could bound /messages — so the lane reads the
+// NEWEST body window for it (its documented fallback), and a probe deep below the newest ~128 bodies comes back
+// row-less; the jump's search treats that as "only newer is readable" and settles on the closest readable window.
+// Cursors that come out of a REAL read (the tail, an earlier page, the landed window of a jump) do carry oldestLt
+// and page on correctly — see refreshPublicPostDetailComments' merge (the date jump that first needed this is gone).
+async function readPublicCommentWindow(item, cursors, shardKey, endRow, probeCache) {
+  const cacheKey = `${shardKey}:${endRow}`;
+  if (probeCache && probeCache.has(cacheKey)) return probeCache.get(cacheKey);
+  const olderThan = {};
+  for (const [key, cursor] of Object.entries(cursors)) {
+    olderThan[key] = { from: key === shardKey ? endRow : 0, entryCount: Number(cursor?.entryCount ?? 0) };
+  }
+  // A probe must not surrender to a 429 window (owner: keep trying, don't give up): retry the read a few
+  // times at the refresh loop's cadence while the screen shows the searching status. The pump still paces
+  // and drops each attempt safely — this only spans the backoff instead of aborting the whole jump on it.
+  let result = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    result = await loadPublicPostComments(item, { olderThan });
+    if (!result.degraded) break;
+    await new Promise((resolve) => window.setTimeout(resolve, 2500));
+    if (!publicPostDetailOpen) break;
+  }
+  if (probeCache && result && !result.degraded) probeCache.set(cacheKey, result);
+  return result;
+}
+
+// Page FORWARD (toward the present) after a date jump. Prepends render ABOVE the viewport, so the scroll
+// position is compensated by the height delta — the reader keeps looking at the same rows.
+async function loadNewerPublicPostComments() {
+  const item = publicPostDetailItem;
+  const cursor = publicPostDetailNewerCursor;
+  if (!item || !cursor || publicPostDetailLoadingNewer || publicPostDetailJumpBusy) return;
+  if (Date.now() < publicCommentsBackoffUntil) { schedulePublicCommentsRetry('newer'); return; }
+  publicPostDetailLoadingNewer = true;
+  renderPublicPostDetail();
+  const generation = publicCommentsPagingGeneration;
+  try {
+    let { shards, shardIdx, from } = cursor;
+    let shard = shards[shardIdx];
+    while (shard && from >= shard.entryCount) {
+      shardIdx += 1;
+      shard = shards[shardIdx];
+      from = 0;
+    }
+    if (!shard) { publicPostDetailNewerCursor = null; return; }
+    const endRow = Math.min(from + PUBLIC_COMMENT_PAGE, shard.entryCount);
+    const olderThan = {};
+    for (const s of shards) olderThan[s.key] = { from: s.key === shard.key ? endRow : 0, entryCount: s.entryCount };
+    const result = await loadPublicPostComments(item, { olderThan });
+    if (!publicPostDetailStillOn(item) || generation !== publicCommentsPagingGeneration) return;
+    if (result.degraded) {
+      publicCommentsBackoffUntil = Date.now() + 3000;
+      console.info('[comments] newer page degraded (rate-limited RPC) — retry in 3s', {
+        rpcLimitedForMs: Math.max(0, Number(globalThis.plathoTonRpcLimitedUntil ?? 0) - Date.now()),
+      });
+      schedulePublicCommentsRetry('newer');
+      return;
+    }
+    if (result.comments.length === 0) {
+      const windowKey = `newer:${shard.key}:${from}`;
+      const rpcCalm = Number(globalThis.plathoTonRpcLimitedUntil ?? 0) <= Date.now();
+      const streak = publicCommentsEmptyStreaks.newer;
+      if (streak.key !== windowKey) { streak.key = windowKey; streak.calmEmpties = 0; }
+      if (rpcCalm) streak.calmEmpties += 1;
+      if (streak.calmEmpties >= 3) {
+        // Genuinely unreadable middle window (retention) — SKIP it forward; newer regions are readable.
+        publicCommentsEmptyStreaks.newer = { key: null, calmEmpties: 0 };
+        const atTail = endRow >= shard.entryCount && shardIdx >= shards.length - 1;
+        publicPostDetailNewerCursor = atTail ? null : { shards, shardIdx, from: endRow };
+        console.info('[comments] unreadable newer window skipped', { from, endRow });
+        return;
+      }
+      // Ambiguous empty: keep the cursor, re-read this window later.
+      publicCommentsBackoffUntil = Date.now() + 4000;
+      console.info('[comments] newer window came back empty — keeping the cursor, will re-read', {
+        calmEmpties: streak.calmEmpties,
+        rpcCalm,
+      });
+      schedulePublicCommentsRetry('newer');
+      return;
+    }
+    publicCommentsBackoffUntil = 0;
+    publicCommentsEmptyStreaks.newer = { key: null, calmEmpties: 0 };
+    publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);
+    const atTail = endRow >= shard.entryCount && shardIdx >= shards.length - 1;
+    publicPostDetailNewerCursor = atTail ? null : { shards, shardIdx, from: endRow };
+    // Tail reached after a jump = the frozen jump-time counts are stale — one refresh brings the true
+    // present in (its merge keeps everything already loaded).
+    if (atTail) refreshPublicPostDetailComments();
+    console.info('[comments] newer page merged', {
+      pageRows: result.comments.length,
+      totalRows: publicPostDetailChainComments.length,
+      reachedTail: atTail,
+    });
+  } catch (error) {
+    publicCommentsBackoffUntil = Date.now() + 3000;
+    schedulePublicCommentsRetry('newer');
+    if (!noteTonRpcRateLimit(error)) console.warn('[public] newer comments read failed', error);
+  } finally {
+    publicPostDetailLoadingNewer = false;
+    // No manual scroll math here: renderPublicPostDetail's reading-position anchor keeps the visible rows
+    // in place through the prepend.
+    renderPublicPostDetail();
+  }
+}
+
 /**
  * READ ONE PAGE FURTHER BACK in this post's comment thread.
  *
@@ -9940,26 +11029,62 @@ async function loadPublicPostComments(item, options = {}) {
  */
 async function loadEarlierPublicPostComments() {
   const item = publicPostDetailItem;
-  if (!item || publicPostDetailLoadingEarlier || !publicPostDetailHasMoreComments) return;
+  if (!item || publicPostDetailLoadingEarlier || !publicPostDetailHasMoreComments || publicPostDetailJumpBusy) return;
+  if (Date.now() < publicCommentsBackoffUntil) { schedulePublicCommentsRetry('earlier'); return; }
   publicPostDetailLoadingEarlier = true;
   renderPublicPostDetail();
-  const token = publicPostDetailLoadToken;
+  const generation = publicCommentsPagingGeneration;
   try {
-    // Older pages stream too: a page can span several era shards, and each one's rows are an addition the reader
-    // may see at once. Same merge, same token guard; the cursors and hasMore are taken only from the final result.
-    const onPartial = (partial) => {
-      if (token !== publicPostDetailLoadToken || !publicPostDetailOpen) return;
-      if (!Array.isArray(partial?.comments) || partial.comments.length === 0) return;
-      publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, partial.comments);
-      renderPublicPostDetail();
-    };
-    const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors, onPartial });
-    if (token !== publicPostDetailLoadToken || !publicPostDetailOpen) return;   // closed or reopened mid-read
-    if (result.degraded) return;                                                // keep the button, let them retry
+    const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors });
+    if (!publicPostDetailStillOn(item) || generation !== publicCommentsPagingGeneration) return;   // closed, switched, or the paging frame changed
+    if (result.degraded) {
+      // Rate-limited: keep the sentinel AND keep trying on a paced timer — never give up, never hammer.
+      publicCommentsBackoffUntil = Date.now() + 3000;
+      console.info('[comments] earlier page degraded (rate-limited RPC) — retry in 3s', {
+        rpcLimitedForMs: Math.max(0, Number(globalThis.plathoTonRpcLimitedUntil ?? 0) - Date.now()),
+      });
+      schedulePublicCommentsRetry('earlier');
+      return;
+    }
+    if (result.comments.length === 0) {
+      const windowKey = `earlier:${JSON.stringify(Object.entries(publicPostDetailCommentCursors ?? {}).sort())}`;
+      const rpcCalm = Number(globalThis.plathoTonRpcLimitedUntil ?? 0) <= Date.now();
+      const streak = publicCommentsEmptyStreaks.earlier;
+      if (streak.key !== windowKey) { streak.key = windowKey; streak.calmEmpties = 0; }
+      if (rpcCalm) streak.calmEmpties += 1;
+      if (streak.calmEmpties >= 3) {
+        // The SAME window stayed empty across calm attempts — that is the genuine retention wall.
+        publicPostDetailCommentCursors = Object.fromEntries(
+          Object.entries(publicPostDetailCommentCursors ?? {})
+            .map(([key, cursor]) => [key, { from: 0, entryCount: Number(cursor?.entryCount ?? 0) }]),
+        );
+        publicPostDetailHasMoreComments = false;
+        publicPostDetailOlderTruncated = true;
+        console.info('[comments] older bodies past the retention window — back-pagination stopped');
+        return;
+      }
+      // Ambiguous empty: do NOT advance the cursor (the window would be skipped unread) — re-read it later.
+      publicCommentsBackoffUntil = Date.now() + 4000;
+      console.info('[comments] earlier window came back empty — keeping the cursor, will re-read', {
+        calmEmpties: streak.calmEmpties,
+        rpcCalm,
+      });
+      schedulePublicCommentsRetry('earlier');
+      return;
+    }
+    publicCommentsBackoffUntil = 0;
+    publicCommentsEmptyStreaks.earlier = { key: null, calmEmpties: 0 };
     publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);
     publicPostDetailCommentCursors = result.cursors ?? publicPostDetailCommentCursors;
     publicPostDetailHasMoreComments = result.hasMore === true;
+    console.info('[comments] earlier page merged', {
+      pageRows: result.comments.length,
+      totalRows: publicPostDetailChainComments.length,
+      hasMore: publicPostDetailHasMoreComments,
+    });
   } catch (error) {
+    publicCommentsBackoffUntil = Date.now() + 3000;
+    schedulePublicCommentsRetry('earlier');
     if (!noteTonRpcRateLimit(error)) console.warn('[public] earlier comments read failed', error);
   } finally {
     publicPostDetailLoadingEarlier = false;
@@ -9983,33 +11108,70 @@ async function refreshPublicPostDetailComments() {
   }
   if (token !== publicPostDetailLoadToken) return;
   const maxAttempts = 6;
-  // PROGRESSIVE PAINT [OWNER 2026-08-21]. Each partial is MERGED into what is on screen — mergePublicComments only
-  // adds and re-sorts — so a list already showing the cached snapshot cannot lose a row to a shorter partial, and
-  // a post opened cold shows its newest era's comments while the older eras are still being read. The load state
-  // is left as it was: a cold open stays 'loading' (the list paints with "loading more…" under it), a cached open
-  // stays 'ready' (the refresh is silent, as it always was). The clean final result below still REPLACES the list,
-  // is the only thing written to the cache, and is the only read that retires a pending local comment.
-  const onPartial = (partial) => {
-    if (token !== publicPostDetailLoadToken) return;                     // closed or reopened — drop it
-    if (!Array.isArray(partial?.comments) || partial.comments.length === 0) return;
-    publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, partial.comments);
-    if (partial.parentExists === true) publicPostDetailParentExists = true;
-    renderPublicPostDetail();
-  };
+  // Comments that arrived in partial frames of THIS refresh — kept so a read that then degrades still persists them
+  // (accumulate-never-wipe, like the degraded branch below does for a partial result).
+  let framedComments = [];
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     let result;
     try {
-      result = await loadPublicPostComments(item, { snapshot: snapshot?.latestLink ? snapshot : null, onPartial });
+      result = await loadPublicPostComments(item, {
+        snapshot: snapshot?.latestLink ? snapshot : null,
+        // A COLD OPEN PAINTS AS IT READS. Each live thread-era shard the lane finishes arrives here as a frame
+        // (freshest era first), merged with the SAME merge the clean result takes below, under "loading more…"
+        // (loadState stays 'loading' until the clean result, and the render shows public.loadingMoreComments once
+        // the list is non-empty). Nothing else moves on a frame: cursors, hasMore, the caches and the 'ready' state
+        // wait for the whole read; a frame for a closed or reopened post dies on the token; and date-jump mode
+        // (newerCursor set) ignores frames — there the clean read REPLACES the jumped window, and merging a tail
+        // frame first would reopen the hidden gap review finding 4 closed.
+        onPartial: (frame) => {
+          if (token !== publicPostDetailLoadToken) return;
+          if (publicPostDetailNewerCursor) return;
+          if (!Array.isArray(frame?.comments) || frame.comments.length === 0) return;
+          framedComments = mergePublicComments(framedComments, frame.comments);
+          publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, frame.comments);
+          if (frame.parentExists === true) publicPostDetailParentExists = true;
+          renderPublicPostDetail();
+        },
+      });
     } catch (error) {
       console.error(error);
       result = { comments: [], degraded: true };
     }
     if (token !== publicPostDetailLoadToken) return; // closed or reopened — drop this result
     if (!result.degraded) {
-      publicPostDetailChainComments = result.comments;
+      if (publicPostDetailNewerCursor) {
+        // Date-jump mode: a clean tail read replaces the jumped window and exits forward paging. The frame
+        // changes wholesale — invalidate in-flight page reads from the jumped frame.
+        publicCommentsPagingGeneration += 1;
+        publicPostDetailChainComments = result.comments;
+        publicPostDetailCommentCursors = result.cursors ?? null;
+      } else {
+        // MERGE, never wipe (stability): the reader may hold pages of history below the tail window from
+        // auto-paging; replacing the list on every own-comment confirmation threw that history away
+        // mid-scroll. Cursors keep the DEEPEST read per shard for the same reason.
+        publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);
+        const mergedCursors = { ...(result.cursors ?? {}) };
+        for (const [key, prev] of Object.entries(publicPostDetailCommentCursors ?? {})) {
+          const fresh = mergedCursors[key];
+          if (!fresh || Number(prev?.from ?? 0) < Number(fresh.from ?? 0)) {
+            mergedCursors[key] = {
+              from: Number(prev?.from ?? 0),
+              entryCount: Math.max(Number(prev?.entryCount ?? 0), Number(fresh?.entryCount ?? 0)),
+              // The deeper cursor keeps ITS body bound: oldestLt is what lets the page below it find bodies at all
+              // (the lane bounds /messages from above with it — see readThreadComments).
+              oldestLt: prev?.oldestLt ?? fresh?.oldestLt ?? null,
+            };
+          }
+        }
+        publicPostDetailCommentCursors = Object.keys(mergedCursors).length > 0 ? mergedCursors : null;
+      }
       publicPostDetailParentExists = result.parentExists === true;
-      publicPostDetailCommentCursors = result.cursors ?? null;
-      publicPostDetailHasMoreComments = result.hasMore === true;
+      publicPostDetailHasMoreComments = publicPostDetailCommentCursors
+        ? Object.values(publicPostDetailCommentCursors).some((c) => Number(c?.from ?? 0) > 0)
+        : result.hasMore === true;
+      // A clean tail read IS the present — forward paging (armed by a date jump) is over by definition.
+      publicPostDetailNewerCursor = null;
+      window.clearTimeout(publicPostDetailRefreshRetryTimer);
       publicPostDetailLoadState = 'ready';
       // Cache the fresh authoritative result so the next open of this post is instant (SWR). Bounded LRU (data
       // URLs can be large): drop the oldest once past the cap.
@@ -10035,8 +11197,8 @@ async function refreshPublicPostDetailComments() {
     // the next open, while the null cursor keeps the unchanged-shortcut disarmed (an incomplete feed must be
     // re-walked, not trusted as complete). The per-entry part cache already made those bodies durable; this makes
     // the post snapshot durable too, so a post whose walk never lands fully clean still restores its images.
-    if (cacheKey && Array.isArray(result.comments) && result.comments.length > 0) {
-      const durablePartial = mergePublicComments(snapshot?.comments ?? [], result.comments);
+    if (cacheKey && ((Array.isArray(result.comments) && result.comments.length > 0) || framedComments.length > 0)) {
+      const durablePartial = mergePublicComments(mergePublicComments(snapshot?.comments ?? [], framedComments), result.comments ?? []);
       if (durablePartial.length > 0) {
         writeCachedPublicComments(cacheKey, durablePartial, publicPostDetailParentExists === true, null);
       }
@@ -10049,7 +11211,19 @@ async function refreshPublicPostDetailComments() {
   if (token !== publicPostDetailLoadToken) return;
   publicPostDetailLoadState = 'error';
   renderPublicPostDetail();
+  // NEVER give up while the reader is looking (owner): the 6-attempt loop above can exhaust inside one long
+  // 429 backoff window — re-arm a paced background retry for as long as this post stays open. Without
+  // cursors from a clean first read there is no sentinel and no pagination at all, so this retry is what
+  // eventually brings the whole thread to life on a throttled keyless RPC.
+  window.clearTimeout(publicPostDetailRefreshRetryTimer);
+  const retryItem = publicPostDetailItem;
+  publicPostDetailRefreshRetryTimer = window.setTimeout(() => {
+    if (!publicPostDetailStillOn(retryItem)) return;
+    console.info('[comments] initial thread read still failing — retrying refresh');
+    refreshPublicPostDetailComments();
+  }, 10000);
 }
+let publicPostDetailRefreshRetryTimer = 0;
 
 // Shown at most once per session: a burst of posts must not turn into a burst of dialogs, and the author who
 // dismissed it has heard us. It returns next session, because the channel is still not listed.
@@ -11086,72 +12260,99 @@ const PUBLIC_DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let publicDiscoveryCache = null; // { at, results: [{ authorWallet, description, tags, name }] }
 
-// clean-17 Discover: sweep the BEACON directory (public-lane ranks live buckets by entry_count, NOT lt) and adapt
-// each announcement to the 4-field shape renderPublicDiscovery consumes. The beacon card body is the raw profile
-// document (a single-part 'document' body), so it decodes header-free via readProfileDocument.
+// clean-17 Discover: sweep the BEACON directory and adapt each announcement to the 4-field shape
+// renderPublicDiscovery consumes. The lane reads EVERY live bucket (ordered by the free last_transaction_lt, newest
+// first — an ORDER, not a selection) and reports after each one; the ranking-by-entry_count pre-pass that cost a
+// get_view per bucket before the first card is gone. The beacon card body is the raw profile document (a
+// single-part 'document' body), so it decodes header-free via readProfileDocument.
+//
+// ONE SWEEP AT A TIME. Reading every bucket is ~2 requests per live bucket through the shared pump, and the sweep
+// keeps running after the Find-channels screen closes (its token guards only drop the paints). A close-and-reopen
+// therefore JOINS the running sweep instead of starting a second one: the joiner is added to the painter set, gets
+// the next partial frame and the same final list.
+let publicDiscoverySweepInFlight = null;   // { promise, painters: Set<(results, { added, done, total }) => void> }
 async function discoverChannelsFromBeacon({ onPartial = null } = {}) {
+  if (publicDiscoverySweepInFlight) {
+    if (typeof onPartial === 'function') publicDiscoverySweepInFlight.painters.add(onPartial);
+    return publicDiscoverySweepInFlight.promise;
+  }
   const lane = directPublicLaneReader();
   if (!lane) return publicDiscoveryCache?.results ?? [];
-  const ownWallet = rawWalletAddress(plathoWallet?.address);
-  const subscribedAuthors = new Set(
-    subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
-      .map((channel) => rawWalletAddress(channel.authorWallet))
-      .filter(Boolean),
-  );
-  const results = [];
-  const seen = new Set();
-  // IDEMPOTENT BY CONSTRUCTION, which is what makes streaming safe: `seen` means a wallet already accepted is
-  // skipped, so handing the same growing catalog in over and over adds only what is new. The sweep hands over
-  // everything it has after each bucket, and the final list is absorbed once more at the end — a card cannot
-  // arrive twice and the streamed result cannot end up different from the whole-sweep one.
-  const absorb = (catalog) => {
-    let added = 0;
-    for (const item of catalog) {
-      const wallet = rawWalletAddress(item.channelWallet);
-      if (!wallet || seen.has(wallet)) continue;
-      if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;   // discovery is for finding NEW channels
-      if (subscribedAuthors.has(wallet)) continue;
-      let profileDoc = null;
-      try { profileDoc = readProfileDocument(tonCell.readSnakeCellBytes(item.card, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES })); }
-      catch { continue; }                                               // a card that is not a profile document is skipped
-      if (!profileDoc?.profileBlock) continue;
-      const description = String(profileDoc.profileBlock.description ?? '').trim();
-      const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
-      if (!publicChannelIsDiscoverable(profileDoc.profileBlock)) continue;   // discovery suggests DESCRIBED channels
-      seen.add(wallet);
-      // Warm the profile cache (also queues .ath verification) so render-time publicAuthorLabel resolves the name.
-      setChannelProfileFromWalk(wallet, profileDoc.profileBlock, null, Number(item.announcedAt ?? 0n));
-      results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
-      added += 1;
+  const painters = new Set();
+  if (typeof onPartial === 'function') painters.add(onPartial);
+  const paint = (results, progress) => {
+    for (const painter of painters) {
+      try { painter(results, progress); }
+      catch (error) { console.warn('[public] discovery partial paint failed', error); }
     }
-    return added;
   };
-  let catalog;
-  try {
-    // EVERY live bucket, streamed most-recently-touched first — no topBuckets cap. MEASURED 2026-08-21: 142 live
-    // beacon buckets on mainnet; the old top-32 cut showed less than a quarter of the described channels and the
-    // ranking pass in front of it (one get_view per live bucket) held the first card back for ~147 requests.
-    catalog = await lane.sweepChannelCatalog({
-      onProgress: (partial) => { if (absorb(partial) > 0 && typeof onPartial === 'function') onPartial(results); },
-    });
-  } catch (error) {
-    console.warn('[public] beacon sweep failed', error);
-    // Whatever streamed in before the failure is real and already on screen — keep it rather than fall back to a
-    // cache that may be older than what the user is looking at.
-    if (results.length > 0) { publicDiscoveryCache = { at: Date.now(), results }; return results; }
-    return publicDiscoveryCache?.results ?? [];
-  }
-  absorb(catalog);
-  publicDiscoveryCache = { at: Date.now(), results };
-  return results;
+  const sweep = (async () => {
+    const ownWallet = rawWalletAddress(plathoWallet?.address);
+    const subscribedAuthors = new Set(
+      subscribedPublicChannels(publicChannelSubscriptions, publicChannelRegistry)
+        .map((channel) => rawWalletAddress(channel.authorWallet))
+        .filter(Boolean),
+    );
+    const results = [];
+    const seen = new Set();
+    publicDiscoveryFollowedInSweep.clear();   // a NEW sweep re-reads subscriptions itself (subscribedAuthors above)
+    // IDEMPOTENT BY CONSTRUCTION, which is what makes streaming safe: `seen` means a wallet already accepted is
+    // skipped, so handing the same growing catalog in over and over adds only what is new. The sweep hands over
+    // everything it has after each bucket, and the final list is absorbed once more at the end — a card cannot
+    // arrive twice and the streamed result cannot end up different from the whole-sweep one.
+    const absorb = (catalog) => {
+      let added = 0;
+      for (const item of catalog) {
+        const wallet = rawWalletAddress(item.channelWallet);
+        if (!wallet || seen.has(wallet)) continue;
+        if (ownWallet && sameWalletAddress(wallet, ownWallet)) continue;   // discovery is for finding NEW channels
+        if (subscribedAuthors.has(wallet)) continue;
+        let profileDoc = null;
+        try { profileDoc = readProfileDocument(tonCell.readSnakeCellBytes(item.card, { maxBytes: PUBLIC_POST_BODY_MAX_BYTES })); }
+        catch { continue; }                                               // a card that is not a profile document is skipped
+        if (!profileDoc?.profileBlock) continue;
+        const description = String(profileDoc.profileBlock.description ?? '').trim();
+        const tags = (profileDoc.profileBlock.tags ?? []).filter(Boolean);
+        if (!publicChannelIsDiscoverable(profileDoc.profileBlock)) continue;   // discovery suggests DESCRIBED channels
+        seen.add(wallet);
+        // Warm the profile cache (also queues .ath verification) so render-time publicAuthorLabel resolves the name.
+        setChannelProfileFromWalk(wallet, profileDoc.profileBlock, null, Number(item.announcedAt ?? 0n));
+        results.push({ authorWallet: wallet, description, tags, name: publicAuthorLabel(wallet) });
+        added += 1;
+      }
+      return added;
+    };
+    let catalog;
+    try {
+      catalog = await lane.sweepChannelCatalog({
+        topBuckets: Infinity,   // EVERY live bucket — the lane orders them, this paints as they come
+        onProgress: (partial, progress) => {
+          paint(results, { added: absorb(partial), done: Number(progress?.done ?? 0), total: Number(progress?.total ?? 0) });
+        },
+      });
+    } catch (error) {
+      console.warn('[public] beacon sweep failed', error);
+      // Whatever streamed in before the failure is real and already on screen — keep it rather than fall back to a
+      // cache that may be older than what the user is looking at.
+      if (results.length > 0) { publicDiscoveryCache = { at: Date.now(), results }; return results; }
+      return publicDiscoveryCache?.results ?? [];
+    }
+    absorb(catalog);
+    publicDiscoveryCache = { at: Date.now(), results };
+    return results;
+  })();
+  publicDiscoverySweepInFlight = { promise: sweep, painters };
+  try { return await sweep; }
+  finally { publicDiscoverySweepInFlight = null; }
 }
 
 async function discoverChannels(options = {}) {
   if (options.force !== true && publicDiscoveryCache && (Date.now() - publicDiscoveryCache.at) < PUBLIC_DISCOVERY_CACHE_TTL_MS) {
     return publicDiscoveryCache.results;
   }
-  // clean-17 direct-pay: discovery sweeps the BEACON directory buckets (discoverChannelsFromBeacon), ranked by
-  // entry_count. The removed CapsuleHub scan walked the one shared public log looking for distinct authors.
+  // clean-17 direct-pay: discovery sweeps EVERY live BEACON directory bucket (discoverChannelsFromBeacon), newest
+  // last_transaction_lt first, painting as it goes. The removed CapsuleHub scan walked the one shared public log
+  // looking for distinct authors.
   return discoverChannelsFromBeacon({ onPartial: options.onPartial ?? null });
 }
 
@@ -11312,6 +12513,11 @@ function claimedPeerUsernameFromOpened(opened) {
 // Keyed by the shard ADDRESS, which already encodes (kRoot, keyId pair, epoch, direction), so one map covers every
 // conversation and every retired root without a composite key. In memory only, exactly like the epoch cursor beside
 // it: a reload costs ONE full re-open pass, and a lost mark can only ever cause a re-read, never a miss.
+//
+// ALSO LENT TO THE READ LANE (conv-lane readIncoming `knownSeqOf`): a shard whose newest page comes back FULL is
+// measured against this mark and paged down to it, so a burst longer than one page no longer loses the bodies
+// between the mark and the page. A shard with no mark (-1) is read newest-page-only — the same cold-start cost as
+// before — which is why "no mark" must keep meaning "holds nothing", never "unknown".
 //
 // Bounded so a long-lived session cannot grow it without limit — epochs advance, and old buckets fall out of the
 // read window but would otherwise keep their entry forever. Eviction is safe by construction: the worst case is
@@ -11890,124 +13096,240 @@ async function hydratePublicDiscoveryAvatars(results, token) {
   return changed;
 }
 
-// ── Discover: the LATEST POST of a channel, on its card ───────────────────────────────────────────────────────
-// [OWNER 2026-08-21: "the description is not quite it — good to see the last post"; "yes, alongside".]
-//
-// LAZY, VISIBLE-ONLY, TWO AT A TIME. The Discover list is every described channel on the network (142 on
-// 2026-08-21), and a channel read per card up front is the ranking wall again — on the one serial pump, in front of
-// the user's own dialogs. So a card asks for its post only when it reaches the screen (an IntersectionObserver with
-// a screen of margin), the asks run two abreast, and a closed panel forgets what it had not yet asked. The read is
-// the lane's small tail read (public-lane.readLatestChannelPosts: one states batch, the newest live era, a 32-row
-// window), and its answer is kept for the panel's life, so the sweep streaming cards in and re-rendering the list
-// costs no read at all. A refresh, or an open past the discovery cache TTL, forgets the answers too.
-const PUBLIC_DISCOVERY_LATEST_CONCURRENCY = 2;
-const PUBLIC_DISCOVERY_LATEST_ERA_HOPS = 3;        // older eras tried when the newest era's tail holds no visible post
-const publicDiscoveryLatestPosts = new Map();      // raw wallet -> { status: 'loading'|'ready'|'none', text, createdAtMs }
-const publicDiscoveryLatestQueue = [];
-let publicDiscoveryLatestActive = 0;
-let publicDiscoveryLatestObserver = null;
+// ONE hydration pass at a time. The sweep now paints a partial frame per bucket, and a pass per frame would start
+// overlapping profile reads for the same wallets (the per-wallet cache is only written when a read completes). A
+// frame that arrives mid-pass is not lost: the LATEST one is remembered and run once this pass ends — still under
+// the token guard, so a closed or superseded discovery never starts a pass.
+let publicDiscoveryAvatarHydration = null;       // the running pass
+let publicDiscoveryAvatarHydrationNext = null;   // { results, token } that arrived while it ran
+function hydratePublicDiscoveryAvatarsOnce(results, token) {
+  if (publicDiscoveryAvatarHydration) {
+    publicDiscoveryAvatarHydrationNext = { results, token };
+    return publicDiscoveryAvatarHydration;
+  }
+  publicDiscoveryAvatarHydration = hydratePublicDiscoveryAvatars(results, token)
+    .catch((error) => { console.warn('[public] discovery avatar hydration failed', error); return false; })
+    .finally(() => {
+      publicDiscoveryAvatarHydration = null;
+      const next = publicDiscoveryAvatarHydrationNext;
+      publicDiscoveryAvatarHydrationNext = null;
+      if (next && next.token === publicDiscoveryLoadToken && publicDiscoveryOpen) void hydratePublicDiscoveryAvatarsOnce(next.results, next.token);
+    });
+  return publicDiscoveryAvatarHydration;
+}
 
-function discoveryLatestObserver() {
-  if (publicDiscoveryLatestObserver) return publicDiscoveryLatestObserver;
-  if (typeof IntersectionObserver !== 'function') return null;
+// ── Discover: the latest post of each card ────────────────────────────────────────────────────────────────────
+// Lazy and shallow by design. A card asks only when it comes within a screen of the viewport; the read is the lane's
+// readLatestChannelPosts (one batched state probe + the 32-row tail of the newest live era, on its own transport
+// profile — ahead of the sweep, never dropped silently), decoded by the SAME decoder the feed uses
+// (publicPostPartsFromShardPosts → assemblePublicParts), so a card can never disagree with the feed about what a post
+// says or whether it is a post at all. The newest era's tail can hold nothing but the channel's profile document
+// (diverted and dropped by that decoder) — then the card steps one era back, up to PUBLIC_DISCOVERY_LATEST_ERA_STEPS.
+
+function discoveryLatestState(wallet) {
+  return wallet ? publicDiscoveryLatestPosts.get(wallet) ?? null : null;
+}
+
+// The block under the description: caption + clock + two clamped lines of the post once the answer is known; the
+// "loading" caption + a shimmer line while it is on its way (or not yet asked); nothing at all for a channel with no
+// visible post or a read that gave up — the next refresh asks again. Returns null when there is nothing to show.
+function buildDiscoveryLatestNode(wallet) {
+  if (!wallet) return null;
+  const state = discoveryLatestState(wallet);
+  if (state && (state.status === 'empty' || state.status === 'error')) return null;
+  const block = document.createElement('div');
+  block.className = 'discovery-card-latest';
+  const meta = document.createElement('span');
+  meta.className = 'discovery-card-latest-meta';
+  const label = document.createElement('span');
+  label.className = 'discovery-card-latest-label';
+  meta.append(label);
+  block.append(meta);
+  if (state && state.status === 'ready') {
+    block.dataset.state = 'ready';
+    label.textContent = t('public.latestPost');
+    // The chat clock (today HH:MM, this year DD.MM HH:MM, else DD.MM.YY HH:MM) — a card line, not a feed stamp.
+    const clock = formatMessageClock(Number(state.createdAtMs));
+    if (clock) {
+      const time = document.createElement('span');
+      time.className = 'discovery-card-latest-time';
+      time.textContent = clock;
+      meta.append(time);
+    }
+    const text = document.createElement('p');
+    text.className = 'discovery-card-latest-text';
+    text.textContent = state.preview;
+    block.append(text);
+    return block;
+  }
+  block.dataset.state = 'loading';
+  label.textContent = t('public.latestPostLoading');
+  const shimmer = document.createElement('span');
+  shimmer.className = 'skeleton skeleton-line discovery-card-latest-skeleton';
+  shimmer.setAttribute('aria-hidden', 'true');
+  block.append(shimmer);
+  return block;
+}
+
+// One line for the card: the first text block (markup stripped), else the media label the chat list uses ("1 image",
+// a file's name, "Shared post") — the thread list's preview rule, so the two surfaces agree.
+function discoveryLatestPreview(item) {
+  const fromBlocks = Array.isArray(item?.blocks) && item.blocks.length > 0 ? messagePreviewFromBlocks(item.blocks) : '';
+  const fromText = fromBlocks || messagePreviewText(item?.text ?? '');
+  if (fromText) return fromText;
+  if (item?.imageUrl) return tPlural('chat.previewImages', 1);
+  return '…';
+}
+
+// Patch ONE card in place (by data-wallet) when its answer lands: a whole-list rebuild for one line would replay the
+// diff and the ghosts for nothing. A card that is leaving is left alone; a wallet not on screen is simply stored —
+// the next rebuild attaches it.
+function applyDiscoveryLatestToCard(wallet) {
+  if (!publicDiscoveryBody || !wallet) return;
+  const card = [...publicDiscoveryBody.querySelectorAll('.discovery-card:not(.is-leaving)')]
+    .find((node) => node.dataset.wallet === wallet);
+  if (!card) return;
+  const previous = card.querySelector('.discovery-card-latest');
+  const next = buildDiscoveryLatestNode(wallet);
+  if (previous && next) previous.replaceWith(next);
+  else if (previous) previous.remove();
+  else if (next) {
+    const actions = card.querySelector('.discovery-card-actions');
+    if (actions) card.insertBefore(next, actions); else card.append(next);
+  }
+}
+
+function ensureDiscoveryLatestObserver() {
+  if (publicDiscoveryLatestObserver || typeof IntersectionObserver !== 'function' || !publicDiscoveryBody) return publicDiscoveryLatestObserver;
+  // Root = the list's own scroller (the pane scrolls it, not the document); rootMargin of one root height so a card
+  // asks a SCREEN before it scrolls in and the line is usually there by the time the reader reaches it.
   publicDiscoveryLatestObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
-      publicDiscoveryLatestObserver?.unobserve(entry.target);
-      queueDiscoveryLatestPost(entry.target.dataset?.wallet);
+      const wallet = entry.target instanceof HTMLElement ? entry.target.dataset.wallet : null;
+      publicDiscoveryLatestObserver.unobserve(entry.target);
+      if (wallet) queueDiscoveryLatestPost(wallet);
     }
-  }, { rootMargin: '100% 0px' });                  // this screen and the next one
+  }, { root: publicDiscoveryBody, rootMargin: '100% 0px' });
   return publicDiscoveryLatestObserver;
 }
 
-function resetDiscoveryLatestPosts() {
-  publicDiscoveryLatestObserver?.disconnect();
-  publicDiscoveryLatestObserver = null;
-  publicDiscoveryLatestQueue.length = 0;
-  publicDiscoveryLatestPosts.clear();
+// (Re)attach the observer after a rebuild: every card is a new node, so the old targets went with the old DOM. Cards
+// whose line is known or being read are skipped, ghosts too. Without IntersectionObserver (old WebKit) the cards queue
+// in list order — the pump's two-at-a-time bounds the cost either way.
+function observeDiscoveryLatestCards() {
+  if (!publicDiscoveryOpen || !publicDiscoveryBody) return;
+  const observer = ensureDiscoveryLatestObserver();
+  if (observer) observer.disconnect();
+  for (const card of publicDiscoveryBody.querySelectorAll('.discovery-card:not(.is-leaving)')) {
+    const wallet = card.dataset.wallet;
+    if (!wallet || discoveryLatestState(wallet) || publicDiscoveryLatestInFlight.has(wallet)) continue;
+    if (observer) observer.observe(card); else queueDiscoveryLatestPost(wallet);
+  }
 }
 
-function queueDiscoveryLatestPost(wallet) {
-  if (!wallet || publicDiscoveryLatestPosts.has(wallet)) return;
-  publicDiscoveryLatestPosts.set(wallet, { status: 'loading' });
+// `retry` is the rate-limit timer's door: a wallet parked as 'loading' while it waits may re-enter the queue; nothing
+// else may re-ask for a wallet the map already knows.
+function queueDiscoveryLatestPost(wallet, { retry = false } = {}) {
+  if (!publicDiscoveryOpen || !wallet) return;
+  const state = discoveryLatestState(wallet);
+  if (state && (!retry || state.status !== 'loading')) return;
+  if (publicDiscoveryLatestInFlight.has(wallet) || publicDiscoveryLatestQueue.includes(wallet)) return;
+  if (!state) publicDiscoveryLatestPosts.set(wallet, { status: 'loading', attempts: 0 });
   publicDiscoveryLatestQueue.push(wallet);
-  void pumpDiscoveryLatestPosts();
+  pumpDiscoveryLatestPosts();
 }
 
-async function pumpDiscoveryLatestPosts() {
-  while (publicDiscoveryLatestActive < PUBLIC_DISCOVERY_LATEST_CONCURRENCY && publicDiscoveryLatestQueue.length > 0) {
-    if (!publicDiscoveryOpen) {
-      // The panel closed: what was queued but never asked is forgotten, so a re-open asks again for what it shows.
-      for (const wallet of publicDiscoveryLatestQueue.splice(0)) {
-        if (publicDiscoveryLatestPosts.get(wallet)?.status === 'loading') publicDiscoveryLatestPosts.delete(wallet);
-      }
-      return;
-    }
+function pumpDiscoveryLatestPosts() {
+  if (!publicDiscoveryOpen) return;
+  while (publicDiscoveryLatestInFlight.size < PUBLIC_DISCOVERY_LATEST_CONCURRENCY && publicDiscoveryLatestQueue.length > 0) {
     const wallet = publicDiscoveryLatestQueue.shift();
-    publicDiscoveryLatestActive += 1;
-    loadDiscoveryLatestPost(wallet).finally(() => {
-      publicDiscoveryLatestActive -= 1;
-      void pumpDiscoveryLatestPosts();
+    if (discoveryLatestState(wallet)?.status !== 'loading' || publicDiscoveryLatestInFlight.has(wallet)) continue;
+    publicDiscoveryLatestInFlight.add(wallet);
+    void loadDiscoveryLatestPost(wallet, publicDiscoveryLatestGeneration).finally(() => {
+      publicDiscoveryLatestInFlight.delete(wallet);
+      // A read ORPHANED by a reset (generation bumped while it ran: the answer is dropped on landing and the map entry
+      // is already gone) left its card unobserved — an in-flight wallet is skipped by observeDiscoveryLatestCards and
+      // refused by queueDiscoveryLatestPost — so nothing would ask for it again before some unrelated rebuild; the
+      // card kept its shimmer with no request pending. Re-arm the observer now: a current-generation completion always
+      // leaves a state (ready/empty/error/loading-retry), so for it this is a no-op.
+      if (publicDiscoveryOpen && !discoveryLatestState(wallet)) observeDiscoveryLatestCards();
+      pumpDiscoveryLatestPosts();
     });
   }
 }
 
-async function loadDiscoveryLatestPost(wallet) {
+async function loadDiscoveryLatestPost(wallet, generation) {
+  const stillWanted = () => generation === publicDiscoveryLatestGeneration;
+  const settle = (state) => {
+    if (!stillWanted()) return;                   // a reset happened underneath: this answer belongs to the old list
+    publicDiscoveryLatestPosts.set(wallet, state);  // stored even while the panel is closed — a reopen within the cache TTL shows it
+    if (publicDiscoveryOpen) applyDiscoveryLatestToCard(wallet);
+  };
   const lane = directPublicLaneReader();
-  let result = null;                                // null = could not read; the next sight of the card asks again
-  if (lane) {
-    try {
-      let beforeEra = null;
-      for (let hop = 0; hop < PUBLIC_DISCOVERY_LATEST_ERA_HOPS; hop += 1) {
-        const { posts: shardPosts, era, exhausted } = await lane.readLatestChannelPosts(wallet, beforeEra === null ? {} : { beforeEra });
-        if (era === null) { result = { status: 'none' }; break; }
-        // The SAME decode the feed uses: profile-only documents are diverted into the profile cache (the card's
-        // description gets warmer for free), parts are assembled, undecodable groups are skipped.
-        const parts = await publicPostPartsFromShardPosts(shardPosts, { id: `discover:${wallet}`, authorWallet: wallet });
-        const posts = assemblePublicParts(parts)
-          .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-        const newest = posts[0];
-        if (newest) {
-          const text = String(newest.text ?? '').trim() || (newest.imageUrl ? tPlural('chat.previewImages', 1) : '');
-          result = text
-            ? { status: 'ready', text, createdAtMs: new Date(newest.createdAt ?? 0).getTime() }
-            : { status: 'none' };
-          break;
-        }
-        if (exhausted) { result = { status: 'none' }; break; }
-        beforeEra = era;                             // the newest era's tail was profile updates only — look one era back
+  if (!lane) { settle({ status: 'error', attempts: 0 }); return; }
+  try {
+    let beforeEra = null;
+    for (let step = 0; step < PUBLIC_DISCOVERY_LATEST_ERA_STEPS; step += 1) {
+      const { posts, era, exhausted } = await lane.readLatestChannelPosts(wallet, { beforeEra });
+      if (!stillWanted()) return;
+      // THE FEED'S DECODER, not a second one: profile documents are diverted (and warm the profile cache), multipart
+      // posts are grouped, undecodable groups are dropped — exactly what the feed would show for this channel. The
+      // synthetic channel id is the one ensurePublicChannelForAuthorWallet would mint, WITHOUT registering anything.
+      const parts = await publicPostPartsFromShardPosts(posts, { id: `wallet:${wallet}`, authorWallet: wallet });
+      const items = assemblePublicParts(parts)
+        .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+      const latest = items[0] ?? null;
+      if (latest) {
+        settle({
+          status: 'ready',
+          preview: discoveryLatestPreview(latest),
+          createdAtMs: new Date(latest.createdAt ?? 0).getTime(),
+          attempts: 0,
+        });
+        return;
       }
-      if (!result) result = { status: 'none' };      // every hop was profile-only: nothing visible to show
-    } catch (error) {
-      if (!noteTonRpcRateLimit(error)) console.warn('[public] latest post read failed', wallet, error);
-      result = null;
+      if (exhausted || era === null) break;
+      beforeEra = era;   // the tail was the profile alone (or unreadable): one era back
     }
-  }
-  if (result) publicDiscoveryLatestPosts.set(wallet, result);
-  else publicDiscoveryLatestPosts.delete(wallet);
-  if (!publicDiscoveryOpen || !publicDiscoveryBody) return;
-  for (const node of publicDiscoveryBody.querySelectorAll('.discovery-card-latest')) {
-    if (node.dataset?.wallet === wallet) fillDiscoveryLatestPost(node, result);
+    settle({ status: 'empty', attempts: 0 });
+  } catch (error) {
+    if (!stillWanted()) return;
+    const attempts = Number(discoveryLatestState(wallet)?.attempts ?? 0) + 1;
+    // A rate-limited read is re-queued on the app-level backoff (the states/messages readers wait through the pump's
+    // backoff themselves, but get_page still refuses while it lasts); anything else is given up on until the next
+    // refresh — the card simply keeps its description.
+    if (noteTonRpcRateLimit(error) && attempts <= PUBLIC_DISCOVERY_LATEST_RETRIES) {
+      publicDiscoveryLatestPosts.set(wallet, { status: 'loading', attempts });
+      const delayMs = Math.max(2_000, tonRpcLimitBackoffMs(error)) * attempts;
+      window.setTimeout(() => { if (stillWanted()) queueDiscoveryLatestPost(wallet, { retry: true }); }, delayMs);
+      return;
+    }
+    console.warn('[public] discovery latest post read failed', wallet, error?.message ?? error);
+    settle({ status: 'error', attempts });
   }
 }
 
-// Paint one card's latest-post block from its state. Loading: the label and a muted "loading" line, so the card
-// keeps its shape while the read is out; ready: "Latest post · when" over the text (the feed's one-line preview,
-// clamped by CSS); none (or a read that failed): the block is removed — an empty box under a name says nothing.
-function fillDiscoveryLatestPost(node, state) {
-  if (!node) return;
-  if (!state || state.status === 'none') { node.remove(); return; }
-  node.replaceChildren();
-  node.classList.toggle('is-loading', state.status === 'loading');
-  const label = document.createElement('span');
-  label.className = 'discovery-card-latest-label';
-  const when = state.status === 'ready' ? formatThreadListTimestamp(Number(state.createdAtMs)) : '';
-  label.textContent = when ? `${t('public.latestPost')} · ${when}` : t('public.latestPost');
-  const text = document.createElement('p');
-  text.className = 'discovery-card-latest-text';
-  text.textContent = state.status === 'ready' ? state.text : t('public.latestPostLoading');
-  node.append(label, text);
+// Close: the waiting queue is dropped and wallets that were only WAITING go back to unknown (a reopen asks for them
+// again through the observer); reads in flight finish and store their answer under the same generation.
+function stopDiscoveryLatestPump() {
+  publicDiscoveryLatestQueue.length = 0;
+  if (publicDiscoveryLatestObserver) publicDiscoveryLatestObserver.disconnect();
+  for (const [wallet, state] of publicDiscoveryLatestPosts) {
+    if (state.status === 'loading' && !publicDiscoveryLatestInFlight.has(wallet)) publicDiscoveryLatestPosts.delete(wallet);
+  }
 }
+
+// Refresh / a new sweep: everything forgotten, and answers still in flight are dropped when they land.
+function resetPublicDiscoveryLatestPosts() {
+  stopDiscoveryLatestPump();
+  publicDiscoveryLatestPosts.clear();
+  publicDiscoveryLatestGeneration += 1;
+}
+
+// Debug hook (the preview panel's hidden tab never fires IntersectionObserver — ARCHITECTURE §7.14): force a card's
+// read from the console and read the map. Same spirit as globalThis.plathoLastPublicSync.
+globalThis.plathoDiscoveryLatest = { posts: publicDiscoveryLatestPosts, queue: (wallet) => queueDiscoveryLatestPost(wallet) };
 
 function base64UrlToBytes(value) {
   const text = String(value ?? '');
@@ -12080,34 +13402,6 @@ async function verifiedPlathoUsernameIdentityForWallet(label, walletAddress) {
   }
 }
 
-/**
- * THE LOCAL ECHO OF AN OWN SEND, matched WITHOUT a capsule id.
- *
- * The composer inserts an 'out' message before any capsule exists, so the echo never carried the capsule id that
- * findMessageByCapsuleId keys on — and once the sync began reading this device's own outgoing shards back, the same
- * message was inserted a second time, under 'received' [OWNER 2026-08-22: "the message doubled with different
- * statuses"]. The echo DOES carry the publish seq (chainEntryId, stamped before the broadcast) and, from the same
- * day on, the shard address; an older echo has the seq and a send time within seconds of the capsule's own signed
- * time. Either pair says "this is mine, and it is already here" — the chain copy then MERGES into the echo (which
- * gains the capsule id, so the next pass matches by id like everything else) instead of standing beside it.
- */
-function findOwnEchoForChainCopy(thread, entry, opened) {
-  const seq = privateEntryIdText(entry);
-  if (!thread || seq === null || opened?.openedAs !== 'sender') return null;
-  const address = typeof entry?.address === 'string' && entry.address ? entry.address : null;
-  const chainMs = capsuleSenderCreatedAtMs(opened);
-  for (const message of thread.messages ?? []) {
-    if (message?.type !== 'out' || String(message.chainEntryId ?? '') !== seq) continue;
-    if (address && message.convShardAddress) {
-      if (message.convShardAddress === address) return { thread, message };
-      continue;                                              // same seq in ANOTHER shard (seq restarts per epoch)
-    }
-    const echoMs = messageCreatedAtMs(message);
-    if (chainMs !== null && echoMs !== null && Math.abs(echoMs - chainMs) <= 5_000) return { thread, message };
-  }
-  return null;
-}
-
 function findMessageByCapsuleId(capsuleId) {
   if (!capsuleId) return null;
   for (const thread of threads) {
@@ -12118,6 +13412,108 @@ function findMessageByCapsuleId(capsuleId) {
     if (message) return { thread, message };
   }
   return null;
+}
+
+// How far apart the local echo's stamp (the composer moment, localCreatedAtMs) and the chain copy's SIGNED stamp
+// (header1.createdAt, taken when the capsule was sealed) may sit and still be the same send — used only for an echo
+// that carries no shard address (stored before the send stamped one), where seq alone is not an identity (seqs
+// restart per shard-day). Seconds apart on a healthy path; a retried send can exceed it, and then the copy is
+// treated as a separate message — a visible duplicate, never a silent loss. [PWA-CONVRESTORE-02]
+const CONV_OWN_ECHO_TIME_SLACK_MS = 5000;
+
+/** Both sides come from recordShardAddress (one string form), so plain equality is the comparison. */
+function sameConvShardAddress(a, b) {
+  return typeof a === 'string' && typeof b === 'string' && a !== '' && a === b;
+}
+
+/**
+ * The local ECHO of an own send that a chain copy (my capsule read back from my outgoing shard, type 'out') belongs to,
+ * or null.
+ *
+ * AN ECHO HAS NO CAPSULE ID. The composer inserts the bubble before anything is sealed, and the send never attaches
+ * the capsule to it, so findMessageByCapsuleId cannot see the echo and the chain copy used to land as a SECOND bubble
+ * of the same message. What the echo does carry is exact: the send stamps chainEntryId (the publish seq — the record's
+ * identity on the shard) and, now, convShardAddress; older echoes carry the address in convDirectSend.address. So the
+ * identity is (shard, seq) — a multipart echo spans [chainEntryId .. chainLastEntryId] (or convDirectSend.maxSeq). An
+ * echo with no address at all (stored before either field existed) falls back to seq + the send moment, ±slack.
+ * Echoes that already carry a capsule are skipped here: the capsule-id lookup above owns that case.
+ */
+function findOwnEchoForChainCopy(thread, copy) {
+  if (!thread || copy?.type !== 'out') return null;
+  const copySeq = privateEntryIdValue({ entry_id: copy.chainEntryId });
+  if (copySeq === null) return null;
+  // A multipart copy names its LAST record too (privateChainMessageOrderFields); a legacy echo below knows only its
+  // own last seq (convDirectSend.maxSeq), so that is the seq the two are compared on.
+  const copyLastSeq = privateEntryIdValue({ entry_id: copy.chainLastEntryId }) ?? copySeq;
+  const copyShard = typeof copy.convShardAddress === 'string' && copy.convShardAddress ? copy.convShardAddress : null;
+  const copyAt = messageCreatedAtMs(copy);
+  for (const message of thread.messages ?? []) {
+    if (message === copy || message?.type !== 'out') continue;
+    if (message.capsule?.id || (Array.isArray(message.capsules) && message.capsules.length > 0)) continue;
+    const echoShard = (typeof message.convShardAddress === 'string' && message.convShardAddress)
+      ? message.convShardAddress
+      : (typeof message.convDirectSend?.address === 'string' && message.convDirectSend.address ? message.convDirectSend.address : null);
+    const first = privateEntryIdValue({ entry_id: message.chainEntryId });
+    if (first === null) {
+      // A LEGACY ECHO — sent before 2026-08-08, when nothing stamped chainEntryId on an outgoing message. It used to
+      // be skipped outright, never reaching the time fallback, so a manual full rescan landed every such send as a
+      // SECOND bubble. What it may still carry is the delivery confirm's target (convDirectSend.address + maxSeq, the
+      // send's LAST seq): with both, (shard, last seq) is as exact an identity as (shard, seq) above; an address that
+      // names ANOTHER shard rules the copy out; with neither, the send moment ±slack is all there is — the same
+      // fallback an echo with a seq but no address gets. [review]
+      if (echoShard !== null && copyShard !== null && !sameConvShardAddress(echoShard, copyShard)) continue;
+      const legacyLastSeq = Number.isFinite(message.convDirectSend?.maxSeq)
+        ? privateEntryIdValue({ entry_id: message.convDirectSend.maxSeq })
+        : null;
+      if (legacyLastSeq !== null && echoShard !== null && copyShard !== null) {
+        if (legacyLastSeq === copyLastSeq) return message;
+        continue;   // the same shard, another seq: another send
+      }
+      const echoAt = messageCreatedAtMs(message);
+      if (copyAt !== null && echoAt !== null && Math.abs(copyAt - echoAt) <= CONV_OWN_ECHO_TIME_SLACK_MS) return message;
+      continue;
+    }
+    const lastRaw = message.chainLastEntryId
+      ?? (Number.isFinite(message.convDirectSend?.maxSeq) ? message.convDirectSend.maxSeq : null);
+    const last = privateEntryIdValue({ entry_id: lastRaw }) ?? first;
+    if (copySeq < first || copySeq > last) continue;
+    if (echoShard !== null && copyShard !== null) {
+      if (sameConvShardAddress(echoShard, copyShard)) return message;
+      continue;   // the same seq in ANOTHER shard (another day, another root) is a different send
+    }
+    const echoAt = messageCreatedAtMs(message);
+    if (copyAt !== null && echoAt !== null && Math.abs(copyAt - echoAt) <= CONV_OWN_ECHO_TIME_SLACK_MS) return message;
+  }
+  return null;
+}
+
+/**
+ * Merge a chain copy of my own message INTO its local echo (capsule, shard, seq range, signed time, meta 'published')
+ * and settle the delivery confirm: a body that verified under my direction's write key and opened under my
+ * sender-recovery key IS the proof the confirm ladder polls the shard for — letting it read the shard again to learn
+ * what this pass already holds is a wasted request per message. Always returns true (the copy is accounted for).
+ */
+async function absorbOwnChainCopy(targetThread, echo, copy) {
+  await upsertOpenedPrivateMessage({ thread: targetThread, message: echo }, targetThread, copy);
+  if (echo.convDelivery !== 'verified') {
+    echo.convDelivery = 'verified';
+    cancelConvDeliveryConfirm(echo);
+    await updateMessageInEncryptedHistory(targetThread, echo);
+  }
+  return true;
+}
+
+/**
+ * Is this chain copy of my own message the copy of an echo that sits on disk OUTSIDE the loaded window? The loaded
+ * window (PRIVATE_HISTORY_WINDOW) is searched by findOwnEchoForChainCopy; beyond it only the clear headers can
+ * answer, and they carry no shard or seq — only the record's createdAt and type. So this is a time-proximity answer
+ * from storedOwnSendTimes, and it is consulted ONLY when the thread actually has unloaded history: inside the window
+ * the in-memory search is authoritative and a proximity guess must never override it.
+ */
+function ownEchoStoredBeyondWindow(thread, copy) {
+  if (!thread?.id || copy?.type !== 'out') return false;
+  if (!threadHistoryHasMore(thread.id)) return false;
+  return ownSendStoredNear(thread.id, messageCreatedAtMs(copy));
 }
 
 /**
@@ -12173,6 +13569,7 @@ function mergeOpenedPrivateMessage(existingMessage, incomingMessage) {
     // pass that re-reads it — so ONE full pass makes the whole window seedable instead of waiting for new traffic
     // to arrive shard by shard. The value is derived from the capsule just read, not invented.
     'convShardAddress',
+    'convSealedAtMs',
     'createdAt',
     'createdAtMs',
     'meta',
@@ -12445,6 +13842,13 @@ function isSavedMessagesThread(thread) {
   });
 }
 
+// "Pin contact" predicate for thread-list-order. `thread.pinned` is the RUNTIME mirror of the per-counterparty store
+// flag (set in hydrateThreadDisplayFromContactStore on first render and by setContactPinned on toggle) — so ordering
+// never reads localStorage per row per render.
+function isThreadPinned(thread) {
+  return thread?.pinned === true;
+}
+
 // Ensure the Saved thread exists (top of the list) once a wallet is available. Keyed by the STANDARD own-wallet
 // dm identity so chain scans (threadForChainCapsule / threadForOpenedSenderCapsule) route self messages here
 // with zero routing changes.
@@ -12700,6 +14104,32 @@ function privateEntryCreatedAtMs(entry) {
   } catch {
     return null;
   }
+}
+
+// The clock next to a chat message (owner: "so it is clear when it was sent"). Today → HH:MM; another
+// day this year → DD.MM HH:MM; older → DD.MM.YY HH:MM — local time, the full stamp rides in the tooltip. The value
+// is messageCreatedAtMs: the SIGNED sender time when the capsule carries one, so both devices show the same clock.
+function formatMessageClock(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const d = new Date(ms);
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  if (sameDay) return hm;
+  const dm = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`;
+  return d.getFullYear() === now.getFullYear() ? `${dm} ${hm}` : `${dm}.${pad(d.getFullYear() % 100)} ${hm}`;
+}
+
+// The meta line under a bubble: the status word ("published", "received", "sending"…) plus the clock (owner: the
+// time lives in the published/received field, not in the bubble). A row with no status still shows the clock; a
+// system row shows neither. messageStatusKey keeps reading the bare status (messageMetaText) for its colouring.
+function messageMetaLine(message) {
+  const status = messageMetaText(message);
+  if (message?.type === 'system') return status;
+  const clock = formatMessageClock(messageCreatedAtMs(message));
+  if (!clock) return status;
+  return status ? `${status} · ${clock}` : clock;
 }
 
 function messageCreatedAtMs(message) {
@@ -13166,14 +14596,17 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
   if (prefsBytes) { collectRestoredPrefsSnapshot(prefsBytes); return true; }
   if (!targetThread) throw new Error('Private chain message target thread could not be resolved');
   const message = messageFromOpenedCapsule(opened, meta, entry);
-  const existing = findMessageByCapsuleId(opened.capsule?.id) ?? findOwnEchoForChainCopy(targetThread, entry, opened);
+  const existing = findMessageByCapsuleId(opened.capsule?.id);
   if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
+  // MY OWN COPY, read back from my outgoing shard, vs MY LOCAL ECHO. The echo has no capsule id (see
+  // findOwnEchoForChainCopy), so the lookup above cannot pair them; (shard, seq) can. Merge, never insert twice.
+  const echo = message.type === 'out' ? findOwnEchoForChainCopy(targetThread, message) : null;
+  if (echo) return absorbOwnChainCopy(targetThread, echo, message);
   // Loaded threads did not have it, but the STORE might: this capsule can be older than the loaded window, and a
   // manual sync re-delivers on purpose. Inserting here would duplicate it on screen and then persist the duplicate.
   if (capsuleAlreadyStored(opened.capsule?.id)) return true;
-  // An OWN capsule whose echo is in the store but outside the window: the send-time index says so (see
-  // storedOwnSendTimes). Handled, not inserted — the echo is the message.
-  if (opened?.openedAs === 'sender' && ownSendStoredNear(targetThread.id, capsuleSenderCreatedAtMs(opened))) return true;
+  // An own echo OLDER than the loaded window has no capsule id on disk either — only its type and send moment.
+  if (message.type === 'out' && ownEchoStoredBeyondWindow(targetThread, message)) return true;
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
@@ -13198,20 +14631,16 @@ async function appendOpenedCapsuleMessage(opened, targetThread, meta, entry) {
 async function appendOpenedPrivatePartsMessage(parts, targetThread, meta) {
   if (!targetThread) throw new Error('Private chain multipart target thread could not be resolved');
   const message = messageFromOpenedPrivateParts(parts, meta);
-  // The echo of an own multipart send is anchored by its FIRST record (min seq) on both sides — see the send path.
-  const anchor = parts.reduce((best, part) => {
-    const seq = Number(privateEntryIdText(part?.entry));
-    if (!Number.isFinite(seq)) return best;
-    return best === null || seq < Number(privateEntryIdText(best.entry)) ? part : best;
-  }, null);
-  const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean)
-    ?? (anchor ? findOwnEchoForChainCopy(targetThread, anchor.entry, anchor.opened) : null);
+  const existing = parts.map((part) => findMessageByCapsuleId(part.opened?.capsule?.id)).find(Boolean);
   if (existing) return upsertOpenedPrivateMessage(existing, targetThread, message);
+  // Own multipart copy vs its echo — see the single-part path. The assembled message carries chainEntryId = the
+  // first record and chainLastEntryId = the last, which is the range the send stamped on the echo.
+  const echo = message.type === 'out' ? findOwnEchoForChainCopy(targetThread, message) : null;
+  if (echo) return absorbOwnChainCopy(targetThread, echo, message);
   // Same reasoning as the single-part path: ANY part already on disk means this message was stored before the
   // window that is currently loaded.
   if (parts.some((part) => capsuleAlreadyStored(part.opened?.capsule?.id))) return true;
-  // Same as the single-part path: an own multipart whose echo is stored outside the window is handled, not inserted.
-  if (anchor?.opened?.openedAs === 'sender' && ownSendStoredNear(targetThread.id, capsuleSenderCreatedAtMs(anchor.opened))) return true;
+  if (message.type === 'out' && ownEchoStoredBeyondWindow(targetThread, message)) return true;
   insertThreadMessage(targetThread, message);
   refreshThreadAfterMessageChange(targetThread);
   if (message.type !== 'out') markIncomingThreadMessage(targetThread);
@@ -13374,10 +14803,11 @@ async function appendConvOpenedCapsules(collected, targetThread) {
   let appended = 0;
   for (const parts of groups.values()) {
     const partCount = Number(parts[0]?.opened?.payload?.partCount ?? 1);
+    // MY OWN COPY, read back from my outgoing shard, is a message that LANDED: its status is the green 'published',
+    // not 'received' (received is the peer's half). openedAs is the crypto layer's verdict — the body opened through
+    // the sender-recovery branch, which only my own keys can do — so it is the one fact here that cannot be spoofed.
+    const meta = parts[0]?.opened?.openedAs === 'sender' ? 'published' : 'received';
     try {
-      // An OWN capsule read back off this device's outgoing shard is a PUBLISHED message, not a received one: the
-      // status under the bubble must say so [OWNER 2026-08-22: a doubled message "with different statuses"].
-      const meta = parts[0]?.opened?.openedAs === 'sender' ? 'published' : 'received';
       if (partCount > 1) {
         if (parts.length < partCount) continue; // incomplete — wait for the remaining parts on a later tick
         if (await appendOpenedPrivatePartsMessage(parts, targetThread, meta)) appended += 1;
@@ -13399,6 +14829,31 @@ async function appendConvOpenedCapsules(collected, targetThread) {
 // (RS_RETENTION), after which a record is retired on-chain, so scanning older buys nothing. This bounds a cold-start /
 // long-offline catch-up to a finite read fan while still covering the whole live retention window. [conv-receive review]
 const CONV_SCAN_CATCHUP_CAP_EPOCHS = 366;
+
+/**
+ * The epoch a conversation was BORN in — its earliest K_root adoption stamp — or null when no stamp is usable.
+ *
+ * adoptedCreatedAt is the INTRO's contract-stamped created_at in SECONDS (IntroShard now(): intro-receive-handler on
+ * the responder, the confirm read on the initiator — never a local clock, see adoptKRoot), and a retired root's
+ * adoptedAt is the same stamp from before the re-INTRO; both sides hold the same numbers and a recovery import carries
+ * adoptedCreatedAt too. A zero/absent stamp (a record written before the field) or one that lands in the future (a
+ * millisecond value fed by mistake) answers null, and the caller falls back to the steady window — never to a wrong
+ * early epoch, which would cost a year of reads for nothing.
+ */
+function convBirthEpoch(record, epochNow) {
+  const stamps = [record?.adoptedCreatedAt, ...(record?.kRootsForRead ?? []).map((entry) => entry?.adoptedAt)]
+    .map(Number)
+    .filter((stamp) => Number.isFinite(stamp) && stamp > 0)
+    // SECONDS, whatever the record carries. Every writer stamps the contract's created_at (seconds), but a stamp in
+    // MILLISECONDS would derive an epoch decades ahead, fail the `birth <= epochNow` guard below, and silently cost
+    // the conversation its cold walk — the exact failure this helper exists to prevent. 1e12 s is year 33658, so
+    // anything above it is a millisecond value, not a date.
+    .map((stamp) => (stamp > 1e12 ? Math.floor(stamp / 1000) : stamp));
+  if (stamps.length === 0) return null;
+  let birth;
+  try { birth = epochFromCreatedAtSeconds(Math.min(...stamps)); } catch { return null; }
+  return Number.isFinite(birth) && birth <= epochNow ? birth : null;
+}
 
 // A REAL macrotask yield (setTimeout 0), not `await Promise.resolve()`: only a macrotask lets the browser paint,
 // which is the whole point on a slow single-thread device. Used between synchronous-crypto iterations.
@@ -13444,8 +14899,7 @@ async function readConvShardStates(plans) {
   const seen = new Set();
   for (const plan of plans) {
     for (const root of plan.rootShards) {
-      // Incoming AND outgoing: the probe answers for every shard the pass may read, in one request.
-      for (const shard of [...root.shards, ...(root.outgoing ?? [])]) {
+      for (const shard of root.shards) {
         if (!shard?.address || seen.has(shard.address)) continue;
         seen.add(shard.address);
         addresses.push(shard.address);
@@ -13463,25 +14917,24 @@ async function readConvShardStates(plans) {
 }
 
 async function syncConvCapsulesFromShards(options = {}) {
-  // A MANUAL "Sync messages" is a FULL re-walk — the button has always promised that (it passes forceIndexRescan),
-  // and under the sharded lane that means: this pass, every conversation is treated as never scanned here, so it
-  // reads from its birth again (both directions). Capsules already stored are deduplicated by id, shards read this
-  // session are served by their marks, so the cost is the cold epochs only — which is exactly what the user who
-  // presses the button is asking for [OWNER 2026-08-22: a restored device whose first passes had the narrow window].
-  const fullRescan = options?.forceIndexRescan === true;
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
+  // A MANUAL sync (the header indicator's tap — runManualPrivateMessageSync passes forceIndexRescan) is a FULL re-walk:
+  // every conversation from its birth, every shard re-read whatever its change marker says, every capsule re-opened
+  // whatever the seq high-water says (dedup is by capsule id / own echo). The cursor, the marker gate and the seq mark
+  // exist to make the 12-second pass cheap; "tap sync" is the one recovery lever that must not be outsmarted by them.
+  const forceFull = options?.forceIndexRescan === true;
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return privateSyncResult({ ok: false, reason: 'provider_unavailable', scanComplete: false });
-  // THE STORE AND KEY PAIR THIS PASS STARTED WITH. A lock, a wallet switch or a background teardown sets both to
-  // null (or to the NEXT wallet's) while this pass is suspended on a network read — and the pass then wrote into
-  // whatever was there: `convKeyStore.advanceConvScanCursor` on null (OBSERVED 2026-08-21 in the owner's console,
-  // "Cannot read properties of null"), or, worse, an append into a freshly unlocked wallet's threads — the
-  // identity-bleed class. Every write below first checks that nothing moved; a pass that finds the ground gone
-  // simply ends, and the next wallet's own tick starts clean.
+  // REMEMBER THE STORE AND THE KEYS THIS PASS BELONGS TO. A lock or an account switch (clearWalletScopedRuntimeState)
+  // sets convKeyStore / localRecipientKeyPair to null mid-pass, and this function used to reach for the globals again
+  // at the end — "Cannot read properties of null (reading 'advanceConvScanCursor')". Worse than the crash: the
+  // appends, seq marks and cursor writes after that point would have landed in the NEXT wallet's state. So the pass
+  // holds its own references, and every write below is gated on `tornDown()`: read freely, write nothing once the
+  // identity it was reading for is gone.
   const store = convKeyStore;
   const keyPair = localRecipientKeyPair;
   const tornDown = () => convKeyStore !== store || localRecipientKeyPair !== keyPair;
-  const selfKeyId = localRecipientKeyPair.keyId;
+  const selfKeyId = keyPair.keyId;
   const lane = convReadLane();
   const epochNow = epochFromCreatedAtSeconds(Math.floor(Date.now() / 1000));
   // Per-tick cheap heal (Saved-only form, no args): a session whose thread routing was poisoned MID-flight
@@ -13495,73 +14948,77 @@ async function syncConvCapsulesFromShards(options = {}) {
   let rateLimited = false;
   let allClean = true;
 
-  // PASS 1 — every conversation's window, and every incoming shard address in it. Pure key derivation, ZERO RPC.
+  // PASS 1 — every conversation's window, and every shard address in it, INCOMING and OUTGOING. Pure key derivation,
+  // ZERO RPC.
   const plans = [];
-  for (const record of convKeyStore.snapshot().values()) {
+  let coldConversations = 0;   // conversations walked from their birth this pass (no cursor, or a manual full rescan)
+  let coldShards = 0;          // how many shard addresses those walks derived (the size of the read fan they risk)
+  for (const record of store.snapshot().values()) {
     if (!record?.kRootCurrent || !record?.peerKeyId) continue;
     const peerKeyId = record.peerKeyId;
-    // OFFLINE CATCH-UP. Always scan at least the last CONV_RECV_WINDOW_W epochs (the ±1 publish-slack window), and
-    // extend BACK to this conversation's scan cursor if it is older — so a message whose epoch scrolled past the
-    // steady window while the client was offline is still read. Capped at CONV_SCAN_CATCHUP_CAP_EPOCHS (retention).
-    // NOTE: the cursor lives on the in-memory conv key store today, so full cross-reload offline resilience also needs
-    // the persistent K_root store (a message is only lost if BOTH the store and the cursor are dropped on reload).
+    // WHERE TO START. Three answers, always at least the steady ±CONV_RECV_WINDOW_W window (publish slack), all capped
+    // at CONV_SCAN_CATCHUP_CAP_EPOCHS (on-chain retention — older buys nothing):
+    //   * a conversation WITH a scan cursor: extend BACK to the cursor (offline catch-up — a message whose epoch
+    //     scrolled past the steady window while the client was offline is still read);
+    //   * a COLD conversation (no cursor: a fresh device, a recovery import, a cleared store): from its BIRTH — the
+    //     INTRO's contract-stamped created_at (convBirthEpoch). This used to be the steady window only, and that is
+    //     the "only the last replies are visible, none of mine" report: a restored device read two days of a
+    //     year-old dialog and called it up to date;
+    //   * a MANUAL sync (forceFull): from birth for EVERY conversation, cursor or not.
     const steadyFrom = epochNow - CONV_RECV_WINDOW_W;
-    // A CONVERSATION THIS DEVICE HAS NEVER SCANNED STARTS FROM ITS BIRTH, not from the steady window. [OWNER
-    // 2026-08-22, on a device restored from the recovery slots: "in some conversations only the peer's latest replies
-    // came".] A restored record carries no cursor (lastScannedEpoch null), and the old rule read that as "scan the
-    // last W epochs" — three days of a conversation that may be months old, with everything before it on chain, paid
-    // for and unread. The record DOES know when the conversation began: adoptedCreatedAt is the INTRO's own stamp,
-    // and a retired root's adoptedAt the re-INTRO's. So a cold record scans from the earliest of those (capped at
-    // retention below, the same as any catch-up); once one pass is clean the cursor is written and this never runs
-    // again for that conversation. Seconds on the wire; a millisecond stamp is tolerated rather than trusted.
-    const birthSeconds = [record.adoptedCreatedAt, ...(record.kRootsForRead ?? []).map((entry) => entry.adoptedAt)]
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value) && value > 0)
-      .map((value) => (value > 1e12 ? Math.floor(value / 1000) : value));
-    const birthFrom = birthSeconds.length > 0 ? epochFromCreatedAtSeconds(Math.min(...birthSeconds)) : steadyFrom;
-    const cursorFrom = (record.lastScannedEpoch == null || fullRescan)
-      ? Math.min(steadyFrom, birthFrom)
-      : Math.min(steadyFrom, Number(record.lastScannedEpoch));
-    const scanFrom = Math.max(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, cursorFrom);
+    const cold = record.lastScannedEpoch == null;
+    const birthEpoch = convBirthEpoch(record, epochNow);
+    const from = (forceFull || cold) ? (birthEpoch ?? steadyFrom) : Number(record.lastScannedEpoch);
+    const scanFrom = Math.max(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, Math.min(steadyFrom, from));
     const windowW = Math.max(CONV_RECV_WINDOW_W, epochNow - scanFrom);
     // The current root plus any retired roots (a re-INTRO minted a new K_root; old messages still in the window
     // decrypt under the retired one). kRootsForRead holds { kRoot, adoptedAt }.
     const roots = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry.kRoot)];
+    // TWO GROUPS PER ROOT, read by the same lane: the peer's direction (what they wrote to me) and MY direction (what
+    // I wrote to them). The second is what brings my own messages back on a restored device — every CONV capsule
+    // carries a sender-recovery section keyed to my own keys for exactly this read (openAsSenderKeyId in pass 3).
+    // Until now only the incoming group was ever derived, so a restore showed the peer's half of every dialog.
     const rootShards = [];
     for (const kRoot of roots) {
-      // BOTH DIRECTIONS. The incoming shards are the peer's messages to this device; the OUTGOING shards are this
-      // device's own messages to the peer — the capsules it published carry a sender-recovery section the publisher
-      // can open (openedAs 'sender' → an 'out' message, deduplicated against the local echo by capsule id), so a
-      // restored device reads its own side of every conversation back off the chain, the way it always could have.
-      // [OWNER 2026-08-22: "only the peer's replies synced, mine did not".] Same reader, same gate, same marks.
-      rootShards.push({
-        kRoot,
-        shards: await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }),
-        outgoing: await outgoingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }),
+      rootShards.push({ kRoot, group: 'incoming', shards: await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
+      rootShards.push({ kRoot, group: 'outgoing', shards: await outgoingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
+    }
+    plans.push({ peerKeyId, windowW, rootShards });
+    if (cold || forceFull) {
+      // Loud on purpose: a cold walk is rare (once per conversation per device, or a manual sync) and is the whole
+      // answer to "why did the first sync take a while" / "why are my old messages back". Named once per conversation.
+      const shardCount = rootShards.reduce((sum, root) => sum + root.shards.length, 0);
+      coldConversations += 1;
+      coldShards += shardCount;
+      console.info('[conv] cold conversation', {
+        peer: introKeyIdString(peerKeyId).slice(0, 8),
+        why: forceFull ? 'manual full rescan' : (birthEpoch === null ? 'no cursor, no birth stamp' : 'no cursor'),
+        birthEpoch, fromEpoch: scanFrom, toEpoch: epochNow, epochs: windowW + 1, roots: roots.length, shards: shardCount,
       });
     }
-    // `cold` = this pass reads further back than the steady window for this conversation (a restore, a long
-    // offline stretch, a manual full re-walk); the pass reports those, once each, so a restore that came back short
-    // can be read off the console instead of guessed at.
-    plans.push({ peerKeyId, windowW, rootShards, cold: cursorFrom < steadyFrom, scanFrom });
     // Deriving one conversation's window is HKDF plus an ed25519 public key per bucket, and a conversation in full
-    // offline catch-up derives up to CONV_SCAN_CATCHUP_CAP_EPOCHS of them. That burst is not new — readIncoming did
-    // exactly the same work — but it used to be separated by each conversation's network reads, and this pass runs
-    // them back to back. One real macrotask between conversations keeps a device with many dialogs able to paint.
+    // offline catch-up derives up to CONV_SCAN_CATCHUP_CAP_EPOCHS of them, now for BOTH directions. That burst is not
+    // new — readIncoming did exactly the same work — but it used to be separated by each conversation's network reads,
+    // and this pass runs them back to back. One real macrotask between conversations keeps a device with many dialogs
+    // able to paint.
     await cooperativeYield();
   }
   const conversations = plans.length;
-  const coldPlans = plans.filter((plan) => plan.cold);
-  if (coldPlans.length > 0) {
-    console.info('[conv] cold scan this pass:', coldPlans.length, 'of', conversations, 'conversations read back to their birth;',
-      coldPlans.reduce((sum, plan) => sum + (epochNow - plan.scanFrom + 1), 0), 'epochs in all (both directions)');
+  if (coldConversations > 0) {
+    console.info('[conv] cold scan', { conversations: coldConversations, of: conversations, shards: coldShards, manual: forceFull });
   }
 
   // PASS 2 — ONE batched accountStates over every address of every conversation, so the pass can tell which shards
   // were written to at all. 1024 addresses fit a single request, so this is one request for the whole device, not
   // one per conversation. `null` means the question could not be answered; then pass 3 reads everything, as before.
   const shardStates = await readConvShardStates(plans);
-  if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
+
+  // A MANUAL full rescan re-reads every shard that EXISTS, whatever its change marker says: the lane's marks are
+  // dropped here, one by one, so the gate below lets every written-to shard through. The states batch still decides
+  // what exists — a never-written shard has no history to read, and that is most of a year's buckets.
+  if (forceFull) {
+    for (const plan of plans) for (const root of plan.rootShards) for (const shard of root.shards) lane.forgetShard(shard.address);
+  }
 
   // PASS 3 — history reads, decryption, append. Only for shards the batch above says have moved.
   for (const plan of plans) {
@@ -13573,27 +15030,34 @@ async function syncConvCapsulesFromShards(options = {}) {
     const bucketBlocked = new Set();  // shard address -> a transient failure: do not advance its mark at all
     let seqSkipped = 0;
     let convClean = true; // every shard read for this conversation succeeded — only then may the cursor advance
-    // Each root's INCOMING shards (the peer's messages) and OUTGOING shards (this device's own, re-opened as sender)
-    // go through the same reader, the same gate and the same marks — the lane does not care which side it reads.
-    const shardGroups = [];
-    for (const { kRoot, shards, outgoing } of plan.rootShards) {
-      shardGroups.push({ kRoot, shards, side: 'incoming' });
-      if (outgoing?.length) shardGroups.push({ kRoot, shards: outgoing, side: 'outgoing' });
-    }
-    for (const { kRoot, shards, side } of shardGroups) {
+    for (const { kRoot, group, shards } of plan.rootShards) {
+      // MY OWN DIRECTION goes through the same lane (my direction's write key is derived the same way, so the
+      // write-signature gate verifies my own publishes) — the difference is how each body is OPENED, below.
+      const ownCopies = group === 'outgoing';
       let entries;
       try {
         entries = await lane.readIncoming({
           kRoot, selfKeyId, peerKeyId, epochNow, windowW: plan.windowW, shards, states: shardStates,
-          // What this device already holds per shard, so a window that does not reach it is paged back rather than
-          // letting the mark jump over unread bodies (MEASURED 2026-08-21: shards of 2156 and 3968 capsules in one
-          // direction-epoch behind a 128-body window).
-          knownSeqOf: (bucket) => convBucketSeqHighWater(String(bucket ?? '')),
+          // The device's per-shard high-water, lent to the lane so a FULL newest page is measured against what this
+          // device already holds and paged down to it (end_lt) instead of taken on faith. -1 for a shard we hold
+          // nothing of (new device, cleared history): then the lane reads the newest page only, silently.
+          // A MANUAL full rescan lends 0 instead — "hold nothing, but DO descend": the lane then pages every full shard
+          // down to its first record (within its per-pass page cap), which is what "walk everything" means.
+          knownSeqOf: forceFull ? () => 0 : convBucketSeqHighWater,
+          // THE LANE SWALLOWS A FAILED SHARD (its own mark stays, the rest of the window is returned) — which is right
+          // for the lane and wrong for the cursor below: a shard-day that was never read must not be advanced past,
+          // or a cold/catch-up walk (restore, offline catch-up) loses that day for good while the UI says 'up to
+          // date'. So a swallowed shard makes this conversation, and the pass, unclean exactly like a thrown one.
+          onShardFailed: (address, error) => {
+            convClean = false; allClean = false;
+            if (noteTonRpcRateLimit(error)) rateLimited = true;
+            else console.warn('[conv] incoming shard read failed', address, error);
+          },
         });
       } catch (error) {
         convClean = false; allClean = false;
         if (noteTonRpcRateLimit(error)) rateLimited = true;
-        else console.warn(`[conv] ${side} shard read failed`, error);
+        else console.warn('[conv] incoming shard read failed', error);
         continue;
       }
       for (const found of entries) {
@@ -13611,18 +15075,17 @@ async function syncConvCapsulesFromShards(options = {}) {
         // `seq` is PLAINTEXT in the publish body (parseCapsulePublishBody reads it before any crypto) and strictly
         // increases per shard — RecordShard gate 13653 refuses a publish whose seq does not exceed last_seq. So this
         // is an exact high-water mark, not a heuristic: nothing at or below it can be new.
-        if (seqUsable && foundSeq <= convBucketSeqHighWater(bucket)) { seqSkipped += 1; continue; }
+        if (!forceFull && seqUsable && foundSeq <= convBucketSeqHighWater(bucket)) { seqSkipped += 1; continue; }
         let opened;
         try {
-          // An OUTGOING capsule is this device's own: CONV header0 carries no sender label (privacy), so the opener
-          // must be TOLD it is the sender — openAsSenderKeyId routes decryptCompactBodyBytes to the sender-recovery
-          // section. Without it the recipient path runs, the AES tag fails, and the capsule reads as "someone else's"
-          // — permanently unreadable, mark advanced, own message silently dropped [OWNER 2026-08-22, on the stand:
-          // "I do not see my own messages" — the first build of this read did exactly that].
-          opened = await openPrivateCapsuleChainEntry(found.entry, localRecipientKeyPair, {
-            enforceExpiry: false,
-            ...(side === 'outgoing' ? { openAsSenderKeyId: localRecipientKeyPair.keyId } : {}),
-          });
+          // MY OWN CAPSULE IS OPENED AS THE SENDER. Its sender-recovery section wraps the payload key to my own keys,
+          // and openPrivateCapsuleChainEntry selects that branch only when told whose copy this is (openAsSenderKeyId,
+          // the base64url keyId — the form recipientKeyIdForSuite compares against). Opened as a recipient, my own
+          // capsule fails the AEAD tag and was counted "permanently unreadable" — which is exactly what happened to
+          // every own message before this, in the one pass that could have restored them.
+          opened = await openPrivateCapsuleChainEntry(found.entry, keyPair, ownCopies
+            ? { enforceExpiry: false, openAsSenderKeyId: introKeyIdString(selfKeyId) }
+            : { enforceExpiry: false });
         } catch (error) {
           if (isPrivateUnreadableCapsuleError(error)) {
             // PERMANENTLY unreadable (someone else's capsule in a shared bucket). Counts as handled: re-trying it
@@ -13651,21 +15114,14 @@ async function syncConvCapsulesFromShards(options = {}) {
         await cooperativeYield();
       }
     }
-    // The reads above are where a teardown lands; nothing of this wallet's may be written past it.
+    // A teardown during the reads above: the opened capsules belong to an identity that no longer exists here. Drop
+    // them (the cursor and marks stay where they were, so the next unlock re-reads the same range) — never append.
     if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
     const appendedNow = await appendConvOpenedCapsules(collected, targetThread);
-    if (plan.cold) {
-      // One line per cold conversation, so a restore that came back short says WHY in the console: how many of its
-      // shards exist on chain at all (per direction), how many capsules were opened, how many were new.
-      const liveOf = (list) => (list ?? []).filter((shard) => Boolean(shardStates?.get(publicAddrKey(shard.address)))).length;
-      const liveIn = plan.rootShards.reduce((sum, root) => sum + liveOf(root.shards), 0);
-      const liveOut = plan.rootShards.reduce((sum, root) => sum + liveOf(root.outgoing), 0);
-      console.info('[conv] cold conversation', introKeyIdString(peerKeyId).slice(0, 12), 'epochs', plan.scanFrom, '..', epochNow,
-        'roots', plan.rootShards.length, 'live shards in/out', shardStates ? `${liveIn}/${liveOut}` : 'unknown (no probe)',
-        'opened', collected.length, 'new', appendedNow, 'skipped', seqSkipped, convClean ? 'clean' : 'INCOMPLETE');
-    }
     // Advance the per-shard marks ONLY here — after the append actually stored them. Moving the mark before this
-    // line would lose every collected message if the append threw.
+    // line would lose every collected message if the append threw. And only for the identity still in place: the
+    // marks are module state the teardown just cleared for the next wallet.
+    if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
     for (const [bucket, seq] of bucketMaxSeq) {
       if (!bucketBlocked.has(bucket)) advanceConvBucketSeqHighWater(bucket, seq);
     }
@@ -13684,14 +15140,20 @@ async function syncConvCapsulesFromShards(options = {}) {
       recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected: collected.length, appended: appendedNow, seqSkipped });
     }
     // Advance the cursor ONLY on a fully clean scan — a failed read must leave the cursor so those epochs are retried,
-    // never silently skipped past.
+    // never silently skipped past. On the CAPTURED store: the global may already be null (or the next wallet's).
     if (convClean && !tornDown()) await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
   }
+  if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
   if (imported > 0) { renderThreads(); renderConversation(); }
   globalThis.plathoLastConvSync = {
     at: new Date().toISOString(), conversations, imported, skipped, epochNow, rateLimited,
+    // `cold`: conversations walked from their birth this pass; `full`: a manual full rescan (cursor, marker gate and
+    // seq mark all bypassed). Both are expected to be non-zero ONCE after a restore / clear / manual sync, then zero.
+    cold: coldConversations, full: forceFull,
     // shards.skipped climbing while read stays flat IS the healthy steady state: nothing was written, so nothing
     // was fetched. `probe: false` means the state batch could not run and every shard was read the old way.
+    // `shards.paged` is how many OLDER pages the backfill pulled; `shards.gaps` how many shards it still could not
+    // reach this device's mark in (each named once on the console with the seq range it left unread).
     shards: lane.shardReadStats(), probe: shardStates !== null,
   };
   // scanComplete reflects the truth: false if any read failed (so the UI does not claim 'up to date' over a gap).
@@ -13813,13 +15275,16 @@ let lastPublicBackgroundSyncAt = 0;
 // suspends it — ticking the public feed + (with a wallet) private messages, so switching tabs is instant:
 // the data is already fresh, setView no longer re-triggers a sync. The loop yields the toncenter budget to an
 // in-flight send/confirm. The funds-critical send/confirm/nonce loops are SEPARATE and untouched.
-function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
+function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS, { manual = false } = {}) {
   clearMessageAutoSyncTimer();
   if (document.hidden) return;
   const transport = globalThis.plathoTonRpcTransport;
   const degradedTransport = typeof transport?.isDegraded === 'function' && transport.isDegraded();
   const requestedDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
-  const effectiveDelayMs = degradedTransport ? Math.max(requestedDelayMs, MESSAGE_AUTO_SYNC_DEGRADED_MS) : requestedDelayMs;
+  // A MANUAL "sync now" tap keeps the 1s floor but skips the degraded-transport backoff: the backoff
+  // protects the background cadence, while the tap is one explicit read the user is watching for —
+  // stretching it to MESSAGE_AUTO_SYNC_DEGRADED_MS read as "the sync button does nothing".
+  const effectiveDelayMs = degradedTransport && !manual ? Math.max(requestedDelayMs, MESSAGE_AUTO_SYNC_DEGRADED_MS) : requestedDelayMs;
   messageAutoSyncPhase = messageAutoSyncLastErrorLabel ? 'delayed' : (messageAutoSyncLastResult ? 'synced' : 'scheduled');
   messageAutoSyncAt = Date.now() + effectiveDelayMs;
   scheduleMessageAutoSyncCountdownUi();
@@ -13966,6 +15431,9 @@ function serializeMessageForHistory(message) {
     // nothing to rebuild the marks from on the next boot. MEASURED on the owner's dump — the first pass after a
     // reload still read `collected: 58, seqSkipped: 0`, fifty-eight decryptions to learn nothing.
     convShardAddress: message.convShardAddress ?? null,
+    // The send's seal second (attemptConvMessagePublishDirect) — what the record's clear-header createdAt is taken
+    // from on the echo's first write, so it matches the chain copy's signed time (ownSendStoredNear).
+    convSealedAtMs: message.convSealedAtMs ?? null,
     localCreatedAtMs: message.localCreatedAtMs ?? null,
     localHistoryCreatedAt: message.localHistoryCreatedAt ?? null,
     blocks: messageBlocksForHistory(message),
@@ -14111,21 +15579,28 @@ async function persistMessageToEncryptedHistory(thread, message) {
 async function writeMessageToEncryptedHistory(thread, message) {
   if (!encryptedMessageStore || !thread || !message) return null;
   ensureMessageOrderFields(message);
+  const firstWrite = !message.localHistoryId;   // a re-seal of the same record must not index its time twice
   try {
     const createdAt = messageCreatedAtMs(message) ?? Date.now();
+    // An own send's FIRST write carries the seal second (convSealedAtMs, stamped by attemptConvMessagePublishDirect
+    // before the bytes went out) rather than the composer moment: the header's createdAt is what ownSendStoredNear
+    // matches a chain copy's signed time against, and the two must agree to the second. A record already written
+    // keeps its createdAt, as before.
+    const sealedAt = Number(message.convSealedAtMs) > 0 ? Number(message.convSealedAtMs) : null;
     const stored = await encryptedMessageStore.putMessage({
       id: message.localHistoryId ?? undefined,
       threadId: thread.id,
       thread: serializeThreadForHistory(thread),
       message: serializeMessageForHistory(message),
-      createdAt: message.localHistoryCreatedAt ?? createdAt,
+      createdAt: message.localHistoryCreatedAt ?? sealedAt ?? createdAt,
     });
     message.localHistoryId = stored.id;
     message.localHistoryCreatedAt = stored.createdAt;
     // Keep the dedup set current: it is built from headers at boot, and without this a capsule stored during THIS
     // session would look unknown to the next re-delivery of the same sync.
     rememberStoredCapsuleIds(message);
-    rememberStoredOwnSend(thread.id, message, stored.createdAt);
+    // Same for the own-send time index (the header's createdAt IS stored.createdAt, so the two never disagree).
+    if (firstWrite && message.type === 'out') rememberStoredOwnSendTime(thread.id, stored.createdAt);
     const state = historyWindowState.get(thread.id);
     if (state) historyWindowState.set(thread.id, { ...state, stored: state.stored + 1, loaded: state.loaded + 1 });
     setText(localStateLabel, historyStatusLabel());
@@ -14249,41 +15724,16 @@ const PRIVATE_HISTORY_WINDOW = 96;
  */
 let storedCapsuleIds = new Set();
 
-// WHEN this device sent something, per thread — the OWN-SEND index the echo match falls back to OUTSIDE the loaded
-// window. findOwnEchoForChainCopy can only see the messages in memory (the newest PRIVATE_HISTORY_WINDOW per thread);
-// an own capsule older than that, read back off the outgoing shard on a manual full sync or a long catch-up, would
-// otherwise be inserted beside an echo that is in the store but not on screen. The clear header of every stored
-// record already carries type and createdAt, so the index costs no decryption: the send times of every 'out' record,
-// per thread, sorted. A chain copy of an own capsule whose signed time lands within a few seconds of a stored send in
-// the same thread IS that send (the echo and the capsule are stamped from the same clock, seconds apart at most).
-const OWN_SEND_TIME_SLACK_MS = 5_000;
-let storedOwnSendTimes = new Map();              // threadId -> sorted createdAt ms of stored 'out' messages
-
-function rememberStoredOwnSend(threadId, message, createdAtMs = null) {
-  if (!threadId || message?.type !== 'out') return;
-  const at = Number(createdAtMs ?? messageCreatedAtMs(message));
-  if (!Number.isFinite(at)) return;
-  const list = storedOwnSendTimes.get(threadId) ?? [];
-  let i = list.length;
-  while (i > 0 && list[i - 1] > at) i -= 1;
-  list.splice(i, 0, at);
-  storedOwnSendTimes.set(threadId, list);
-}
-
-function ownSendStoredNear(threadId, createdAtMs) {
-  const at = Number(createdAtMs);
-  if (!threadId || !Number.isFinite(at)) return false;
-  const list = storedOwnSendTimes.get(threadId);
-  if (!list || list.length === 0) return false;
-  let lo = 0;
-  let hi = list.length - 1;
-  while (lo < hi) {                                // first index with list[i] >= at - slack
-    const mid = (lo + hi) >> 1;
-    if (list[mid] < at - OWN_SEND_TIME_SLACK_MS) lo = mid + 1; else hi = mid;
-  }
-  return Math.abs(list[lo] - at) <= OWN_SEND_TIME_SLACK_MS
-    || (lo > 0 && Math.abs(list[lo - 1] - at) <= OWN_SEND_TIME_SLACK_MS);
-}
+/**
+ * Per thread, the ASCENDING record createdAt of every OUTGOING ('out') record the store holds — from the same clear
+ * headers as storedCapsuleIds, so no decryption. An own echo is stored WITHOUT a capsule id (the send never attaches
+ * one), so when my own capsule is read back from my outgoing shard and its echo is older than the loaded window,
+ * storedCapsuleIds cannot vouch for it; the only thing a header knows about an echo is WHEN it was sent — the seal
+ * second (convSealedAtMs, the copy's own signed time) for an echo first written after its send, the composer moment
+ * for one written earlier. Answers ownSendStoredNear (±CONV_OWN_ECHO_TIME_SLACK_MS), consulted only beyond the
+ * window (ownEchoStoredBeyondWindow).
+ */
+let storedOwnSendTimes = new Map();
 
 /**
  * Per thread: how much the store holds, how much is loaded, and the timestamp to page back from.
@@ -14339,7 +15789,16 @@ async function loadEarlierThreadHistory(thread) {
     });
   } finally {
     privateHistoryLoadingThreadId = null;
+    const strip = messageStrip;
+    const prevHeight = strip ? strip.scrollHeight : 0;
     renderConversation();
+    // renderConversation's own rAF restores the PRE-prepend scrollTop for a scrolled-up reader; one frame
+    // later add the height the older page inserted above, so the viewport keeps showing the same rows.
+    if (strip) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        strip.scrollTop += Math.max(0, strip.scrollHeight - prevHeight);
+      }));
+    }
   }
 }
 
@@ -14349,6 +15808,44 @@ function rememberStoredCapsuleIds(message) {
   for (const capsule of message.capsules ?? []) {
     if (capsule?.id) storedCapsuleIds.add(capsule.id);
   }
+}
+
+/** Rebuild storedOwnSendTimes from clear headers (boot restore). */
+function indexStoredOwnSendTimes(headers) {
+  const next = new Map();
+  for (const header of headers ?? []) {
+    if (header?.type !== 'out' || !header.threadId) continue;
+    const at = Number(header.createdAt);
+    if (!Number.isFinite(at) || at <= 0) continue;
+    if (!next.has(header.threadId)) next.set(header.threadId, []);
+    next.get(header.threadId).push(at);
+  }
+  for (const list of next.values()) list.sort((a, b) => a - b);
+  storedOwnSendTimes = next;
+}
+
+/** Add one own record's createdAt (a new send lands at the tail almost always, so the insert walks from the end). */
+function rememberStoredOwnSendTime(threadId, createdAt) {
+  const at = Number(createdAt);
+  if (!threadId || !Number.isFinite(at) || at <= 0) return;
+  const list = storedOwnSendTimes.get(threadId) ?? [];
+  let index = list.length;
+  while (index > 0 && list[index - 1] > at) index -= 1;
+  list.splice(index, 0, at);
+  storedOwnSendTimes.set(threadId, list);
+}
+
+/** Does the store hold an own record of this thread within ±slackMs of `atMs`? Binary search on the sorted list. */
+function ownSendStoredNear(threadId, atMs, slackMs = CONV_OWN_ECHO_TIME_SLACK_MS) {
+  const list = storedOwnSendTimes.get(threadId);
+  if (!list || list.length === 0 || !Number.isFinite(atMs)) return false;
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid] < atMs - slackMs) lo = mid + 1; else hi = mid;
+  }
+  return lo < list.length && list[lo] <= atMs + slackMs;
 }
 
 /** How many records the store holds for each thread, counted from headers — no decryption. */
@@ -14370,11 +15867,7 @@ function storedCountsByThread(headers) {
  */
 async function restoreHistoryWindows(headers) {
   storedCapsuleIds = new Set(headers.map((header) => header?.capsuleId).filter(Boolean));
-  // The own-send index, from the same clear headers (type + createdAt), for the echo match outside the window.
-  storedOwnSendTimes = new Map();
-  for (const header of headers) {
-    if (header?.type === 'out' && header?.threadId) rememberStoredOwnSend(header.threadId, { type: 'out' }, Number(header.createdAt));
-  }
+  indexStoredOwnSendTimes(headers);
   const counts = storedCountsByThread(headers);
   const messages = [];
   const failed = [];
@@ -15304,7 +16797,7 @@ const PLATHO_ACTIVATION_IN_FLIGHT_KEY = 'platho.accountActivation.inFlight.v1';
 // GUARANTEED dead, so a rebuild cannot double-execute.
 const PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS = 330_000;
 
-function rememberPlathoActivationInFlight(walletAddress, pendingBoc = null) {
+function rememberPlathoActivationInFlight(walletAddress, pendingBoc = null, pendingSeqno = null) {
   const raw = rawWalletAddress(walletAddress);
   if (!raw) return;
   try {
@@ -15312,14 +16805,14 @@ function rememberPlathoActivationInFlight(walletAddress, pendingBoc = null) {
     // stops a second fee; it does nothing to make the first activation arrive, so a tab the phone suspended left
     // the user waiting out the horizon and then pressing Activate again — which is what the second real user did.
     // Persisted, the same external can be re-broadcast on the next load: it is bound to its seqno, so the chain
-    // runs it at most once no matter how many copies reach it.
+    // runs it at most once no matter how many copies reach it. The seqno itself is kept so the re-send carries it.
     localStorageOrNull()?.setItem(PLATHO_ACTIVATION_IN_FLIGHT_KEY,
-      JSON.stringify({ wallet: raw, at: Date.now(), boc: pendingBoc ?? null }));
+      JSON.stringify({ wallet: raw, at: Date.now(), boc: pendingBoc ?? null, seqno: pendingSeqno ?? null }));
   } catch { /* private mode / quota: the in-memory flag still covers this tab */ }
 }
 
 /** The external still owed a delivery, or null. Same wallet, same horizon as the lock — one source of truth. */
-function plathoActivationPendingBoc() {
+function plathoActivationPendingExternal() {
   const raw = rawWalletAddress(plathoWallet?.address);
   if (!raw) return null;
   let record = null;
@@ -15327,7 +16820,11 @@ function plathoActivationPendingBoc() {
   catch { return null; }
   if (!record || record.wallet !== raw || typeof record.boc !== 'string' || !record.boc) return null;
   const age = Date.now() - Number(record.at ?? 0);
-  return (age >= 0 && age < PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS) ? record.boc : null;
+  return (age >= 0 && age < PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS) ? { boc: record.boc, seqno: record.seqno ?? null } : null;
+}
+
+function plathoActivationPendingBoc() {
+  return plathoActivationPendingExternal()?.boc ?? null;
 }
 
 /**
@@ -15349,12 +16846,13 @@ function forcePlathoActivationDelivery() {
   clearPlathoActivationForce();
   const knock = async () => {
     if (hasActivePlathoAccount()) { clearPlathoActivationForce(); return; }
-    const boc = plathoActivationPendingBoc();
-    if (!boc) { clearPlathoActivationForce(); return; }   // landed, expired, or another wallet — nothing owed
+    const pending = plathoActivationPendingExternal();
+    if (!pending?.boc) { clearPlathoActivationForce(); return; }   // landed, expired, or another wallet — nothing owed
     try {
       const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-      const rotated = await broadcastThroughNextDoor(boc);
-      if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc, walletAddress: plathoWallet?.address });
+      // The signed seqno rides along; the answer is still not read here — activation is confirmed by the account read below.
+      const rotated = await broadcastThroughNextDoor(pending.boc, { seqno: pending.seqno });
+      if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc: pending.boc, walletAddress: plathoWallet?.address, seqno: pending.seqno });
     } catch { /* a refused door proves nothing: an earlier copy may still land, so keep the schedule */ }
     try { await refreshVaultActivationStatus(); } catch { /* transient read */ }
   };
@@ -15390,6 +16888,49 @@ function plathoActivationInFlightForCurrentWallet() {
 // the external is still alive — is what made a user notice activation at all. Kept on ONE line because a gate
 // sums this list and compares it to the horizon; a comment inside the brackets turns that sum into NaN.
 const PLATHO_ACTIVATION_CONFIRM_DELAYS_MS = [0, 4_000, 6_000, 8_000, 12_000, 15_000, 20_000, 30_000, 40_000, 45_000, 65_000, 85_000];
+
+// ── ACTIVATION RE-READ LADDER (PWA-ACTIVATION-04) ──────────────────────────────────────────────────────────────
+//
+// refreshVaultActivationStatus treats every read failure that is not a definitive uninit shard as TRANSIENT and
+// leaves the binding alone — correct, and also the reason the row could sit on "keys pending" for as long as the
+// user stayed on the tab: nothing re-read activation except a transaction or a return to the tab. A registered
+// user who unlocked under a 429 therefore saw the composer gated on a stale binding until they happened to
+// background the app.
+//
+// So a transient failure now arms ONE re-read on a rising ladder (3s … 240s, ~8 minutes, seven reads in all).
+// A DEFINITE answer — registered or not, both write the binding — clears it; a wallet change clears it (the next
+// wallet's own refresh is queued by queueVaultRefreshAfterWalletChange); a lock clears it (nothing to read for).
+// Past the last rung it stays parked until one of those resets it: under a dead RPC this must be bounded, and the
+// tab-return / transaction triggers still read as before. Not gated on document.hidden — seven reads over eight
+// minutes are nothing, and the binding is what the composer gates on the moment the tab comes back.
+const PLATHO_ACTIVATION_REREAD_DELAYS_MS = [3_000, 8_000, 15_000, 30_000, 60_000, 120_000, 240_000];
+let plathoActivationRereadTimer = null;
+let plathoActivationRereadStep = 0;
+let plathoActivationRereadWallet = null;   // raw wallet the ladder is climbing for; a different wallet restarts it
+
+function clearPlathoActivationReread() {
+  if (plathoActivationRereadTimer) { clearTimeout(plathoActivationRereadTimer); plathoActivationRereadTimer = null; }
+  plathoActivationRereadStep = 0;
+  plathoActivationRereadWallet = null;
+}
+
+/** Arm the next rung for `forWalletRaw` (a raw address). One timer at a time; the read it fires re-arms on failure. */
+function schedulePlathoActivationReread(forWalletRaw) {
+  if (!forWalletRaw) return;
+  if (plathoActivationRereadWallet && plathoActivationRereadWallet !== forWalletRaw) clearPlathoActivationReread();
+  if (plathoActivationRereadTimer) return;   // a re-read is already on the clock; it advances the ladder itself
+  if (plathoActivationRereadStep >= PLATHO_ACTIVATION_REREAD_DELAYS_MS.length) return;   // exhausted: parked until a definite answer / wallet change
+  const delayMs = PLATHO_ACTIVATION_REREAD_DELAYS_MS[plathoActivationRereadStep];
+  plathoActivationRereadStep += 1;
+  plathoActivationRereadWallet = forWalletRaw;
+  plathoActivationRereadTimer = setTimeout(() => {
+    plathoActivationRereadTimer = null;
+    // The wallet this rung was armed for is gone (lock / switch): the ladder belongs to it, not to whoever is next.
+    if (rawWalletAddress(plathoWallet?.address) !== forWalletRaw) { clearPlathoActivationReread(); return; }
+    // Its own catch arms the next rung on another transient failure; a definite answer clears the ladder.
+    refreshVaultActivationStatus().catch(() => {});
+  }, delayMs);
+}
 
 async function waitForPlathoAccountActivation(stillWanted = () => true) {
   for (const delayMs of PLATHO_ACTIVATION_CONFIRM_DELAYS_MS) {
@@ -18513,10 +20054,24 @@ async function readJsonFile(file) {
   return JSON.parse(text);
 }
 
-const PLATHO_LOCAL_INDEXED_DB_NAMES = Object.freeze([
-  LEGACY_MESSAGE_HISTORY_DB_NAME,
-  LEGACY_REPLAY_DB_NAME,
+// EVERY base name a store in this codebase opens — legacy and current. Each is deleted in its three spellings (bare
+// legacy, deployment-scoped, deployment+wallet-scoped for the CURRENT wallet); other wallets' copies and anything a
+// future store adds are caught by the `platho-` prefix enumeration below.
+//
+// MEASURED 2026-08: "clear local data" deleted only the message history and the replay guard, so the sealed
+// conversation key store (WITH its per-conversation scan cursors), the INTRO lane's replay guard and the media caches
+// all survived the clear. Restoring a backup on top then re-used the stale cursors ("cleared, imported — five messages
+// again") and every INTRO came back as a replay (one red line per first contact). [PWA-CLEAR-01]
+const PLATHO_LOCAL_INDEXED_DB_BASE_NAMES = Object.freeze([
+  LEGACY_MESSAGE_HISTORY_DB_NAME,     // encrypted-message-store ('platho-local-message-history-v1')
+  LEGACY_REPLAY_DB_NAME,              // replay-store + intro-cursor-store share this DB ('platho-local-security-v1')
+  'platho-intro-replay-v1',           // the INTRO lane's own replay guard (currentIntroReplayDbName)
+  'platho-conv-keys-v1',              // sealed K_root store + scan cursors (currentConvKeyDbName)
+  'platho-profile-avatar-media-v1',   // avatar media cache (deployment-scoped)
+  'platho-public-comments-v1',        // public comment window snapshots (deployment-scoped)
+  'platho-public-post-media-v1',      // public post image media (deployment-scoped)
 ]);
+const PLATHO_LOCAL_INDEXED_DB_PREFIX = 'platho-';
 
 function deleteIndexedDbDatabase(name) {
   return new Promise((resolve) => {
@@ -18531,40 +20086,27 @@ function deleteIndexedDbDatabase(name) {
   });
 }
 
-// EVERY DATABASE THIS APP OWNS, and nothing short of it. "Clear local data" used to delete the message history and
-// the replay store only — and left the conversation KEY store (K_roots AND this device's scan cursors), the intro
-// replay store and the media caches in place. So a "cleared" device that imported its key again was not a fresh
-// device at all: the key store was non-empty, the recovery restore stood down as "authoritative", every
-// conversation kept its old cursor, and the first sync read the steady window — five messages, while a manual full
-// sync (which ignores cursors) brought the whole history [OWNER 2026-08-22, on the stand, after several rounds of
-// "cleared it, imported again, still five"]. Every store is prefixed `platho-`, so where the browser can enumerate,
-// everything under that prefix goes; where it cannot, the explicit list below names every store this wallet and
-// deployment can have created.
-const PLATHO_INDEXED_DB_PREFIX = 'platho-';
 async function plathoLocalIndexedDbNames() {
-  const names = new Set([
-    ...PLATHO_LOCAL_INDEXED_DB_NAMES,
-    currentMessageHistoryDbName(),
-    currentReplayDbName(),
-    currentConvKeyDbName(),
-    currentIntroReplayDbName(),
-    scopedIndexedDbName('platho-profile-avatar-media-v1'),
-    scopedIndexedDbName('platho-public-comments-v1'),
-    scopedIndexedDbName('platho-public-post-media-v1'),
-  ]);
+  // The explicit list first: it works on browsers that expose IndexedDB but cannot enumerate it, where the
+  // enumeration below is simply skipped. Deleting a name that does not exist is a no-op, so over-naming is free.
+  const names = new Set();
+  for (const baseName of PLATHO_LOCAL_INDEXED_DB_BASE_NAMES) {
+    names.add(baseName);
+    names.add(scopedIndexedDbName(baseName));
+    names.add(walletScopedIndexedDbName(baseName));
+  }
   if (globalThis.indexedDB?.databases) {
     try {
       const databases = await indexedDB.databases();
       for (const database of databases ?? []) {
         const name = database?.name;
-        if (typeof name !== 'string') continue;
-        if (name.startsWith(PLATHO_INDEXED_DB_PREFIX)) names.add(name);
+        if (typeof name === 'string' && name.startsWith(PLATHO_LOCAL_INDEXED_DB_PREFIX)) names.add(name);
       }
     } catch {
       // Some browsers expose IndexedDB but do not allow database enumeration.
     }
   }
-  return [...names].filter(Boolean);
+  return [...names];
 }
 
 function clearDocumentCookies() {
@@ -18788,6 +20330,10 @@ function ensureContactCtaCard() {
   if (privateContactCtaCard) return privateContactCtaCard;
   const card = document.createElement('article');
   card.className = 'feed-item discovery-cta contact-cta';
+  const glow = document.createElement('span');   // see buildDiscoveryCtaCard: the clipped glow layer
+  glow.className = 'discovery-cta-glow';
+  glow.setAttribute('aria-hidden', 'true');
+  card.append(glow);
   const head = document.createElement('div');
   head.className = 'discovery-cta-head';
   const badge = document.createElement('span');
@@ -18820,6 +20366,7 @@ function ensureContactCtaCard() {
 }
 
 function renderThreads() {
+  refreshChatsRailBadge();
   const q = search.value.trim().toLowerCase();
   threads.forEach(hydrateThreadDisplayFromContactStore);
   const visibleThreads = threads
@@ -18831,15 +20378,15 @@ function renderThreads() {
       // The LABEL, not the internal token: searching must match what the row shows, in the user's own language.
       return `${thread.name} ${thread.preview} ${threadStateLabel(thread)} ${threadIdentitySearchText(thread)}`.toLowerCase().includes(q);
     });
-  // My notes is PINNED first regardless of activity order — a partition at render time, so no array mutation
-  // (chain sync / history restore reorder `threads` freely and must not have to know about the pin). The other
-  // dialogs sort by RECENCY (newest activity first, threadLastActivityMs): an active chat rises to the top, a
-  // dormant one quietly drifts down — instead of the old insertion order where every NEW chat appeared LAST.
-  // Display-order only (a sorted copy): the `threads` array keeps its structural invariants untouched. The sort is
-  // stable, so dialogs with equal/unknown activity keep their relative order.
-  // ...and since 2026-08-21 the user's own PINS sit between the two: My notes, then pinned dialogs by recency, then
-  // the rest by recency. ONE rule, in thread-list-order.mjs, shared with the share-to-contact sheet.
-  const ordered = orderThreadsForList(visibleThreads, { isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs });
+  // ONE ordering rule for the list AND the share sheet — thread-list-order.mjs: My notes first, then PINNED dialogs by
+  // recency (threadLastActivityMs), then the rest by recency. A partition + stable sort on a COPY at render time, so
+  // no array mutation (chain sync / history restore reorder `threads` freely and must not have to know about pins).
+  // `thread.pinned` is the runtime mirror of the per-counterparty store flag (hydrate / setContactPinned).
+  const ordered = orderThreadsForList(visibleThreads, {
+    isSaved: isSavedMessagesThread,
+    isPinned: isThreadPinned,
+    lastActivityMs: threadLastActivityMs,
+  });
   // F3 (scale): keyed reconciliation instead of innerHTML='' + a full O(chats) teardown/rebuild. renderThreads runs
   // on every sync tick AND every search keystroke, so a user with hundreds of chats otherwise rebuilt every row
   // (avatar + identity label + a fresh click listener each) on each. Now existing rows are REUSED (matched by
@@ -19057,20 +20604,27 @@ function applyConversationStatusOnlyPatch(thread) {
   if (!snapshot || snapshot.threadId !== thread.id) return false;
   const messages = Array.isArray(thread.messages) ? thread.messages : [];
   if (snapshot.rows.length !== messages.length) return false;
-  if (!messageStrip || messageStrip.children.length !== messages.length) return false;
+  if (!messageStrip) return false;
+  // Only MESSAGE rows count — the day/unread separators and the "show earlier" control share the strip. The control's
+  // own state (present / loading) must match too, because it is only ever repainted by the full rebuild. [review]
+  const rowNodes = Array.from(messageStrip.children).filter((node) => node.classList.contains('message'));
+  if (rowNodes.length !== messages.length) return false;
+  const earlier = messageStrip.firstElementChild?.classList.contains('conversation-earlier-button') ? messageStrip.firstElementChild : null;
+  if (Boolean(earlier) !== threadHistoryHasMore(thread.id)) return false;
+  if (earlier && earlier.disabled !== (privateHistoryLoadingThreadId === thread.id)) return false;
   for (let i = 0; i < messages.length; i += 1) {
     const row = snapshot.rows[i];
     const message = messages[i];
     if (row.ref !== message) return false;
-    const metaText = messageMetaText(message);
+    const metaText = messageMetaLine(message);
     if ((metaText !== '') !== row.hasMeta) return false;
     if (Boolean(privateMessageShouldShowManualActions(message)) !== row.showManual) return false;
   }
   for (let i = 0; i < messages.length; i += 1) {
     const row = snapshot.rows[i];
     const message = messages[i];
-    const node = messageStrip.children[i];
-    const metaText = messageMetaText(message);
+    const node = rowNodes[i];
+    const metaText = messageMetaLine(message);
     if (metaText !== row.metaText) {
       row.metaText = metaText;
       node.dataset.status = messageStatusKey(message);
@@ -19091,6 +20645,123 @@ function applyConversationStatusOnlyPatch(thread) {
   return true;
 }
 
+// Rows that were already painted (identity-keyed: message objects are stable across repaints) and the thread they
+// belong to. A thread being opened is painted still; after that a row new to the strip — received or just sent —
+// surfaces (owner).
+const conversationSurfacedMessages = new WeakMap();
+let conversationSurfacedThreadId = null;
+
+// DATE SEPARATORS (owner): a rule split in the middle by the day — "Today" / "Yesterday" / "21 August" (+ year when it
+// differs) — before the first row of each day, and an accent "New messages" rule before the first unread row when a
+// thread opens with unread history (the open-scroll anchor already lands on that row). Separators are NOT rows: the
+// status-only fast path counts .message nodes only.
+function messageDayKey(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+function formatDaySeparatorLabel(ms) {
+  const d = new Date(ms);
+  const now = new Date();
+  const key = messageDayKey(ms);
+  if (key === messageDayKey(now.getTime())) return t('chat.today');
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (key === messageDayKey(yesterday.getTime())) return t('chat.yesterday');
+  const opts = d.getFullYear() === now.getFullYear()
+    ? { day: 'numeric', month: 'long' }
+    : { day: 'numeric', month: 'long', year: 'numeric' };
+  try { return new Intl.DateTimeFormat(currentLocale(), opts).format(d); } catch { return d.toLocaleDateString(); }
+}
+function buildStripSeparator(label, { unread = false } = {}) {
+  const node = document.createElement('div');
+  node.className = unread ? 'strip-separator is-unread' : 'strip-separator';
+  node.setAttribute('role', 'separator');
+  node.setAttribute('aria-label', label);
+  const span = document.createElement('span');
+  span.textContent = label;
+  node.append(span);
+  return node;
+}
+
+// EMPTY DIALOG (owner: "No messages yet", with some life and a nudge to write): a waving bubble that bobs over three
+// breathing dots, the title, a one-line hint and tappable openers that pre-fill the composer (never send). Saved notes
+// get their own hint and opener. Not a .message row, so the status-only fast path ignores it; the first message's
+// rebuild removes it.
+function buildEmptyConversationNode(thread) {
+  const saved = isSavedMessagesThread(thread);
+  const node = document.createElement('div');
+  node.className = 'conversation-empty';
+  const art = document.createElement('div');
+  art.className = 'conversation-empty-art';
+  const bubble = document.createElement('div');
+  bubble.className = 'conversation-empty-bubble';
+  bubble.textContent = saved ? '✍️' : '👋';
+  const dots = document.createElement('div');
+  dots.className = 'conversation-empty-dots';
+  for (let i = 0; i < 3; i += 1) { const dot = document.createElement('span'); dot.className = 'conversation-empty-dot'; dots.append(dot); }
+  art.append(bubble, dots);
+  const title = document.createElement('h3');
+  title.textContent = t('chat.emptyTitle');
+  const hint = document.createElement('p');
+  hint.textContent = saved ? t('chat.emptyNotesHint') : t('chat.emptyHint');
+  const chips = document.createElement('div');
+  chips.className = 'conversation-empty-chips';
+  const openers = saved ? [t('chat.emptyChipNote')] : [t('chat.emptyChipHello'), t('chat.emptyChipHow'), t('chat.emptyChipMinute')];
+  for (const text of openers) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'conversation-empty-chip';
+    chip.textContent = text;
+    chip.addEventListener('click', () => {
+      const input = typeof messageInput !== 'undefined' ? messageInput : null;
+      if (!input) return;
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      try { input.focus(); } catch { /* hidden composer */ }
+    });
+    chips.append(chip);
+  }
+  node.append(art, title, hint, chips);
+  return node;
+}
+
+// Total unread across the private list, on the "Private" tab button (owner). Reconciled in place.
+function refreshChatsRailBadge() {
+  const item = document.querySelector('.rail-item[data-tab="chats"]');
+  if (!item) return;
+  let total = 0;
+  for (const thread of threads) {
+    if (!thread || isTransientPendingResolutionThread(thread)) continue;
+    total += threadUnreadCount(thread);
+  }
+  let badge = item.querySelector('.rail-badge');
+  if (total <= 0) { if (badge) badge.remove(); return; }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'rail-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    item.append(badge);
+  }
+  badge.textContent = total > 99 ? '99+' : String(total);
+}
+// CHAT SWITCH ANIMATION (owner: "come up with an animation for switching chats"): opening a DIFFERENT dialog, the message strip
+// settles in from below and the header's avatar + title slide in from the left (chatSwapIn / chatHeadSwap). One-shot
+// classes: released on their own animationend (filtered by animation name — the strip also receives the bubbling
+// cardSurface ends of its rows), re-armed with a reflow so two quick switches restart the motion.
+const conversationHeaderNode = activeTitle?.closest('.conversation-header') ?? null;
+function playChatSwitchAnimation() {
+  for (const node of [messageStrip, conversationHeaderNode]) {
+    if (!node || node.clientHeight === 0) continue;   // hidden pane: nothing to show
+    node.classList.remove('is-chat-switching');
+    void node.offsetWidth;
+    node.classList.add('is-chat-switching');
+  }
+}
+for (const node of [messageStrip, conversationHeaderNode]) {
+  node?.addEventListener('animationend', (event) => {
+    if (event.animationName === 'chatSwapIn' || event.animationName === 'chatHeadSwap') node.classList.remove('is-chat-switching');
+  });
+}
 function renderConversation() {
   // The conversation pane only exists on the Private (chats) tab. Boot opens on Public and the background sync runs
   // on every tab, so without this guard we'd rebuild the whole strip — decoding every image — into a hidden pane on
@@ -19131,6 +20802,7 @@ function renderConversation() {
   // first unread message.
   const conversationThreadChanged = thread.id !== lastConversationThreadId;
   const conversationOpenUnreadCount = conversationThreadChanged ? threadUnreadCount(thread) : 0;
+  if (conversationThreadChanged) playChatSwitchAnimation();
   // Consume the "user just sent" flag exactly once (the send submit set it right before inserting the optimistic
   // message, so THIS render is the fresh own-send). Precise signal for abandoning the open-anchor — see the flag decl.
   const ownSendScrollToEnd = ownSendPendingRender;
@@ -19201,6 +20873,7 @@ function renderConversation() {
   // scroll writes, no rAF). Only a structural change (new message, manual-action flip) rebuilds.
   if (!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch(thread)) return;
   const conversationRenderSnapshotRows = [];
+  if (conversationEarlierObserver) conversationEarlierObserver.disconnect();
   messageStrip.innerHTML = '';
   // Older messages live on disk outside the loaded window. The control goes ABOVE the first row, where the reader
   // is already looking when they scroll up, and appears only when the store really has more — a button that
@@ -19215,10 +20888,29 @@ function renderConversation() {
     earlier.disabled = privateHistoryLoadingThreadId === thread.id;
     earlier.addEventListener('click', () => { loadEarlierThreadHistory(thread).catch((error) => console.error(error)); });
     messageStrip.append(earlier);
+    // Auto-page: scrolling up to the control loads the page without a tap (the observer just clicks it; the
+    // disabled state while loading makes a repeat fire a no-op). Without IntersectionObserver it stays a button.
+    if (conversationEarlierObserver) conversationEarlierObserver.observe(earlier);
   }
+  const surfaceNewRows = conversationSurfacedThreadId === thread.id;
+  conversationSurfacedThreadId = thread.id;
+  let surfacingRows = 0;
+  let lastDayKey = null;
   thread.messages.forEach((message) => {
+    const rowMs = messageCreatedAtMs(message);
+    const dayKey = messageDayKey(rowMs);
+    if (dayKey && dayKey !== lastDayKey) {
+      messageStrip.append(buildStripSeparator(formatDaySeparatorLabel(rowMs)));
+      lastDayKey = dayKey;
+    }
+    if (message === conversationOpenFirstUnreadRef) messageStrip.append(buildStripSeparator(t('chat.newMessages'), { unread: true }));
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
+    if (surfaceNewRows) {
+      if (surfaceRow(row, conversationSurfacedMessages, message, surfacingRows)) surfacingRows += 1;
+    } else if (!conversationSurfacedMessages.has(message)) {
+      conversationSurfacedMessages.set(message, { at: -1e9, delay: 0 });   // painted still on thread open
+    }
     // Chain anchor: the swipe-to-reply gesture reads it as the reply ref, and reply quotes scroll to it. A
     // not-yet-confirmed optimistic message has none — replying to it is gated until the entry id lands.
     if (message.chainEntryId !== undefined && message.chainEntryId !== null) row.dataset.entryId = String(message.chainEntryId);
@@ -19291,7 +20983,7 @@ function renderConversation() {
       bubble.append(image);
     }
     const manualActions = privateMessageManualActionsElement(thread, message);
-    const metaText = messageMetaText(message);
+    const metaText = messageMetaLine(message);
     if (metaText) {
       row.dataset.status = messageStatusKey(message);
       const meta = document.createElement('div');
@@ -19316,6 +21008,7 @@ function renderConversation() {
     });
   });
   lastConversationRenderSnapshot = { threadId: thread.id, rows: conversationRenderSnapshotRows };
+  if (thread.messages.length === 0 && !threadHistoryHasMore(thread.id)) messageStrip.append(buildEmptyConversationNode(thread));
 
   // Open burst: apply the anchor SYNCHRONOUSLY now (reading scrollHeight/getBoundingClientRect forces the layout), so
   // the NEXT render in the burst reads the correct scrollTop at its entry instead of a transient 0 — the fix for a
@@ -20097,6 +21790,17 @@ async function runManualPrivateMessageSync() {
   }
 }
 
+publicDiscoverySearch?.addEventListener('input', () => {
+  publicDiscoveryQuery = publicDiscoverySearch.value.trim();
+  renderPublicDiscovery({ loading: false });
+});
+publicDiscoverySearch?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !publicDiscoverySearch.value) return;
+  event.preventDefault();
+  publicDiscoverySearch.value = '';
+  publicDiscoveryQuery = '';
+  renderPublicDiscovery({ loading: false });
+});
 publicChannelSearch?.addEventListener('input', () => {
   publicChannelSearchQuery = publicChannelSearch.value;
   publicFeedShownCap = PUBLIC_FEED_RENDER_CAP; // a new query is a fresh result set — render from the newest cap again
@@ -21671,7 +23375,7 @@ async function showReceiveWalletTonDialog() {
       render: () => createWalletReceiveQrNode(address),
     }],
     summary: [
-      { label: t('common.network'), value: appConfig.network?.label ?? appConfig.network?.chain ?? 'TON' },
+      { label: t('common.network'), value: appConfig.network?.label ?? appConfig.network?.chain ?? 'GRAM' },
       { label: t('wallet.destination'), value: t('wallet.localPlathoWallet') },
     ],
   });
@@ -21867,9 +23571,15 @@ async function exportEncryptedWalletKeyFile(alreadyUnlocked = null) {
   return true;
 }
 
-async function activateImportedEncryptedWalletRecord(wallet, record) {
+async function activateImportedEncryptedWalletRecord(wallet, record, { toncenterApiKey = null } = {}) {
   prepareWalletScopedRuntimeForWallet(wallet, 'wallet key imported');
   await writeEncryptedPlathoWalletRecord(record);
+  // THE IMPORT'S POINT OF NO RETURN — the record is written. A toncenter key carried by the backup (v2+/v3) is applied
+  // HERE, not before the write: applyToncenterApiKey overwrites the device key and rebuilds the transports irreversibly,
+  // and applied ahead of the write it survived an activation that threw before the record was committed (a failed
+  // setItem) — the OLD wallet stayed stored, under the NEW key. Still ahead of the first chain read (bootCrypto below),
+  // which is all the pre-read placement was for (PWA-WALLET-REPLACE-03).
+  if (toncenterApiKey) applyToncenterApiKey(toncenterApiKey);
   plathoWallet = wallet;
   // Importing an encrypted wallet-key backup proves the key is already backed up (the file IS the export), so
   // clear any "key never exported" pending flag for this address -- in localStorage AND its Telegram CloudStorage
@@ -21897,17 +23607,16 @@ async function importEncryptedWalletKeyFile(file) {
     submitLabel: t('wallet.importWalletKey'),
   });
   if (!wallet) return false;
-  if (!(await confirmWalletReplacement(t('wallet.importWalletKey')))) return false;
-  // THE KEY FIRST, THEN THE BOOT. v2+ backups carry the user's own toncenter API key, and it used to be restored
-  // AFTER activateImportedEncryptedWalletRecord returned — which is the whole first boot: the activation read, the
-  // recovery restore, the cold sync of every conversation, all of it knocking on toncenter KEYLESS while a key sat
-  // in the very file being imported, and the Profile field stayed empty until that boot was over (minutes, on a
-  // restored device). [OWNER 2026-08-22: "the RPC key did not show up after importing the wallet key; it should be
-  // applied as early as possible so the app does not hit toncenter keyless when it has one".] The wallet is already
-  // decrypted here, so the key can be too — applyToncenterApiKey stores it, rebuilds the transports and paints the
-  // field before a single chain read of this wallet is made. v1 backups (no key) skip this; keyless works either way.
+  // v2+ backups also carry the user's own toncenter API key — restore it so importing the wallet key on a new device
+  // brings the RPC key too. v1 backups (no key) skip this. Keyless toncenter works either way.
+  //
+  // DECRYPTED HERE, APPLIED BELOW, BEFORE THE FIRST CHAIN READ (PWA-WALLET-REPLACE-03). This used to run AFTER
+  // activateImportedEncryptedWalletRecord — i.e. after the whole first boot of the imported wallet (activation read,
+  // private sync, avatar, vault refresh) had gone out KEYLESS through the ~1 rps emergency queue, with the profile's
+  // key field still empty the whole time. The key needs nothing but the just-decrypted wallet (v3 encrypts it under
+  // the seed), so it is ready before anything touches the network. A backup whose key does not decrypt still imports.
+  let restoredApiKey = null;
   if (parsed?.kind === PLATHO_WALLET_KEY_BACKUP_KIND) {
-    let restoredApiKey = null;
     if (parsed.toncenterApiKeyEnc) {
       // v3: encrypted under the wallet seed — decrypt with the just-unlocked wallet.
       try { restoredApiKey = await decryptToncenterApiKeyFromBackup(parsed.toncenterApiKeyEnc, wallet); }
@@ -21915,9 +23624,12 @@ async function importEncryptedWalletKeyFile(file) {
     } else if (typeof parsed.toncenterApiKey === 'string' && parsed.toncenterApiKey.trim()) {
       restoredApiKey = parsed.toncenterApiKey.trim(); // v2 legacy plaintext backups
     }
-    if (restoredApiKey && restoredApiKey.trim()) applyToncenterApiKey(restoredApiKey.trim());
   }
-  return activateImportedEncryptedWalletRecord(wallet, record);
+  if (!(await confirmWalletReplacement(t('wallet.importWalletKey')))) return false;
+  // Past the confirm only, and applied by the activation itself once the record is written (its point of no return):
+  // a declined OR failed import must not change the device's RPC key. applyToncenterApiKey drops and rebuilds the
+  // transports there, ahead of bootCrypto, so every chain read of the activation still rides the restored key.
+  return activateImportedEncryptedWalletRecord(wallet, record, { toncenterApiKey: restoredApiKey?.trim() || null });
 }
 
 /**
@@ -22945,8 +24657,13 @@ function refreshNavVaultBalance() {
       container.classList.remove('rail-vault-balance-reveal');
       container.setAttribute('aria-hidden', 'true');
     }
+    // Mobile tab bar: with no known balance the plate cell is dropped entirely, so the four tabs center
+    // across the full width; the class puts the cell back the moment a balance exists (owner request —
+    // no :has() per the iOS floor rule, so the state rides a JS-toggled ancestor class).
+    document.querySelector('.sidebar')?.classList.remove('has-vault-balance');
     return;
   }
+  document.querySelector('.sidebar')?.classList.add('has-vault-balance');
   for (const container of navVaultBalanceContainers) {
     if (container.classList.contains('is-pending')) {
       container.classList.remove('is-pending');
@@ -23372,20 +25089,23 @@ function scheduleVaultAutoRefresh(delayMs = VAULT_AUTO_REFRESH_MS) {
   }, effectiveDelayMs);
 }
 
-// What the refresh in flight was asked for. A caller who asks for MORE than that (activation, stats) must not be
-// handed the running promise as if it covered them — that was how a return-to-tab activation read could be
-// swallowed by a balance-only auto-refresh already running: the caller got "done", and activation was never read.
-let vaultRefreshInFlightFlags = null;
-
 async function refreshVaultNow({ includeActivation = false, includeStats = false } = {}) {
   if (vaultRefreshPromise) {
-    const covered = vaultRefreshInFlightFlags
-      && (!includeActivation || vaultRefreshInFlightFlags.includeActivation)
-      && (!includeStats || vaultRefreshInFlightFlags.includeStats);
-    if (covered) return vaultRefreshPromise;
-    // Not covered: run the wanted jobs AFTER the one in flight settles (still one refresh at a time).
-    const wanted = { includeActivation, includeStats };
-    return vaultRefreshPromise.then(() => refreshVaultNow(wanted), () => refreshVaultNow(wanted));
+    // WHAT THE RUNNING REFRESH WAS ASKED FOR. This is single-flight, and it used to hand a late caller the running
+    // promise regardless of what that refresh covered — a "read activation too" request arriving while a balance-
+    // only refresh ran got the balance-only promise back, and its activation read simply never happened. Now the
+    // late caller TOPS UP: it waits for the running refresh, then runs ONLY the jobs it did not cover
+    // (PWA-ACTIVATION-04). Nothing overlaps — the running refresh keeps the lock; the delay(0) hop is its release
+    // (`finally` below clears the lock a microtask after the work settles; a same-tick follow-up would still see
+    // the stale lock and be handed the old promise again).
+    const running = vaultRefreshInFlightFlags ?? { includeActivation: false, includeStats: false };
+    const missingActivation = includeActivation && !running.includeActivation;
+    const missingStats = includeStats && !running.includeStats;
+    if (!missingActivation && !missingStats) return vaultRefreshPromise;
+    return vaultRefreshPromise
+      .catch(() => null)
+      .then(() => delay(0))
+      .then(() => refreshVaultNow({ includeActivation: missingActivation, includeStats: missingStats }));
   }
   vaultRefreshInFlightFlags = { includeActivation, includeStats };
   const vaultWork = (async () => {
@@ -23476,7 +25196,6 @@ function queueVaultRefreshAfterWalletChange() {
   // A pending activation belongs to the previous wallet; never carry the in-flight
   // lock across a wallet switch (the new wallet's activation state is read fresh).
   plathoAccountActivationPending = false;
-  clearPlathoActivationReread();                           // the re-read ladder was for the previous wallet
   // The WRITTEN marker is deliberately left alone: it names the wallet that sent the external, so it cannot bleed
   // onto the new one, and switching back inside the horizon must still find its activation protected.
   markNavVaultBalancePending('wallet changed', {
@@ -23599,6 +25318,11 @@ async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry,
 // local storage alone and the reads happen when the dialog opens. Two getters on every refresh to render a row
 // nobody had opened is exactly what the ATH-flush row cost, and it was deleted this morning for it.
 let ownedUsernameNftsInFlight = false;
+// ONE real read per wallet per session, behind the row's first paint (scheduleOwnedUsernameNftsSessionCheck below):
+// the remembered list is only a FLOOR and the row quoted it as fact until the dialog was opened — a name transferred
+// away from another wallet app kept showing as owned. Keyed by raw wallet; a rate-limited attempt is not counted.
+const OWNED_USERNAME_NFTS_SESSION_CHECK_DELAY_MS = 6_000;
+const ownedUsernameNftsSessionChecked = new Set();
 // [OWNER 2026-08-09] The last CHAIN-VERIFIED count. Without it the row kept claiming four names straight after the
 // dialog had just shown three: the row read local storage while the dialog read the chain, so the app displayed a
 // number it had itself disproved seconds earlier. The dialog does the expensive work; throwing its answer away was
@@ -23623,10 +25347,46 @@ function renderMyUsernamesStatus() {
       : t('username.knownNamesPartial', { count: String(count) }), '');
     return;
   }
-  // Nothing verified yet this session — what the device remembers, and no chain read to find out. Two getters per
+  // Nothing verified yet this session — what the device remembers, painted NOW, and ONE real check scheduled behind
+  // this first paint (once per wallet per session). The refresh itself still adds no chain read — two getters per
   // wallet refresh to render a row nobody had opened is what the ATH-flush row cost, and it was deleted for it.
   const known = readKnownPlathoUsernames().length;
   setProfileActionStatus(myUsernamesStatus, known > 0 ? tPlural('username.knownNames', known) : t('username.openList'), '');
+  scheduleOwnedUsernameNftsSessionCheck();
+}
+
+// The session's one real read of the owned names (loadOwnedUsernameNfts: floor + indexer, every item chain-verified,
+// memory reconciled), deferred past the post-unlock burst and serialized on the username-hygiene lane so it never runs
+// beside another username resolve (the v509 iOS run-loop class). Skipped when the dialog already did the read this
+// session; a rate-limited attempt re-arms on the next paint; any other failure counts (the dialog re-reads on open).
+function scheduleOwnedUsernameNftsSessionCheck() {
+  const owner = rawWalletAddress(plathoWallet?.address);
+  if (!owner || ownedUsernameNftsSessionChecked.has(owner) || ownedUsernameNftsInFlight) return;
+  ownedUsernameNftsSessionChecked.add(owner);
+  setTimeout(() => {
+    queueUsernameHygiene(async () => {
+      if (rawWalletAddress(plathoWallet?.address) !== owner) { ownedUsernameNftsSessionChecked.delete(owner); return; }
+      if (ownedUsernameNftsInFlight || ownedUsernameNftsVerified) return;
+      if (tonRpcLimited()) { ownedUsernameNftsSessionChecked.delete(owner); return; }
+      ownedUsernameNftsInFlight = true;
+      renderMyUsernamesStatus();
+      try {
+        await loadOwnedUsernameNfts();
+        // A rate-limited read comes back complete:false through the caught paths inside the loader, never via the
+        // catch below — without this the row quoted "N+" for the whole session and the check never re-armed.
+        if (ownedUsernameNftsVerified?.complete === false && tonRpcLimited()) {
+          ownedUsernameNftsVerified = null;
+          ownedUsernameNftsSessionChecked.delete(owner);
+        }
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) ownedUsernameNftsSessionChecked.delete(owner);
+        else console.warn('[username] owned-names session check failed', error);
+      } finally {
+        ownedUsernameNftsInFlight = false;
+        renderMyUsernamesStatus();
+      }
+    });
+  }, OWNED_USERNAME_NFTS_SESSION_CHECK_DELAY_MS);
 }
 
 /** Verify one item address on chain: authoritative, and owned by this wallet. */
@@ -23650,12 +25410,14 @@ async function loadOwnedUsernameNfts() {
   const registryProvider = await resolveUsernameRegistryProvider();
 
   // The floor: names this device already knows. Derived to item addresses locally, then confirmed like any other.
-  // A DERIVATION THAT FAILED IS NOT A NAME THAT IS GONE. This used to swallow the failure (`.catch(() => null)`)
-  // and carry on: the name was simply absent from the list, the list still said "complete", and the reconcile below
-  // forgot the name — and unlinked it if it was the linked one. [OWNER 2026-08-22: "sometimes at unlock the linked
-  // username does not load" — the boot check, 1.5 s after the first paint, on a transient read.] A failed
-  // derivation now leaves the list INCOMPLETE, the way a failed verification already does.
   const candidateAddresses = [];
+  // A remembered name whose item address could not even be DERIVED (registry getter failed) was never checked, so the
+  // read is not complete — the reconcile below must not forget a name it never asked about. A label the derivation
+  // REJECTS (null: not a legal name) is different: nothing on chain can own it, it is simply not a candidate.
+  // COUNTED, and handed to collectOwnedUsernameNfts as `candidateFailures`, so `complete` is decided in ONE place
+  // (PWA-MYNAMES-01). The first version swallowed this throw (.catch(() => null)): the name was merely absent from a
+  // read that then called itself complete, reconcileKnownPlathoUsernames forgot it, and the LINKED name "sometimes
+  // dropped on unlock" — on nothing but a failed getter.
   let candidateFailures = 0;
   for (const label of readKnownPlathoUsernames()) {
     let candidate = null;
@@ -23681,70 +25443,70 @@ async function loadOwnedUsernameNfts() {
     console.warn('username nft discovery unavailable', error);
   }
 
-  const collected = await collectOwnedUsernameNfts({
+  const result = await collectOwnedUsernameNfts({
     ownerWallet: wallet,
     candidateAddresses,
+    candidateFailures,   // a name not asked about is not "not owned": folded into `complete` by the collector
     indexerAddresses,
     indexerError,
     verifyItem: verifyOwnedUsernameNft,
   });
-  const result = candidateFailures > 0 ? { ...collected, complete: false, candidateFailures } : collected;
+  // RECONCILE THE MEMORY WITH THE CHAIN. The remembered list is what the row quotes before the dialog opens, so a name
+  // transferred away kept showing until this very read disproved it — and then the memory was left as it was. Now the
+  // read writes back: remember what was found, and forget ONLY what the chain proved transferred (result.transferred)
+  // — never "whatever a complete read did not find": absence is not proof (UNFT-11 / PWA-MYNAMES-01).
+  reconcileKnownPlathoUsernames(result, wallet);
   // KEEP the answer. This is the only place in the app that knows how many names the chain will vouch for, and the
   // row above it used to go on quoting local storage regardless.
   ownedUsernameNftsVerified = { count: result.owned.length, complete: result.complete };
-  // AND RECONCILE WHAT THE DEVICE REMEMBERS. The row's cold number comes from the remembered list; this read is the
-  // chain's word on it. A COMPLETE read (indexer answered, every item verified) may forget a name that is no longer
-  // owned — transferred away from another device, or here before the transfer path learned to forget — and must
-  // remember one that was found. An incomplete read may only ADD. [OWNER 2026-08-21: "I had five names, gave one
-  // away; the dialog shows four and fixes the row, and after a reload the row says five again."]
-  reconcileKnownPlathoUsernames(result);
   return result;
 }
 
-function reconcileKnownPlathoUsernames(result) {
-  const owner = plathoWallet?.address;
-  if (!owner || !Array.isArray(result?.owned)) return;
-  const ownedLabels = new Set(result.owned.map((nft) => (typeof nft?.label === 'string' ? nft.label.trim() : '')).filter(Boolean));
-  for (const label of ownedLabels) addKnownPlathoUsername(label, owner);
-  // FORGET ONLY ON PROOF. A name is forgotten — and unlinked, if it was the linked one — only when the chain showed
-  // its item authoritative and OWNED BY ANOTHER WALLET (`transferred`), never on mere absence from the list:
-  // absence has transient causes (a derivation that failed, an item read as not initialised, a mismatch on a
-  // lagging replica), and on 2026-08-22 one of them cost the owner his linked name at unlock "sometimes". The
-  // 2026-08-21 case this exists for — a name given away from another device — is exactly a transferred item, so
-  // it is still forgotten; a complete list is still required, so half an answer forgets nothing.
-  if (result.complete !== true) return;
-  const transferredLabels = new Set((result.transferred ?? []).map((nft) => (typeof nft?.label === 'string' ? nft.label.trim() : '')).filter(Boolean));
-  for (const label of readKnownPlathoUsernames(owner)) {
-    if (ownedLabels.has(label) || !transferredLabels.has(label)) continue;
-    removeKnownPlathoUsername(label, owner);
-    // The linked name is a remembered name too: the chain says it is someone else's now, and the client must stop
-    // stamping it onto what it sends (the transfer path's own rule, FM-4).
-    if (readLinkedPlathoUsername(owner)?.label === label) clearLinkedPlathoUsername(owner);
+// The write-back half of loadOwnedUsernameNfts. Labels are compared canonically (".ath" stripped, lower-case) because
+// the memory stores "<name>.ath" (the linked-name form) while an owned item carries the bare name. Entries still owned
+// keep their stored spelling; new finds are stored in the linked-name form.
+//   owned       -> added to the stored quick-pick list (complete or not: a name the chain vouches for is a fact);
+//   transferred -> removed from it — the ONLY thing that removes anything. The chain read the item as authoritative
+//                  under ANOTHER wallet and this side proved the label by name_hash (UNFT-11). A name merely absent
+//                  from the owned list — a failed derivation, a check that threw, an indexer that answered short,
+//                  even a "complete" read that did not meet it — is NOT forgotten: "not found" was never "not owned",
+//                  and acting on it is what made the linked name "sometimes drop on unlock" (PWA-MYNAMES-01).
+// The LINKED name is never cleared here either. If it is among the transferred, its verified_at stamp is zeroed and
+// the authoritative reconcile (reconcileOwnLinkedUsername: re-verifies, falls back to another owned name, never strips
+// on a degraded read) is queued — the single chokepoint that already knows how to give a name up safely.
+function reconcileKnownPlathoUsernames(result, owner = plathoWallet?.address) {
+  if (!result || !Array.isArray(result.owned) || !owner) return;
+  const canonical = (label) => canonicalUsernameDisplay(String(label ?? '')).trim().toLowerCase();
+  const found = new Set(result.owned.map((nft) => canonical(nft.label)).filter(Boolean));
+  const lost = new Set((Array.isArray(result.transferred) ? result.transferred : []).map((nft) => canonical(nft.label)).filter(Boolean));
+  const key = knownPlathoUsernamesStorageKey(owner);
+  if (!key) return;
+  let stored = [];
+  try {
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? '[]');
+    if (Array.isArray(parsed)) stored = parsed.filter((label) => typeof label === 'string' && label.trim());
+  } catch {
+    stored = [];
   }
-}
-
-// ONE REAL CHECK PER SESSION, AT LOAD. [OWNER 2026-08-21: "at app load it would be good to check the real number
-// of usernames."] The row used to quote the remembered list until the dialog was opened, so a
-// name given away elsewhere stayed counted across reloads. This runs the same verified read the dialog runs, once
-// per wallet per session, after the first paint — not on every wallet refresh (two getters per name per refresh is
-// what the ATH-flush row cost, and it was deleted for it).
-let ownedUsernameNftsCheckedFor = null;
-function scheduleOwnedUsernamesBootCheck() {
-  const address = plathoWallet?.address ?? null;
-  if (!address || ownedUsernameNftsCheckedFor === address || ownedUsernameNftsInFlight) return;
-  ownedUsernameNftsCheckedFor = address;
-  setTimeout(() => {
-    if (plathoWallet?.address !== address || ownedUsernameNftsInFlight) return;
-    ownedUsernameNftsInFlight = true;
-    renderMyUsernamesStatus();
-    loadOwnedUsernameNfts()
-      .catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[username] boot check failed', error); })
-      .finally(() => {
-        ownedUsernameNftsInFlight = false;
-        renderMyUsernamesStatus();
-        renderWalletIdentity();
-      });
-  }, 1_500);
+  // Forget by PROOF only (see above). One item has one owner, so a name cannot be both owned and transferred in one
+  // read; should two proposals ever disagree, the chain-owned answer wins — `found` is checked first.
+  const kept = stored.filter((label) => found.has(canonical(label)) || !lost.has(canonical(label)));
+  const known = new Set(kept.map(canonical));
+  for (const name of found) {
+    if (known.has(name)) continue;
+    known.add(name);
+    kept.push(`${name}.ath`);
+  }
+  try {
+    localStorageOrNull()?.setItem(key, JSON.stringify(kept.slice(0, 24)));
+  } catch {
+    // Cosmetic quick-pick list; safe to drop on a storage failure.
+  }
+  const linked = readLinkedPlathoUsername(owner);
+  if (linked?.label && lost.has(canonical(linked.label)) && !found.has(canonical(linked.label))) {
+    writeLinkedPlathoUsername({ ...linked, verified_at: 0 }, owner); // expire the throttle: verify, don't assume
+    queueUsernameHygiene(() => reconcileOwnLinkedUsername());
+  }
 }
 
 function usernameNftCardNode(nft, onTransfer) {
@@ -23757,7 +25519,7 @@ function usernameNftCardNode(nft, onTransfer) {
   // (Chrome < 88, the WebView many Telegram clients ship) gives the on-chain SVG — which carries a viewBox but no
   // width/height, so it has no intrinsic pixel height — a height of ZERO under `width:100%`, and the art collapses
   // to a sliver. The frame's height comes from padding-bottom:100% instead, which every engine has always honoured,
-  // and the <img> fills it absolutely; nothing depends on aspect-ratio any more.
+  // and the <img> fills it absolutely; nothing depends on aspect-ratio any more. [PWA-NFTART-01]
   const frame = document.createElement('div');
   frame.className = 'nft-card-art-frame';
   frame.hidden = !nft.image;
@@ -24407,7 +26169,7 @@ async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
   // fee a second time nor abandons the copy already paid for. `pendingBoc` is the LAST chunk's — the one that may
   // still be in flight when the send call returns; the top-level `boc` is the first chunk's and would re-send the
   // wrong bytes.
-  rememberPlathoActivationInFlight(ownerWallet, result?.result?.pendingBoc ?? result?.result?.boc ?? null);
+  rememberPlathoActivationInFlight(ownerWallet, result?.result?.pendingBoc ?? result?.result?.boc ?? null, result?.result?.pendingSeqno ?? result?.result?.seqno ?? null);
   forcePlathoActivationDelivery();
   vaultDraftStatus.textContent = t('vault.activationSent');
   queueVaultPostTransactionRefresh({ pollActivation: true });
@@ -25209,9 +26971,16 @@ async function attemptIntroFirstContactDirect(context) {
   let sendState = message.introDirectSend;
   if (sendState?.boc && (Date.now() - sendState.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
     // Through the NEXT door, not the one that already has these bytes: a retry exists because the first entry point
-    // did not get them into a block, so re-knocking there is the one thing we know did not work.
-    const rotated = await broadcastThroughNextDoor(sendState.boc);
-    if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc: sendState.boc, walletAddress: plathoWallet.address });
+    // did not get them into a block, so re-knocking there is the one thing we know did not work. Once the chain has
+    // moved past the signed seqno the re-sends STOP (the bytes can never execute now); the created_at confirm below
+    // still runs, so an INTRO that did land is adopted and one that did not fails honestly — the old external is
+    // never rebuilt before its validity window closes (a re-mint double-charges and can fork).
+    if (!(Number(sendState.seqnoConsumedAt) > 0)) {
+      const answer = await rebroadcastSignedExternal(sendState.boc, sendState.seqno ?? null, transport);
+      if (answer.verdict === BROADCAST_VERDICT.REJECTED && await directSendSeqnoConsumed(sendState, transport)) {
+        sendState.seqnoConsumedAt = Date.now();
+      }
+    }
   } else {
     // FRESH mint + publish (first attempt, or the prior external has expired so a re-mint cannot double-execute).
     // Resolve the recipient's FULL bundle from their KeyShard (by the wallet the thread targets — a KeyShard is
@@ -25271,8 +27040,9 @@ async function attemptIntroFirstContactDirect(context) {
     try {
       const result = await publishIntroLane({ wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE });
       pending.boc = result?.result?.boc ?? null;
+      pending.seqno = result?.result?.seqno ?? null;   // an INTRO is one message = one external: top-level seqno is its seqno
     } catch (error) {
-      if (!pending.boc && error?.builtBoc) pending.boc = error.builtBoc;
+      if (!pending.boc && error?.builtBoc) { pending.boc = error.builtBoc; pending.seqno = error.builtSeqno ?? null; }
       throw error;
     }
     sendState = pending;
@@ -25384,6 +27154,48 @@ function markDirectSendBroadcast(thread, message, options = {}) {
   refreshMessagingControls();
 }
 
+/**
+ * ONE re-broadcast of already-signed bytes, through the carousel (or the primary when no doors are configured), that
+ * REPORTS THE DOOR'S VERDICT instead of swallowing it. Never throws: a refused or broken door proves nothing about
+ * delivery. `seqno` is the seqno the bytes were signed for; it rides with the POST so the answer can be read against it.
+ * Returns { verdict, status, exitCode, door, error } — verdict is one of BROADCAST_VERDICT; exitCode is the TVM code a
+ * chain rejection carried (broadcastThroughNextDoor / error.chainExitCode), or null — the public lane reads it.
+ */
+async function rebroadcastSignedExternal(boc, seqno, transport) {
+  const rotated = await broadcastThroughNextDoor(boc, { seqno: seqno ?? null });
+  if (rotated) return { verdict: rotated.verdict ?? BROADCAST_VERDICT.UNKNOWN, status: rotated.status ?? null, exitCode: rotated.exitCode ?? null, door: rotated.door ?? null, error: null };
+  // DOORS-07: the primary sendBoc is a FALLBACK, reached only when no door is configured — never a second knock.
+  if (!transport?.sendBoc || !plathoWallet?.address) return { verdict: BROADCAST_VERDICT.UNKNOWN, status: null, exitCode: null, door: null, error: null };
+  try {
+    await transport.sendBoc({ boc, walletAddress: plathoWallet.address, seqno: seqno ?? null });
+    return { verdict: BROADCAST_VERDICT.ACCEPTED, status: 200, exitCode: null, door: 'primary', error: null };
+  } catch (error) {
+    return { verdict: error?.broadcastVerdict ?? BROADCAST_VERDICT.UNKNOWN, status: error?.status ?? null, exitCode: error?.chainExitCode ?? null, door: 'primary', error };
+  }
+}
+
+/**
+ * A DOOR SAID NO — is the signed seqno still open, or already spent? ONE fresh seqno read, on a rejection only.
+ *
+ * MEASURED on the owner's wallet: an external signed for N+1 while a recovery backup took N+1 from the same chain
+ * state died with exit 133, and its re-broadcasts then collected 406 / 406 / 500 from the three doors every five
+ * seconds for eight minutes, because nothing asked the one question that settles it. If the chain has moved PAST the
+ * signed seqno, these bytes can never execute now — either they already did (the confirm will find the record) or
+ * another external took the slot (it will not) — and re-sending them is pure noise either way. Returns true only
+ * on that proof; an unreadable seqno or a record that never captured its seqno returns false and changes nothing.
+ */
+async function directSendSeqnoConsumed(send, transport) {
+  const signed = Number(send?.seqno);
+  if (!Number.isFinite(signed) || !plathoWallet?.address || !transport?.runGetMethod) return false;
+  try {
+    const chainSeqno = await getPlathoWalletSeqno(plathoWallet, transport);
+    return Number(chainSeqno) > signed;
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[send] seqno read after a rejected re-broadcast failed', error);
+    return false;
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 // CONV DELIVERY CONFIRM DRIVER. The send path marks a message green OPTIMISTICALLY the moment the wallet external is
 // broadcast — but a broadcast is not a landing: the publish can bounce (gate 13653, insufficient value) and the record
@@ -25415,6 +27227,11 @@ function markDirectSendBroadcast(thread, message, options = {}) {
 // landed in half a minute is not waiting on the indexer.
 const CONV_CONFIRM_SCHEDULE_MS = [4_000, 9_000, 18_000, 30_000, 45_000, 60_000, 90_000, 120_000];
 const CONV_CONFIRM_MAX_AGE_MS = 8 * 60 * 1000;   // TERMINAL: past ~8 min the external is long dead (>330s) and a landed record is indexed — decide now
+// TERMINAL EARLY once the chain has PROVABLY moved past the signed seqno (convDirectSend.seqnoConsumedAt, stamped by
+// the one seqno read a rejected re-broadcast triggers): the bytes can never execute now, so a landed record is either
+// already indexed or never will be. Ten seconds covers the measured 1-5s index lag with margin; waiting out the full
+// eight minutes only kept a dead message on "sending".
+const CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS = 10_000;
 const CONV_CONFIRM_BOUNDED_SCAN = 256;           // non-terminal ticks scan only the recent top (a landed message is there); the FULL record_count walk that proves ABSENCE runs once, at the terminal tick
 const CONV_CONFIRM_REARM_MAX_AGE_MS = 24 * 60 * 60 * 1000;   // re-arm unresolved sends up to 24h after reload: well under RS_RETENTION (1y), so an absent shard is still "never deployed" (red correct), not "retired"
 const convDeliveryConfirmTimers = new Map();     // message -> setTimeout handle, so teardown/re-arm can cancel it
@@ -25444,13 +27261,17 @@ function captureConvDeliveryConfirmTarget(message, { address, epoch, commits, ma
   if (Number.isFinite(maxSeq)) send.maxSeq = Number(maxSeq);
 }
 
-function armConvDeliveryConfirm(thread, message, attempt = 0) {
+function armConvDeliveryConfirm(thread, message, attempt = 0, options = {}) {
   const send = message?.convDirectSend;
   if (!send?.address || !Array.isArray(send.commits) || send.commits.length === 0) return;   // nothing to confirm
   if (message.convDelivery === 'verified' || message.convDelivery === 'unlanded') return;    // already resolved
   cancelConvDeliveryConfirm(message);                                                         // never double-arm
   const generation = convDeliveryConfirmGeneration;
-  const delayMs = CONV_CONFIRM_SCHEDULE_MS[Math.min(attempt, CONV_CONFIRM_SCHEDULE_MS.length - 1)];
+  // A consumed seqno pins the next tick to its own short clock (see CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS) instead
+  // of wherever the ladder had got to — the ladder was sized for indexer lag, not for a message already known dead.
+  const delayMs = Number.isFinite(options.delayMs)
+    ? Math.max(250, Number(options.delayMs))
+    : CONV_CONFIRM_SCHEDULE_MS[Math.min(attempt, CONV_CONFIRM_SCHEDULE_MS.length - 1)];
   const timer = setTimeout(() => {
     runConvDeliveryConfirm(thread, message, attempt, generation).catch((error) => console.warn('[conv] delivery confirm tick failed', error));
   }, delayMs);
@@ -25466,7 +27287,26 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   if (message.convDelivery === 'verified' || message.convDelivery === 'unlanded') return;
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   const ageMs = Date.now() - Number(send.at ?? Date.now());
-  const reArm = () => { if (generation === convDeliveryConfirmGeneration && ageMs < CONV_CONFIRM_MAX_AGE_MS) armConvDeliveryConfirm(thread, message, attempt + 1); };
+  // The chain moved past the signed seqno (stamped by rebroadcastPendingDirectSend / the retry path): the external is
+  // provably dead, so the verdict comes on the short clock, not the eight-minute one.
+  const consumedAgeMs = Number(send.seqnoConsumedAt) > 0 ? Date.now() - Number(send.seqnoConsumedAt) : -1;
+  const seqnoTerminal = consumedAgeMs >= CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS;
+  const reArm = () => {
+    if (generation !== convDeliveryConfirmGeneration) return;
+    // Re-read the stamp HERE: rebroadcastPendingDirectSend may have set seqnoConsumedAt during this very tick, and
+    // the next tick belongs on the short clock from the moment of the stamp, not one ladder step later.
+    const consumedNow = Number(send.seqnoConsumedAt) > 0 ? Date.now() - Number(send.seqnoConsumedAt) : -1;
+    if (consumedNow >= 0 && consumedNow < CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS) {
+      armConvDeliveryConfirm(thread, message, attempt + 1, { delayMs: CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS - consumedNow });
+      return;
+    }
+    // Past the consumed terminal only an AUTHORITATIVE read can close the verdict; while reads keep failing (429,
+    // network, keyless pump) the wait goes back on the ladder under the eight-minute bound — NEVER a 250 ms spin of
+    // full shard walks (the negative remainder used to clamp to the floor). At the bound the message is left
+    // unverified, exactly as it would be without a seqno stamp. [port review]
+    if (ageMs < CONV_CONFIRM_MAX_AGE_MS) armConvDeliveryConfirm(thread, message, attempt + 1);
+    else markConvDeliveryUnverified(thread, message);
+  };
   if (!transport?.runGetMethod) { reArm(); return; }
   // FRESH, like the INTRO confirm. This lane was SAVED by its schedule rather than by its code: ticks at 12s/20s/30s
   // are spaced wider than the 15s read cache, so a cached negative expired between them. That was luck holding a
@@ -25479,14 +27319,7 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   // Only the TERMINAL tick needs the authoritative full-shard walk (to prove ABSENCE via complete). Earlier ticks scan
   // just the recent top — a LANDED message is there and short-circuits to verified; a not-found stays inconclusive and
   // re-arms — so the up-to-record_count walk runs at most once, not on every tick. [confirm review: per-tick re-walk cost]
-  //
-  // TERMINAL EARLY when the chain is KNOWN to have run the external (send.consumedAt — a door refused the bytes and
-  // a fresh wallet seqno read confirmed the seqno moved past them, see noteConvExternalRefused) and the shard has
-  // had CONV_CONFIRM_CONSUMED_SETTLE_MS to take the internal it carried. From that moment the record is either stored
-  // or bounced — nothing is in flight — so a complete scan is exactly as authoritative now as at the 8-minute
-  // deadline, and waiting for the deadline only keeps a bounced message on "sending" for seven more minutes.
-  const consumedSettled = Number(send.consumedAt) > 0 && (Date.now() - Number(send.consumedAt)) >= CONV_CONFIRM_CONSUMED_SETTLE_MS;
-  const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS || consumedSettled;
+  const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS || seqnoTerminal;
   let res;
   // clean-17 keyless coordination: pause the background index-walk sync for THIS confirm read only (not the whole
   // re-arm window) so on the paced ~1 rps keyless path the read gets the scarce budget without the walk interleaving;
@@ -25519,13 +27352,11 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
     refreshMessagingControls();
     return;
   }
-  // Definitive non-delivery needs BOTH: the external is provably dead AND the read was authoritative — the scan reached
-  // the bottom (res.complete) OR the shard never accepted my seq (res.seqShort: mine-only + strictly-increasing ⇒ it
-  // never will now). "Provably dead" has two proofs: the chain RAN it and the shard has settled (consumedSettled,
-  // above — the early terminal), or it is past max age and can never land. Before either it is indexer lag, not
-  // loss — keep polling. An inconclusive early read is not a failure either: it re-arms and the deadline still rules.
-  if (consumedSettled && (res.complete || res.seqShort)) { markConvDeliveryUnlanded(thread, message); return; }
-  if (ageMs >= CONV_CONFIRM_MAX_AGE_MS) {
+  // Definitive non-delivery needs BOTH: the external is provably dead (past max age — it can never land now — OR its
+  // seqno was consumed by the chain, see CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS) AND the read was authoritative —
+  // the scan reached the bottom (res.complete) OR the shard never accepted my seq (res.seqShort: mine-only +
+  // strictly-increasing ⇒ it never will now). Before that it is indexer lag, not loss — keep polling.
+  if (terminal) {
     if (res.complete || res.seqShort) markConvDeliveryUnlanded(thread, message);
     else markConvDeliveryUnverified(thread, message);
     return;
@@ -25534,7 +27365,8 @@ async function runConvDeliveryConfirm(thread, message, attempt, generation) {
   // re-broadcasts only while a send is running, so the FINAL external of a message had nobody watching it once the
   // call returned. MEASURED on the owner's wallet: that last external took 148s to reach a block on one send and
   // needed two re-broadcasts on another; if it is dropped and the user sends nothing else, only this driver is left.
-  await rebroadcastPendingDirectSend(send, transport);
+  // A consumed seqno is the one case where re-sending is pointless: the bytes can never execute now.
+  if (consumedAgeMs < 0) await rebroadcastPendingDirectSend(send, transport);
   reArm();
 }
 
@@ -25555,9 +27387,7 @@ const DIRECT_SEND_CONFIRM_REBROADCAST_MS = 5_000;
  */
 async function rebroadcastPendingDirectSend(send, transport) {
   if (!send?.boc || !transport?.sendBoc || !plathoWallet?.address) return;
-  // The chain has already RUN these bytes (noteConvExternalRefused proved it): there is nothing left to re-send,
-  // and the shard read alone decides what became of the record.
-  if (send.consumedAt) return;
+  if (Number(send.seqnoConsumedAt) > 0) return;   // the chain already moved past these bytes: nothing to re-send
   const now = Date.now();
   const validUntilMs = Number(send.validUntil) > 0
     ? Number(send.validUntil) * 1000
@@ -25565,85 +27395,27 @@ async function rebroadcastPendingDirectSend(send, transport) {
   if (now >= validUntilMs) return;
   if (now - Number(send.lastRebroadcastAt ?? 0) < DIRECT_SEND_CONFIRM_REBROADCAST_MS) return;
   send.lastRebroadcastAt = now;
-  let answer = null;   // { door, status, chainExitCode, rejectedByChain, detail } — the door's classified reply
-  try {
-    // Rotate the entry point, do not re-knock: see broadcastThroughNextDoor. Falls back to the primary
-    // transport when no doors are configured.
-    const rotated = await broadcastThroughNextDoor(send.boc);
-    if (!rotated) await transport.sendBoc({ boc: send.boc, walletAddress: plathoWallet.address });
-    answer = rotated ?? null;
-  } catch (error) {
-    // The primary THROWS where a door reports: the same verdict arrives on the error (chainExitCode is parsed off
-    // toncenter's body by the transport). Everything else is a failed POST, and a failed POST changes nothing: the
-    // earlier copy may still land, so the confirm keeps polling instead of concluding anything here.
-    if (error?.chainExitCode == null && error?.status !== 406) {
-      if (!noteTonRpcRateLimit(error)) console.warn('[conv] pending re-broadcast failed', error);
-      return;
-    }
-    answer = { door: 'primary', status: error?.status ?? null, chainExitCode: error?.chainExitCode ?? null, rejectedByChain: true, detail: String(error?.responseBody ?? '').slice(0, 200) || null };
-  }
-  if (answer?.rejectedByChain) {
-    await noteConvExternalRefused(send, transport, answer);
+  // Rotate the entry point, do not re-knock: see broadcastThroughNextDoor. Falls back to the primary transport when
+  // no doors are configured. The signed seqno rides along so the door's answer can be read against it.
+  const answer = await rebroadcastSignedExternal(send.boc, send.seqno ?? null, transport);
+  send.lastRebroadcastVerdict = answer.verdict;
+  if (answer.verdict === BROADCAST_VERDICT.ACCEPTED) {
+    // The INFO line means exactly one thing now: a door TOOK the bytes. It used to print on every attempt, including
+    // the 406/406/500 ones, which made a rejected corpse look like a message patiently being re-sent.
+    console.info('[conv] re-broadcast pending external while awaiting the shard', { seq: send.maxSeq ?? null, seqno: send.seqno ?? null, door: answer.door });
     return;
   }
-  // HONEST ABOUT WHAT HAPPENED. This line used to print after ANY door answer — the owner's console showed it right
-  // under a 406 and a 500, three times in a row. A refusal that is not a chain verdict (a bare 5xx, a 429 the pump
-  // did not absorb) is logged as what it is; only an accepted POST is called a re-broadcast.
-  if (answer && answer.status != null && answer.status >= 400) {
-    console.info('[conv] re-broadcast door refused (no chain verdict) — the next tick rotates', { seq: send.maxSeq ?? null, door: answer.door, status: answer.status, detail: answer.detail });
+  if (answer.verdict === BROADCAST_VERDICT.REJECTED) {
+    // The chain refused these bytes. ONE fresh seqno read decides whether the slot is still open (keep offering the
+    // bytes — the predecessor may still land) or already spent (stop: the confirm goes terminal on its short clock).
+    console.warn('[conv] re-broadcast rejected by the chain', { seq: send.maxSeq ?? null, seqno: send.seqno ?? null, door: answer.door, status: answer.status });
+    if (await directSendSeqnoConsumed(send, transport)) send.seqnoConsumedAt = Date.now();
     return;
   }
-  console.info('[conv] re-broadcast pending external while awaiting the shard', { seq: send.maxSeq ?? null, door: answer?.door ?? 'primary' });
+  // broken / refused / unknown: the SHARD READ is the verdict on delivery, never this POST. A failed re-send changes
+  // nothing — the earlier copy may still land — so the confirm keeps polling instead of concluding anything here.
+  if (answer.error && !noteTonRpcRateLimit(answer.error)) console.warn('[conv] pending re-broadcast failed', answer.error);
 }
-
-/**
- * A door (or the primary) answered that the chain will not run these bytes against the current state — for a
- * wallet external that is exit 133 (the signed seqno is not the stored one) or 136 (expired). Which of two worlds
- * that puts us in is decided by ONE fresh read of the wallet seqno, never by the door alone: its lite-server may
- * simply be a block behind, and a lagging node sees exactly the same mismatch a consumed external produces.
- *
- *   - wallet seqno PAST the signed one → the chain already executed this external. The internal it carried has by
- *     now been accepted or bounced by the shard; the shard read holds the answer and nothing else ever will.
- *     Re-sending is over (send.consumedAt), and runConvDeliveryConfirm may go terminal as soon as the shard has
- *     had a moment to settle instead of sitting on "sending" until the 8-minute deadline.
- *   - wallet seqno still AT the signed one → the external has not run; the refusing node was behind. The bytes are
- *     alive, and the next tick knocks on the next door exactly as before.
- *
- * OBSERVED 2026-08-21 on the owner's screen: a message whose publish bounced sat on "sending" for the full eight
- * minutes while all three doors had said "done with these bytes" from the four-second tick on.
- */
-async function noteConvExternalRefused(send, transport, answer) {
-  const signed = Number(send?.seqno);
-  let chainSeqno = null;
-  if (Number.isFinite(signed) && plathoWallet) {
-    try {
-      chainSeqno = await getPlathoWalletSeqno(plathoWallet, transport);   // never from cache — a signing input
-    } catch (error) {
-      if (!noteTonRpcRateLimit(error)) console.warn('[conv] wallet seqno read failed after a refused re-broadcast', error);
-    }
-  }
-  const consumed = chainSeqno != null && Number.isFinite(signed) && Number(chainSeqno) > signed;
-  const detail = {
-    seq: send?.maxSeq ?? null,
-    door: answer?.door ?? null,
-    status: answer?.status ?? null,
-    exitCode: answer?.chainExitCode ?? null,
-    signedSeqno: Number.isFinite(signed) ? signed : null,
-    chainSeqno,
-  };
-  if (consumed) {
-    send.consumedAt = Date.now();
-    console.warn('[conv] the chain already ran this external — re-broadcast stops, the shard read decides', detail);
-  } else {
-    console.info('[conv] a door refused the bytes but the wallet seqno has not moved — still alive, next door next tick', detail);
-  }
-}
-
-// How long after the chain is KNOWN to have run the external the confirm waits before treating a complete scan as
-// terminal. The internal the external carried reaches the shard within a block or two of the wallet transaction; the
-// consumed moment is itself observed one tick AFTER the execution, so this is margin on top of margin. Ticks after
-// the first are at least 9s apart, so in practice the red is painted at the second tick after the verdict.
-const CONV_CONFIRM_CONSUMED_SETTLE_MS = 10_000;
 
 /**
  * The deadline passed and the read could prove NEITHER side — the scan never reached the bottom and the shard is not
@@ -25720,9 +27492,15 @@ async function attemptConvMessagePublishDirect(context) {
   // (below) is a rebuild reached, when the old copy is guaranteed expired.
   const captured = message.convDirectSend;
   if (captured?.boc && (Date.now() - captured.at) <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
-    // Another door, same bytes — see broadcastThroughNextDoor. Falls back to the primary when no doors exist.
-    const rotated = await broadcastThroughNextDoor(captured.boc);
-    if (!rotated && transport?.sendBoc) await transport.sendBoc({ boc: captured.boc, walletAddress: plathoWallet.address });
+    // Another door, same bytes — see broadcastThroughNextDoor. Falls back to the primary when no doors exist. Once the
+    // chain has moved past the signed seqno there is nothing left to re-send: the confirm (armed below) settles it.
+    if (!(Number(captured.seqnoConsumedAt) > 0)) {
+      const answer = await rebroadcastSignedExternal(captured.boc, captured.seqno ?? null, transport);
+      captured.lastRebroadcastVerdict = answer.verdict;
+      if (answer.verdict === BROADCAST_VERDICT.REJECTED && await directSendSeqnoConsumed(captured, transport)) {
+        captured.seqnoConsumedAt = Date.now();
+      }
+    }
     markDirectSendBroadcast(thread, message);
     armConvDeliveryConfirm(thread, message);   // re-broadcast re-arms on the SAME captured commits (idempotent)
     return { rebroadcast: true };
@@ -25754,6 +27532,14 @@ async function attemptConvMessagePublishDirect(context) {
   // Route: the conversation-direction RecordShard for this send's timestamp (epoch + bucketKey + write keypair),
   // all derived from the adopted K_root with zero on-chain lookups.
   const createdAtSec = Math.floor(Date.now() / 1000);
+  // THE SEAL MOMENT, kept on the echo. Every part's header1.createdAt is this second — the signed time a chain copy
+  // of this message carries — while the echo's own time is the COMPOSER moment, and between the two sit the serial
+  // publish lane, the keyless sync wait, the reply-bundle read, a retry: seconds on the keyless path, more than the
+  // ±5 s CONV_OWN_ECHO_TIME_SLACK_MS allows. The echo's history record is first written AFTER this point
+  // (markDirectSendBroadcast), so writeMessageToEncryptedHistory stamps the clear header with it: then the stored
+  // own-send index (ownSendStoredNear) meets a copy read back beyond the loaded window within the 1 s floor instead
+  // of letting it land as a duplicate bubble. An echo already in history keeps its stamp (the retry case). [review]
+  message.convSealedAtMs = createdAtSec * 1000;
   const route = await outgoingRecordShard({ kRoot: rec.kRootCurrent, selfKeyId, peerKeyId, createdAtSec });
 
   // COLD-START SEQ FLOOR. If the local monotonic counter has no value for this (conversation, epoch) — the first send
@@ -25827,11 +27613,13 @@ async function attemptConvMessagePublishDirect(context) {
   // does not have the quoted message either, so the quote strip falls back to its snippet, which is the honest
   // rendering of "I am answering something you never received".
   message.chainEntryId = String(Math.min(...parts.map((part) => part.seq)));
-  // And WHICH shard: the echo's identity on chain is (shard address, seq). The sync reads this device's own outgoing
-  // shards back (openedAs 'sender'), and the chain copy has no capsule id to match the echo by — the composer inserts
-  // the echo before the capsule exists — so it matches on exactly this pair [OWNER 2026-08-22: "the message doubled,
-  // with different statuses"]. Persisted with the message (history whitelist), so a reload keeps the pairing.
+  // …AND WHICH SHARD, for the same reason the receiver stamps it (privateChainMessageOrderFields): the next boot
+  // rebuilds this outgoing shard's seq high-water from the echo (seedConvSeqMarksFromHistory) instead of re-opening
+  // my own capsules, and the receive scan recognises MY OWN capsule read back from this shard as THIS echo
+  // (findOwnEchoForChainCopy — an echo has no capsule id, so (shard, seq) is its only exact identity). A multipart
+  // message also names its last record, as the receiver does, so that range is exact. [PWA-CONVRESTORE-02]
   message.convShardAddress = route.address;
+  if (parts.length > 1) message.chainLastEntryId = String(Math.max(...parts.map((part) => part.seq)));
 
   // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
   // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a
@@ -25866,12 +27654,9 @@ async function attemptConvMessagePublishDirect(context) {
     // stop being re-sendable.
     message.convDirectSend = {
       boc: result?.result?.pendingBoc ?? null,
-      validUntil: result?.result?.pendingValidUntil ?? null,
-      // The wallet seqno those bytes are signed against. It is what lets the confirm tell "the chain already RAN
-      // this external" (the wallet seqno moved past it) from "the network has not taken it yet": the difference
-      // between a re-broadcast that can still help and one that is noise — and between a red that must wait out the
-      // 8-minute deadline and one the shard can settle in seconds. See noteConvExternalRefused.
+      // The seqno the pending external was SIGNED for: what a rejected re-broadcast is checked against.
       seqno: result?.result?.pendingSeqno ?? null,
+      validUntil: result?.result?.pendingValidUntil ?? null,
       at: Date.now(),
     };
     // Record the parts' frame_commits + shard address + my highest seq for the delivery confirm (below). commits come
@@ -25882,7 +27667,10 @@ async function attemptConvMessagePublishDirect(context) {
     // re-seals/re-bumps the seq). Without this a transient sendBoc failure whose external actually landed would
     // double-publish on the next attempt. Capture the commits too (from error.preparedParts) so a later re-broadcast
     // success can arm the confirm on them.
-    if (!message.convDirectSend?.boc && error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, seqno: error.builtSeqno ?? null, at: Date.now() };
+    // UNCONDITIONAL: this catch is only reachable past the idempotent re-broadcast branch, i.e. after a REBUILD with new
+    // seqs — so the captured external is the NEW one and must replace whatever older (expired) boc was recorded.
+    // Keeping the old record let the next Retry rebuild AGAIN while the new external might still land: double publish.
+    if (error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, seqno: error.builtSeqno ?? null, at: Date.now() };
     if (Array.isArray(error?.preparedParts)) captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: error.preparedParts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
     // `broadcast` distinguishes the two outcomes that matter and that nothing recorded before: a throw with a signed
     // external attached means the request DID go out and the answer was lost (an ambiguous broadcast — the external
@@ -26157,6 +27945,17 @@ function patchPublicPublishBadgesInPlace(job, item) {
 // the same bodyHash appears. So the record stays PENDING (not "failed") while the external is still valid, and the
 // existing no-progress deadline remains the honest terminal for the case where it really did not land.
 const PUBLIC_REBROADCAST_MIN_INTERVAL_MS = 20_000;   // resume fires on every focus/pageshow; don't hammer the RPC
+// Once the chain has moved past a retained external's signed seqno (publicDirectSend.seqnoConsumedAt) the bytes can
+// never execute: stop re-sending, give the feed merge one sync to retire a twin that DID land, then terminal. The
+// public twin of CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS; resume runs right after each visibility-ladder sync.
+// (Named PUBLIC_SEQNO_CONSUMED_TERMINAL_MS in the 1.2.4 port; upstream's name from here on.)
+const PUBLIC_CONSUMED_SETTLE_MS = 10_000;
+// W5 `error::invalid_seqno`. MEASURED 2026-08-04 on the owner's wallet: a lite-server applying a stale external
+// answers `cannot apply external message … exit code 133`. The code is SYMMETRIC (platho-wallet.mjs: "ahead by one ->
+// 133, behind -> 133"): it also comes from a door whose node has not yet applied our previous external, i.e. for bytes
+// that are still valid. So a 133 at re-broadcast is a reason to ASK the chain (directSendSeqnoConsumed, as the CONV
+// twin does on every rejection), never the answer itself; rebroadcastPublicPublish logs it next to the verdict.
+const WALLET_V5_INVALID_SEQNO_EXIT_CODE = 133;
 
 /**
  * The patch for a throw that MAY have landed — or null when the failure is unambiguous.
@@ -26169,34 +27968,36 @@ function publicAmbiguousPublishPatch(error, status) {
   if (!error?.builtBoc) return null;
   return {
     publishStatus: status,
-    publicDirectSend: { boc: error.builtBoc, at: Date.now(), seqno: error.builtSeqno ?? null, rebroadcastAt: null },
+    // No validUntil on a throw (the wallet attaches only boc + seqno): resume falls back to the fixed window.
+    publicDirectSend: { boc: error.builtBoc, at: Date.now(), seqno: error.builtSeqno ?? null, validUntil: null, rebroadcastAt: null },
   };
 }
 
 /**
- * The retained external of a SUCCESSFUL broadcast — the last chunk's signed bytes, the seqno they are bound to and
- * when they stop being re-sendable. Read off the send result the way the CONV lane reads it (`pendingBoc` is set by
- * platho-wallet on the RPC result; the response itself carries no boc). Null when the wallet handed back nothing to
- * retain — then the resume has only the deadline, as before.
+ * The retained external of a send that RETURNED — the public twin of message.convDirectSend (PWA-PUBLIC-RETAIN-01).
+ *
+ * A door's 200 is a QUEUE, not an execution. Seen on the owner's wallet: toncenter accepted a post's external, another
+ * external of the same wallet took its seqno first, the chain never ran the post — and because the public lane kept
+ * the signed bytes ONLY on an ambiguous throw, nobody re-sent them and nobody read the verdict: the record sat on
+ * "confirming" for the whole six-minute deadline and then went red over a post that a single re-send, or a single
+ * seqno read, would have settled in seconds. The CONV lane captures result.result.pendingBoc/pendingSeqno/
+ * pendingValidUntil on success for exactly this; the public lane now does the same, for posts and comments alike.
+ *
+ * `result` is what publishPublicLaneParts returned ({ parts, result }); `result.result` is the wallet send's answer,
+ * whose `pending*` fields name the LAST external — the only one still possibly in flight. Null when the send carried
+ * no boc to retain (nothing to re-send; the record keeps today's behaviour).
  */
 function publicRetainedExternalFromSend(result) {
   const boc = result?.result?.pendingBoc ?? null;
-  if (!boc) return null;
+  if (typeof boc !== 'string' || !boc) return null;
   return {
     boc,
-    seqno: result?.result?.pendingSeqno ?? null,
-    validUntil: result?.result?.pendingValidUntil ?? null,
+    seqno: result?.result?.pendingSeqno ?? null,           // what a rejected re-broadcast is checked against
+    validUntil: result?.result?.pendingValidUntil ?? null, // seconds; the only thing that says when re-sending stops
     at: Date.now(),
     rebroadcastAt: null,
-    consumedAt: null,
   };
 }
-
-// Once a door has said the chain will not take these bytes again (exit 133: the wallet seqno moved past them), the
-// external is either RUN — the feed merge then retires the record on the next read — or replaced by another external
-// of the same wallet. Ten seconds is what a landed post needs to show up in a read; past that, "failed" is honest,
-// and it is said in seconds instead of after the six-minute deadline. The CONV lane's settle, same number.
-const PUBLIC_CONSUMED_SETTLE_MS = 10_000;
 
 /**
  * Re-send a retained external. Stamps the attempt BEFORE sending so a failure cannot turn the next focus into a
@@ -26207,24 +28008,28 @@ async function rebroadcastPublicPublish(job, retained) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.sendBoc || !plathoWallet?.address || !retained?.boc) return;
   persistPublicPublishProgress(job, { publicDirectSend: { ...retained, rebroadcastAt: Date.now() } });
-  try {
-    // The public lane rotates too. Every lane that re-sends already-signed bytes goes through the carousel: the
-    // external is seqno-bound so the chain runs it at most once whichever door accepts it, and the door that already
-    // failed to deliver is the least promising place to knock again.
-    const answer = await broadcastThroughNextDoor(retained.boc);
-    if (!answer) await transport.sendBoc({ boc: retained.boc, walletAddress: plathoWallet.address });
-    // READ THE DOOR'S VERDICT. A 406 / 500-with-exit-code is the CHAIN refusing these bytes, and exit 133 says why:
-    // the wallet's seqno has moved past them — the external was either run (the feed merge will retire the record)
-    // or replaced by another external of the same wallet, e.g. from a second device. Either way re-sending is noise
-    // from here; the resume settles it in seconds instead of waiting out the deadline. Said once, in the console,
-    // because until now this case was silent for six minutes and then "failed" [OWNER 2026-08-22].
-    if (answer?.rejectedByChain && Number(answer.chainExitCode) === 133 && !retained.consumedAt) {
-      console.warn('[public] the chain will not take this external again (seqno consumed) — waiting briefly for its twin, then giving up', answer.detail ?? '');
-      persistPublicPublishProgress(job, { publicDirectSend: { ...retained, rebroadcastAt: Date.now(), consumedAt: Date.now() } });
-    }
-  } catch (error) {
-    if (!noteTonRpcRateLimit(error)) console.warn('[public] re-broadcast of a retained external failed', error);
+  // The public lane rotates too. Every lane that re-sends already-signed bytes goes through the carousel: the
+  // external is seqno-bound so the chain runs it at most once whichever door accepts it, and the door that already
+  // failed to deliver is the least promising place to knock again. The door's VERDICT is kept: a chain rejection
+  // triggers one fresh seqno read, and a consumed seqno stops the re-sends for good (resume terminals it).
+  const answer = await rebroadcastSignedExternal(retained.boc, retained.seqno ?? null, transport);
+  if (answer.verdict === BROADCAST_VERDICT.ACCEPTED) {
+    console.info('[public] re-broadcast retained external', { localId: job?.localId ?? null, seqno: retained.seqno ?? null, door: answer.door });
+    return;
   }
+  if (answer.verdict === BROADCAST_VERDICT.REJECTED) {
+    // THE CHAIN IS ASKED, NOT THE DOOR. Exit 133 (W5 invalid_seqno) is symmetric (WALLET_V5_INVALID_SEQNO_EXIT_CODE):
+    // a door whose node has not yet applied our PREVIOUS external answers 133 to bytes that are still valid, so taking
+    // it as "consumed" on the spot would stop the re-sends and terminal the record while the original copy lands. One
+    // fresh seqno read settles it — what the CONV twin pays on every rejection; the exit code is kept for the log.
+    const consumed = await directSendSeqnoConsumed(retained, transport);
+    console.warn('[public] re-broadcast rejected by the chain', { localId: job?.localId ?? null, seqno: retained.seqno ?? null, door: answer.door, status: answer.status, exitCode: answer.exitCode ?? null, invalidSeqno: Number(answer.exitCode) === WALLET_V5_INVALID_SEQNO_EXIT_CODE, consumed });
+    if (consumed) {
+      persistPublicPublishProgress(job, { publicDirectSend: { ...retained, rebroadcastAt: Date.now(), seqnoConsumedAt: Date.now(), lastRebroadcastVerdict: answer.verdict } });
+    }
+    return;
+  }
+  if (answer.error && !noteTonRpcRateLimit(answer.error)) console.warn('[public] re-broadcast of a retained external failed', answer.error);
 }
 
 /**
@@ -26267,6 +28072,14 @@ function openPublicPostHasPendingComment() {
   return cachedCommentsForPost(publicPostDetailItem).some((comment) => isPendingPublicFeedItem(comment));
 }
 
+/** Is the post detail on screen showing THIS cached post (same channel key, same entry)? The only screen whose
+ *  thread read (refreshPublicPostDetailComments -> retireConfirmedLocalPublicComments) can retire a pending comment. */
+function publicPostDetailOpenFor(channelId, cachedPost) {
+  if (!publicPostDetailOpen || !publicPostDetailItem || !cachedPost) return false;
+  if (String(publicPostDetailItem.channelId ?? 'platho.app') !== String(channelId)) return false;
+  return sameCachedPublicPost(cachedPost, publicPostDetailItem);
+}
+
 function anyPendingPublicFeedItem() {
   for (const entry of Object.values(publicChannelFeedCache ?? {})) {
     for (const post of entry?.feed?.posts ?? entry?.posts ?? []) {
@@ -26299,7 +28112,9 @@ function schedulePublicPublishVisibilityChecks(attempt = 0) {
     // exists for scale: no walker may read comments for posts nobody is looking at. This read is the opposite of
     // a walker — it is the OPEN post, and only while a comment THIS USER just published is still unconfirmed. It
     // stops the moment the record retires, which is what the whole ladder is waiting for anyway.
-    if (openPublicPostHasPendingComment()) {
+    if (openPublicPostHasPendingComment() && !publicPostDetailNewerCursor && !publicPostDetailJumpBusy) {
+      // Skipped while the reader stands in a jumped window: the refresh's jump-exit REPLACE would teleport
+      // them to the present mid-read (review finding 7). The confirmation retries again next pass.
       try { await refreshPublicPostDetailComments(); } catch (error) { noteTonRpcRateLimit(error); }
     }
     // Re-broadcast a retained external and pronounce the verdict past the deadline. Both used to happen only when
@@ -26343,23 +28158,42 @@ function resumePendingPublicPublishConfirmations() {
       for (const { item, kind } of candidates) {
         if (!isPendingPublicFeedItem(item)) continue;
         const createdAt = Date.parse(item.createdAt ?? '') || Date.now();
-        // A RETAINED EXTERNAL OUTRANKS THE DEADLINE. An ambiguous broadcast kept its signed external, and while
-        // that external is still valid the right move is to send it AGAIN — not to declare a failure over a post
-        // that may be on chain. Same seqno, so the chain runs it at most once; if it had already landed, the feed
-        // merge retires this record when the twin appears.
+        // A RETAINED EXTERNAL OUTRANKS THE DEADLINE. An ambiguous broadcast kept its signed external — and since
+        // PWA-PUBLIC-RETAIN-01 so does a SUCCESSFUL one (publicRetainedExternalFromSend) — and while that external is
+        // still valid the right move is to send it AGAIN — not to declare a failure over a post that may be on chain.
+        // Same seqno, so the chain runs it at most once; if it had already landed, the feed merge retires this record
+        // when the twin appears.
         const retained = item.publicDirectSend;
-        // A CONSUMED external is never re-sent: the chain has moved past its seqno. If it ran, the feed merge retires
-        // this record within the settle (the visibility ladder reads the channel right before this); if it did not,
-        // "failed" is said now — seconds after the verdict, not after the six-minute deadline.
-        if (retained?.consumedAt) {
-          if (Date.now() - Number(retained.consumedAt) >= PUBLIC_CONSUMED_SETTLE_MS) {
-            persistPublicPublishProgress({ channelId, localId: item.id, publishState: null },
-              { publishStatus: kind === 'comment' ? 'comment failed' : 'public publish failed' });
+        // The record's honest terminal word: a comment that lost says "comment failed", as its own clear-failure
+        // path already does — the consumed/deadline terminals used to stamp "public publish failed" on both.
+        const failedStatus = kind === 'comment' ? 'comment failed' : 'public publish failed';
+        // SEQNO CONSUMED: the retained bytes can never execute now. No more re-sends; after one short settle (the
+        // visibility ladder has synced at least once meanwhile, so a twin that landed has had its merge) the record
+        // is terminal — on this clock, not the six-minute one.
+        const consumedAgeMs = Number(retained?.seqnoConsumedAt) > 0 ? Date.now() - Number(retained.seqnoConsumedAt) : -1;
+        if (consumedAgeMs >= 0) {
+          // A COMMENT IS NOT TERMINALLED WITHOUT A READ THAT COULD HAVE RETIRED IT. The settle's premise ("the ladder
+          // has synced at least once, so a twin that landed has had its merge") holds for posts only: the channel walk
+          // cannot see thread comments, and the one read that retires a pending comment (retireConfirmedLocalPublicComments,
+          // from refreshPublicPostDetailComments) runs only while THIS post's detail is open. Since PWA-PUBLIC-RETAIN-01
+          // every successful comment is re-sent once (exit 133 on an already-landed one -> seqnoConsumedAt), so with the
+          // detail closed this branch stamped 'comment failed' over a comment that is on chain. With the detail closed
+          // the record now simply stays 'confirming' (no re-sends either way: the seqno is spent) until the user opens
+          // the thread and a CLEAN read settles it one way or the other. Residual: under degraded thread reads with
+          // the detail open the terminal can still precede a clean read, and the 6-min deadline branch below keeps
+          // its pre-port behaviour.
+          if (consumedAgeMs >= PUBLIC_CONSUMED_SETTLE_MS && !(kind === 'comment' && !publicPostDetailOpenFor(channelId, post))) {
+            persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: failedStatus });
           }
           continue;
         }
-        const retainedAgeMs = retained?.boc ? Date.now() - Number(retained.at ?? 0) : null;
-        if (retainedAgeMs !== null && retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS) {
+        // Re-sendable while the external is VALID: its own validUntil when the send returned one (a successful send
+        // retains it), else the fixed window for bytes captured off a throw (no validUntil on the error). Past it the
+        // bytes are guaranteed dead and the deadline below is the last word.
+        const retainedValidUntilMs = retained?.boc
+          ? (Number(retained.validUntil) > 0 ? Number(retained.validUntil) * 1000 : Number(retained.at ?? 0) + DIRECT_SEND_REBROADCAST_WINDOW_MS)
+          : null;
+        if (retainedValidUntilMs !== null && Date.now() < retainedValidUntilMs) {
           if (Date.now() - Number(retained.rebroadcastAt ?? 0) >= PUBLIC_REBROADCAST_MIN_INTERVAL_MS) {
             void rebroadcastPublicPublish({ channelId, localId: item.id, publishState: null }, retained);
           }
@@ -26372,7 +28206,7 @@ function resumePendingPublicPublishConfirmations() {
         // re-broadcasts first and this stays the honest last word. The Vault confirm driver that used to be started
         // for a publishState record is gone with the state itself.
         if (Date.now() - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS) {
-          persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: 'public publish failed' });
+          persistPublicPublishProgress({ channelId, localId: item.id, publishState: null }, { publishStatus: failedStatus });
         }
       }
     }
@@ -26690,19 +28524,11 @@ async function submitPublicPostDirect(draft = null) {
   // pending nor chain-anchored (publicFeedPostHasChainAnchor), so the next background sync silently dropped
   // the just-published post from the feed. The pending copy retires by itself: the merge drops it once the
   // chain twin with the same bodyHash appears.
-  // KEEP THE SIGNED EXTERNAL ON SUCCESS TOO. A 200 from a door means "queued", not "executed" — and the owner's
-  // release post of 2026-08-22 was exactly that: accepted by the door, never run by the chain (its seqno was taken
-  // by another external of the same wallet from another device), and because only an AMBIGUOUS throw used to keep the
-  // bytes, nothing re-sent it and nothing could read the chain's verdict; the record sat "confirming" for six silent
-  // minutes and then said "failed". The CONV lane has kept its external on success since the door-verdict fix; this
-  // is the same line for the public lane: the resume re-broadcasts these bytes while they are valid, the door's
-  // refusal is read (rebroadcastPublicPublish), and a consumed external is pronounced in seconds, not minutes.
-  if (ref) {
-    persistPublicPublishProgress({ ...ref, publishState: null }, {
-      publishStatus: 'public published, confirming',
-      publicDirectSend: publicRetainedExternalFromSend(result),
-    });
-  }
+  // …AND KEEP THE SIGNED BYTES (PWA-PUBLIC-RETAIN-01): the 200 above queued them, nothing more. resume re-sends them
+  // through the door carousel while they are valid and reads the verdict; a consumed seqno turns the record terminal
+  // on the short clock instead of the six-minute one. Same shape as message.convDirectSend on the CONV lane.
+  const retainedPost = publicRetainedExternalFromSend(result);
+  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'public published, confirming', ...(retainedPost ? { publicDirectSend: retainedPost } : {}) });
   // Ask the chain when the indexer can actually answer, instead of waiting for the 30s feed timer to come round.
   schedulePublicPublishVisibilityChecks();
   // Match the RECORD, which correctly says 'public published, confirming' one line above. The composer used to
@@ -26814,12 +28640,10 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
     setPublicStatus(ambiguous ? 'comment unconfirmed, retrying' : 'comment failed');
     throw error;
   }
-  if (ref) {
-    persistPublicPublishProgress({ ...ref, publishState: null }, {
-      publishStatus: 'comment published, confirming',
-      publicDirectSend: publicRetainedExternalFromSend(result),   // the same retained bytes as a post — see the post path
-    });
-  }
+  // Same retention as the post path (PWA-PUBLIC-RETAIN-01): a comment's external is queued by a 200 exactly as a
+  // post's is, and was the twin that got forgotten here too.
+  const retainedComment = publicRetainedExternalFromSend(result);
+  if (ref) persistPublicPublishProgress({ ...ref, publishState: null }, { publishStatus: 'comment published, confirming', ...(retainedComment ? { publicDirectSend: retainedComment } : {}) });
   schedulePublicPublishVisibilityChecks();   // same clock as a post — a comment is the twin that gets forgotten
   // MATCH THE RECORD, which says "confirming" one line above. A broadcast is not a confirmation: toncenter's 200
   // means QUEUED, and an external whose seqno the chain has not reached is dropped outright. The post path was
@@ -26842,50 +28666,6 @@ globalThis.plathoVaultTransactions = {
   syncPrivateCapsulesFromChain,
 };
 
-// ── A READ THAT LEARNED NOTHING ASKS AGAIN ON ITS OWN ────────────────────────────────────────────────────────────
-//
-// [OWNER 2026-08-22, on the stand with a freshly imported key: "the balance loaded, but the app kept saying the
-// wallet was not connected; a few minutes later it sorted itself out".] The ONE activation read at unlock had
-// failed on a transient — a 15 s RPC timeout, a verifier that did not answer (both were in his console that hour)
-// — and the catch below preserved the binding, correctly: a bad read must never flip a registered user to
-// "activate". But then nothing asked again. The background refresh re-reads the BALANCE only; activation is re-read
-// by a transaction, a return to the Wallet view, a wallet switch — so the app sat on "activate your account" for
-// as long as nothing else happened to it. A read that learned nothing is not an answer. It re-asks on its own, on a
-// rising ladder, until a DEFINITIVE answer is written for THIS wallet (registered, or a never-deployed shard), and
-// a wallet switch drops the ladder with the binding it was climbing for. Cheap: one critical read per rung, and
-// the first rung usually lands. A hidden tab does not climb (the wallet locks in the background anyway; the unlock
-// on return reads afresh) — it re-arms the same rung.
-const PLATHO_ACTIVATION_REREAD_DELAYS_MS = [3_000, 6_000, 12_000, 24_000, 45_000, 60_000, 90_000, 120_000, 180_000, 240_000];
-let plathoActivationRereadTimer = null;
-let plathoActivationRereadStep = 0;
-let plathoActivationRereadWallet = null;
-
-function clearPlathoActivationReread() {
-  if (plathoActivationRereadTimer) clearTimeout(plathoActivationRereadTimer);
-  plathoActivationRereadTimer = null;
-  plathoActivationRereadStep = 0;
-  plathoActivationRereadWallet = null;
-}
-
-function schedulePlathoActivationReread(forWalletRaw) {
-  if (!forWalletRaw) return;
-  if (plathoActivationRereadWallet !== forWalletRaw) {
-    clearPlathoActivationReread();                         // a ladder belongs to ONE wallet
-    plathoActivationRereadWallet = forWalletRaw;
-  }
-  if (plathoActivationRereadTimer) return;                 // one ladder, already climbing
-  const step = Math.min(plathoActivationRereadStep, PLATHO_ACTIVATION_REREAD_DELAYS_MS.length - 1);
-  const delayMs = PLATHO_ACTIVATION_REREAD_DELAYS_MS[step];
-  plathoActivationRereadTimer = setTimeout(() => {
-    plathoActivationRereadTimer = null;
-    if (!plathoWallet?.address || rawWalletAddress(plathoWallet.address) !== forWalletRaw) { clearPlathoActivationReread(); return; }
-    if (document.hidden) { schedulePlathoActivationReread(forWalletRaw); return; }   // same rung, later
-    plathoActivationRereadStep = step + 1;
-    // Its own catch re-arms the ladder if this rung learns nothing again; a definitive answer clears it.
-    refreshVaultActivationStatus().catch(() => {});
-  }, delayMs);
-}
-
 async function refreshVaultActivationStatus(options = {}) {
   if (!plathoWallet?.address || !localVaultDraft?.message) {
     setText(vaultRecordStatus, plathoWallet ? t('vault.keysPending') : t('common.walletRequiredStatus'));
@@ -26898,6 +28678,9 @@ async function refreshVaultActivationStatus(options = {}) {
   // .user shape the ~15 activation consumers read ({ exists, current_key_id, auth_pubkey } — existence gates, never the
   // Vault key-id formula, which is gone with the Vault). auth_pubkey is the LOCAL auth key: KeyShard omits it by
   // privacy invariant, and for one's OWN identity the local key IS it.
+  // The wallet a TRANSIENT failure should re-read for (PWA-ACTIVATION-04). Captured outside the try so the catch can
+  // arm the ladder for exactly the wallet the read was issued for — never for whoever is current by then.
+  let rereadFor = null;
   try {
     const registry = requireBasechainAddress(requireProfileRegistryAddress(), 'ProfileRegistry');
     const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
@@ -26906,6 +28689,7 @@ async function refreshVaultActivationStatus(options = {}) {
     // never be attributed to B — B's own refresh, queued behind this one, reads B.
     const forWallet = plathoWallet.address;
     const forWalletRaw = rawWalletAddress(forWallet);
+    rereadFor = forWalletRaw;
     // A never-deployed shard (uninit) is a DEFINITIVE "not registered" → {exists:false}. Any OTHER read failure is
     // TRANSIENT and must NOT flip a registered user to "activate" (KeyShard registration is monotonic): rethrow to the
     // outer catch, which PRESERVES the existing binding. [activation review: transient read flips activated→activate]
@@ -26926,7 +28710,7 @@ async function refreshVaultActivationStatus(options = {}) {
       && BigInt(view.sign_pubkey ?? 0n) === BigInt(localVaultDraft.message.sign_pubkey ?? 0n);
     if (!registeredMine) {
       globalThis.plathoVaultBinding = { walletAddress: forWallet, user: { exists: view?.exists === true, current_key_id: 0n }, keyRecord: null };
-      clearPlathoActivationReread();                       // a definitive answer: not registered (yet)
+      clearPlathoActivationReread();   // a DEFINITE answer (not registered / keys rotated): nothing left to re-ask
       setText(vaultRecordStatus, t('vault.activationRequired'));
       refreshMessageActionStatuses();
       refreshMessagingControls();
@@ -26943,7 +28727,7 @@ async function refreshVaultActivationStatus(options = {}) {
       scan_pubkey: BigInt(view.scan_pubkey ?? 0n),
     };
     globalThis.plathoVaultBinding = { walletAddress: forWallet, user, keyRecord: null };
-    clearPlathoActivationReread();                         // a definitive answer: registered
+    clearPlathoActivationReread();   // DEFINITE: registered with the current local keys
     setText(vaultRecordStatus, t('vault.activated'));
     // The chain has just confirmed this wallet's keys are registered. Once per wallet, this is where the welcome
     // comes from — see maybeShowActivationWelcome for why the trigger is here and not at the activation send.
@@ -26955,7 +28739,10 @@ async function refreshVaultActivationStatus(options = {}) {
   } catch (error) {
     // A transient read must NOT flip a registered user to "activate" — leave the binding untouched and show pending.
     if (!noteTonRpcRateLimit(error)) console.warn('[keyshard] activation status read failed', error);
-    schedulePlathoActivationReread(rawWalletAddress(plathoWallet?.address));   // and ask again — the ladder above
+    // …AND ASK AGAIN ON OUR OWN CLOCK (PWA-ACTIVATION-04). Only for the wallet this read was issued for, and only
+    // when the failure happened at the read itself (rereadFor is null before the provider exists — a config fault
+    // is not transient and gets no ladder). A wallet switched mid-read gets its own refresh from the switch.
+    if (rereadFor && rawWalletAddress(plathoWallet?.address) === rereadFor) schedulePlathoActivationReread(rereadFor);
     setText(vaultRecordStatus, t('vault.keysPending'));
     refreshMessageActionStatuses();
     refreshComposerPublishPolicy();
@@ -27117,10 +28904,27 @@ async function runBootScreenUnlock() {
   }
 }
 
+// Posts painted UNDER the boot screen rose while nobody could see it; as the screen lifts, the feed on screen rises
+// in for real (owner: the moment loaded posts appear to the reader must animate). Re-registers each article as fresh
+// and restarts its animation (class off → reflow → on). A feed hidden behind another tab starts the rise when shown.
+function surfaceFeedOnReveal() {
+  if (!publicFeed) return;
+  let index = 0;
+  for (const node of Array.from(publicFeed.children)) {
+    const key = node.dataset?.itemId;
+    if (!key) continue;
+    node.classList.remove('is-surfacing');
+    void node.offsetWidth;
+    publicFeedSurfacedIds.delete(key);
+    if (surfaceRow(node, publicFeedSurfacedIds, key, index)) index += 1;
+  }
+}
+
 function hideBootScreen() {
   if (!bootScreenActive || !bootScreen) return;
   setBootDebug('ready');
   bootScreenActive = false;
+  try { surfaceFeedOnReveal(); } catch (error) { console.warn('[feed] reveal surfacing skipped', error); }
   if (bootScreenSafetyTimer) { clearTimeout(bootScreenSafetyTimer); bootScreenSafetyTimer = null; }
   if (bootScreenIdleFailsafe) { clearTimeout(bootScreenIdleFailsafe); bootScreenIdleFailsafe = null; }
   bootScreen.classList.add('is-hiding');
@@ -27482,6 +29286,10 @@ quickStartLanguageSelect?.addEventListener('change', () => {
   setLocale(quickStartLanguageSelect.value);
   applyStaticTranslations();
   refreshProfileFeeLabels();
+  // The public feed IS already rendered behind this dialog (it renders pre-wallet), and its cards bake t()
+  // output into DOM. Re-render the public surfaces in the new locale — the locale term in
+  // publicFeedItemRenderSignature forces the card rebuild that node reuse would otherwise skip.
+  renderPublicSurface({ anchorUnread: false });
   if (appLanguageSelect) appLanguageSelect.value = currentLocale();
   // Re-render the stepper ONLY if it is actually open: renderQuickStartStep persists progress (resume-on-boot)
   // and may auto-advance — neither is welcome while the user is still on the welcome view.
@@ -28131,7 +29939,7 @@ function quickStartAdvance() {
 let quickStartBackupMode = false;
 
 function closeQuickStart() {
-  if (quickStartDialog) quickStartDialog.hidden = true;
+  hideDialogAnimated(quickStartDialog);
   // Every exit runs through here — finish, ✕ and skip-out alike — so the deferred welcome is released once, from
   // one place, whichever way the overlay was left.
   flushPendingActivationWelcome();
@@ -28199,11 +30007,11 @@ function markActivationWelcomeShown(walletAddress) {
 }
 
 function openActivationWelcomeDialog() {
-  if (activationWelcomeDialog) activationWelcomeDialog.hidden = false;
+  if (activationWelcomeDialog) { activationWelcomeDialog.classList.remove('is-closing'); activationWelcomeDialog.hidden = false; }
 }
 
 function closeActivationWelcomeDialog() {
-  if (activationWelcomeDialog) activationWelcomeDialog.hidden = true;
+  hideDialogAnimated(activationWelcomeDialog);
   // The install invitation waited for this. Now it may speak.
   offerDeferredInstallPrompt();
 }
@@ -28235,7 +30043,7 @@ function openQuickStartAtStep(index) {
   quickStartStepIndex = Math.max(0, Math.min(Number(index) || 0, QUICK_START_STEPS.length - 1));
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
   if (quickStartStepsView) quickStartStepsView.hidden = false;
-  quickStartDialog.hidden = false;
+  quickStartDialog.classList.remove('is-closing'); quickStartDialog.hidden = false;
   renderQuickStartStep();
 }
 
@@ -28268,7 +30076,7 @@ function openQuickStart() {
   quickStartStepIndex = 0;
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = false;
   if (quickStartStepsView) quickStartStepsView.hidden = true;
-  quickStartDialog.hidden = false;
+  quickStartDialog.classList.remove('is-closing'); quickStartDialog.hidden = false;
 }
 
 function quickStartStepIndexByKey(key) {
@@ -28285,7 +30093,7 @@ function openQuickStartAtBackup() {
   quickStartStepIndex = quickStartStepIndexByKey('export');
   if (quickStartWelcomeView) quickStartWelcomeView.hidden = true;
   if (quickStartStepsView) quickStartStepsView.hidden = false;
-  quickStartDialog.hidden = false;
+  quickStartDialog.classList.remove('is-closing'); quickStartDialog.hidden = false;
   renderQuickStartStep();
 }
 
@@ -28399,7 +30207,7 @@ function positionEmojiPicker(button) {
 
 function closeEmojiPicker() {
   if (!emojiPicker || emojiPicker.hidden) return;
-  emojiPicker.hidden = true;
+  hidePopoverAnimated(emojiPicker);
   emojiPickerTargetButton?.setAttribute('aria-expanded', 'false');
   emojiPickerTargetInput = null;
   emojiPickerTargetButton = null;
@@ -28409,6 +30217,7 @@ function openEmojiPicker(button, input) {
   if (!emojiPicker || !button) return;
   emojiPickerTargetInput = input;
   emojiPickerTargetButton = button;
+  emojiPicker.classList.remove('is-closing');
   emojiPicker.hidden = false;
   positionEmojiPicker(button);
   button.setAttribute('aria-expanded', 'true');

@@ -23,8 +23,8 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole lane
 // runs against a stub transport and a fixed clock, the way the intro lane does.
 
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=22';
-import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=24';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=24';
+import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=26';
 import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=5';
 import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=5';
 import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=7';
@@ -39,7 +39,7 @@ import {
   publicEpochTag,
   publicEraOf,
   addrKey,
-} from './shard-discovery.mjs?v=21';
+} from './shard-discovery.mjs?v=23';
 
 const PS_KIND_CHANNEL = 0;
 const PS_KIND_THREAD = 1;
@@ -143,10 +143,14 @@ export function createPublicLane({
   //
   // PER SHARD, not per thread: a post's comments accumulate across era shards, so a year-old thread with one new
   // comment re-reads one shard and serves the rest from the snapshot.
-  const SHARD_SNAPSHOT_MAX = 256;                 // ~256 era-shards of comments; bounded so a long session cannot grow it
+  const SHARD_SNAPSHOT_MAX = 512;                 // era-shards of comments + channel shards + the ~142 live beacon buckets (one discovery sweep must not evict every thread); bounded so a long session cannot grow it
   const shardSnapshots = new Map();               // addrKey -> { marker, posts }
 
   function readShardSnapshot(key, marker) {
+    // A null marker is "nothing measured" (an 'unknown' accountStates row — the endpoint refused the address):
+    // never a cache hit, never a cache key. Otherwise a shard nobody could read would be served from the snapshot
+    // for good.
+    if (marker === null || marker === undefined) return null;
     const hit = shardSnapshots.get(key);
     if (!hit || hit.marker !== marker) return null;
     shardSnapshots.delete(key);                   // reinsert: Map keeps insertion order, so this is the LRU bump
@@ -155,6 +159,7 @@ export function createPublicLane({
   }
 
   function writeShardSnapshot(key, marker, posts) {
+    if (marker === null || marker === undefined) return;   // see readShardSnapshot: an unmeasured shard is not cached
     shardSnapshots.delete(key);
     shardSnapshots.set(key, { marker, posts });
     while (shardSnapshots.size > SHARD_SNAPSHOT_MAX) {
@@ -168,8 +173,10 @@ export function createPublicLane({
   // written there, the next full channel read with the same marker would have been served those few rows as the
   // whole shard, and a channel screen would have lost its older posts to a card. The small read therefore reads the
   // shared cache when it can (a full snapshot IS the answer, and free) but writes only here.
+  const LATEST_SNAPSHOT_MAX = 256;                // one entry per visited card's live era shard (~142 on the measured directory); bounded so a long Discover session cannot grow it
   const latestSnapshots = new Map();              // addrKey -> { marker, posts }
   function readLatestSnapshot(key, marker) {
+    if (marker === null || marker === undefined) return null;   // an unmeasured shard is never a hit — see readShardSnapshot
     const hit = latestSnapshots.get(key);
     if (!hit || hit.marker !== marker) return null;
     latestSnapshots.delete(key);
@@ -177,9 +184,10 @@ export function createPublicLane({
     return hit.posts;
   }
   function writeLatestSnapshot(key, marker, posts) {
+    if (marker === null || marker === undefined) return;
     latestSnapshots.delete(key);
     latestSnapshots.set(key, { marker, posts });
-    while (latestSnapshots.size > SHARD_SNAPSHOT_MAX) {
+    while (latestSnapshots.size > LATEST_SNAPSHOT_MAX) {
       const oldest = latestSnapshots.keys().next();
       if (oldest.done) break;
       latestSnapshots.delete(oldest.value);
@@ -235,12 +243,19 @@ export function createPublicLane({
 
       // Most recently touched first. lt arrives as a string of digits; compare as BigInt (a lexical compare of
       // unequal lengths would put 99 above 100).
+      // ACTIVE only: a publicly-derivable bucket can be touched into an uninit account, and get_page on one throws
+      // exit -13 (the same trap the thread read documents); an 'unknown' row (the endpoint refused the address)
+      // is not readable either.
       const ltOf = (state) => { try { return BigInt(state?.lastLt ?? 0); } catch { return 0n; } };
-      const ordered = [...states.values()].sort((a, b) => (ltOf(a) < ltOf(b) ? 1 : ltOf(a) > ltOf(b) ? -1 : 0));
+      const ordered = [...states.values()]
+        .filter((state) => state.status === 'active')
+        .sort((a, b) => (ltOf(a) < ltOf(b) ? 1 : ltOf(a) > ltOf(b) ? -1 : 0));
       const limit = Number.isFinite(Number(topBuckets)) && Number(topBuckets) > 0 ? Number(topBuckets) : ordered.length;
+      const buckets = ordered.slice(0, limit);
 
       const byWallet = new Map();
-      for (const state of ordered.slice(0, limit)) {
+      let done = 0;
+      for (const state of buckets) {
         const key = addrKey(state.address);
         const marker = changeMarkerOf(state);
         const snapshot = readShardSnapshot(key, marker);
@@ -261,8 +276,13 @@ export function createPublicLane({
             for (const post of [...tail.posts, ...posts]) merged.set(String(post.entry_id), post);
             posts = [...merged.values()];
           }
-          // ONE VALUE SHAPE for the shared snapshot cache — see readChannelPosts.
-          writeShardSnapshot(key, marker, { posts, from: 0n, entryCount: first.entry_count });
+          // ONE VALUE SHAPE for the shared snapshot cache — see readChannelPosts. NOT SNAPSHOTTED WHEN ROWS CAME
+          // BACK WITHOUT BODIES: the pump drops a rate-limited /messages silently (skipIfRateLimited), and caching
+          // that as "no announcements" would hide a channel until the bucket's marker moves — which for a directory
+          // bucket can be never. An empty bucket (no rows at all) is cached as such.
+          if (posts.length > 0 || BigInt(first.entry_count ?? 0n) === 0n) {
+            writeShardSnapshot(key, marker, { posts, from: 0n, entryCount: first.entry_count });
+          }
         }
         for (const post of posts) {
           if (!post.publisher) continue;
@@ -272,8 +292,10 @@ export function createPublicLane({
             byWallet.set(wallet, { channelWallet: post.publisher, announcedAt: post.created_at, card: post.body });
           }
         }
+        done += 1;
         if (typeof onProgress === 'function') {
-          try { onProgress([...byWallet.values()]); }
+          // `{ done, total }` rides with every frame so a caller can say how far the sweep is, not only what it has.
+          try { onProgress([...byWallet.values()], { done, total: buckets.length }); }
           catch { /* see the note on onProgress: the caller's paint is not this sweep's problem */ }
         }
       }
@@ -303,7 +325,7 @@ export function createPublicLane({
       const posts = [];
       for (const coord of coords) {
         const state = live.get(addrKey(coord.address));
-        if (!state) continue;
+        if (!state || state.status !== 'active') continue;   // 'unknown' (refused by the endpoint) / uninit rows are not readable
         // THE SAME MARKER GATE THE THREAD READ HAS USED ALL ALONG, and the reason the window above can span a year
         // at all: without it, every live shard of every past era would have its history re-read on every feed sync.
         // A CLOSED era cannot change — its shards are past the publish gate's +/-1 slack — so after one read they
@@ -356,33 +378,37 @@ export function createPublicLane({
       }
       if (coords.length === 0) return { posts: [], era: null, exhausted: true };
       const live = await readLatestStates(coords.map((c) => c.address));
-      // coords run newest era first, so the first live coordinate names the newest live era.
-      let newestEra = null;
-      for (const coord of coords) {
-        if (live.get(addrKey(coord.address))) { newestEra = coord.era; break; }
-      }
-      if (newestEra === null) return { posts: [], era: null, exhausted: true };
+      // ACTIVE only — 'unknown' (refused by the endpoint) and uninit rows are not readable (get_page on an uninit
+      // account throws exit -13, the trap every read in this lane documents). Coordinates run newest era first, so
+      // the first live one names the newest live era.
+      const isLive = (coord) => { const state = live.get(addrKey(coord.address)); return Boolean(state && state.status === 'active'); };
+      const newestLive = coords.find(isLive);
+      if (!newestLive) return { posts: [], era: null, exhausted: true };
+      const newestEra = newestLive.era;
+      const exhausted = !coords.some((coord) => coord.era < newestEra && isLive(coord));
       const posts = [];
       for (const coord of coords) {
-        if (coord.era !== newestEra) continue;
+        if (coord.era !== newestEra || !isLive(coord)) continue;
         const state = live.get(addrKey(coord.address));
-        if (!state) continue;
         const key = addrKey(coord.address);
         const marker = changeMarkerOf(state);
         const full = readShardSnapshot(key, marker);
         let shardPosts = full ? full.posts : readLatestSnapshot(key, marker);
         if (!shardPosts) {
-          shardPosts = (await provider.readPosts(state.address, {
+          const tail = await provider.readPosts(state.address, {
             readMessagesWithSource: readLatestMessagesWithSource,
             maxCount: BigInt(maxCount),
             callOptions: { priority: LATEST_READ_OPTIONS.priority },   // get_page rides the same lane as the bodies
-          })).posts;
-          writeLatestSnapshot(key, marker, shardPosts);
+          });
+          shardPosts = tail.posts;
+          // The same gate as the sweep: a tail whose rows came back without bodies (the /messages window missed
+          // them) is not remembered as "no posts" until the marker moves; a genuinely empty shard is.
+          if (shardPosts.length > 0 || BigInt(tail.entry_count ?? 0n) === 0n) writeLatestSnapshot(key, marker, shardPosts);
         }
         for (const p of shardPosts) posts.push({ ...p, channelWallet, channelEpochTag: coord.epochTag, channelShardSeq: coord.seq });
       }
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
-      return { posts, era: newestEra, exhausted: !coords.some((c) => c.era < newestEra) };
+      return { posts, era: newestEra, exhausted };
     },
 
     /**
@@ -532,7 +558,9 @@ export function createPublicLane({
         });
         const count = Number(entryCount ?? 0);
         const from = fromId === null ? Math.max(0, count - PAGE_ROWS) : Number(fromId);
-        if (!paged) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count, oldestLt: oldestLt ?? null });
+        // Same gate as the sweep: a window whose bodies were DECLINED by the paced pump (a non-strict /messages
+        // answers [] under a rate limit) must not be remembered as "no comments" until the marker moves.
+        if (!paged && (shardPosts.length > 0 || count === 0)) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count, oldestLt: oldestLt ?? null });
         posts.push(...shardPosts);
         cursors[key] = { from, entryCount: count, oldestLt: oldestLt ?? null };
         report();

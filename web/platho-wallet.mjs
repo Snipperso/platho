@@ -14,7 +14,7 @@ import {
   parseTonAddress,
 } from './crypto/platho-crypto.mjs?v=15';
 import { tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=78';
+import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=80';
 
 const {
   beginCell,
@@ -872,8 +872,10 @@ async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options 
         // A DIFFERENT DOOR each time, not the same one again. The external reaches one node and spreads from
         // there; knocking twice on the door that already has it changes nothing, while another entry point is
         // another route to the collator. Falls back to the primary transport when no doors are configured.
-        const rotated = await broadcastThroughNextDoor(pending.boc, options);
-        if (!rotated) await transport.sendBoc({ boc: pending.boc, walletAddress: wallet.address });
+        // The signed seqno rides with the bytes: a door's verdict (classifyBroadcastDoorAnswer) is only meaningful
+        // against the seqno these bytes were signed for.
+        const rotated = await broadcastThroughNextDoor(pending.boc, { ...options, seqno: pending.seqno });
+        if (!rotated) await transport.sendBoc({ boc: pending.boc, walletAddress: wallet.address, seqno: pending.seqno });
         rebroadcasts += 1;
       } catch {
         // The seqno read is the verdict here, not this POST. A failed re-send changes nothing: the earlier copy may
@@ -981,7 +983,7 @@ async function sendPlathoWalletTransactionInLane(wallet, transaction, options = 
     profile?.mark('sign');
     let result = null;
     try {
-      result = await transport.sendBoc({ boc: built.boc, walletAddress: wallet.address });
+      result = await transport.sendBoc({ boc: built.boc, walletAddress: wallet.address, seqno });
     } catch (error) {
       // Surface WHY toncenter rejected the WALLET external (transfers/top-ups/deploy) — this was the last
       // broadcast path without a [platho] warn, so its 500s showed as bare mysteries in the console.
@@ -989,6 +991,7 @@ async function sendPlathoWalletTransactionInLane(wallet, transaction, options = 
         status: error?.status ?? null,
         code: error?.code ?? null,
         detail: error?.responseBody ?? String(error?.message ?? error),
+        verdict: error?.broadcastVerdict ?? null,
         seqno,
       });
       // A seqno mismatch is the chain PROVING our floor wrong. Two consequences, and getting either one wrong is

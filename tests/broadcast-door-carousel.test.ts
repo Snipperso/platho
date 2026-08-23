@@ -160,9 +160,19 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
         if (!/transport\??\.sendBoc\(\{ boc/.test(line)) return;
         // `built.boc` is the freshly signed chunk — the FIRST attempt, deliberately straight to the primary.
         if (line.includes('boc: built.boc')) return;
-        const previous = lines[index - 1] ?? '';
+        // The rotation must sit ABOVE the fallback POST inside the same function: the line before it (the wallet's
+        // pending re-offer), or — since the design integration (2026-08-23) — the shared rebroadcastSignedExternal,
+        // whose carousel call is a few lines up and whose primary sendBoc is reached only when `rotated` is null
+        // (no doors configured). Walk back to the function head; a `function` line before a rotation means a
+        // sendBoc that rotates nothing.
+        let rotates = false;
+        for (let back = index - 1; back >= Math.max(0, index - 12); back -= 1) {
+          const above = lines[back] ?? '';
+          if (above.includes('broadcastThroughNextDoor(')) { rotates = true; break; }
+          if (/^\s*(?:async\s+)?function\s/.test(above)) break;
+        }
         expect(
-          previous.includes('broadcastThroughNextDoor('),
+          rotates,
           `${name}:${index + 1} re-sends a captured external without rotating the door:\n${line.trim()}`,
         ).toBe(true);
       });
@@ -171,6 +181,9 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
     // And the rotation is reachable from both files that need it.
     expect(app).toContain('broadcastThroughNextDoor,');
     expect(wallet).toContain('broadcastThroughNextDoor,');
+    // Every lane's retry goes through the ONE helper (CONV confirm, INTRO idempotent retry, the public post and
+    // comment re-broadcasts) — the helper is where the verdict is read, so a lane that bypassed it would also lose it.
+    expect((app.match(/\brebroadcastSignedExternal\(/g) ?? []).length, 'four callers + the definition').toBeGreaterThanOrEqual(5);
   });
 
   it('DOORS-05: a door may never answer a read, and may never be a host of ours', () => {

@@ -21,12 +21,14 @@ describe('DISCOVERSTREAM — beacons are reported as they are read', () => {
   it('DISCOVERSTREAM-01: the sweep reports after EACH bucket, inside the loop', () => {
     const fn = lane.slice(lane.indexOf('async sweepChannelCatalog('));
     const body = fn.slice(0, fn.indexOf('async readChannelPosts('));
-    const loopAt = body.indexOf('for (const state of ordered.slice(0, limit))');
-    const callAt = body.indexOf('onProgress([...byWallet.values()])');
+    const loopAt = body.indexOf('for (const state of buckets)');
+    const callAt = body.indexOf('onProgress([...byWallet.values()], { done, total: buckets.length })');
     const returnAt = body.indexOf('return [...byWallet.values()];');
     expect(loopAt).toBeGreaterThan(-1);
     expect(callAt).toBeGreaterThan(loopAt);
     expect(callAt, 'reporting after the loop is the bug, not the fix').toBeLessThan(returnAt);
+    // And the frame says HOW FAR the sweep is, so the screen can count down under the cards (DISCOVERSTREAM-07).
+    expect(body).toContain('done += 1;');
   });
 
   it('DISCOVERSTREAM-05: no ranking wall in front of the first bucket, and no cap on how many are read', () => {
@@ -37,27 +39,32 @@ describe('DISCOVERSTREAM — beacons are reported as they are read', () => {
     // a loop that started 142 requests late.
     const fn = lane.slice(lane.indexOf('async sweepChannelCatalog('));
     const body = fn.slice(0, fn.indexOf('async readChannelPosts('));
-    const loopAt = body.indexOf('for (const state of ordered.slice(0, limit))');
+    const loopAt = body.indexOf('for (const state of buckets)');
     expect(loopAt).toBeGreaterThan(-1);
-    // Nothing between the states batch and the loop reads a bucket: the order is the FREE lt from accountStates.
+    // Nothing between the states batch and the loop reads a bucket: the order is the FREE lt from accountStates —
+    // and only ACTIVE buckets are read (an uninit or 'unknown' row is not readable: get_page throws exit -13).
     expect(body.slice(0, loopAt)).not.toContain('provider.getView(');
     expect(body.slice(0, loopAt)).not.toContain('readShardPosts(');
     expect(body.slice(0, loopAt)).toContain('const ltOf = (state) =>');
+    expect(body.slice(0, loopAt)).toContain(".filter((state) => state.status === 'active')");
     // Every live bucket by default — the cap is opt-in, never the default.
     expect(body).toMatch(/async sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = null, onProgress = null \} = \{\}\)/);
     expect(body).toContain(': ordered.length;');
-    // And a bucket whose marker has not moved is served from the snapshot cache — the same gate the channel read uses.
+    // And a bucket whose marker has not moved is served from the snapshot cache — the same gate the channel read
+    // uses; a bucket whose rows came back WITHOUT bodies is not cached as empty (the pump may have declined them).
     expect(body.slice(loopAt)).toContain('readShardSnapshot(key, marker)');
-    expect(body.slice(loopAt)).toContain('writeShardSnapshot(key, marker, { posts, from: 0n, entryCount: first.entry_count })');
-    // The app asks for everything: no topBuckets at the call site.
+    expect(body.slice(loopAt)).toContain('if (posts.length > 0 || BigInt(first.entry_count ?? 0n) === 0n) {');
+    expect(body.slice(loopAt)).toContain('writeShardSnapshot(key, marker, { posts, from: 0n, entryCount: first.entry_count });');
+    // The app asks for everything: topBuckets: Infinity at the call site (the lane reads that as "all of them").
     const call = app.slice(app.indexOf('catalog = await lane.sweepChannelCatalog({'), app.indexOf('catalog = await lane.sweepChannelCatalog({') + 200);
-    expect(call).not.toContain('topBuckets');
+    expect(call).toContain('topBuckets: Infinity');
   });
 
   it('DISCOVERSTREAM-02: a throwing consumer cannot stop the sweep', () => {
     const fn = lane.slice(lane.indexOf('async sweepChannelCatalog('));
     const body = fn.slice(0, fn.indexOf('async readChannelPosts('));
-    const callAt = body.indexOf('onProgress([...byWallet.values()])');
+    const callAt = body.indexOf('onProgress([...byWallet.values()], { done, total: buckets.length })');
+    expect(callAt).toBeGreaterThan(-1);
     // The remaining buckets are the user's channels; a bad frame in the caller must not cost them.
     expect(body.slice(callAt - 40, callAt + 160)).toContain('catch');
   });
@@ -98,23 +105,28 @@ describe('DISCOVERSTREAM — beacons are reported as they are read', () => {
   });
 
   it('DISCOVERSTREAM-06: a late partial cannot repaint a panel the user has left', () => {
-    const open = app.slice(app.indexOf('async function openPublicDiscovery()'));
-    const body = open.slice(0, open.indexOf('function renderPublicDiscovery'));
-    const cb = body.indexOf('onPartial: (partial)');
+    // The sweep keeps running after the screen closes, so the token check belongs INSIDE the painter — the one both
+    // the open and the refresh hand to the sweep, built per load so it carries that load's token.
+    expect(app).toContain('const results = await discoverChannels({ onPartial: publicDiscoveryPartialPainter(token) });');
+    expect(app).toContain('const results = await discoverChannels({ force: true, onPartial: publicDiscoveryPartialPainter(token) });');
+    const painter = app.slice(app.indexOf('function publicDiscoveryPartialPainter(token)'));
+    const cb = painter.indexOf('return (partial, progress) => {');
     expect(cb).toBeGreaterThan(-1);
-    // The sweep keeps running after the screen closes; the token check belongs INSIDE the callback too.
-    expect(body.slice(cb, cb + 260)).toContain('token !== publicDiscoveryLoadToken');
-    expect(body.slice(cb, cb + 260)).toContain('!publicDiscoveryOpen');
+    expect(painter.slice(cb, cb + 200)).toContain('token !== publicDiscoveryLoadToken');
+    expect(painter.slice(cb, cb + 200)).toContain('!publicDiscoveryOpen');
   });
 
   it('DISCOVERSTREAM-07: a still-sweeping list says so, under the cards', () => {
+    // The status line under the cards says "still looking… N of M" while the sweep's progress is remembered
+    // (publicDiscoveryProgress, from the painter's frames); only a FINISHED sweep may say "nothing found".
     const render = app.slice(app.indexOf('function renderPublicDiscovery(options'));
     const body = render.slice(0, render.indexOf('function discoveryCardIdentityButton'));
-    const cardsAt = body.indexOf('publicDiscoveryBody.append(buildDiscoveryCard(channel))');
-    const partialAt = body.indexOf("options.partial === true");
-    expect(cardsAt).toBeGreaterThan(-1);
-    // Under, not instead of: a short list mid-sweep must not read as a finished short list.
-    expect(partialAt).toBeGreaterThan(cardsAt);
-    expect(body.slice(partialAt)).toContain("t('public.discoverLoading')");
+    expect(body).toContain('status.textContent = publicDiscoveryStatusText(progress, { shownCount: shown.length, loading, error: options.error === true });');
+    const statusText = app.slice(app.indexOf('function publicDiscoveryStatusText(progress'), app.indexOf('function updatePublicDiscoveryStatusLine'));
+    expect(statusText).toContain('const sweeping = loading || progress !== null;');
+    expect(statusText).toContain('if (sweeping) return publicDiscoverySweepStatusText(progress);');
+    const sweepText = app.slice(app.indexOf('function publicDiscoverySweepStatusText(progress'));
+    expect(sweepText.slice(0, 800)).toContain("t('public.discoverScanning', { done, total, left: Math.max(0, total - done) })");
+    expect(sweepText.slice(0, 800)).toContain("t('public.discoverLoading')");
   });
 });

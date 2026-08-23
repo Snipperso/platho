@@ -128,6 +128,10 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
     const refreshComposerPublishPolicy = () => {};
     const reloadForPendingServiceWorkerAppShellUpdate = () => false;
     const clearVaultAutoRefreshTimer = () => {};
+    // Since the design integration (2026-08-23) the lock also drops the activation re-read ladder and the
+    // chain-verified names count of the wallet being torn down — both edges here, neither decides anything.
+    const clearPlathoActivationReread = () => {};
+    let ownedUsernameNftsVerified = null;
     const clearWalletUnlockPromptTimer = () => { walletUnlockPromptTimer = null; };
     const hasStoredPlathoWalletRecord = () => true;
     const privateOutboundWorkActive = () => sendHoldsKey;
@@ -335,7 +339,7 @@ describe('background wallet lock deferral', () => {
     expect(app, 'and the dialog clause is what the reloader is reading through it')
       .toMatch(/function shouldIgnoreTransientWalletLock\(\) \{\s*return Boolean\(activeActionDialog\)/);
     // All three return doors settle the deadline, and none of them is left holding the old clear-only call.
-    for (const door of ["document.addEventListener('visibilitychange'", "window.addEventListener('pageshow'", "window.addEventListener('focus'"]) {
+    for (const door of ["document.addEventListener('visibilitychange', () => {", "window.addEventListener('pageshow'", "window.addEventListener('focus'"]) {
       const start = app.indexOf(door);
       expect(start, `${door} must exist`).toBeGreaterThan(-1);
       const body = app.slice(start, app.indexOf('\n});', start));

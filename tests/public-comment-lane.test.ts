@@ -80,29 +80,31 @@ describe('CMT — a busy post can be read further back than one page', () => {
     // The loader converts each partial with the SAME conversion as the final result, in ORDER, and never after the
     // read has returned — a later, fuller partial finishing first must not be overwritten by an earlier one, and no
     // partial may land on top of the authoritative whole.
+    // (2026-08 redesign port: the frames are CHAINED — converted in the lane's order, a superseded frame skipped, and
+    // the chain drained before the read returns — so no frame can land after the authoritative whole.)
     const loader = functionBody(APP, 'async function loadPublicPostCommentsFromShards(');
-    expect(loader).toContain('const seq = (partialSeq += 1);');
-    expect(loader).toContain('if (partialsClosed || seq !== partialSeq) return;');
-    expect(loader).toMatch(/\} finally \{\s*\n\s*partialsClosed = true;/);
-    expect(loader).toContain('publicCommentsFromThreadPosts(item, partial.posts)');
-    expect(loader).toContain('const comments = await publicCommentsFromThreadPosts(item, read.posts);');
-    expect(APP).toContain('async function publicCommentsFromThreadPosts(item, threadPosts) {');
+    expect(loader).toContain('partialChain = partialChain.then(async () => {');
+    expect(loader).toContain('const comments = await publicThreadPostsToComments(item, next.posts ?? [], hashMemo);');
+    expect(loader).toContain('const comments = await publicThreadPostsToComments(item, read.posts, hashMemo);');
+    expect(loader.match(/await partialChain;/g)?.length, 'drained on the failure path AND before the result').toBe(2);
+    expect(loader.indexOf('await partialChain;\n  const comments = await publicThreadPostsToComments(item, read.posts'), 'drained BEFORE the final conversion').toBeGreaterThan(-1);
+    expect(APP).toContain('async function publicThreadPostsToComments(item, threadPosts, hashMemo = null) {');
     // Still: "no comments yet" comes from a live shard, for partials and for the whole alike.
-    expect(loader).toContain("onPartial({ comments, parentExists: Number(partial.shardsSeen ?? 0) > 0,");
+    expect(loader).toContain('parentExists: Number(next.shardsSeen ?? 0) > 0,');
+    expect(loader).toContain('parentExists: Number(read.shardsSeen ?? 0) > 0,');
 
-    // The screen MERGES a partial (mergePublicComments only adds) and leaves the load state alone; only the clean
-    // final result replaces the list, reaches the cache, and retires a pending local comment (CONF-03).
+    // The screen MERGES a frame (mergePublicComments only adds) and leaves the load state alone; only the clean
+    // final result reaches the cache and retires a pending local comment (CONF-03).
     const refresh = functionBody(APP, 'async function refreshPublicPostDetailComments(');
-    expect(refresh).toContain('publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, partial.comments);');
-    expect(refresh).toContain('if (token !== publicPostDetailLoadToken) return;                     // closed or reopened — drop it');
-    expect(refresh).toContain("result = await loadPublicPostComments(item, { snapshot: snapshot?.latestLink ? snapshot : null, onPartial });");
-    const partialBody = refresh.slice(refresh.indexOf('const onPartial = (partial) => {'), refresh.indexOf('for (let attempt = 0;'));
-    expect(partialBody, 'a partial never touches the cache').not.toContain('writeCachedPublicComments');
-    expect(partialBody, 'a partial never retires a pending comment').not.toContain('retireConfirmedLocalPublicComments');
-    expect(partialBody, 'a partial never flips the load state').not.toContain('publicPostDetailLoadState =');
-    // Older pages stream the same way.
-    const earlier = functionBody(APP, 'async function loadEarlierPublicPostComments(');
-    expect(earlier).toContain("const result = await loadPublicPostComments(item, { olderThan: publicPostDetailCommentCursors, onPartial });");
+    expect(refresh).toContain('publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, frame.comments);');
+    expect(refresh).toContain('if (token !== publicPostDetailLoadToken) return; // closed or reopened — drop this result');
+    const partialBody = refresh.slice(refresh.indexOf('onPartial: (frame) => {'), refresh.indexOf('} catch (error) {', refresh.indexOf('onPartial: (frame) => {')));
+    expect(partialBody.length, 'the frame handler slice must not collapse').toBeGreaterThan(200);
+    expect(partialBody, 'a frame for a closed or reopened post dies on the token').toContain('if (token !== publicPostDetailLoadToken) return;');
+    expect(partialBody, 'a frame never touches the cache').not.toContain('writeCachedPublicComments');
+    expect(partialBody, 'a frame never retires a pending comment').not.toContain('retireConfirmedLocalPublicComments');
+    expect(partialBody, 'a frame never flips the load state').not.toContain('publicPostDetailLoadState =');
+    expect(partialBody, 'a frame never moves the cursors').not.toContain('publicPostDetailCommentCursors =');
   });
 
   it('CMT-04: the snapshot cache may only answer the NEWEST window', () => {
@@ -110,22 +112,29 @@ describe('CMT — a busy post can be read further back than one page', () => {
     // the newest rows dressed as older ones — the "load earlier" that appends what is already on screen.
     const reader = functionBody(LANE, 'async readThreadComments(');
     expect(reader).toContain('const snapshot = paged ? null : readShardSnapshot(key, marker);');
-    expect(reader).toContain('if (!paged) writeShardSnapshot(key, marker,');
+    // ...and a newest window whose bodies the paced pump declined (rows, no bodies) is NOT remembered as "no
+    // comments" until the marker moves — only a window with bodies, or a genuinely empty shard, is cached.
+    expect(reader).toContain('if (!paged && (shardPosts.length > 0 || count === 0)) writeShardSnapshot(key, marker,');
     // One value shape across both readers of the shared cache.
     expect(LANE).toContain('writeShardSnapshot(key, marker, { posts: shardPosts, from: null, entryCount: null });');
   });
 
-  it('CMT-05: the button appears only when there IS more, and adds rather than replaces', () => {
-    expect(APP).toContain('if (publicPostDetailHasMoreComments) {');
-    expect(APP).toContain("earlier.textContent = publicPostDetailLoadingEarlier ? t('public.loadingComments') : t('public.showEarlierComments');");
+  it('CMT-05: the "earlier" sentinel appears only when there IS more, and adds rather than replaces', () => {
+    // 2026-08 redesign: the "show earlier comments" BUTTON became a load SENTINEL at the older end of the
+    // newest-first thread (an IntersectionObserver pages it in; a tap still works) — appended only while the lane
+    // says there is more, and never while a date jump is busy.
+    expect(APP).toContain("if (publicPostDetailHasMoreComments && !publicPostDetailJumpBusy) section.append(buildCommentsLoadSentinel('earlier'));");
+    const sentinel = functionBody(APP, 'function buildCommentsLoadSentinel(');
+    expect(sentinel).toContain("const label = direction === 'newer' ? t('public.loadingNewerComments') : t('public.showEarlierComments');");
+    expect(sentinel).toContain('else loadEarlierPublicPostComments();');
     const earlier = functionBody(APP, 'async function loadEarlierPublicPostComments(');
     // A page of older comments is an ADDITION to what is on screen; mergePublicComments dedups by entry id and
     // re-sorts by time, so an overlapping page cannot double-count.
     expect(earlier).toContain('publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);');
-    // Re-entrancy: the button disables itself, and a result that arrives after the post was closed or reopened is
-    // dropped rather than merged into whatever is on screen now.
-    expect(earlier).toContain('if (!item || publicPostDetailLoadingEarlier || !publicPostDetailHasMoreComments) return;');
-    expect(earlier).toContain('if (token !== publicPostDetailLoadToken || !publicPostDetailOpen) return;');
+    // Re-entrancy: the sentinel disables itself, and a result that arrives after the post was closed, switched or
+    // re-framed (the paging generation moved) is dropped rather than merged into whatever is on screen now.
+    expect(earlier).toContain('if (!item || publicPostDetailLoadingEarlier || !publicPostDetailHasMoreComments || publicPostDetailJumpBusy) return;');
+    expect(earlier).toContain('if (!publicPostDetailStillOn(item) || generation !== publicCommentsPagingGeneration) return;');
     // NOT written to the comment cache: that snapshot is the post's newest window, and a back-page written into it
     // would make the next open serve a middle slice of the thread as if it were the head.
     expect(earlier).not.toContain('writeCachedPublicComments');

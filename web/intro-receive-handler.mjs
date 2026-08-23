@@ -56,10 +56,18 @@ export function createIntroReceiveHandler({
     const capsule = delivery?.capsule ?? delivery;
     const header0Bytes = asBytes(capsule.header0, 'intro header0');
     const bodyBytes = asBytes(capsule.body, 'intro body');
+    // THE NONCE IS RECORDED ONLY AFTER ADOPTION SUCCEEDS. The crypto layer adds it INSIDE the open, before K_root is
+    // stored; if upsertConversationKRoot / onFirstContact then threw (an IDB write error, a lock mid-pass), the next
+    // pass saw "replay" and the runner marked the entry delivered — a first contact lost durably and silently. So the
+    // guard handed to the open only CHECKS; the add happens below, once the adoption has landed.
+    let nonceToRecord = null;
+    const checkOnlyGuard = introReplayGuard
+      ? { has: (key) => introReplayGuard.has(key), add: async (key) => { nonceToRecord = key; } }
+      : undefined;
     let opened;
     try {
       opened = await openIntroCapsuleFromChainCells(header0Bytes, bodyBytes, recipientKeyPair, {
-        introReplayGuard: introReplayGuard ?? undefined,
+        introReplayGuard: checkOnlyGuard,
         enforceExpiry: false,
       });
     } catch (error) {
@@ -91,6 +99,7 @@ export function createIntroReceiveHandler({
 
     const result = { ...opened, adoption };
     if (typeof onFirstContact === 'function') await onFirstContact(result, capsule);
+    if (introReplayGuard && nonceToRecord !== null) await introReplayGuard.add(nonceToRecord);
     return result;
   };
 }

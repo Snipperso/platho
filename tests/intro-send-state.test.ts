@@ -19,12 +19,19 @@ import {
 
 const bytes = (fill: number, n = 32) => new Uint8Array(n).fill(fill);
 
+// peerKeyId is what the app stores: bundle.keyId — computeHybridKeyId's base64url STRING (43 characters, with '-' and
+// '_' in its alphabet), never bytes. The first version of this fixture used 32 bytes here, which is exactly what hid
+// the defect ISS-07 pins: the hex codec passed a string out unchanged and then refused it on the way back in.
+const PEER_KEY_ID = 'Qm9iS2V5SWQtMjAyNl8wOF8yM19iYXNlNjR1cmxfU1RS';
+
 const sample = () => ({
   at: 1_790_000_000_000,
   boc: 'te6ccgEBAQEAAgAAAA==',
   kRoot: bytes(0x5a),
   introNonce: bytes(0x11, 16),
-  peerKeyId: bytes(0x22),
+  peerKeyId: PEER_KEY_ID,
+  seqno: 41,
+  seqnoConsumedAt: 0,
   peerWallet: 'EQBOSbFHf8Iqe390MhsuN8RywBimRbzTwq8dtnN9fN4MyZOP',
   epoch: 20_717,
   bucket: 391,
@@ -44,7 +51,9 @@ describe('INTRO-SEND-STATE', () => {
     expect(revived!.kRoot, 'the K_root comes back as BYTES').toBeInstanceOf(Uint8Array);
     expect([...revived!.kRoot!]).toEqual([...original.kRoot]);
     expect([...revived!.introNonce!]).toEqual([...original.introNonce]);
-    expect([...revived!.peerKeyId!]).toEqual([...original.peerKeyId]);
+    expect(revived!.peerKeyId, 'the peer key id comes back as the SAME STRING (it is compared to bundle.keyId as a string)').toBe(original.peerKeyId);
+    expect(revived!.seqno, 'the seqno the external was signed for survives').toBe(41);
+    expect(revived!.seqnoConsumedAt).toBe(0);
     expect(revived!.r, 'the stealth R stays a BigInt of the same value').toBe(original.r);
     expect(revived!.viewTag).toBe(original.viewTag);
     expect(revived!.expectedEntryId).toBe(original.expectedEntryId);
@@ -52,6 +61,25 @@ describe('INTRO-SEND-STATE', () => {
     expect(revived!.peerWallet).toBe(original.peerWallet);
     expect(revived!.epoch).toBe(original.epoch);
     expect(revived!.bucket).toBe(original.bucket);
+  });
+
+  it('ISS-07: a REAL key id (base64url string) survives the round-trip — the hex codec nulled the whole record', () => {
+    // FOUND IN THE DESIGN-INTEGRATION REVIEW (2026-08-22/23): attemptIntroFirstContactDirect stores peerKeyId =
+    // bundle.keyId, a 43-char base64url string; the old serializer passed it through toHex unchanged and the reviver
+    // ran fromHex on it, which throws (not hex, odd length) — and the catch turned the WHOLE record into null. So no
+    // INTRO send ever survived a reload, and a retry after reload minted a second INTRO (double charge, possible
+    // fork) — the very failure this module exists to prevent.
+    for (const keyId of [PEER_KEY_ID, 'abc-_DEF0123456789abcdefghijklmnopqrstuvwxyzA', 'a'.repeat(43)]) {
+      const revived = reviveIntroDirectSend(JSON.parse(JSON.stringify(serializeIntroDirectSend({ ...sample(), peerKeyId: keyId }))));
+      expect(revived, `a record with peerKeyId ${keyId.slice(0, 8)}… must revive`).not.toBeNull();
+      expect(revived!.peerKeyId).toBe(keyId);
+      expect([...revived!.kRoot!], 'and the K_root beside it is intact').toEqual([...sample().kRoot]);
+    }
+    // A legacy record that somehow carried bytes is revived as the string every consumer expects (base64url of them).
+    const legacy = reviveIntroDirectSend(JSON.parse(JSON.stringify(serializeIntroDirectSend({ ...sample(), peerKeyId: new Uint8Array([250, 251, 252]) as any }))));
+    expect(legacy!.peerKeyId).toBe('-vv8');
+    // And an absent one stays absent rather than becoming the string "null".
+    expect(reviveIntroDirectSend(JSON.parse(JSON.stringify(serializeIntroDirectSend({ ...sample(), peerKeyId: null as any }))))!.peerKeyId).toBeNull();
   });
 
   it('ISS-02: a plain JSON clone would have CORRUPTED it — this is why the codec exists', () => {

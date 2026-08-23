@@ -21,7 +21,7 @@
 // to "you own nothing", and this list is a statement about somebody's PROPERTY. A down indexer must degrade to "here
 // is what I can prove, the list may be incomplete" and never to silence — `complete` carries that, and a caller that
 // ignores it will show a list that lies.
-import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=62';
+import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=64';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
 
 /** Public indexer, read-only. Already reachable under the production CSP as a broadcast door; this reads. */
@@ -150,13 +150,18 @@ export async function usernameNftCandidateFromLabel(label, { registryProvider, c
  * is authoritative AND its owner is this wallet; everything else is dropped without comment, because "an account we
  * were pointed at is not yours" is not news the user needs.
  *
- * `complete` is false when the indexer could not be asked or refused. It is not cosmetic: the caller must say so.
+ * `complete` is false when the indexer could not be asked or refused, when any item check THREW (`unverified`
+ * counts them, `verifyFailures` is the same number under the caller's name), OR when the caller could not even turn a
+ * remembered name into a candidate (`candidateFailures` — a registry getter that failed while deriving the item
+ * address; the name was never asked about). It is not cosmetic: the caller must say so — and a caller that reconciles
+ * its own memory against this list may only ADD from an incomplete one, never forget.
  */
 export async function collectOwnedUsernameNfts({
   ownerWallet,
   candidateAddresses = [],
   indexerAddresses = null,
   indexerError = null,
+  candidateFailures = 0,
   verifyItem,
 } = {}) {
   if (typeof verifyItem !== 'function') throw new Error('username nft collect: verifyItem is required');
@@ -216,8 +221,11 @@ export async function collectOwnedUsernameNfts({
       const hash = await nameHashOrNull(proposedLabel);
       if (hash !== null && BigInt(hash) === BigInt(record.name_hash ?? 0n)) label = proposedLabel;
     }
-    if (rawAddress(record.owner_wallet) !== mine) {
-      if (label) transferred.push({ itemAddress, label, ownerWallet: rawAddress(record.owner_wallet) });
+    const ownerWalletRaw = rawAddress(record.owner_wallet);
+    if (ownerWalletRaw !== mine) {
+      // Somebody else's now — and the chain, not a proposer, says so. Reported ONLY with a proven name: the caller
+      // forgets by label, and an unproven label is exactly the thing this module never lets anyone act on.
+      if (label && ownerWalletRaw) transferred.push({ itemAddress, nameHash: record.name_hash ?? null, label, ownerWallet: ownerWalletRaw });
       continue;
     }
     owned.push({
@@ -230,5 +238,14 @@ export async function collectOwnedUsernameNfts({
     });
   }
 
-  return { owned, transferred, complete: indexerError === null && indexerAddresses !== null && unverified === 0, indexerError, unverified };
+  const candidateFailureCount = Math.max(0, Number(candidateFailures) || 0);
+  return {
+    owned,
+    transferred,
+    complete: indexerError === null && indexerAddresses !== null && unverified === 0 && candidateFailureCount === 0,
+    indexerError,
+    unverified,
+    verifyFailures: unverified,
+    candidateFailures: candidateFailureCount,
+  };
 }

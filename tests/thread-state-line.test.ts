@@ -60,9 +60,13 @@ describe('THREADSTATE — the private list says only what it can back up', () =>
     expect(APP).toContain("state.dataset.tone = thread.state === 'blocked' ? 'failed' : 'sending';");
     const css = readFileSync('web/styles.css', 'utf8');
     expect(css).toContain('.thread-state[data-tone="failed"]');
-    // Matched to .message[data-status="failed"] .message-meta — one idea of "wrong", one colour.
-    const failedRow = css.slice(css.indexOf('.thread-state[data-tone="failed"]'));
-    expect(failedRow.slice(0, 120)).toContain('#ff8f8f');
+    // Matched to .message[data-status="failed"] .message-meta — one idea of "wrong", one colour. Since the 2026-08
+    // redesign both read the ONE theme token (--danger, themed per scheme) rather than a literal; the pin is that
+    // the two rules name the same colour, whatever it is.
+    const colourOf = (selector: string) => /color:\s*([^;]+);/.exec(css.slice(css.indexOf(selector)).slice(0, 160))?.[1]?.trim() ?? null;
+    const listFailed = colourOf('.thread-state[data-tone="failed"]');
+    expect(listFailed, 'the list row names a colour').toBeTruthy();
+    expect(colourOf('.message[data-status="failed"] .message-meta'), 'the open dialog uses the SAME red').toBe(listFailed);
   });
 
   it('THREADSTATE-05: search matches what the row SHOWS, not the internal token', () => {

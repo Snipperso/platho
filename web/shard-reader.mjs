@@ -24,7 +24,7 @@
 //   4. include_boc is all-or-nothing: with it on you also download code_boc, which is identical for every shard.
 //      The cheap pass therefore runs with it OFF and uses data_hash / last_transaction_lt to spot changes.
 
-import { addrKey } from './shard-discovery.mjs?v=21';
+import { addrKey } from './shard-discovery.mjs?v=23';
 
 // One request covers a full 1024-bucket read space with headroom under the measured 1149 ceiling. Deliberately
 // NOT set to 1149: the limit is in bytes, so a longer address form or an extra query parameter would silently
@@ -77,11 +77,13 @@ let unnamedRefusalReported = false;
 export function isDeadlineDetail(detail) {
   return /deadline exceeded|timed? ?out/i.test(String(detail ?? ''));
 }
-const STATES_BATCH_FLOOR = 32;                      // below this a timeout is the endpoint's problem, not the batch's
-const STATES_BATCH_RECOVERY_AFTER = 16;             // clean batches at a lowered ceiling before it doubles back
+export const STATES_BATCH_FLOOR = 32;               // below this a timeout is the endpoint's problem, not the batch's
+export const STATES_BATCH_RECOVERY_AFTER = 16;      // clean batches at a lowered ceiling before it doubles back
 let statesBatchCeiling = ACCOUNT_STATES_MAX_PER_CALL;
 let statesBatchCleanRun = 0;
 let deadlineReported = false;
+/** The ceiling in force right now (diagnostics, tests, a status line). */
+export function currentStatesBatchCeiling() { return statesBatchCeiling; }
 function noteBatchTimedOut(size) {
   const next = Math.max(STATES_BATCH_FLOOR, Math.min(statesBatchCeiling, Math.floor(size / 2)));
   statesBatchCleanRun = 0;
@@ -114,8 +116,11 @@ function publishCeiling() {
   }
 }
 export function seedStatesBatchCeiling(value) {
+  // null / undefined / '' — what localStorage.getItem hands back for an absent key — is "nothing stored", NOT a
+  // number: Number(null) is 0 and would read as "clamp to the floor", pinning a fresh profile at 32 for no reason.
+  if (value === null || value === undefined || value === '') return statesBatchCeiling;
   const n = Number(value);
-  if (!Number.isFinite(n)) return statesBatchCeiling;
+  if (!Number.isFinite(n) || n <= 0) return statesBatchCeiling;
   statesBatchCeiling = Math.max(STATES_BATCH_FLOOR, Math.min(ACCOUNT_STATES_MAX_PER_CALL, Math.floor(n)));
   statesBatchCleanRun = 0;
   return statesBatchCeiling;
@@ -135,10 +140,68 @@ export function __resetRefusedAddressesForTests() {
   ceilingListeners.clear();
 }
 
-const refusedRow = (wire) => ({ address: wire, status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });
+const refusedRow = (wire) => ({ address: wire, status: 'unknown', reason: 'refused', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: true });
 // An address the endpoint did not get to this pass: unknown like a refused one (the lanes read it the slow way),
 // but NOT refused — nothing was said about it, and it goes back on the wire next pass.
-const unansweredRow = (wire) => ({ address: wire, status: 'unknown', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: false, unanswered: true });
+const unansweredRow = (wire) => ({ address: wire, status: 'unknown', reason: 'unanswered', balance: 0n, dataHash: null, codeHash: null, lastLt: null, dataBoc: null, refused: false, unanswered: true });
+
+/** True for either 'unknown' row above — a shard the endpoint did not answer about, not one that is empty. */
+export const isUnknownAccountState = (state) => state?.status === 'unknown';
+
+/**
+ * True unless the 422 body is well-formed FastAPI detail JSON in which NO entry points at an `address` parameter (by
+ * `loc`) or carries an `input` string — i.e. a 422 that names some OTHER parameter, or a proxy answering 422 to
+ * everything, is not an address refusal, and bisecting it would cost 2N-1 requests and mark every address unknown
+ * for the session. Unknown shapes (not JSON, no detail, the Go-style "index N of address" text) keep the bisecting
+ * behaviour: this only ever says "stop" when the body positively names something else.
+ */
+export function unprocessableBodyMayNameAddress(bodyText) {
+  const raw = String(bodyText ?? '').trim();
+  if (!raw) return true;
+  let json;
+  try { json = JSON.parse(raw); } catch { return true; }
+  const details = Array.isArray(json?.detail)
+    ? json.detail
+    : (json?.detail && typeof json.detail === 'object' ? [json.detail] : []);
+  if (details.length === 0) return true;
+  return details.some((item) =>
+    (Array.isArray(item?.loc) && item.loc.some((part) => String(part).toLowerCase() === 'address'))
+    || typeof item?.input === 'string');
+}
+
+/**
+ * The FastAPI shape of "which address": `{"detail":[{"loc":["query","address",<i>],"msg":"…","input":"…"}]}` — the
+ * integer after "address" in `loc` is the 0-based index into the `address=` parameters AS SENT; `input`, when present,
+ * is the offending value and is used as a second opinion. Trusted only in range, and only when a recognisable `input`
+ * agrees (an `input` we did not send is ignored, not a veto); -1 when the body does not say, like refusedIndexFromDetail.
+ */
+export function refusedIndexFromBody(bodyText, wireAddresses = []) {
+  const raw = String(bodyText ?? '').trim();
+  if (!raw) return -1;
+  let json;
+  try { json = JSON.parse(raw); } catch { return -1; }
+  const details = Array.isArray(json?.detail)
+    ? json.detail
+    : (json?.detail && typeof json.detail === 'object' ? [json.detail] : []);
+  for (const item of details) {
+    const loc = Array.isArray(item?.loc) ? item.loc : null;
+    let index = -1;
+    if (loc) {
+      const at = loc.findIndex((part) => String(part).toLowerCase() === 'address');
+      const next = at >= 0 ? loc[at + 1] : undefined;
+      if (Number.isInteger(next) && next >= 0 && next < wireAddresses.length) index = next;
+      else if (typeof next === 'string' && /^\d+$/.test(next) && Number(next) < wireAddresses.length) index = Number(next);
+    }
+    const input = typeof item?.input === 'string' ? item.input : null;
+    if (input !== null) {
+      const byInput = wireAddresses.indexOf(input);
+      if (index < 0) index = byInput;
+      else if (byInput >= 0 && byInput !== index) index = -1;   // loc and input disagree — trust neither, bisect
+    }
+    if (index >= 0) return index;
+  }
+  return -1;
+}
 
 /**
  * Which address a 422 is about, when the endpoint says. toncenter v3 names the culprit by position:
@@ -183,13 +246,17 @@ export async function readAccountStates(addresses, { request, includeBoc = false
       // that is the silent-loss shape. An unknown row carries no marker, which every lane already treats as "read
       // it, remember nothing".
       if (error?.status === 422) {
-        const index = refusedIndexFromDetail(error?.detail);
+        // The body under BOTH names it has worn: the Go-style "index N of address" text (measured on the owner's
+        // console) and the FastAPI detail[].loc shape (the verbatim body, when the request function kept it).
+        const bodyText = error?.responseText ?? error?.detail ?? '';
+        const namedIndex = refusedIndexFromDetail(error?.detail);
+        const index = namedIndex >= 0 ? namedIndex : refusedIndexFromBody(bodyText, wire);
         if (index >= 0 && index < wire.length) {
           noteRefused(wire[index], error?.detail);
           if (wire.length > 1) await readGroup([...wire.slice(0, index), ...wire.slice(index + 1)]);
           return;
         }
-        if (isDeadlineDetail(error?.detail)) {
+        if (isDeadlineDetail(error?.detail) || isDeadlineDetail(bodyText)) {
           // Their clock, not our addresses: split, remember to ask smaller, refuse nothing. See the note above.
           noteBatchTimedOut(wire.length);
           if (!deadlineReported) {
@@ -204,14 +271,23 @@ export async function readAccountStates(addresses, { request, includeBoc = false
           // are UNANSWERED this pass (the lanes read them the slow way) and go back on the wire next pass, when
           // the remembered ceiling already keeps the batches small.
           if (wire.length > STATES_BATCH_FLOOR) {
-            const mid = Math.ceil(wire.length / 2);
-            await readGroup(wire.slice(0, mid));
-            await readGroup(wire.slice(mid));
+            // The halves are cut at the LIVE ceiling, like the top-level groups: the first half's own deadlines
+            // lower it, and the sibling must not be re-asked at a size the endpoint has just refused (that was one
+            // more deadline wait per level, and one extra halving persisted for nothing).
+            const half = Math.ceil(wire.length / 2);
+            for (let off = 0; off < wire.length;) {
+              const part = wire.slice(off, off + Math.max(1, Math.min(half, statesBatchCeiling)));
+              off += part.length;
+              await readGroup(part);
+            }
             return;
           }
           for (const w of wire) out.set(addrKey(w), unansweredRow(w));
           return;
         }
+        // A 422 that positively names some OTHER parameter (or a proxy answering 422 to everything) is not an
+        // address refusal: bisecting it would cost 2N-1 requests and mark every address unknown for the session.
+        if (!unprocessableBodyMayNameAddress(bodyText)) throw error;
         if (wire.length > 1) {
           if (!unnamedRefusalReported) {
             unnamedRefusalReported = true;
@@ -256,6 +332,10 @@ export async function readAccountStates(addresses, { request, includeBoc = false
 export function changedSince(states, seen = new Map()) {
   const changed = [];
   for (const [key, state] of states) {
+    // An 'unknown' row (the endpoint refused or did not answer about the address) is ALWAYS listed: nothing was
+    // measured, so nothing can be "unchanged" — the caller reads it the slow way and, its marker being null,
+    // remembers nothing for it.
+    if (isUnknownAccountState(state)) { changed.push({ key, state }); continue; }
     const previous = seen.get(key);
     if (previous === undefined || previous === null) { changed.push({ key, state }); continue; }
     if (String(state.lastLt ?? state.dataHash) !== String(previous)) changed.push({ key, state });
@@ -263,8 +343,13 @@ export function changedSince(states, seen = new Map()) {
   return changed;
 }
 
-/** The marker to remember for `changedSince` — kept in one place so the two sides cannot drift apart. */
-export const changeMarkerOf = (state) => String(state.lastLt ?? state.dataHash);
+/**
+ * The marker to remember for `changedSince` — kept in one place so the two sides cannot drift apart. NULL for an
+ * 'unknown' row: the old String(null ?? null) was the constant "null", which matched itself on the next pass and
+ * silenced a shard nobody had ever read. conv-lane's markShard already refuses a null marker, intro-receive stores
+ * it and re-reads, and the public lane's snapshot cache refuses it (readShardSnapshot / writeShardSnapshot).
+ */
+export const changeMarkerOf = (state) => (isUnknownAccountState(state) ? null : String(state.lastLt ?? state.dataHash));
 
 /**
  * A LIVE account — one that actually carries code, so a get-method against it will run.

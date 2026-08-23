@@ -261,14 +261,14 @@ describe('wallet unlock prompt on resume', () => {
 
     // THREE return doors, not two. focus was a line-for-line copy of pageshow minus this one call, so a return
     // that fires focus alone — routine on Android — came back silent even on an otherwise correct tree.
-    for (const door of ["document.addEventListener('visibilitychange'", "window.addEventListener('pageshow'", "window.addEventListener('focus'"]) {
+    for (const door of ["document.addEventListener('visibilitychange', () => {", "window.addEventListener('pageshow'", "window.addEventListener('focus'"]) {
       const start = app.indexOf(door);
       expect(start, `${door} must exist`).toBeGreaterThan(-1);
       const body = app.slice(start, app.indexOf('\n});', start));
       expect(body, `${door} must resume the unlock prompt`).toContain('resumeWalletUnlockPrompt();');
     }
     // ...and both exit doors must record the departure, or the declined flag would never be released.
-    for (const door of ["document.addEventListener('visibilitychange'", "window.addEventListener('pagehide'"]) {
+    for (const door of ["document.addEventListener('visibilitychange', () => {", "window.addEventListener('pagehide'"]) {
       const start = app.indexOf(door);
       const body = app.slice(start, app.indexOf('\n});', start));
       expect(body, `${door} must note the departure`).toContain('noteWalletUnlockInterruptedByBackground();');

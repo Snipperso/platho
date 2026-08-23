@@ -65,14 +65,15 @@ describe('public comment scroll-into-view', () => {
 
   it('CMTSCROLL-04: it scrolls AFTER layout, and again once late images settle', () => {
     expect(scroller.length, 'the scroller slice must not collapse').toBeGreaterThan(200);
-    // scrollHeight is not final on the tick the row is appended.
-    expect(scroller).toMatch(/requestAnimationFrame\(toBottom\);/);
-    expect(scroller).toContain('body.scrollTop = body.scrollHeight;');
-    // An image inside the new comment finishes loading a few frames later and grows the list under the scroll
-    // position. Already-complete images are skipped, so this costs nothing on a text-only thread.
+    // Layout is not final on the tick the row is appended. (2026-08 redesign: comments are NEWEST FIRST, so "latest"
+    // is the comments section's start under the heading, not the scroller's bottom — toLatest, not toBottom.)
+    expect(scroller).toMatch(/requestAnimationFrame\(toLatest\);/);
+    expect(scroller).toContain("const section = body.querySelector('.public-detail-comments');");
+    // An image above the section (the post card) finishes loading a few frames later and shifts the section under
+    // the scroll position. Already-complete images are skipped, so this costs nothing on a text-only thread.
     expect(scroller).toContain('if (image.complete) continue;');
-    expect(scroller).toMatch(/image\.addEventListener\('load', toBottom, \{ once: true \}\);/);
-    // A broken image resolves the wait too — otherwise a failed load leaves the list short of where it will settle.
-    expect(scroller).toMatch(/image\.addEventListener\('error', toBottom, \{ once: true \}\);/);
+    expect(scroller).toMatch(/image\.addEventListener\('load', toLatest, \{ once: true \}\);/);
+    // A broken image resolves the wait too — otherwise a failed load leaves the section short of where it will settle.
+    expect(scroller).toMatch(/image\.addEventListener\('error', toLatest, \{ once: true \}\);/);
   });
 });

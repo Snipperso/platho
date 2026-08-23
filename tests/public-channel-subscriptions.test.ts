@@ -46,7 +46,8 @@ describe('PWA public channel subscriptions', () => {
     // channel. Pinned here because this test is where the two behaviours meet.
     expect(publicChannelThreadsToFeedItems(threads)).toEqual([]);
     const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toMatch(/if \(publicSyncPhase === 'syncing' && !publicChannelSearchQuery\) \{\s*renderPublicEmpty\(t\('public\.previewWaitingFeed'\)/);
+    // The 2026-08 redesign paints two skeleton cards above the waiting line; the waiting line itself is unchanged.
+    expect(app).toMatch(/if \(publicSyncPhase === 'syncing' && !publicChannelSearchQuery\) \{\s*(?:publicFeed\.append\(buildSkeletonNodes\('post', \d+\)\);\s*)?renderPublicEmpty\(t\('public\.previewWaitingFeed'\)/);
     expect(app).toMatch(/renderPublicEmpty\(publicChannelSearchQuery \? t\('public\.noPostsFound'\) : t\('public\.noPosts'\)/);
   });
 

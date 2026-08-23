@@ -23,7 +23,10 @@ describe('public publish heal driver guard', () => {
     );
     expect(resume).toMatch(/if \(!isPendingPublicFeedItem\(item\)\) continue;/);
     expect(resume).toMatch(/Date\.now\(\) - createdAt >= PRIVATE_PUBLISH_CONFIRM_NO_PROGRESS_DEADLINE_MS/);
-    expect(resume).toMatch(/publishStatus: 'public publish failed'/);
+    // The terminal word is the record's own: a post says "public publish failed", a comment says "comment failed"
+    // (2026-08 port: the consumed/deadline terminals used to stamp the post word on both).
+    expect(resume).toMatch(/const failedStatus = kind === 'comment' \? 'comment failed' : 'public publish failed';/);
+    expect(resume).toMatch(/publishStatus: failedStatus/);
     // Resume is wired at the same hooks as the private side (parity, not a magic count).
     expect(app.match(/resumePendingPublicPublishConfirmations\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
@@ -63,7 +66,7 @@ describe('public publish heal driver guard', () => {
     expect(app).not.toMatch(/author: 'you'/);
     expect(app.match(/author: publicAuthorLabel\(plathoWallet\?\.address\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     // The comment renderer shows the SAME live private-style status badge as feed posts.
-    const commentRenderer = app.slice(app.indexOf('function appendPublicItemComments'), app.indexOf('function appendPublicItemComments') + 2200);
+    const commentRenderer = app.slice(app.indexOf('function appendPublicItemComments'), app.indexOf('function appendPublicItemComments') + 3_800);   // the 2026-08 surfacing rows sit above the badge
     expect(commentRenderer).toMatch(/isPendingPublicFeedItem\(comment\) && comment\.publishStatus/);
     expect(commentRenderer).toMatch(/\(comment\.publishState \? publishStateMeta\(comment\.publishState\) : null\) \|\| comment\.publishStatus/);
     // The open post-detail screen refreshes on every progress write-back.
@@ -76,7 +79,7 @@ describe('public publish heal driver guard', () => {
     expect(app).toMatch(/const cacheKey = publicPostCommentsCacheKey\(item\);\s*const cached = publicPostCommentsCache\.get\(cacheKey\);/);
     expect(app).toMatch(/publicPostDetailLoadState = publicPostDetailChainComments\.length > 0 \? 'ready' : 'loading';/);
     // A fresh authoritative (non-degraded) load populates the cache (bounded LRU) — a degraded read must NOT.
-    const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 3200);
+    const refresh = app.slice(app.indexOf('async function refreshPublicPostDetailComments'), app.indexOf('async function refreshPublicPostDetailComments') + 7_000);   // frames + cursor merge (2026-08) precede the cache write
     expect(refresh).toMatch(/if \(cacheKey\) \{[\s\S]*publicPostCommentsCache\.set\(cacheKey, \{ comments: result\.comments/);
     expect(refresh).toMatch(/while \(publicPostCommentsCache\.size > 24\)/);
     // Cleared on account switch alongside the other public state.

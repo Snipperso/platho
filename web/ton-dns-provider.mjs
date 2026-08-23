@@ -1,6 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
 import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=78';
+import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=80';
 
 export class TonDnsProviderError extends Error {
   constructor(message) {

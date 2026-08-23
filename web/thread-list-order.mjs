@@ -9,16 +9,43 @@
 //   3. then everything else, newest activity first.
 //
 // A sorted COPY — the callers' arrays keep their structural invariants untouched — and a STABLE one, so dialogs with
-// equal or unknown activity keep their relative order. `isSavedMessages(thread)` and `lastActivityMs(thread)` are
-// injected: the rule is about ORDER, and the app owns what "saved" and "activity" mean.
-export function orderThreadsForList(threads, { isSavedMessages = () => false, lastActivityMs = () => 0 } = {}) {
-  const list = Array.isArray(threads) ? threads : [];
-  const byRecency = (a, b) => (Number(lastActivityMs(b)) || 0) - (Number(lastActivityMs(a)) || 0);
-  const saved = list.filter((thread) => isSavedMessages(thread));
-  const rest = list.filter((thread) => !isSavedMessages(thread));
-  return [
-    ...saved,
-    ...rest.filter((thread) => thread?.pinned === true).sort(byRecency),
-    ...rest.filter((thread) => thread?.pinned !== true).sort(byRecency),
-  ];
+// equal or unknown activity keep their relative order. The predicates and the clock are injected: the rule is about
+// ORDER, and the app owns what "saved", "pinned" and "activity" mean.
+//
+//   isSaved(thread)        -> true for "My notes" (the own-wallet dialog);     app: isSavedMessagesThread
+//   isPinned(thread)       -> true for a pinned contact (default: thread.pinned === true)
+//   lastActivityMs(thread) -> recency stamp in ms (newest activity);          app: threadLastActivityMs
+//
+// `isSavedMessages` is the same predicate under its earlier name — both spellings are honoured so neither caller
+// has to move.
+
+/** Newest activity first; a missing/invalid stamp counts as 0 (sinks), like threadLastActivityMs' fallback. */
+const activityOf = (thread, lastActivityMs) => {
+  const ms = Number(lastActivityMs(thread));
+  return Number.isFinite(ms) ? ms : 0;
+};
+
+/** The bucket a dialog belongs to: 'saved' | 'pinned' | 'other'. Saved wins over pinned (pinning Saved is a no-op). */
+export function threadListBucket(thread, { isSaved = () => false, isPinned = (t) => t?.pinned === true } = {}) {
+  if (isSaved(thread)) return 'saved';
+  if (isPinned(thread)) return 'pinned';
+  return 'other';
+}
+
+export function orderThreadsForList(threads, {
+  isSaved = null,
+  isSavedMessages = null,
+  isPinned = (thread) => thread?.pinned === true,
+  lastActivityMs = () => 0,
+} = {}) {
+  const savedPredicate = typeof isSaved === 'function' ? isSaved : (typeof isSavedMessages === 'function' ? isSavedMessages : () => false);
+  const saved = [];
+  const pinned = [];
+  const other = [];
+  for (const thread of Array.isArray(threads) ? threads : []) {
+    const bucket = threadListBucket(thread, { isSaved: savedPredicate, isPinned });
+    (bucket === 'saved' ? saved : bucket === 'pinned' ? pinned : other).push(thread);
+  }
+  const byRecency = (a, b) => activityOf(b, lastActivityMs) - activityOf(a, lastActivityMs);
+  return [...saved, ...pinned.sort(byRecency), ...other.sort(byRecency)];
 }

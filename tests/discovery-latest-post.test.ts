@@ -6,15 +6,17 @@ import { I18N_LOCALES, I18N_STRINGS } from '../web/i18n-strings.mjs';
 // DISCOVER-LATEST — the channel's latest post on its Discover card.
 //
 // [OWNER 2026-08-21: "the description is not quite it — good to see the last post"; "yes, alongside".]
+// Re-pinned 2026-08-23 to the redesign's implementation (the same contract, the designer's shape): the answer lives
+// in a wallet-keyed map outside the card, the block is patched in place, the read is lazy and two abreast.
 //
 // What must hold, and why each half matters:
 //   * the card carries a latest-post block, found by wallet, filled IN PLACE when the read lands — the list is
 //     rebuilt by every streamed partial, so the answer must live outside the card;
 //   * the read is LAZY: asked for only when the card reaches the screen (observer), two at a time, through the
 //     lane's SMALL read (readLatestChannelPosts) — not readChannelPosts, not up front for every card;
-//   * the block says it is loading, shows "Latest post · when" over the text, and is removed for a channel with no
+//   * the block says it is loading, shows "Latest post" + the clock over the text, and is gone for a channel with no
 //     visible post; the decode is the feed's own (profile divert, parts assembled);
-//   * a closed panel forgets what it had not asked; a refresh / stale open forgets the answers too;
+//   * a closed panel forgets what it had not asked; a refresh / an open that starts a new sweep forgets the answers;
 //   * the words exist in every locale; the CSS gives the block its plate and the clamp, and the description yields.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -33,10 +35,12 @@ const slice = (text: string, from: string, to: string) => {
 describe('DISCOVER-LATEST — the latest post on a Discover card', () => {
   it('DLATEST-01: the lane has a SMALL latest-posts read — newest live era, tail window, own cache, never the shared one', () => {
     const fn = slice(lane, 'async readLatestChannelPosts(', 'async readPostAt(');
-    // One states batch over the era/overflow coordinates, then ONLY the newest era with a live shard.
+    // One states batch over the era/overflow coordinates, then ONLY the newest era with a LIVE (active) shard —
+    // an 'unknown' row (the endpoint refused the address) or an uninit one is not readable.
     expect(fn).toMatch(/const live = await readLatestStates\(coords\.map\(\(c\) => c\.address\)\);/);
-    expect(fn).toMatch(/if \(live\.get\(addrKey\(coord\.address\)\)\) \{ newestEra = coord\.era; break; \}/);
-    expect(fn).toMatch(/if \(coord\.era !== newestEra\) continue;/);
+    expect(fn).toMatch(/const isLive = \(coord\) => \{ const state = live\.get\(addrKey\(coord\.address\)\); return Boolean\(state && state\.status === 'active'\); \};/);
+    expect(fn).toMatch(/const newestLive = coords\.find\(isLive\);/);
+    expect(fn).toMatch(/if \(coord\.era !== newestEra \|\| !isLive\(coord\)\) continue;/);
     // A small window by default, read through the provider's tail reader with that window.
     expect(fn).toMatch(/maxCount = PUBLIC_LATEST_POST_WINDOW/);
     expect(lane).toMatch(/const PUBLIC_LATEST_POST_WINDOW = 32n;/);
@@ -50,77 +54,91 @@ describe('DISCOVER-LATEST — the latest post on a Discover card', () => {
     expect(rpc).toMatch(/export function createShardMessagesWithSourceReader\(\{[^}]*requestOptions = null \}/);
     expect(rpc).toMatch(/readMessageRows\(\{ base, key, doFetch, address, limit, opcode, maxPages, strict, endLt, startUtime, endUtime, requestOptions \}\)/);
     expect(rpc).toMatch(/scanRequestOptions\(requestOptions\)\);\s*if \(!response\) \{\s*\/\/ DECLINED BY THE PUMP/);
-    // Reads the shared snapshot when it exists (a full answer is free), WRITES only its own.
+    // Reads the shared snapshot when it exists (a full answer is free), WRITES only its own — and never remembers a
+    // tail whose rows came back without bodies as "no posts" (a genuinely empty shard is remembered).
     expect(fn).toMatch(/const full = readShardSnapshot\(key, marker\);/);
-    expect(fn).toMatch(/writeLatestSnapshot\(key, marker, shardPosts\);/);
+    expect(fn).toMatch(/if \(shardPosts\.length > 0 \|\| BigInt\(tail\.entry_count \?\? 0n\) === 0n\) writeLatestSnapshot\(key, marker, shardPosts\);/);
     expect(fn).not.toMatch(/writeShardSnapshot\(/);
-    // Walk-back handle and the exhaustion flag a caller loops on.
+    // Walk-back handle and the exhaustion flag a caller loops on — exhausted only when no LIVE shard is older.
     expect(fn).toMatch(/beforeEra = null/);
-    expect(fn).toMatch(/exhausted: !coords\.some\(\(c\) => c\.era < newestEra\)/);
-    // The second cache is its own map, bounded like the first.
+    expect(fn).toMatch(/const exhausted = !coords\.some\(\(coord\) => coord\.era < newestEra && isLive\(coord\)\);/);
+    // The second cache is its own map, bounded on its own, and a null marker (an unmeasured shard) is never a key.
     expect(lane).toMatch(/const latestSnapshots = new Map\(\);/);
-    expect(lane).toMatch(/while \(latestSnapshots\.size > SHARD_SNAPSHOT_MAX\)/);
+    expect(lane).toMatch(/while \(latestSnapshots\.size > LATEST_SNAPSHOT_MAX\)/);
+    const readLatest = slice(lane, 'function readLatestSnapshot(key, marker) {', 'function writeLatestSnapshot(');
+    expect(readLatest).toMatch(/if \(marker === null \|\| marker === undefined\) return null;/);
   });
 
-  it('DLATEST-02: the card carries a latest block found by wallet, filled from the kept answer or queued for the observer', () => {
+  it('DLATEST-02: the card carries a latest block built from the kept answer, by wallet, and rebuilt in place', () => {
     const card = slice(app, 'function buildDiscoveryCard(channel)', 'function followContactPublicChannel(');
-    expect(card).toMatch(/latest\.className = 'discovery-card-latest';/);
-    expect(card).toMatch(/latest\.dataset\.wallet = channel\.authorWallet;/);
-    // Answer in hand → painted at once; otherwise loading + observe (or queue where there is no observer).
-    expect(card).toMatch(/const latestState = publicDiscoveryLatestPosts\.get\(channel\.authorWallet\) \?\? null;/);
-    expect(card).toMatch(/fillDiscoveryLatestPost\(latest, \{ status: 'loading' \}\);\s*const observer = discoveryLatestObserver\(\);\s*if \(observer\) observer\.observe\(latest\);\s*else queueDiscoveryLatestPost\(channel\.authorWallet\);/);
-    // The block sits between the head and the description: "alongside", the post first.
-    const headAt = card.indexOf('card.append(head);');
-    const latestAt = card.indexOf('card.append(latest);');
-    const descAt = card.indexOf("desc.className = 'discovery-card-desc';");
-    expect(headAt).toBeGreaterThan(-1);
-    expect(latestAt).toBeGreaterThan(headAt);
-    expect(descAt).toBeGreaterThan(latestAt);
+    // Built from the map (answer, loading, or nothing), keyed by the channel's wallet; the actions row follows it.
+    expect(card).toMatch(/const latest = buildDiscoveryLatestNode\(rawWalletAddress\(channel\.authorWallet\)\);\s*if \(latest\) card\.append\(latest\);/);
+    const latestAt = card.indexOf('buildDiscoveryLatestNode(');
+    const actionsAt = card.indexOf("actions.className = 'discovery-card-actions';");
+    expect(latestAt).toBeGreaterThan(-1);
+    expect(actionsAt).toBeGreaterThan(latestAt);
+    const builder = slice(app, 'function buildDiscoveryLatestNode(wallet)', 'function discoveryLatestPreview(item)');
+    expect(builder).toMatch(/block\.className = 'discovery-card-latest';/);
+    // Nothing at all for a channel with no visible post or a read that gave up; a ready answer carries the caption,
+    // the clock and the preview; anything else is the loading shape (caption + shimmer).
+    expect(builder).toMatch(/if \(state && \(state\.status === 'empty' \|\| state\.status === 'error'\)\) return null;/);
+    expect(builder).toMatch(/label\.textContent = t\('public\.latestPost'\);/);
+    expect(builder).toMatch(/const clock = formatMessageClock\(Number\(state\.createdAtMs\)\);/);
+    expect(builder).toMatch(/text\.textContent = state\.preview;/);
+    expect(builder).toMatch(/block\.dataset\.state = 'loading';\s*label\.textContent = t\('public\.latestPostLoading'\);/);
+    // The answer lands IN PLACE on the one card (by data-wallet) — never a whole-list rebuild for one line.
+    const apply = slice(app, 'function applyDiscoveryLatestToCard(wallet)', 'function ensureDiscoveryLatestObserver()');
+    expect(apply).toMatch(/\.find\(\(node\) => node\.dataset\.wallet === wallet\);/);
+    expect(apply).toMatch(/if \(previous && next\) previous\.replaceWith\(next\);/);
+    // And every rebuild re-attaches the observer to the fresh nodes.
+    const render = slice(app, 'function renderPublicDiscovery(options', 'function discoveryCardIdentityButton(');
+    expect(render).toMatch(/observeDiscoveryLatestCards\(\);/);
   });
 
   it('DLATEST-03: the read is lazy (observer, a screen of margin), two abreast, through the small lane read and the feed decode', () => {
-    const block = slice(app, '// ── Discover: the LATEST POST of a channel, on its card', 'function base64UrlToBytes(value)');
-    expect(block).toMatch(/const PUBLIC_DISCOVERY_LATEST_CONCURRENCY = 2;/);
+    const block = slice(app, '// ── Discover: the latest post of each card', 'function base64UrlToBytes(value)');
+    expect(app).toMatch(/const PUBLIC_DISCOVERY_LATEST_CONCURRENCY = 2;/);
     expect(block).toMatch(/new IntersectionObserver\(/);
     expect(block).toMatch(/rootMargin: '100% 0px'/);
-    expect(block).toMatch(/publicDiscoveryLatestObserver\?\.unobserve\(entry\.target\);\s*queueDiscoveryLatestPost\(entry\.target\.dataset\?\.wallet\);/);
-    expect(block).toMatch(/while \(publicDiscoveryLatestActive < PUBLIC_DISCOVERY_LATEST_CONCURRENCY && publicDiscoveryLatestQueue\.length > 0\)/);
+    expect(block).toMatch(/publicDiscoveryLatestObserver\.unobserve\(entry\.target\);\s*if \(wallet\) queueDiscoveryLatestPost\(wallet\);/);
+    expect(block).toMatch(/while \(publicDiscoveryLatestInFlight\.size < PUBLIC_DISCOVERY_LATEST_CONCURRENCY && publicDiscoveryLatestQueue\.length > 0\)/);
     // The SMALL read, not the whole channel — and the feed's own decode.
-    expect(block).toMatch(/await lane\.readLatestChannelPosts\(wallet, beforeEra === null \? \{\} : \{ beforeEra \}\)/);
+    expect(block).toMatch(/await lane\.readLatestChannelPosts\(wallet, \{ beforeEra \}\)/);
     expect(block).not.toMatch(/readChannelPosts\(/);
-    expect(block).toMatch(/publicPostPartsFromShardPosts\(shardPosts, \{ id: `discover:\$\{wallet\}`, authorWallet: wallet \}\)/);
+    expect(block).toMatch(/publicPostPartsFromShardPosts\(posts, \{ id: `wallet:\$\{wallet\}`, authorWallet: wallet \}\)/);
     expect(block).toMatch(/assemblePublicParts\(parts\)/);
     // A profile-only tail walks one era back, boundedly.
-    expect(block).toMatch(/const PUBLIC_DISCOVERY_LATEST_ERA_HOPS = 3;/);
-    expect(block).toMatch(/beforeEra = era;/);
-    // An image-only post reads as the feed's image preview; a post with nothing visible is "none".
+    expect(app).toMatch(/const PUBLIC_DISCOVERY_LATEST_ERA_STEPS = 3;/);
+    expect(block).toMatch(/if \(exhausted \|\| era === null\) break;\s*beforeEra = era;/);
+    // An image-only post reads as the feed's image preview.
     expect(block).toMatch(/tPlural\('chat\.previewImages', 1\)/);
-    // The answer lands IN PLACE, by wallet, on whatever cards are on screen now.
-    expect(block).toMatch(/for \(const node of publicDiscoveryBody\.querySelectorAll\('\.discovery-card-latest'\)\) \{\s*if \(node\.dataset\?\.wallet === wallet\) fillDiscoveryLatestPost\(node, result\);/);
-    // A read that failed is forgotten (the next sight asks again); an answer is kept.
-    expect(block).toMatch(/if \(result\) publicDiscoveryLatestPosts\.set\(wallet, result\);\s*else publicDiscoveryLatestPosts\.delete\(wallet\);/);
+    // An answer is kept (ready / empty / error); a rate-limited read is re-queued a bounded number of times; an answer
+    // from before a reset (generation bumped) is dropped on landing rather than stored.
+    expect(block).toMatch(/const stillWanted = \(\) => generation === publicDiscoveryLatestGeneration;/);
+    expect(block).toMatch(/if \(!stillWanted\(\)\) return;\s*\/\/ a reset happened underneath/);
+    expect(block).toMatch(/if \(noteTonRpcRateLimit\(error\) && attempts <= PUBLIC_DISCOVERY_LATEST_RETRIES\)/);
+    expect(block).toMatch(/settle\(\{ status: 'error', attempts \}\);/);
   });
 
-  it('DLATEST-04: the block paints loading / "Latest post · when" / nothing, and the panel lifecycle forgets the right things', () => {
-    const fill = slice(app, 'function fillDiscoveryLatestPost(node, state)', 'function base64UrlToBytes(value)');
-    expect(fill).toMatch(/if \(!state \|\| state\.status === 'none'\) \{ node\.remove\(\); return; \}/);
-    expect(fill).toMatch(/node\.classList\.toggle\('is-loading', state\.status === 'loading'\);/);
-    expect(fill).toMatch(/formatThreadListTimestamp\(Number\(state\.createdAtMs\)\)/);
-    expect(fill).toMatch(/label\.textContent = when \? `\$\{t\('public\.latestPost'\)\} · \$\{when\}` : t\('public\.latestPost'\);/);
-    expect(fill).toMatch(/text\.textContent = state\.status === 'ready' \? state\.text : t\('public\.latestPostLoading'\);/);
-    // Closing the panel drops the observer; the pump drains an un-asked queue for a closed panel.
+  it('DLATEST-04: the panel lifecycle forgets the right things', () => {
+    // Closing the panel drops the waiting queue and the observer; answers in hand stay for a reopen within the TTL.
     const close = slice(app, 'function closePublicDiscovery()', '// --- Channel view (v753)');
-    expect(close).toMatch(/publicDiscoveryLatestObserver\?\.disconnect\(\);\s*publicDiscoveryLatestObserver = null;/);
-    const pump = slice(app, 'async function pumpDiscoveryLatestPosts()', 'async function loadDiscoveryLatestPost(');
-    expect(pump).toMatch(/if \(!publicDiscoveryOpen\) \{[\s\S]*?publicDiscoveryLatestQueue\.splice\(0\)[\s\S]*?return;\s*\}/);
-    // A refresh, and an open past the cache TTL, forget the answers too.
+    expect(close).toMatch(/stopDiscoveryLatestPump\(\);/);
+    const stop = slice(app, 'function stopDiscoveryLatestPump()', 'function resetPublicDiscoveryLatestPosts()');
+    expect(stop).toMatch(/publicDiscoveryLatestQueue\.length = 0;/);
+    expect(stop).toMatch(/if \(publicDiscoveryLatestObserver\) publicDiscoveryLatestObserver\.disconnect\(\);/);
+    expect(stop).toMatch(/if \(state\.status === 'loading' && !publicDiscoveryLatestInFlight\.has\(wallet\)\) publicDiscoveryLatestPosts\.delete\(wallet\);/);
+    // A refresh, and an open that will START a new sweep (no cache or an expired one, none in flight), forget the
+    // answers and bump the generation so an in-flight answer is dropped on landing.
+    const reset = slice(app, 'function resetPublicDiscoveryLatestPosts()', '// Debug hook');
+    expect(reset).toMatch(/stopDiscoveryLatestPump\(\);\s*publicDiscoveryLatestPosts\.clear\(\);\s*publicDiscoveryLatestGeneration \+= 1;/);
     const refresh = slice(app, 'async function refreshPublicDiscovery()', 'function renderPublicDiscovery(options');
-    expect(refresh).toMatch(/resetDiscoveryLatestPosts\(\);/);
+    expect(refresh).toMatch(/resetPublicDiscoveryLatestPosts\(\);/);
     const open = slice(app, 'async function openPublicDiscovery()', 'function closePublicDiscovery()');
-    expect(open).toMatch(/if \(!publicDiscoveryCache \|\| \(Date\.now\(\) - publicDiscoveryCache\.at\) >= PUBLIC_DISCOVERY_CACHE_TTL_MS\) resetDiscoveryLatestPosts\(\);/);
-    // The list rebuild drops detached observer targets.
-    const render = slice(app, 'function renderPublicDiscovery(options', 'function discoveryCardIdentityButton(');
-    expect(render).toMatch(/publicDiscoveryBody\.replaceChildren\(\);\s*\/\/[^\n]*\n\s*publicDiscoveryLatestObserver\?\.disconnect\(\);/);
+    expect(open).toMatch(/if \(!publicDiscoverySweepInFlight\s*&& \(!publicDiscoveryCache \|\| \(Date\.now\(\) - publicDiscoveryCache\.at\) >= PUBLIC_DISCOVERY_CACHE_TTL_MS\)\) \{\s*resetPublicDiscoveryLatestPosts\(\);/);
+    // The pump does nothing for a closed panel.
+    const pump = slice(app, 'function pumpDiscoveryLatestPosts()', 'async function loadDiscoveryLatestPost(');
+    expect(pump).toMatch(/if \(!publicDiscoveryOpen\) return;/);
   });
 
   it('DLATEST-05: the words exist in every locale and the CSS gives the block its plate and clamp', () => {
@@ -132,9 +150,12 @@ describe('DISCOVER-LATEST — the latest post on a Discover card', () => {
     }
     expect((I18N_STRINGS as any).en['public.latestPost']).toBe('Latest post');
     expect((I18N_STRINGS as any).ru['public.latestPost']).toBe('Последний пост');
-    expect(css).toMatch(/\.discovery-card-latest \{[\s\S]*?border-left: 2px solid rgba\(48, 213, 176, 0\.45\);/);
-    expect(css).toMatch(/\.discovery-card-latest-text \{[\s\S]*?-webkit-line-clamp: 4;/);
-    expect(css).toMatch(/\.discovery-card-latest\.is-loading \.discovery-card-latest-text \{[\s\S]*?color: var\(--muted\);/);
+    // ONE block of rules (the pre-redesign twin was removed 2026-08-23): a quote-like strip with an accent edge, a
+    // dimmer edge while loading, the text clamped.
+    expect(css.match(/\.discovery-card-latest \{/g)?.length, 'one rule block for the plate').toBe(1);
+    expect(css).toMatch(/\.discovery-card-latest \{[\s\S]*?border-left: 2px solid var\(--a40\);/);
+    expect(css).toMatch(/\.discovery-card-latest\[data-state="loading"\] \{[\s\S]*?border-left-color: var\(--a16\);/);
+    expect(css).toMatch(/\.discovery-card-latest-text \{[\s\S]*?-webkit-line-clamp: 2;/);
     // The description yields the room: clamped, not removed ("alongside").
     expect(css).toMatch(/\.discovery-card-desc \{[\s\S]*?-webkit-line-clamp: 3;/);
   });

@@ -524,7 +524,10 @@ describe('quick-start resume + activation gate guard', () => {
     // attempt did — puts a correctly-sized box in the wrong place, and the difference falls off the screen: the
     // tab bar was half below the edge, and the maximized composer left a band of app showing under it.
     const shellRuleRaw = css.slice(css.indexOf('  .app-shell {'), css.indexOf('overflow: hidden;', css.indexOf('  .app-shell {')));
-    expect(shellRuleRaw.length, 'the mobile shell rule must not collapse').toBeGreaterThan(300);
+    // The guard is against the slice collapsing or running away, not a word count: the 2026-08 redesign carries the
+    // same declarations without the long in-rule note (the history lives here instead), so the rule is ~240 chars.
+    expect(shellRuleRaw.length, 'the mobile shell rule must not collapse').toBeGreaterThan(150);
+    expect(shellRuleRaw.length, 'the mobile shell rule must not run away').toBeLessThan(2_000);
     // Declarations only. The note inside this rule QUOTES the declarations it forbids — a scan over the raw text
     // fails on its own explanation, which has now cost three rounds across this file.
     const shellRule = shellRuleRaw.split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');

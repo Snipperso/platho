@@ -3,8 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#0b0d0f">
-    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0f12" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#e9f0ee" media="(prefers-color-scheme: light)">
+    <meta name="color-scheme" content="dark light">
     <!-- The app has its own i18n; a browser/Google auto-translate on top would double-translate and mangle the
          UI. Opt out (translate="no" on <html> + the Google-specific meta). -->
     <meta name="google" content="notranslate">
@@ -12,12 +13,12 @@
     <link rel="manifest" href="/manifest.webmanifest?v=3">
     <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="/assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="/styles.css?v=341">
+    <link rel="stylesheet" href="/styles.css?v=343">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
          not tied to import-map support (Safari 16.4). -->
-    <script src="/boot-guard.js?v=6"></script>
+    <script src="/boot-guard.js?v=7"></script>
   </head>
   <body>
     <div class="app-shell" data-view="public">
@@ -70,6 +71,9 @@
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
                 <span class="icon icon-open-app"></span>
               </button>
+              <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                <span class="icon icon-theme"></span>
+              </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                 <span class="icon icon-info"></span>
               </button>
@@ -101,6 +105,9 @@
               </button>
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
                 <span class="icon icon-open-app"></span>
+              </button>
+              <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                <span class="icon icon-theme"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                 <span class="icon icon-info"></span>
@@ -181,6 +188,9 @@
             <button class="icon-button edit-channel-profile-button" id="editChannelProfileButton" type="button" hidden aria-label="Edit channel description" title="Edit channel description" data-i18n-aria-label="public.editChannelDescription" data-i18n-title="public.editChannelDescription">
               <span class="icon icon-about"></span>
             </button>
+            <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+              <span class="icon icon-theme"></span>
+            </button>
             <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
               <span class="icon icon-info"></span>
             </button>
@@ -208,12 +218,19 @@
                 <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
                   <span class="icon icon-open-app"></span>
                 </button>
+                <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                  <span class="icon icon-theme"></span>
+                </button>
                 <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                   <span class="icon icon-info"></span>
                 </button>
                 <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
               </div>
             </header>
+            <div class="search-row discovery-search-row" id="publicDiscoverySearchRow">
+              <span class="icon icon-search"></span>
+              <input id="publicDiscoverySearch" type="search" placeholder="Search channels" autocomplete="off" data-i18n-placeholder="public.discoverSearchPlaceholder">
+            </div>
             <div class="public-discovery-body" id="publicDiscoveryBody"></div>
           </div>
           <div class="public-channel-view" id="publicChannelView" hidden>
@@ -229,6 +246,9 @@
               <div class="header-actions">
                 <button class="mini-action-button public-channel-share-button" id="publicChannelViewShareButton" type="button" data-i18n="public.shareChannel" hidden>Share</button>
                 <button class="mini-action-button public-channel-follow-button" id="publicChannelViewFollowButton" type="button" hidden>Follow</button>
+                <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                  <span class="icon icon-theme"></span>
+                </button>
                 <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                   <span class="icon icon-info"></span>
                 </button>
@@ -253,6 +273,9 @@
                 </button>
                 <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
                   <span class="icon icon-open-app"></span>
+                </button>
+                <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                  <span class="icon icon-theme"></span>
                 </button>
                 <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                   <span class="icon icon-info"></span>
@@ -329,6 +352,9 @@
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
                 <span class="icon icon-open-app"></span>
+              </button>
+              <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                <span class="icon icon-theme"></span>
               </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                 <span class="icon icon-info"></span>
@@ -437,6 +463,9 @@
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
                 <span class="icon icon-open-app"></span>
               </button>
+              <button class="icon-button theme-toggle-button" type="button" aria-label="Switch theme" title="Switch theme" data-i18n-aria-label="theme.toggle" data-i18n-title="theme.toggle">
+                <span class="icon icon-theme"></span>
+              </button>
               <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
                 <span class="icon icon-info"></span>
               </button>
@@ -499,9 +528,37 @@
                     <option value="enabled" data-i18n="public.commentsAllowedNotRecommended">Allowed - not recommended</option>
                   </select>
                 </label>
+                <label class="settings-select-row compact-select-row" for="feedTimestampModeSelect">
+                  <span data-i18n="public.timestampMode">Post timestamps</span>
+                  <select id="feedTimestampModeSelect" aria-label="Post timestamps" data-i18n-aria-label="public.timestampMode">
+                    <option value="datetime" selected data-i18n="public.timestampDateTime">Date and time</option>
+                    <option value="date" data-i18n="public.timestampDateOnly">Date only</option>
+                  </select>
+                </label>
                 <!-- Moved out of the Wallet block: saving subscriptions is a public-channels action that happens to
                      cost gas, not a wallet function. It belongs where a user goes looking for it. -->
                 <button id="savePrefsButton" type="button"><span data-i18n="wallet.saveSubscriptions">Save subscriptions</span><strong id="savePrefsStatus" data-i18n="wallet.statusNotSaved">not saved</strong></button>
+              </div>
+            </section>
+            <section class="profile-section" aria-label="Appearance" data-i18n-aria-label="profile.appearance">
+              <h2 data-i18n="profile.appearance">Appearance</h2>
+              <div class="settings-list">
+                <label class="settings-select-row compact-select-row settings-range-row" for="auroraLevelRange">
+                  <span data-i18n="profile.auroraBrightness">Background glow</span>
+                  <input id="auroraLevelRange" type="range" min="0" max="100" step="5" value="30" aria-label="Background glow" data-i18n-aria-label="profile.auroraBrightness">
+                </label>
+                <label class="settings-select-row compact-select-row settings-range-row" for="auroraCountRange">
+                  <span data-i18n="profile.auroraCount">Plasma count</span>
+                  <input id="auroraCountRange" type="range" min="1" max="16" step="1" value="5" aria-label="Plasma count" data-i18n-aria-label="profile.auroraCount">
+                </label>
+                <label class="settings-select-row compact-select-row settings-range-row" for="auroraSpeedRange">
+                  <span data-i18n="profile.auroraSpeed">Plasma speed</span>
+                  <input id="auroraSpeedRange" type="range" min="25" max="600" step="25" value="175" aria-label="Plasma speed" data-i18n-aria-label="profile.auroraSpeed">
+                </label>
+                <label class="settings-select-row compact-select-row settings-range-row" for="auroraEnergyRange">
+                  <span data-i18n="profile.auroraEnergy">Plasma activity</span>
+                  <input id="auroraEnergyRange" type="range" min="0" max="200" step="10" value="50" aria-label="Plasma activity" data-i18n-aria-label="profile.auroraEnergy">
+                </label>
               </div>
             </section>
 
@@ -724,7 +781,7 @@
           <header>
             <div>
               <h2 id="quickStartTitle" data-i18n="quickstart.welcome">Welcome to Platho</h2>
-              <p id="quickStartLead" data-i18n="quickstart.lead">A keyless, end-to-end encrypted messenger on TON.</p>
+              <p id="quickStartLead" data-i18n="quickstart.lead">A keyless, end-to-end encrypted messenger on GRAM.</p>
             </div>
             <button class="icon-button" id="quickStartCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
               <span class="icon icon-close" aria-hidden="true"></span>
@@ -736,7 +793,7 @@
               <span class="quick-start-language-label" data-i18n="quickstart.language">Language</span>
               <select id="quickStartLanguageSelect" aria-label="Language" data-i18n-aria-label="quickstart.language"></select>
             </label>
-            <p class="quick-start-pitch" data-i18n="quickstart.pitch">Your keys and messages live only on this device, encrypted &mdash; there is no server account that can read them or hold your keys. Private chats are end-to-end and post-quantum encrypted; everything is client-direct on TON, with no central gateway to block or censor.</p>
+            <p class="quick-start-pitch" data-i18n="quickstart.pitch">Your keys and messages live only on this device, encrypted &mdash; there is no server account that can read them or hold your keys. Private chats are end-to-end and post-quantum encrypted; everything is client-direct on GRAM, with no central gateway to block or censor.</p>
             <ul class="quick-start-highlights">
               <li data-i18n="quickstart.highlightEncrypted">End-to-end + post-quantum encrypted private chats</li>
               <li data-i18n="quickstart.highlightOwnKeys">Your own keys &mdash; no server can read or hold them</li>
@@ -790,7 +847,7 @@
             </div>
             <p class="boot-loading-label" id="bootLoadingLabel" data-i18n="boot.loading">Loading…</p>
           </div>
-          <p class="boot-tagline" data-i18n="boot.tagline">End-to-end + post-quantum encrypted. Client-direct on TON.</p>
+          <p class="boot-tagline" data-i18n="boot.tagline">End-to-end + post-quantum encrypted. Client-direct on GRAM.</p>
         </div>
       </div>
     </div>
@@ -798,6 +855,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="/vendor/telegram-web-app.js?v=1"></script>
-    <script src="/app.js?v=b5ab6a342" type="module"></script>
+    <script src="/app.js?v=b4bb243d6" type="module"></script>
   </body>
 </html>

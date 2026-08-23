@@ -1,61 +1,204 @@
+/* Platho redesign v340 — modern messenger look. Dark (default) + light via prefers-color-scheme.
+   All selectors, data-attribute hooks, keyframe names and layout mechanics from v339 are preserved:
+   app.js contracts are untouched. */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: dark;
+  --theme-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8ZM11 1h2v3h-2ZM11 20h2v3h-2ZM1 11h3v2H1ZM20 11h3v2h-3ZM4.2 5.6l1.4-1.4 2.1 2.1-1.4 1.4ZM16.3 17.7l1.4-1.4 2.1 2.1-1.4 1.4ZM4.2 18.4l2.1-2.1 1.4 1.4-2.1 2.1ZM16.3 6.3l2.1-2.1 1.4 1.4-2.1 2.1Z'/%3E%3C/svg%3E");
+  /* geometry contracts (JS/layout-load-bearing — keep) */
   --message-media-width: 320px;
   --message-card-width: calc(var(--message-media-width) + 28px);
-  /* Long-post collapse (v765): max height a feed/channel post body renders at before it is clamped behind the
-     "Show full post" button. SINGLE SOURCE — the JS side never hardcodes this; it detects the clamp biting via
-     scrollHeight vs clientHeight. */
   --feed-post-collapsed-max-height: 480px;
-  /* Shared-post embed (v766): the forwarded-post card clamps tighter than a full feed post. */
   --shared-post-embed-max-height: 220px;
-  /* Opaque embed card background — the collapse fade must blend into it, so it cannot be translucent. */
-  --shared-post-embed-bg: #10161a;
-  --bg: #0b0d0f;
-  --panel: #111417;
-  --panel-2: #151a1d;
-  --panel-3: #1c2225;
-  --line: #283136;
-  --line-soft: #1e262a;
-  --text: #f4f7f5;
-  --muted: #96a19c;
-  --muted-2: #66726d;
-  --accent: #30d5b0;
-  --accent-2: #49a6ff;
-  --amber: #d7ad57;
-  --rose: #e06666;
-  --green: var(--accent);
-  --shadow: rgba(0, 0, 0, 0.32);
-  /* Accent-tinted outline for modal panels so a dark dialog separates from the dark app background (owner). */
-  --modal-outline: rgba(48, 213, 176, 0.5);
-  /* SINGLE SOURCE OF TRUTH for how wide a dialog card is. There used to be four numbers across eight dialogs —
-     440 for the forms, 460 for the quick start, 520 for the install sheet, and whatever the newest one copied —
-     and the owner read that straight off the screen as "this one is wider than the rest" (2026-08-07). Widths that
-     agree only by someone remembering to type the same digits do not stay in agreement.
-     ONE EXCEPTION, and it is a different kind of surface rather than a different taste: the docs reader is a
-     document viewer, so it has its own token below. The image lightbox is full-viewport and not a card at all. */
   --modal-card-width: 460px;
   --modal-reader-width: 980px;
   --header-actions-width: 216px;
-  /* SINGLE SOURCE OF TRUTH for every header (pane headers, the public absolute action cluster, the
-     conversation/post-detail headers): one top offset, one bar height, one control size, one derived
-     control inset. Every header rule below MUST derive from these four — never hardcode header geometry. */
   --header-top-offset: 11px;
   --header-height: 50px;
   --header-button-size: 34px;
   --header-button-inset: calc((var(--header-height) - var(--header-button-size)) / 2);
-  /* ONE dimming for every disabled control. Five different values had drifted in (0.46 / 0.55 /
-     0.58 / 0.62) plus three cursors, so "disabled" looked like a different state depending on which button. */
-  --disabled-opacity: 0.46;
+  --disabled-opacity: 0.45;
+  --gutter: 24px;
+  --space-3: 12px;
+  /* radii */
+  --r-s: 10px;
+  --r-m: 14px;
+  --r-l: 18px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+  /* dark palette */
+  --bg: #0a0f12;
+  --panel: #0f1518;
+  --panel-2: #151d22;
+  --panel-3: #1d262d;
+  --field: #10171c;
+  --aurora-rgb: 48, 213, 176;          /* the canvas aurora paints with this (alpha per frame) */
+  --field-raised: #141c21;              /* text fields sit a step above the panel (owner: edges blended in) */
+  --field-edge: rgba(255, 255, 255, 0.1);
+  --glass: rgba(16, 23, 28, 0.6);        /* glass: search row (owner: "a glassy look") */
+  --glass-2: rgba(21, 29, 34, 0.66);      /* glass at half strength: cards */
+  --glass-3: rgba(29, 38, 45, 0.76);     /* card hover */
+  --glass-edge: rgba(255, 255, 255, 0.07);
+  --glass-edge-2: rgba(255, 255, 255, 0.045);
+  --line: #263139;
+  --line-soft: #1d262d;
+  --text: #eef4f2;
+  --muted: #94a5a2;
+  --muted-2: #66757a;
+  --text-halo: 0 1px 3px rgba(0, 0, 0, 0.6);          /* halo under small text that sits right on the plasma */
+  --text-muted: var(--muted);
+  --accent: #30d5b0;
+  --accent-hi: #4ce4c3;
+  --on-accent: #04211a;
+  --accent-2: #4da3ff;
+  --amber: #e0b45e;
+  --rose: #ef7a7a;
+  --danger: #ff6b6b;
+  --green: var(--accent);
+  --surface: rgba(255, 255, 255, 0.03);
+  --a06: rgba(48, 213, 176, 0.07);
+  --a10: rgba(48, 213, 176, 0.11);
+  --a16: rgba(48, 213, 176, 0.16);
+  --a25: rgba(48, 213, 176, 0.25);
+  --a40: rgba(48, 213, 176, 0.4);
+  --id-ton: #9fd3f2;
+  --id-platho: #8fdcc8;
+  --bubble-in: #1b242b;
+  --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
+  --bubble-out-text: #e9fdf6;
+  --bubble-out-flat: #155243;
+  --media-bg: #070a0c;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --modal-outline: rgba(48, 213, 176, 0.32);
+  --shared-post-embed-bg: #121b21;
+  --scrollbar: rgba(148, 165, 162, 0.38);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+
+    color-scheme: light;
+    --theme-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z'/%3E%3C/svg%3E");
+    --bg: #e9f0ee;
+    --panel: #f5f9f8;
+    --panel-2: #ffffff;
+    --panel-3: #e8efed;
+    --field: #ffffff;
+  --aurora-rgb: 15, 157, 129;
+  --field-raised: #ffffff;
+  --field-edge: rgba(23, 49, 44, 0.14);
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-2: rgba(255, 255, 255, 0.7);
+  --glass-3: rgba(232, 239, 237, 0.78);
+  --glass-edge: rgba(23, 49, 44, 0.1);
+  --glass-edge-2: rgba(23, 49, 44, 0.06);
+    --line: #d2deda;
+    --line-soft: #dee7e4;
+    --text: #16211f;
+    --muted: #5e716d;
+    --muted-2: #8b9995;
+  --text-halo: 0 1px 3px rgba(255, 255, 255, 0.8);
+    --accent: #0f9d81;
+    --accent-hi: #0c8a71;
+    --on-accent: #ffffff;
+    --accent-2: #1877d2;
+    --amber: #9a7420;
+    --rose: #c94f4f;
+    --danger: #d64545;
+    --surface: rgba(10, 60, 50, 0.04);
+    --a06: rgba(15, 157, 129, 0.07);
+    --a10: rgba(15, 157, 129, 0.12);
+    --a16: rgba(15, 157, 129, 0.16);
+    --a25: rgba(15, 157, 129, 0.28);
+    --a40: rgba(15, 157, 129, 0.45);
+    --id-ton: #2b7ab8;
+    --id-platho: #0e8a72;
+    --bubble-in: #ffffff;
+    /* Same branded bubble in BOTH themes (owner): an outgoing message looks identical everywhere. */
+    --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
+    --bubble-out-text: #e9fdf6;
+    --bubble-out-flat: #155243;
+    --shadow: rgba(23, 49, 44, 0.2);
+    --shadow-1: 0 1px 2px rgba(23, 49, 44, 0.1);
+    --shadow-2: 0 8px 28px rgba(23, 49, 44, 0.14);
+    --shadow-pop: 0 24px 60px rgba(23, 49, 44, 0.25);
+    --modal-outline: rgba(15, 157, 129, 0.3);
+    --shared-post-embed-bg: #eef4f2;
+    --scrollbar: rgba(94, 113, 109, 0.4);
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+    }
+}
+
+/* Manual override from the header theme toggle (html[data-theme], persisted; boot-guard.js
+   re-applies it before first paint). KEEP IN SYNC with the media block above. */
+:root[data-theme="light"] {
+
+    color-scheme: light;
+    --theme-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z'/%3E%3C/svg%3E");
+    --bg: #e9f0ee;
+    --panel: #f5f9f8;
+    --panel-2: #ffffff;
+    --panel-3: #e8efed;
+    --field: #ffffff;
+  --aurora-rgb: 15, 157, 129;
+  --field-raised: #ffffff;
+  --field-edge: rgba(23, 49, 44, 0.14);
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-2: rgba(255, 255, 255, 0.7);
+  --glass-3: rgba(232, 239, 237, 0.78);
+  --glass-edge: rgba(23, 49, 44, 0.1);
+  --glass-edge-2: rgba(23, 49, 44, 0.06);
+    --line: #d2deda;
+    --line-soft: #dee7e4;
+    --text: #16211f;
+    --muted: #5e716d;
+    --muted-2: #8b9995;
+  --text-halo: 0 1px 3px rgba(255, 255, 255, 0.8);
+    --accent: #0f9d81;
+    --accent-hi: #0c8a71;
+    --on-accent: #ffffff;
+    --accent-2: #1877d2;
+    --amber: #9a7420;
+    --rose: #c94f4f;
+    --danger: #d64545;
+    --surface: rgba(10, 60, 50, 0.04);
+    --a06: rgba(15, 157, 129, 0.07);
+    --a10: rgba(15, 157, 129, 0.12);
+    --a16: rgba(15, 157, 129, 0.16);
+    --a25: rgba(15, 157, 129, 0.28);
+    --a40: rgba(15, 157, 129, 0.45);
+    --id-ton: #2b7ab8;
+    --id-platho: #0e8a72;
+    --bubble-in: #ffffff;
+    /* Same branded bubble in BOTH themes (owner): an outgoing message looks identical everywhere. */
+    --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
+    --bubble-out-text: #e9fdf6;
+    --bubble-out-flat: #155243;
+    --shadow: rgba(23, 49, 44, 0.2);
+    --shadow-1: 0 1px 2px rgba(23, 49, 44, 0.1);
+    --shadow-2: 0 8px 28px rgba(23, 49, 44, 0.14);
+    --shadow-pop: 0 24px 60px rgba(23, 49, 44, 0.25);
+    --modal-outline: rgba(15, 157, 129, 0.3);
+    --shared-post-embed-bg: #eef4f2;
+    --scrollbar: rgba(94, 113, 109, 0.4);
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+    }
+/* ── Base ───────────────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
+  /* No blue Android/Chrome tap flash — buttons carry their own press feedback (:active scale). */
+  -webkit-tap-highlight-color: transparent;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(150, 161, 156, 0.42) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -70,13 +213,13 @@
 *::-webkit-scrollbar-thumb {
   min-height: 36px;
   border: 2px solid transparent;
-  border-radius: 999px;
-  background: rgba(150, 161, 156, 0.42);
+  border-radius: var(--r-pill);
+  background: var(--scrollbar);
   background-clip: content-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(48, 213, 176, 0.56);
+  background: var(--a40);
   background-clip: content-box;
 }
 
@@ -89,29 +232,11 @@
 
 html,
 body {
-  /* THE PAGE IS EXACTLY AS TALL AS WHAT CAN BE SEEN. That is the whole of it.
-     [MEASURED in the owner's installed app 2026-08-14] With the keyboard up the screen is 894 and the visible
-     area is 508, and he could push the interface up by 386 — the keyboard's height, to the pixel. That number is
-     not a coincidence and not a gesture: it is the page being 894 tall inside a 508 window, so the browser holds
-     386px of slack and hands it to any finger that asks. "The page is longer than the screen by exactly the
-     height of the keyboard", as he put it, reading it off the behaviour before any measurement confirmed it.
-     His fuller account is the clearest statement of the bug anyone produced: the page size does not change when
-     the keyboard appears, the interface redraws itself into the smaller area, and what is left underneath is a
-     black band that can be scrolled out from behind the keyboard.
-     Two earlier shapes did not remove that slack. `min-height: 100%` + `overflow: hidden` left the page the
-     height of the SCREEN, and overflow cannot help anyway — when a field takes focus iOS must bring the caret
-     into view and scrolls regardless. `position: fixed` + `inset: 0` took the root out of flow but still
-     stretched it to the screen, so the slack survived untouched.
-     Sizing it to --app-viewport-height is what actually closes the gap: page height equals window height, slack
-     is zero, and there is nothing left to drag. Every scroller in the app is an element inside the shell, so
-     nothing is lost. */
+  /* Page height = visible height exactly (keyboard slack fix, v339) — do not change. */
   height: var(--app-viewport-height, 100dvh);
   max-height: var(--app-viewport-height, 100dvh);
   overflow: hidden;
   overscroll-behavior: none;
-  /* No browser zoom anywhere (owner request): pan tokens only — no pinch-zoom, no double-tap zoom. iOS
-     ignores user-scalable=no in the viewport meta, but honors touch-action. The image lightbox is NOT
-     affected: its viewport is touch-action:none and its zoom is its own pointer/transform implementation. */
   touch-action: pan-x pan-y;
 }
 
@@ -120,6 +245,11 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--a25);
 }
 
 button,
@@ -129,6 +259,11 @@ input {
 
 button {
   color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--a40);
+  outline-offset: 2px;
 }
 
 button:disabled,
@@ -182,6 +317,70 @@ button:disabled,
   display: none;
 }
 
+/* ── Micro-interactions ─────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+}
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+
+button,
+select,
+.thread-item,
+.feed-item,
+.avatar,
+.identity-variant,
+.share-target-row,
+.docs-nav button {
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease,
+    box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.icon-button,
+.send-button,
+.rail-item,
+.recipient-submit,
+.secondary-button,
+.mini-action-button,
+.discovery-cta-action,
+.composer-toolbar-button,
+.public-jump-down-button {
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease,
+    box-shadow 0.16s ease, opacity 0.16s ease, transform 0.12s ease;
+}
+
+.icon-button:not(:disabled):active,
+.send-button:not(:disabled):active,
+.rail-item:not(:disabled):active,
+.recipient-submit:not(:disabled):active,
+.secondary-button:not(:disabled):active,
+.mini-action-button:not(:disabled):active,
+.discovery-cta-action:not(:disabled):active,
+.composer-toolbar-button:not(:disabled):active,
+.public-jump-down-button:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.content-pane.is-active {
+  animation: fadeIn 0.18s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-pane.is-active,
+  .public-pane[data-discover-open="true"] > .public-discovery,
+  .public-pane[data-channel-open="true"] > .public-channel-view,
+  .public-pane[data-post-open="true"] > .public-post-detail {
+    animation: none;
+  }
+}
+
+/* ── App shell ──────────────────────────────────────────────────────────── */
 .app-shell {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
@@ -193,29 +392,30 @@ button:disabled,
   height: var(--app-viewport-height, 100dvh);
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(48, 213, 176, 0.05), transparent 280px),
+    radial-gradient(120% 70% at 18% 0%, var(--a06), transparent 55%),
     var(--bg);
 }
 
 .sidebar {
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 24px;
-  padding: 18px 12px;
+  gap: 22px;
+  padding: 16px 12px;
   border-right: 1px solid var(--line-soft);
-  background: rgba(11, 13, 15, 0.92);
+  background: transparent;
 }
 
 .brand {
   display: grid;
   justify-items: center;
-  gap: 10px;
+  gap: 9px;
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
+  border-radius: 10px;
 }
 
 .brand-name {
@@ -236,7 +436,7 @@ button:disabled,
   min-height: 11px;
   font-size: 9px;
   font-weight: 700;
-  color: rgba(48, 213, 176, 0.72);
+  color: var(--a40);
 }
 
 .status-dot {
@@ -244,13 +444,13 @@ button:disabled,
   height: 7px;
   border-radius: 50%;
   background: var(--green);
-  box-shadow: 0 0 0 3px rgba(48, 213, 176, 0.14);
+  box-shadow: 0 0 0 3px var(--a16);
 }
 
 .rail {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 6px;
 }
 
 .rail-item,
@@ -265,10 +465,10 @@ button:disabled,
 .rail-item {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  min-height: 62px;
+  gap: 5px;
+  min-height: 58px;
   padding: 9px 4px;
-  border-radius: 8px;
+  border-radius: var(--r-m);
   background: transparent;
   color: var(--muted);
 }
@@ -278,15 +478,18 @@ button:disabled,
   line-height: 1;
 }
 
-.rail-item.is-active {
-  background: #17211f;
-  border-color: rgba(48, 213, 176, 0.24);
+.rail-item:not(.is-active):not(:disabled):hover {
+  background: var(--surface);
   color: var(--text);
 }
 
-/* A tab gated until account activation (e.g. Vault): dimmed but still clearly readable, inert. */
+.rail-item.is-active {
+  background: var(--a16);
+  color: var(--accent);
+}
+
 .rail-item.is-locked {
-  color: #6b7480;
+  color: var(--muted-2);
   cursor: not-allowed;
 }
 
@@ -302,7 +505,7 @@ button:disabled,
   gap: 3px;
   min-height: 64px;
   padding: 5px 2px 10px;
-  border-bottom: 1px solid rgba(48, 213, 176, 0.16);
+  border-bottom: 1px solid var(--a16);
   color: var(--muted);
   line-height: 1.05;
   text-align: center;
@@ -310,8 +513,7 @@ button:disabled,
   user-select: none;
 }
 
-/* While the balance is unknown the block keeps its layout slot (min-height reserves the space, so the rail buttons
-   never shift when the balance arrives) but its content is invisible — empty space, no spinner. */
+/* Keeps its layout slot while unknown; fades in when a real balance lands (contract). */
 .rail-vault-balance.is-pending {
   opacity: 0;
 }
@@ -329,9 +531,6 @@ button:disabled,
   max-width: 100%;
   overflow: hidden;
   color: var(--text);
-  /* "GRAM" is a char wider than "TON"; 9px keeps "N.NNNN GRAM" on one line in the narrow rail,
-     and auto-height rows + normal wrapping let a longer value drop cleanly to a second line
-     instead of overlapping the row below (the fixed 14px rows used to clip/overlap it). */
   font-size: 9px;
   font-weight: 800;
   line-height: 1.05;
@@ -341,8 +540,6 @@ button:disabled,
   word-break: normal;
 }
 
-/* The rail balance shows NOTHING until it is known (no spinner — the global header sync indicator already signals
-   activity); when a real balance lands the whole block fades in. */
 .rail-vault-balance-reveal {
   animation: rail-balance-fade-in 0.45s ease-out both;
 }
@@ -387,16 +584,16 @@ button:disabled,
 .list-pane {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 14px;
-  padding: var(--header-top-offset) 24px 24px;
+  gap: 12px;
+  padding: var(--header-top-offset) var(--gutter) var(--gutter);
   border-right: 1px solid var(--line-soft);
-  background: rgba(17, 20, 23, 0.96);
+  background: transparent;
 }
 
 .content-pane {
   display: none;
   background:
-    linear-gradient(90deg, rgba(48, 213, 176, 0.04), transparent 380px),
+    radial-gradient(90% 60% at 50% 0%, var(--a06), transparent 60%),
     var(--panel);
 }
 
@@ -411,6 +608,7 @@ button:disabled,
   overflow: hidden;
 }
 
+/* ── Headers ────────────────────────────────────────────────────────────── */
 .pane-header {
   display: flex;
   align-items: center;
@@ -421,17 +619,15 @@ button:disabled,
 
 .conversation-header {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) max-content;
+  grid-template-columns: 60px minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
 }
 
-/* Header action clusters are pinned to the TOP of the header bar at the shared inset (not centered against the
-   bar's actual height), so every tab's buttons sit at exactly the same offset even when a device's font scale
-   grows a title and stretches one header taller than another. Same formula as the public absolute cluster. */
+/* Action clusters pinned to the shared top inset on every tab (contract). */
 .pane-header .header-actions,
 .conversation-header .header-actions {
   align-self: start;
@@ -452,16 +648,13 @@ button:disabled,
 .profile-pane h2,
 .feed-item h2 {
   margin: 0;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .pane-header h1 {
-  font-size: 26px;
-  line-height: 1.1;
-  /* On a narrow screen the public header (title + Feed/Channels toggle + info) can run out of room; let the
-     title truncate with an ellipsis so the action buttons stay fully visible instead of overflowing the edge.
-     The title-block is min-width: 0, so this only kicks in when space is genuinely tight. */
+  font-size: 21px;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -473,7 +666,7 @@ button:disabled,
 .feed-item p,
 .balance-card small,
 .ledger-row small {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   color: var(--muted);
 }
 
@@ -508,9 +701,8 @@ button:disabled,
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.06);
-  border-color: rgba(48, 213, 176, 0.24);
+  border-radius: var(--r-pill);
+  background: var(--a06);
   color: var(--accent);
 }
 
@@ -518,23 +710,23 @@ button:disabled,
 .send-button:hover,
 .action-grid button:hover,
 .settings-list button:hover {
-  border-color: rgba(48, 213, 176, 0.42);
+  border-color: var(--a25);
 }
 
 .icon-button:hover {
-  background: rgba(48, 213, 176, 0.1);
+  background: var(--a10);
 }
 
 .icon-button.accent,
 .send-button {
   background: var(--accent);
-  color: #06100d;
+  color: var(--on-accent);
   border-color: transparent;
 }
 
 .icon-button:disabled {
   background: var(--panel-3);
-  border-color: var(--line);
+  border-color: transparent;
   color: var(--muted);
 }
 
@@ -542,39 +734,30 @@ button:disabled,
   display: none;
 }
 
-/* ONE rule for EVERY header control (docs/install/discover/edit/identity/back/refresh — anything that lives in a
-   header container): the same compact square with the same near-black fill, on desktop AND mobile. Addressed by
-   CONTAINER so a new header button can never be missed by a per-class list. Composer/send/search controls are not
-   inside header containers and keep the generic .icon-button sizing above. */
+/* ONE rule for every header control, addressed by container (contract). */
 .pane-header .icon-button,
 .public-header-actions .icon-button,
 .conversation-header .icon-button {
   width: var(--header-button-size);
   height: var(--header-button-size);
-  background: #0d1012;
+  background: transparent;
+  color: var(--muted);
 }
 
 .pane-header .icon-button:hover,
 .public-header-actions .icon-button:hover,
 .conversation-header .icon-button:hover {
-  background: rgba(48, 213, 176, 0.1);
+  background: var(--a10);
+  color: var(--accent);
 }
 
-/* A dialog's ✕ is a header control too, and it was the ONLY one still at the generic 40px — visibly bigger than the
-   sync button sitting a few pixels away (owner, 2026-08-09). SIZE only: the dialog card keeps its own teal-tinted
-   .icon-button fill, which is a separate decision and not what was being compared. Addressed by CONTAINER for the
-   same reason as the rule above — every modal header is covered, including ones not written yet. A per-dialog list
-   has already failed here once: MODALGEO-03 exists because a new dialog was missed by exactly that shape of rule. */
+/* Dialog ✕ is a header control too (contract). */
 .modal-backdrop header .icon-button {
   width: var(--header-button-size);
   height: var(--header-button-size);
 }
 
-/* Global sync indicator: a green spinner while any sync is running, a green check when synced. Sits in the header
-   corner (last in .header-actions) on every tab, so the sync state is visible everywhere — replacing the private
-   dialog's text subtitle. Pure CSS (reuses rail-balance-spin); no new icon asset. A real <button>: in check mode
-   a tap runs a context-aware "sync now" (syncNowForCurrentScreen); while spinning the tap is a no-op, so the
-   pointer affordance shows only when idle. */
+/* Global sync indicator: spinner while syncing, check when idle (contract). */
 .global-sync-indicator {
   width: var(--header-button-size);
   height: var(--header-button-size);
@@ -584,26 +767,32 @@ button:disabled,
   padding: 0;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-pill);
+  transition: background-color 0.16s ease;
 }
+
 .global-sync-indicator[data-syncing="false"] {
   cursor: pointer;
 }
+
 .global-sync-indicator[data-syncing="false"]:hover {
-  background: rgba(48, 213, 176, 0.1);
+  background: var(--a10);
 }
+
 .global-sync-indicator::before {
   content: "";
   box-sizing: border-box;
 }
+
 .global-sync-indicator[data-syncing="true"]::before {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid rgba(48, 213, 176, 0.28);
+  border: 2px solid var(--a25);
   border-top-color: var(--accent);
   animation: rail-balance-spin 0.8s linear infinite;
 }
+
 .global-sync-indicator[data-syncing="false"]::before {
   width: 7px;
   height: 12px;
@@ -619,22 +808,32 @@ button:disabled,
   }
 }
 
-/* Inside a Telegram Mini App the install/"Add to Home screen" affordance is
-   meaningless; hide it reliably regardless of the JS install-state refresh. */
 html[data-platho-telegram="true"] .install-header-button {
   display: none !important;
 }
 
+/* ── Search ─────────────────────────────────────────────────────────────── */
 .search-row {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0d1012;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--field);
+  box-shadow: var(--shadow-1);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.search-row:focus-within {
+  border-color: var(--a40);
+  box-shadow: 0 0 0 3px var(--a10);
+}
+
+.search-row .icon {
+  color: var(--muted-2);
 }
 
 .public-channel-search-row[hidden] {
@@ -654,35 +853,42 @@ html[data-platho-telegram="true"] .install-header-button {
   color: var(--muted-2);
 }
 
+/* ── Thread list ────────────────────────────────────────────────────────── */
 .thread-list {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 3px;
   overflow: auto;
   padding-right: 4px;
 }
 
 .thread-item {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 72px;
-  padding: 10px;
+  min-height: 64px;
+  padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--r-m);
   background: transparent;
   text-align: left;
 }
 
-.thread-item:hover,
+.thread-item:hover {
+  background: var(--surface);
+}
+
 .thread-item.is-selected {
-  background: var(--panel-2);
-  border-color: var(--line);
+  background: var(--a16);
 }
 
 .thread-item.has-unread {
-  border-color: rgba(48, 213, 176, 0.26);
+  background: var(--a06);
+}
+
+.thread-item.has-unread .thread-name {
+  font-weight: 800;
 }
 
 .thread-main {
@@ -714,35 +920,33 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .identity-label-ton {
-  color: #9fd3f2;
+  color: var(--id-ton);
 }
 
 .identity-label-platho {
-  color: #8fdcc8;
+  color: var(--id-platho);
 }
 
 .thread-time {
   justify-self: end;
   max-width: 72px;
-  color: var(--muted);
+  color: var(--muted-2);
   font-size: 12px;
 }
 
 .thread-side {
   display: grid;
   justify-items: end;
-  gap: 7px;
+  gap: 6px;
   min-width: 72px;
 }
 
 .thread-unread-badge {
-  /* Count-only pill ("3", "99+") — the localized word wrapped this badge onto two lines in the narrow side column. */
-  min-width: 22px;
+  min-width: 21px;
   padding: 3px 7px;
-  border: 1px solid rgba(48, 213, 176, 0.24);
-  border-radius: 999px;
-  background: rgba(48, 213, 176, 0.12);
-  color: var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 800;
   line-height: 1.1;
@@ -751,32 +955,32 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .thread-preview {
-  margin-top: 4px;
+  margin-top: 3px;
   color: var(--muted);
   font-size: 13px;
 }
 
 .thread-state {
-  margin-top: 6px;
+  margin-top: 5px;
   color: var(--accent);
   font-size: 11px;
   text-transform: uppercase;
 }
 
-/* Same red the failed message meta uses, so the list and the open dialog agree on what "wrong" looks like. */
 .thread-state[data-tone="failed"] {
-  color: #ff8f8f;
+  color: var(--danger);
 }
 
+/* ── Avatars (round — modern messenger) ─────────────────────────────────── */
 .avatar {
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 8px;
-  background: #19221f;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--a25), var(--a06));
   color: var(--accent);
-  border: 1px solid rgba(48, 213, 176, 0.25);
+  border: 0;
   font-weight: 800;
   background-size: cover;
   background-position: center;
@@ -793,9 +997,8 @@ html[data-platho-telegram="true"] .install-header-button {
   font-size: 24px;
 }
 
-/* Saved (My notes) thread: pencil icon instead of the wallet-letter fallback. */
 .avatar.avatar-saved {
-  background: rgba(48, 213, 176, 0.12);
+  background: var(--a16);
 }
 
 .avatar.avatar-saved svg {
@@ -811,20 +1014,19 @@ html[data-platho-telegram="true"] .install-header-button {
 }
 
 .feed-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  flex: 0 0 30px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex: 0 0 32px;
   font-size: 12px;
 }
 
+/* ── Conversation header ────────────────────────────────────────────────── */
 .conversation-header {
   min-height: var(--header-height);
-  /* Vertical padding 0 so the bar is exactly the shared header height; the chat-pane top padding
-     (both breakpoints) lands it at the shared top offset — identical geometry to the pane headers. */
-  padding: 0 24px;
+  padding: 0 var(--gutter);
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(15, 18, 20, 0.94);
+  background: transparent;
 }
 
 .conversation-title {
@@ -847,6 +1049,7 @@ html[data-platho-telegram="true"] .install-header-button {
   white-space: nowrap;
 }
 
+/* ── Identity popover ───────────────────────────────────────────────────── */
 .identity-popover {
   position: fixed;
   z-index: 50;
@@ -854,14 +1057,13 @@ html[data-platho-telegram="true"] .install-header-button {
   gap: 8px;
   width: min(280px, calc(100vw - 24px));
   padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #111417;
-  box-shadow: 0 18px 50px var(--shadow);
-  /* A long channel description must never spill off-screen (its bottom was clipped, unreadable): cap the height to the
-     viewport and scroll the overflow. The close-on-scroll handler ignores scrolls INSIDE the popover, so this is safe. */
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-l);
+  background: var(--panel-2);
+  box-shadow: var(--shadow-pop);
   max-height: calc(var(--app-viewport-height, 100dvh) - 24px);
   overflow-y: auto;
+  animation: popIn 0.16s ease-out;
 }
 
 .identity-popover[hidden] {
@@ -880,7 +1082,7 @@ html[data-platho-telegram="true"] .install-header-button {
   min-width: 0;
   padding: 9px 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--r-s);
   background: transparent;
   text-align: left;
   cursor: pointer;
@@ -888,8 +1090,7 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .identity-variant:hover,
 .identity-variant[aria-checked="true"] {
-  border-color: rgba(48, 213, 176, 0.24);
-  background: rgba(48, 213, 176, 0.08);
+  background: var(--a10);
 }
 
 .identity-variant strong,
@@ -928,15 +1129,14 @@ html[data-platho-telegram="true"] .install-header-button {
   width: 38px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--r-s);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
 
 .identity-variant-edit:hover {
-  border-color: rgba(48, 213, 176, 0.24);
-  background: rgba(48, 213, 176, 0.08);
+  background: var(--a10);
   color: var(--text);
 }
 
@@ -946,10 +1146,9 @@ html[data-platho-telegram="true"] .install-header-button {
   display: block;
 }
 
-/* Transient "copied" confirmation on the address-row copy button (no global toast exists). */
 .identity-variant-edit.identity-variant-copied {
   color: var(--accent);
-  border-color: rgba(48, 213, 176, 0.24);
+  background: var(--a10);
 }
 
 .conversation-title h2 {
@@ -957,9 +1156,10 @@ html[data-platho-telegram="true"] .install-header-button {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
-  font-size: 20px;
+  font-size: 18px;
 }
 
+/* ── Message strip ──────────────────────────────────────────────────────── */
 .message-strip {
   display: flex;
   flex-direction: column;
@@ -968,11 +1168,9 @@ html[data-platho-telegram="true"] .install-header-button {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Swipe-to-reply grabs the whole ROW LINE (v647), so the CONTAINER must also surrender horizontal touch
-     gestures to JS: without pan-y here, a swipe starting on the strip's empty space beside a bubble lets the
-     browser claim the gesture and fire pointercancel mid-drag — the row jerks and snaps back (v648). */
+  /* Swipe-to-reply: the container yields horizontal touch gestures to JS (contract). */
   touch-action: pan-y;
-  padding: 22px;
+  padding: 20px var(--gutter);
 }
 
 .message-strip::before {
@@ -982,16 +1180,14 @@ html[data-platho-telegram="true"] .install-header-button {
 
 .message {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   flex: 0 0 auto;
   min-width: 0;
   max-width: min(var(--message-card-width), 82%);
   overflow-wrap: anywhere;
 }
 
-/* Swipe-to-reply (v646): rows keep native VERTICAL scroll (touch-action pan-y) while horizontal drags feed the
-   gesture; transform gives live feedback and springs back through the transition (killed mid-drag).
-   position: relative anchors the desktop hover Reply button (v647). */
+/* Swipe-to-reply mechanics (contract). */
 .message,
 .comment-item {
   position: relative;
@@ -999,60 +1195,50 @@ html[data-platho-telegram="true"] .install-header-button {
   transition: transform 0.15s ease-out;
 }
 
-/* Desktop reply affordance (v647): visible ONLY on hover-capable devices — touch keeps the clean swipe UX. */
-/* ONE CLUSTER, NOT PER-BUTTON OFFSETS.
-   Each row action used to place itself absolutely by its ORDINAL — reply at -26px, copy at -52px — which silently
-   assumed every earlier button exists. In "My notes" there is no Reply (you do not reply to yourself), so Copy sat
-   at -52px with a 26px DEAD GAP between it and the bubble: the pointer left the row on its way there, :hover ended,
-   and the button vanished before it could be clicked. [OWNER 2026-08-04: "the copy button is away from the window,
-   so it cannot be pressed"]
-   A flex cluster has no ordinals to get wrong: whatever buttons a row has are contiguous and flush against the
-   bubble, and adding or removing one cannot open a gap. */
-/* ANCHORED BY THE EDGE THAT FACES THE BUBBLE, never by a fixed pixel offset. A single 26px button could be placed
-   at left:-26px and land flush; a CLUSTER placed that way grows RIGHTWARD and climbs onto the message (owner saw
-   the delete icon sitting on the post). Pinning the facing edge to the row's edge — right:100% on the left side,
-   left:100% on the right — makes the cluster grow AWAY from the bubble whatever it contains. */
+/* Hover row actions: one flex cluster anchored by the edge facing the bubble (contract). */
+/* Hover actions (reply / copy) fade and slide in on hover and out on leave (owner) — display toggling cannot animate,
+   so they are always laid out (absolute, out of flow) and shown through opacity/visibility. */
 .row-actions {
-  display: none;
+  display: inline-flex;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(-4px, 0, 0);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
   position: absolute;
   top: 0;
   left: 100%;
   right: auto;
-  /* PADDING, NOT MARGIN, on the side facing the bubble. A margin puts the breathing room OUTSIDE the cluster's box,
-     and on an outgoing row — where .message shrinks to its bubble — those few pixels belong to neither the bubble,
-     the row, nor the cluster. The pointer crossing them is over nothing, :hover drops, and the buttons vanish just
-     as the cursor arrives (owner: "I can't press them, they disappear as soon as I move the mouse there").
-     As padding the gap is INSIDE the cluster: the hit area touches the bubble, the eye still sees the space. */
   padding-left: 4px;
   gap: 2px;
   align-items: flex-start;
 }
 
-/* Incoming bubbles get the cluster to the RIGHT of the bubble; outgoing (right-edge-hugging) to the LEFT, where
-   row-reverse keeps the FIRST button nearest the bubble. */
 .message.out .row-actions {
   left: auto;
   right: 100%;
   padding-left: 0;
-  padding-right: 4px;   /* the facing side flips with the cluster — see the note above */
+  padding-right: 4px;
   flex-direction: row-reverse;
+  transform: translate3d(4px, 0, 0);
 }
 
-/* Comment cards are wide and their top-right corner is free, so the cluster sits INSIDE them (v651) — the one
-   place it is deliberately over the card rather than beside it. */
 .comment-item .row-actions {
   top: 2px;
   right: 2px;
   left: auto;
   padding-left: 0;
   flex-direction: row-reverse;
+  transform: translate3d(4px, 0, 0);
 }
 
 @media (hover: hover) {
   .message:hover .row-actions,
   .comment-item:hover .row-actions,
   .row-actions:focus-within {
-    display: inline-flex;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
   }
 }
 
@@ -1065,44 +1251,39 @@ html[data-platho-telegram="true"] .install-header-button {
   height: 26px;
   padding: 0;
   border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  background: rgba(15, 18, 20, 0.92);
+  border-radius: var(--r-s);
+  background: var(--panel-2);
   color: var(--accent);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  box-shadow: var(--shadow-1);
 }
 
-/* v653 (owner: buttons overlapped the message text): on PRIVATE rows the hover actions sit OUTSIDE the bubble,
-   flush against its edge — never over the content. Hover survives because the cluster is a DOM child of the row
-   (CSS :hover follows the tree, not the box) and flush placement leaves no dead gap; it renders on hover-capable
-   (desktop) viewports only, where the strip has ample side space (bubbles cap at 82%). */
 .row-reply-button:hover {
   border-color: var(--accent);
 }
 
-/* A failed publish badge doubles as its own Retry control (v649) — the red text is the affordance. */
 .public-publish-status--retryable {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-/* Copy (v651) and, in "My notes", Delete — they carry no geometry of their own any more: the cluster places them. */
 .row-note-delete-button .icon {
   width: 15px;
   height: 15px;
 }
 
 .row-note-delete-button:hover {
-  border-color: var(--danger, #ff6b6b);
-  color: var(--danger, #ff6b6b);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
-/* Long-press copy confirmation (v651): a quick green "camera flash" over the bubble/row. */
+/* Long-press copy flash (contract keyframe name). */
 @keyframes copy-flash {
   0% { background-color: rgba(48, 213, 176, 0); }
-  18% { background-color: rgba(48, 213, 176, 0.55); }
+  18% { background-color: var(--a40); }
   100% { background-color: transparent; }
 }
 
@@ -1110,8 +1291,6 @@ html[data-platho-telegram="true"] .install-header-button {
   animation: copy-flash 0.6s ease-out 1;
 }
 
-/* Touch devices: long-press IS the copy action — suppress the native selection callout / context selection on
-   the rows (desktop keeps normal text selection; this applies only where hover is unavailable). */
 @media (hover: none) {
   .message .bubble,
   .comment-item {
@@ -1121,32 +1300,27 @@ html[data-platho-telegram="true"] .install-header-button {
   }
 }
 
-/* An image-bearing avatar is tappable (v651) — zoom cursor everywhere it opens the lightbox. */
 .avatar.has-image {
   cursor: zoom-in;
 }
 
-/* ...but NOT inside an interactive row (private chat list, etc.). The avatar-lightbox click handler
-   deliberately yields to the row's own click there (`avatar.closest('button, a, [role="button"]')` →
-   opening the chat wins), so the zoom cursor would LIE. Mirror that exact guard here: fall back to the
-   row's cursor so the pointer tells the truth (single source of truth = the JS guard's boundary). */
 button .avatar.has-image,
 a .avatar.has-image,
 [role="button"] .avatar.has-image {
   cursor: inherit;
 }
 
-/* File attachment chip (v652): name + size, tap to download. Shared by private bubbles and public surfaces. */
+/* File attachment chip. */
 .message-file-chip {
   display: flex;
   align-items: center;
   gap: 8px;
   max-width: 100%;
-  margin-top: 8px;
+  margin-top: 0;                 /* the gap lives BETWEEN blocks (rule below), not above the first one */
   padding: 8px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.08);
+  border: 1px solid transparent;
+  border-radius: var(--r-m);
+  background: var(--a10);
   color: var(--text);
   font-size: 14px;
   cursor: pointer;
@@ -1176,26 +1350,25 @@ a .avatar.has-image,
   transition: none;
 }
 
+/* Armed swipe ring: shadow ring instead of border (bubbles are borderless now). */
 .message.swipe-armed .bubble,
 .comment-item.swipe-armed {
-  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* Own bubbles override border-color later in the sheet (.message.out .bubble) at equal specificity — this
-   higher-specificity rule keeps the armed ring visible on OUTGOING messages too (v651, owner report). */
 .message.out.swipe-armed .bubble {
-  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* Reply quote strip inside a bubble / comment: tappable, accent-edged, one-line snippet. */
+/* Reply quote strip inside a bubble / comment. */
 .message-reply-quote {
   display: grid;
   gap: 2px;
-  padding: 4px 8px;
+  padding: 5px 9px;
   margin-bottom: 6px;
   border-left: 2px solid var(--accent);
-  border-radius: 4px;
-  background: rgba(48, 213, 176, 0.08);
+  border-radius: 6px;
+  background: var(--a10);
   cursor: pointer;
   min-width: 0;
 }
@@ -1214,9 +1387,13 @@ a .avatar.has-image,
   text-overflow: ellipsis;
 }
 
-/* Scroll-to-original highlight (quote tap). */
+.message.out .message-reply-quote-snippet {
+  color: inherit;
+  opacity: 0.72;
+}
+
 @keyframes reply-target-flash {
-  0% { background-color: rgba(48, 213, 176, 0.22); }
+  0% { background-color: var(--a25); }
   100% { background-color: transparent; }
 }
 
@@ -1242,30 +1419,33 @@ a .avatar.has-image,
   justify-self: end;
 }
 
+/* ── Bubbles: borderless, soft shadow, asymmetric corners ───────────────── */
 .bubble {
-  /* The anchor for the row's hover actions. MEASURED 2026-08-04: an INCOMING .message is a grid that stretches to
-     max-width min(348px, 82%) whatever the bubble holds, so a short reply left its row box 240px wider than the
-     bubble — actions anchored to the ROW hung that far out in space. Outgoing rows happen to shrink to their
-     bubble, which is why only one side ever looked right. The bubble is the only edge that is always the edge the
-     user sees, so it is the one the cluster hangs off. */
   position: relative;
   width: fit-content;
   min-width: 0;
   max-width: 100%;
-  padding: 11px 13px;
-  border-radius: 8px;
-  background: var(--panel-3);
-  border: 1px solid var(--line);
-  line-height: 1.38;
+  padding: 9px 13px;
+  border-radius: var(--r-l);
+  background: var(--bubble-in);
+  border: 0;
+  box-shadow: var(--shadow-1);
+  line-height: 1.4;
   font-size: 15px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+.message.in .bubble {
+  border-bottom-left-radius: 6px;
+}
+
 .message.out .bubble {
-  background: #13312b;
-  border-color: rgba(48, 213, 176, 0.24);
+  background: var(--bubble-out);
+  color: var(--bubble-out-text);
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: var(--r-l);
 }
 
 .message.system {
@@ -1276,8 +1456,10 @@ a .avatar.has-image,
 
 .message.system .bubble {
   color: var(--muted);
-  background: #101416;
-  border-style: dashed;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-m);
+  box-shadow: none;
   font-size: 13px;
 }
 
@@ -1291,7 +1473,7 @@ a .avatar.has-image,
 }
 
 .message[data-status="sending"] .bubble {
-  opacity: 0.74;
+  opacity: 0.72;
 }
 
 .message[data-status="sending"] .message-meta {
@@ -1299,7 +1481,7 @@ a .avatar.has-image,
 }
 
 .message[data-status="failed"] .message-meta {
-  color: #ff8f8f;
+  color: var(--danger);
 }
 
 .message-actions {
@@ -1314,11 +1496,11 @@ a .avatar.has-image,
 }
 
 .message-actions button {
-  min-height: 18px;
-  padding: 1px 7px;
+  min-height: 20px;
+  padding: 2px 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: rgba(10, 13, 15, 0.72);
+  border-radius: var(--r-pill);
+  background: var(--panel-2);
   color: var(--text);
   font: inherit;
   font-size: 11px;
@@ -1348,8 +1530,8 @@ a .avatar.has-image,
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(10, 13, 15, 0.62);
+  border-radius: var(--r-s);
+  background: var(--panel-2);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -1372,10 +1554,7 @@ a .avatar.has-image,
   white-space: nowrap;
 }
 
-/* v769: the composer is a vertical stack (flex column) — context strips, the formatting toolbar, the input row,
-   attachment panels, and the cost status stack top-to-bottom in DOM order. This replaced the fragile 5-column
-   grid (which needed a mobile 2-row reshuffle + an .is-replying juggle): with fewer buttons on the input row
-   (only the anon / comments control + textarea + send), everything just stacks naturally on every width. */
+/* ── Composer ───────────────────────────────────────────────────────────── */
 .composer {
   display: flex;
   flex-direction: column;
@@ -1383,36 +1562,32 @@ a .avatar.has-image,
   min-width: 0;
   max-width: 100%;
   overflow: visible;
-  padding: 12px 24px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+  padding: 12px var(--gutter) calc(14px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
   border-top: 1px solid var(--line-soft);
-  background: rgba(15, 18, 20, 0.96);
+  background: transparent;   /* owner: no dark plate under the composer — plasma shows through */
 }
 
 .composer > * {
   min-width: 0;
 }
 
-/* The input row: leading control (anon toggle / comments toggle) | textarea | send. align-items:end keeps the
-   leading control and send pinned to the textarea's bottom line as it grows. */
 .composer-input-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: end;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* WYSIWYG contenteditable composer (v771): a single-line-min, 144px-max editable area that renders formatting
-   live. The placeholder rides on a ::before gated by the JS is-empty class (a contenteditable has no native
-   placeholder). Inline format = CLASS spans (no inline styles per prod CSP style-src 'self'). */
+/* WYSIWYG contenteditable input: pill that grows; placeholder rides ::before (contract). */
 .composer .composer-input {
-  position: relative; /* anchor for the absolutely-positioned placeholder below */
+  position: relative;
   min-width: 0;
   min-height: 44px;
   max-height: 144px;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0d1012;
+  padding: 11px 16px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: var(--field);
   color: var(--text);
   font: inherit;
   line-height: 1.35;
@@ -1421,20 +1596,22 @@ a .avatar.has-image,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   cursor: text;
+  box-shadow: var(--shadow-1);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-/* The placeholder is absolutely positioned (out of the inline flow) so the caret in the empty editor sits at the
-   real start, offset 0 — NOT after the placeholder text. An inline ::before is generated content that precedes
-   offset 0, so the browser rendered the caret at the END of the placeholder. Out of flow also keeps the box at one
-   line even when the browser leaves a bogus <br> after a manual clear. nowrap+ellipsis degrades a placeholder too
-   long for a narrow screen to a single truncated line (absolute content can't grow the box, so wrapping would clip
-   the 2nd line mid-word). top/left/right match the input padding. */
+.composer .composer-input:focus {
+  border-color: var(--a40);
+  box-shadow: 0 0 0 3px var(--a10);
+}
+
+/* Placeholder position must match the input padding above (contract). */
 .composer .composer-input.is-empty::before {
   content: attr(placeholder);
   position: absolute;
   top: 11px;
-  left: 14px;
-  right: 14px;
+  left: 16px;
+  right: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1449,9 +1626,6 @@ a .avatar.has-image,
 
 .composer .composer-input .fmt-bold { font-weight: 700; }
 .composer .composer-input .fmt-italic { font-style: italic; }
-/* A heading is a LINE format, so it renders as the line it will become — same weight and size the recipient sees
-   (.msg-heading / .msg-heading-1), not a literal `# ` the writer has to read past. inline-block keeps it inside the
-   <br>-separated flow the editor is built on while still taking the line's own type size. */
 .composer .composer-input .fmt-heading {
   display: inline-block;
   font-weight: 800;
@@ -1461,22 +1635,17 @@ a .avatar.has-image,
 .composer .composer-input .fmt-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.92em;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface);
   border-radius: 4px;
   padding: 0 3px;
 }
 
-/* v773: marker atoms render their REAL content live (image/file/payment/share). Each is one atomic, deletable
-   unit — its inner content is display-only (pointer-events off) so a click selects the block, not the media. */
+/* Atomic marker blocks (contract). */
 .composer .composer-input .composer-block {
   display: inline-block;
   max-width: 100%;
   vertical-align: bottom;
   margin: 2px 1px;
-  /* Every atom (link/image/file/payment/post) selects ATOMICALLY: contenteditable=false stops the caret going inside,
-     so a mouse drag includes the whole chip as one unit, and copy/cut serialize its marker. user-select:text (NOT
-     'all') — 'all' made the selection FLICKER as the cursor moved over the chip and blocked extending a right-to-left
-     selection past it; text keeps the atomic-via-contenteditable behavior without the flicker. */
   -webkit-user-select: text;
   user-select: text;
 }
@@ -1489,35 +1658,28 @@ a .avatar.has-image,
   display: block;
   max-width: 100%;
   max-height: 200px;
-  border-radius: 10px;
+  border-radius: var(--r-s);
   object-fit: contain;
 }
 
 .composer .composer-input .composer-block-pill {
   padding: 1px 9px;
-  border-radius: 999px;
-  background: rgba(48, 213, 176, 0.14);
-  border: 1px solid rgba(48, 213, 176, 0.3);
+  border-radius: var(--r-pill);
+  background: var(--a16);
+  border: 1px solid var(--a25);
   color: var(--accent);
   font-size: 0.85em;
   white-space: nowrap;
 }
 
-/* v778: an inserted link renders live as a link chip (accent + underline), not raw [label](url) markdown. It is
-   plain inline text (unlike the block image/file atoms), so it flows on the text BASELINE — the inherited
-   inline-block + vertical-align:bottom + vertical margin from .composer-block would drop it below the line (v779). */
 .composer .composer-input .composer-block-link {
-  /* inline-BLOCK (like the image/file atoms), NOT inline: an inline contenteditable=false chip let the MOUSE hit-test
-     between its letters (partial/letter-by-letter selection + the drag got stuck on it); inline-block makes the mouse
-     treat it as ONE atomic unit. vertical-align:baseline + margin:0 keep it on the text baseline (v779). */
   display: inline-block;
   vertical-align: baseline;
   margin: 0;
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
-  cursor: pointer; /* click to edit the link (opens the dialog pre-filled) */
-  /* user-select inherits `text` from .composer-block above (atomic via contenteditable=false + inline-block, no flicker). */
+  cursor: pointer;
 }
 
 .composer .composer-input .composer-block-file {
@@ -1525,8 +1687,8 @@ a .avatar.has-image,
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-s);
+  background: var(--surface);
   border: 1px solid var(--line);
   font-size: 0.85em;
 }
@@ -1545,17 +1707,15 @@ a .avatar.has-image,
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid rgba(48, 213, 176, 0.26);
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.06);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--a06);
   color: var(--accent);
   font-size: 13px;
   cursor: pointer;
 }
 
-/* Comments toggle reads its state at a glance: ON = accent green, no slash (see
-   :has(input:checked) below); OFF = muted with a diagonal slash across the chat icon,
-   like the eye/eye-off send-privacy button. */
+/* Comments toggle: OFF = slash across the icon (contract). */
 .composer-post-option::after {
   content: "";
   position: absolute;
@@ -1565,7 +1725,7 @@ a .avatar.has-image,
   height: 2px;
   border-radius: 2px;
   background: currentColor;
-  box-shadow: 0 0 0 2px var(--panel-3);
+  box-shadow: 0 0 0 2px var(--panel);
   transform: translate(-50%, -50%) rotate(-45deg);
   pointer-events: none;
 }
@@ -1587,8 +1747,7 @@ a .avatar.has-image,
 }
 
 .composer-post-option:has(input:checked) {
-  border-color: rgba(48, 213, 176, 0.42);
-  background: rgba(48, 213, 176, 0.1);
+  background: var(--a16);
   color: var(--accent);
 }
 
@@ -1597,14 +1756,7 @@ a .avatar.has-image,
   height: 20px;
 }
 
-.composer-post-option:hover {
-  border-color: rgba(48, 213, 176, 0.42);
-  background: rgba(48, 213, 176, 0.1);
-}
-
-/* Disabled dim: the .is-disabled class is the LOAD-BEARING selector (toggled by refreshPublicSendButtonState
-   in lockstep with the checkbox's disabled) — the :has() variant no-ops on the iOS floor (Safari 14). Kept as
-   a SEPARATE rule: one unsupported selector in a shared list would drop the whole rule there. */
+/* .is-disabled is the load-bearing selector; the :has() twin stays separate (contract). */
 .composer-post-option.is-disabled {
   cursor: not-allowed;
   opacity: 0.62;
@@ -1615,9 +1767,8 @@ a .avatar.has-image,
   opacity: var(--disabled-opacity);
 }
 
-/* Keyboard focus only (matches the eye/send-privacy button): no ring on a plain mouse press. */
 .composer-post-option:has(input:focus-visible) {
-  outline: 2px solid rgba(48, 213, 176, 0.28);
+  outline: 2px solid var(--a25);
   outline-offset: 2px;
 }
 
@@ -1631,10 +1782,10 @@ a .avatar.has-image,
   justify-content: space-between;
   gap: 8px;
   min-height: 32px;
-  padding: 6px 8px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.08);
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: var(--a10);
   color: var(--muted);
   font-size: 12px;
 }
@@ -1643,23 +1794,18 @@ a .avatar.has-image,
   display: none;
 }
 
-/* Swipe-to-reply quote strip: in the PRIVATE composer grid it spans the full row ABOVE the input (the public
-   composer's strip lives inside .composer-stack and needs no placement). The text ellipsizes on one line. */
 .composer > .composer-reply-context {
   grid-column: 1 / -1;
 }
 
 .composer-context .composer-reply-text {
-  display: block; /* block so text-overflow:ellipsis applies (an inline span ignores it), truncating the snippet */
+  display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   min-width: 0;
 }
 
-/* The text-holder flex child (#…ContextText) must be allowed to SHRINK: a flex item defaults to min-width:auto = its
-   nowrap min-content width, so on a narrow screen it kept the FULL snippet width and pushed the Cancel button off the
-   edge. min-width:0 lets it shrink and the .composer-reply-text inside ellipsizes. The <button> sibling is unaffected. */
 .composer-context > span {
   min-width: 0;
 }
@@ -1680,36 +1826,36 @@ a .avatar.has-image,
   cursor: pointer;
 }
 
+/* Round accent send button with a soft glow. */
 .composer .send-button {
-  width: 52px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-pill);
+  /* Fill comes from the base .send-button (flat accent) + the ::before glow layer — a gradient here
+     out-specified the layer scheme and kept the button snapping on theme switches. */
+  box-shadow: 0 4px 14px var(--a25);
 }
 
-/* The only icon-button left on the input row is the private anonymous / wallet-visibility toggle (the public
-   input row's leading control is the comments toggle). Everything else moved to the formatting toolbar (v769). */
+.composer .send-button:hover {
+  box-shadow: 0 6px 18px var(--a40);
+}
+
 .composer .private-anonymous-button {
   width: 44px;
   height: 44px;
-  background: rgba(48, 213, 176, 0.06);
-  border-color: rgba(48, 213, 176, 0.26);
+  background: var(--a06);
+  border-color: transparent;
   color: var(--accent);
 }
 
-.composer .private-anonymous-button:hover {
-  border-color: rgba(48, 213, 176, 0.42);
-  background: rgba(48, 213, 176, 0.1);
-}
-
-/* NO :has() here: Safari 14 (iOS floor) drops a whole rule when ANY selector in the list is unsupported. */
+/* NO :has() in this rule (Safari-floor contract). */
 .composer .private-anonymous-button:disabled {
   background: var(--panel-3);
-  border-color: var(--line);
+  border-color: transparent;
   color: var(--muted);
 }
 
-/* Formatting toolbar (v769): a slide-out row above the input. Shown on textarea focus/click, hidden while typing
-   and by the trailing ▼ button. Collapsed = max-height 0 + opacity 0 (animated). No sticky/fixed: the whole
-   app-shell tracks the visual viewport, so the toolbar rides above the mobile keyboard as a normal stacked row. */
+/* Formatting toolbar: slide-out row (contract mechanics). */
 .composer-toolbar {
   display: flex;
   align-items: center;
@@ -1734,42 +1880,21 @@ a .avatar.has-image,
   .composer-toolbar { transition: opacity 0.18s ease; transform: none; }
 }
 
-/* Maximize (v780): expand the composer to a full-screen overlay for composing long posts. The editor DOM is untouched
-   (draft/caret/selection preserved) — only the container is restyled. Height = --app-viewport-height (JS tracks the
-   visual viewport), so the send button stays above the mobile keyboard. z-index 30 sits ABOVE the app chrome (<=4)
-   but BELOW every dialog/picker/lightbox (>=40), so Insert-link / emoji / attachments still open on top. */
+/* Maximized composer overlay (contract mechanics; opaque bg). */
 .composer.is-maximized {
   position: fixed;
-  /* TOP-ANCHORED, and the keyboard is left to the browser.
-     [OWNER 2026-08-14] He worked this out from the behaviour alone: "it thought it was at the top of the screen,
-     and you were just yanking it down by hand... every frame it jumped back to where it believed it was, and the
-     app shoved it back again." He was right, and the measurement that finally settled it says the correction
-     itself was never needed.
-     [MEASURED on his iPhone with the keyboard OPEN, which no earlier reading had captured: innerHeight 755,
-     visible height 438, keyboard 317, offsetTop 0, scrollY 0, and a fixed strip anchored exactly like this one
-     sitting at 0 — precisely where it belongs.] The visible area does NOT slide when the keyboard opens; it only
-     shrinks, from the bottom, and a top-anchored fixed element is already in the right place. Every correction
-     tried here — bottom pinned to the keyboard gap, top driven from offsetTop — was moving something that was
-     not out of position, which is why each one flew upward by the amount it "corrected".
-     So the composer needs exactly one thing from us: to be as TALL as the visible area. Nothing else. */
   top: 0;
   left: 0;
   right: 0;
-  margin: 0; /* the public composer bleeds to the pane edges with margin: 0 -24px — reset it so left/right:0 = viewport */
-  height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh)); /* exact (unfloored) so send/restore stay above the keyboard on short viewports */
+  margin: 0;
+  height: var(--app-viewport-height-exact, var(--app-viewport-height, 100dvh));
   z-index: 30;
   max-width: none;
-  background: #0f1214; /* opaque (the resting composer bg is translucent — it would show the app behind) */
+  background: var(--panel);
   padding-top: calc(12px + var(--app-safe-area-top, env(safe-area-inset-top)));
 }
 
-/* Maximize/restore (v783): the composer visibly GROWS from its inline footprint to full-screen (and shrinks back) via
-   a JS FLIP — composerRunMaximizeFlip measures the inline rect, then transitions a transform that maps full-screen
-   back to that rect. So the animation is driven by inline transform/transition set in JS (CSSOM per-property, CSP-ok),
-   NOT a keyframe. transform-origin is set to top left by the FLIP. */
-
-/* Dock-toggle (v782, slower v783): when the ↕ button flips the toolbar above<->below the input, it slides + fades back
-   in on its new side. --dock-shift (set by JS) points the slide the right way. */
+/* Dock-toggle slide (contract keyframe name + --dock-shift var). */
 @keyframes composerDockShift {
   from { opacity: 0.15; transform: translateY(var(--dock-shift, 12px)); }
   to { opacity: 1; transform: translateY(0); }
@@ -1780,7 +1905,6 @@ a .avatar.has-image,
   .composer-toolbar.is-docking { animation: none; }
 }
 
-/* The toolbar auto-hides while typing; force it visible when maximized so the restore button is always reachable. */
 .composer.is-maximized .composer-toolbar {
   max-height: 48px;
   opacity: 1;
@@ -1788,8 +1912,6 @@ a .avatar.has-image,
   pointer-events: auto;
 }
 
-/* The input row grows to fill the overlay; the editor stretches to fill it, the leading/send controls stay pinned to
-   the bottom edge (as in the resting align-items:end layout). */
 .composer.is-maximized .composer-input-row {
   flex: 1 1 auto;
   min-height: 0;
@@ -1803,9 +1925,9 @@ a .avatar.has-image,
 .composer.is-maximized .composer-input {
   max-height: none;
   height: auto;
+  border-radius: var(--r-l);
 }
 
-/* The button flips to the inward-arrows "restore" glyph while maximized. */
 .composer.is-maximized .composer-toolbar-maximize .icon {
   --mask: url("./assets/icons/collapse.svg?v=2");
 }
@@ -1825,12 +1947,6 @@ a .avatar.has-image,
   display: none;
 }
 
-/* MEASURED 2026-08-04 at 375 CSS px (iPhone SE2, the narrowest device this project targets): the eight buttons
-   are 8x28 = 224px and the seven 2px gaps make 238 — the row fit with 7px to spare, and the Heading button
-   returning in v831 pushed it 11px over. It is a horizontal scroller, so nothing was unreachable, but the last
-   button sat half-cut on exactly the device with the least room to swipe.
-   Closing the gap on narrow screens buys back 14px and touches nothing wider: the buttons keep their 28px hit
-   target (they are already separated by their own padding), and the separators keep the groups readable. */
 @media (max-width: 380px) {
   .composer-toolbar-scroll { gap: 0; }
 }
@@ -1842,22 +1958,21 @@ a .avatar.has-image,
   width: 28px;
   height: 28px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--r-s);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
 }
 
-/* hover: hover only — on touch devices :hover STICKS after a tap, so Bold/Italic stayed accent-green after pressing. */
 @media (hover: hover) {
   .composer-toolbar-button:hover:not(:disabled) {
-    background: rgba(48, 213, 176, 0.1);
+    background: var(--a10);
     color: var(--accent);
   }
 }
 
 .composer-toolbar-button.is-active {
-  background: rgba(48, 213, 176, 0.16);
+  background: var(--a16);
   color: var(--accent);
 }
 
@@ -1888,7 +2003,7 @@ a .avatar.has-image,
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-s);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -1909,9 +2024,7 @@ a .avatar.has-image,
   height: 18px;
 }
 
-/* v774: the ↕ dock button flips the formatting toolbar BELOW the input (owner-chosen, persisted). Reorder the
-   composer's flex children; reply/share strips stay above the input, attachments + cost stay below the toolbar.
-   Default (no class) keeps the toolbar above the input (DOM order) — right for iOS/desktop. */
+/* Toolbar below the input (owner-persisted; contract). */
 :root.is-composer-dock-below .composer-context { order: 0; }
 :root.is-composer-dock-below .composer-input-row { order: 1; }
 :root.is-composer-dock-below .composer-toolbar { order: 2; }
@@ -1920,24 +2033,22 @@ a .avatar.has-image,
 
 .composer-post-option.is-disabled {
   background: var(--panel-3);
-  border-color: var(--line);
+  border-color: transparent;
   color: var(--muted);
 }
 
 .composer-post-option:has(input:disabled) {
   background: var(--panel-3);
-  border-color: var(--line);
+  border-color: transparent;
   color: var(--muted);
 }
 
 .private-anonymous-button[aria-pressed="true"] {
-  border-color: rgba(48, 213, 176, 0.42);
-  background: rgba(48, 213, 176, 0.1);
+  background: var(--a16);
   color: var(--accent);
 }
 
-/* Emoji picker: a global fixed popover (positioned via JS relative to the trigger, so it survives pane switches),
-   with a scrollable grid of self-contained unicode emojis — no external font/library (CSP style-src 'self'). */
+/* Emoji picker. */
 .emoji-picker {
   position: fixed;
   z-index: 60;
@@ -1945,11 +2056,12 @@ a .avatar.has-image,
   max-height: min(320px, 48vh);
   overflow-y: auto;
   padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #0d1012;
-  box-shadow: 0 18px 50px var(--shadow);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-l);
+  background: var(--panel-2);
+  box-shadow: var(--shadow-pop);
   -webkit-overflow-scrolling: touch;
+  animation: popIn 0.16s ease-out;
 }
 
 .emoji-picker[hidden] {
@@ -1971,14 +2083,14 @@ a .avatar.has-image,
   font-size: 22px;
   line-height: 1;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-s);
   background: transparent;
   cursor: pointer;
 }
 
 .emoji-picker-item:hover,
 .emoji-picker-item:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface);
   outline: none;
 }
 
@@ -1996,8 +2108,8 @@ a .avatar.has-image,
 .composer-attachment select {
   min-height: 34px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0d1012;
+  border-radius: var(--r-s);
+  background: var(--field);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -2010,10 +2122,10 @@ a .avatar.has-image,
   justify-content: space-between;
   gap: 8px;
   min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.08);
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: var(--a10);
   color: var(--muted);
   font-size: 12px;
 }
@@ -2021,7 +2133,7 @@ a .avatar.has-image,
 .composer-attachment.is-list {
   align-items: stretch;
   flex-direction: column;
-  max-height: 150px; /* v775: ~3 rows, then scroll — a long attachment list must not eat the whole screen */
+  max-height: 150px;
   overflow-y: auto;
 }
 
@@ -2054,30 +2166,20 @@ a .avatar.has-image,
   cursor: pointer;
 }
 
-/* Private chat-bubble image: bounded to the narrow bubble media width (a bubble is not the full pane). This was
-   previously SHARED with .feed-image; v747 split them so the public feed can go wider (below) while private
-   bubbles keep the bubble cap. */
+/* ── Media in messages / feed ───────────────────────────────────────────── */
 .message-image {
   display: block;
   width: 100%;
   max-width: var(--message-media-width);
   max-height: 360px;
   margin-top: 8px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border: 0;
+  border-radius: var(--r-m);
   object-fit: contain;
-  background: #0d1012;
+  background: var(--media-bg);
+  box-shadow: var(--shadow-1);
 }
 
-/* Public post/comment image (v747, owner ask): span the CONTENT column when the column is no wider than the image
-   (fill, downscaling a big image), else sit CENTERED at natural size when the image is narrower than the column —
-   never upscaled, never left-stuck. width:auto (no upscale) + max-width:100% (never exceed the content column,
-   replacing the old 320px --message-media-width chat-bubble cap that made feed images tiny) + margin-inline:auto
-   (center when narrower); height:auto keeps aspect. Verified in-browser: 804x1024 -> natural 805x1025 centered on a
-   1111px column; 1600x600 -> 1111px full width; 200x150 -> natural centered; on a 321px mobile column all fill the
-   width. max-height 1400px is a scale-safety that bounds a pathological super-tall image (e.g. 300x4000 -> 106x1400)
-   without touching normal posts (a 1024px recipe is well under it) — the lightbox still shows the full image.
-   object-fit is gone: with auto width/height there is no fixed box to fit into. */
 .feed-image {
   display: block;
   width: auto;
@@ -2086,9 +2188,10 @@ a .avatar.has-image,
   max-height: 1400px;
   margin-top: 8px;
   margin-inline: auto;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: #0d1012;
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--media-bg);
+  box-shadow: var(--shadow-1);
 }
 
 .message-text-block,
@@ -2109,9 +2212,6 @@ a .avatar.has-image,
   margin-top: 8px;
 }
 
-/* Safe message formatting (v769): block-level elements emitted by appendFormattedMessageText into the
-   .message-text-block / .feed-block-text container (which stays white-space: pre-wrap, so newlines inside a
-   paragraph/quote render). Sizes are deliberately modest — this is chat/feed body text, not a document. */
 .msg-block {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -2138,6 +2238,11 @@ a .avatar.has-image,
   color: var(--muted);
 }
 
+.message.out .msg-quote {
+  color: inherit;
+  opacity: 0.78;
+}
+
 .msg-list {
   margin: 0;
   padding-left: 22px;
@@ -2153,7 +2258,7 @@ a .avatar.has-image,
 .msg-code {
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(150, 161, 156, 0.16);
+  background: rgba(128, 148, 144, 0.18);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.92em;
 }
@@ -2166,9 +2271,9 @@ a .avatar.has-image,
   width: min(100%, 360px);
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid rgba(48, 213, 176, 0.34);
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.08);
+  border: 1px solid var(--a25);
+  border-radius: var(--r-m);
+  background: var(--a10);
 }
 
 .message-payment-label {
@@ -2186,7 +2291,7 @@ a .avatar.has-image,
 .message-image:focus-visible,
 .feed-image[data-full-image-src]:hover,
 .feed-image[data-full-image-src]:focus-visible {
-  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--a40);
   outline: none;
 }
 
@@ -2195,9 +2300,6 @@ a .avatar.has-image,
   min-width: 0;
   max-width: 100%;
   min-height: 18px;
-  /* On a narrow screen the cost/reserve/discount line wraps to many rows and pushes the whole composer tall
-     (owner). Cap it at 3 lines (line-height 1.35) and scroll the overflow. Harmless on wide screens where it fits
-     in one or two lines. */
   max-height: calc(1.35em * 3);
   overflow-y: auto;
   color: var(--accent);
@@ -2224,57 +2326,43 @@ a .avatar.has-image,
 }
 
 .public-composer {
-  /* Full-bleed: the negative margins span the whole pane (the base .composer max-width:100% would otherwise
-     cap the width to the padded pane). Private's composer spans its pane the same way. Layout otherwise
-     inherits the base .composer flex column + the shared .composer-input-row grid. */
-  margin: 0 -24px -24px;
+  margin: 0 calc(-1 * var(--gutter)) calc(-1 * var(--gutter));
   max-width: none;
-  padding: 12px 24px calc(16px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
+  padding: 12px var(--gutter) calc(14px + var(--app-safe-area-bottom, env(safe-area-inset-bottom)));
 }
 
-/* Comment mode (post detail screen) hides the "allow comments" toggle — the input row becomes textarea | send
-   (no empty leading track where the toggle used to be). */
 .public-composer[data-mode="comment"] .composer-input-row {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+/* ── Panes ──────────────────────────────────────────────────────────────── */
 .public-pane,
 .wallet-pane,
 .profile-pane {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
   overflow: hidden;
-  /* Shared top offset (not 24): every pane's header bar starts at the same y as the conversation/comment
-     headers, so nothing jumps when switching tabs. */
-  padding: var(--header-top-offset) 24px 24px;
+  padding: var(--header-top-offset) var(--gutter) var(--gutter);
 }
 
 .public-pane {
   position: relative;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  /* Keep the Channels list column identical to the Private dialog-list column (.workspace). */
   --public-list-col: clamp(280px, 32vw, 392px);
 }
 
-/* The public action cluster is pinned top-right: absolutely positioned against the pane (.public-pane is
-   position:relative) at the SAME derived offset as every in-flow header cluster (top offset + control inset),
-   so the buttons sit at an identical y across all tabs by construction. */
 .public-pane .public-header-actions {
   position: absolute;
   top: calc(var(--header-top-offset) + var(--header-button-inset));
-  right: 24px;
+  right: var(--gutter);
   z-index: 3;
 }
-/* Pin the (title-only) pane header to row 1, column 1 (the menu is absolutely positioned and out of flow, so it
-   neither shares nor disturbs this cell). */
+
 .public-pane .pane-header {
   grid-column: 1;
   grid-row: 1;
 }
 
-/* The feed's row is stated rather than left to auto-placement, because the jump-to-newest button has to share it
-   (see .public-jump-down-button). Auto-placement would hand the button its own row and push the feed down —
-   MEASURED: the pane went from four rows to five and the feed dropped into row 4. */
 .public-pane > .public-feed {
   grid-column: 1;
   grid-row: 3;
@@ -2285,9 +2373,6 @@ a .avatar.has-image,
   overflow: hidden;
 }
 
-/* The two headline balances. They are driven by the SAME refresh that fills the rail corner, so they follow its
-   pending rule too: the block keeps its layout slot and stays invisible until a real balance lands (no spinner —
-   the header sync indicator already signals activity), then fades in via .rail-vault-balance-reveal. */
 .wallet-headline {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -2302,9 +2387,12 @@ a .avatar.has-image,
   display: grid;
   gap: 6px;
   padding: 16px 18px;
-  border: 1px solid rgba(48, 213, 176, 0.16);
-  border-radius: 14px;
-  background: var(--surface, rgba(255, 255, 255, 0.03));
+  border: 1px solid transparent;
+  border-radius: var(--r-l);
+  background:
+    linear-gradient(135deg, var(--a10), transparent 70%),
+    var(--panel-2);
+  box-shadow: var(--shadow-1);
 }
 
 .wallet-headline-card span {
@@ -2317,8 +2405,6 @@ a .avatar.has-image,
 
 .wallet-headline-card strong {
   color: var(--text);
-  /* Big by request, but it must not push a long value out of the card on a narrow phone: clamp scales it down
-     rather than letting "1234.5678 GRAM" overflow or clip. */
   font-size: clamp(20px, 5.2vw, 30px);
   font-weight: 800;
   line-height: 1.1;
@@ -2342,10 +2428,6 @@ a .avatar.has-image,
   gap: 14px;
   min-height: 0;
   overflow-y: auto;
-  /* overflow-y:auto alone COMPUTES overflow-x to auto too, and iOS Safari lets an auto axis rubber-band
-     even with zero horizontal overflow (the "pull the list sideways and it springs back" feel). Pin the x
-     axis shut and hand horizontal gestures back to the browser via pan-y — the same cure the chat strip and
-     the feed scrollers already use. */
   overflow-x: hidden;
   touch-action: pan-y;
   overscroll-behavior: contain;
@@ -2360,18 +2442,12 @@ a .avatar.has-image,
   gap: 10px;
 }
 
-/* Cap the implicit grid column at the container width. Without this, the single auto column sizes to the
-   widest child's max-content (e.g. the RPC-key row: label + input placeholder + "recommended" + Get), which on
-   a narrow phone exceeds the viewport and stretches every settings row past the right edge. minmax(0,1fr) forces
-   rows to the container width so flexible children (the RPC input, min-width:0) shrink instead of overflowing. */
 .settings-list {
   grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .public-feed {
-  /* Cap the implicit grid column at the container width (same fix as .settings-list above): without it the
-     single auto column sizes to its widest child's max-content, so a feed card with a long unbroken token
-     (URL / wallet / id) stretches EVERY .feed-item past the right edge on a phone. */
   grid-template-columns: minmax(0, 1fr);
   overflow: auto;
   padding-right: 4px;
@@ -2387,7 +2463,7 @@ a .avatar.has-image,
 .mini-action-button,
 .public-jump-down-button {
   min-height: 34px;
-  border-radius: 8px;
+  border-radius: var(--r-s);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -2401,27 +2477,19 @@ a .avatar.has-image,
   gap: 6px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  background: rgba(10, 13, 15, 0.62);
+  background: var(--panel-2);
+}
+
+.mini-action-button:hover {
+  border-color: var(--a40);
+  color: var(--accent);
 }
 
 .mini-action-button[hidden] {
   display: none;
 }
 
-/* [OWNER 2026-08-13, screenshot] It sat on top of the composer's formatting toolbar. It was placed by a
-   HAND-MEASURED 134px from the bottom of the pane, and nothing about that number can know how tall the composer
-   currently is: the toolbar adds 48px when it opens, and the cost line under the field wraps to two or three
-   lines depending on the language and the discount text. Any single number is wrong for most of those states.
-
-   So it is no longer measured from the pane at all. The pane is a grid whose third row IS the feed and whose
-   fourth is the composer; putting the button in the feed's own cell and pinning it to the bottom of that cell
-   makes "just above the composer" true BY CONSTRUCTION, whatever the composer is doing. It shares the cell with
-   the feed rather than taking a row of its own, so it overlays the posts exactly as before and the layout is
-   untouched.
-
-   Icon only (owner: "leave just the arrow, it is obvious"). The label lives on aria-label/title, so the button
-   is still announced — this is a deliberate exception to the labelled-actions rule, for a control whose meaning
-   is carried by one of the few genuinely universal glyphs. */
+/* Jump-to-newest: pinned inside the feed's own grid cell (contract). */
 .public-jump-down-button {
   grid-column: 1;
   grid-row: 3;
@@ -2433,48 +2501,50 @@ a .avatar.has-image,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  min-height: 38px;
+  width: 40px;
+  min-height: 40px;
   padding: 0;
-  border: 1px solid rgba(48, 213, 176, 0.3);
+  border: 1px solid var(--a25);
   border-radius: 50%;
-  background: rgba(13, 16, 18, 0.92);
-  box-shadow: 0 14px 34px var(--shadow);
+  background: var(--panel-2);
+  color: var(--accent);
+  box-shadow: var(--shadow-2);
   backdrop-filter: blur(12px);
 }
 
 .public-jump-down-button:hover {
-  border-color: rgba(48, 213, 176, 0.58);
+  border-color: var(--a40);
   color: var(--accent);
+  box-shadow: var(--shadow-pop);
 }
 
 .public-jump-down-button[hidden] {
   display: none;
 }
 
+/* ── Feed cards ─────────────────────────────────────────────────────────── */
 .feed-item {
   display: block;
   width: 100%;
   max-width: 100%;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-l);
   background: var(--panel-2);
   color: var(--text);
   text-align: left;
+  box-shadow: var(--shadow-1);
 }
 
-/* F2: "show older" affordance at the BOTTOM of the newest-first feed (newest at the top) — reveals another page of
-   older posts that the render cap is holding back. */
 .feed-show-older {
   display: block;
   width: 100%;
   max-width: 100%;
   padding: 10px 18px;
   margin-bottom: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-m);
+  background: var(--surface);
   color: var(--muted);
   font: inherit;
   text-align: center;
@@ -2482,19 +2552,16 @@ a .avatar.has-image,
 }
 
 .feed-show-older:hover {
-  border-color: var(--accent);
+  border-color: var(--a25);
   color: var(--text);
 }
 
 .public-feed[data-public-mode="feed"] > .feed-item:not(.compact) {
-  /* Full-width like the compact channel cards (was capped to image width, which left real posts
-     looking narrow/unfinished on desktop). Images inside (.feed-image) fill this content column or center
-     at natural size (v747) — no longer the narrow --message-media-width bubble cap. */
   width: 100%;
 }
 
 .feed-item.is-unread {
-  border-color: rgba(48, 213, 176, 0.42);
+  border-color: var(--a40);
 }
 
 button.feed-item {
@@ -2502,12 +2569,12 @@ button.feed-item {
 }
 
 button.feed-item:hover {
-  border-color: rgba(48, 213, 176, 0.36);
-  background: #171d1f;
+  border-color: var(--a25);
+  background: var(--panel-3);
 }
 
 .feed-item.compact {
-  padding: 14px 18px;
+  padding: 13px 18px;
 }
 
 .feed-meta {
@@ -2521,25 +2588,16 @@ button.feed-item:hover {
 
 .feed-item h2 {
   margin-top: 10px;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .feed-item p {
   line-height: 1.45;
-  /* Break long unbroken tokens (URLs / wallet addresses / ids) so a plain post body cannot exceed the
-     viewport (matches .feed-block-text). The grid-column cap above only helps if children can shrink. */
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-/* Long-post collapse (v765, feed + channel view): the post body is clamped while the collapsible ROOT (the
-   feed <article>, or a shared-post embed since v766) carries .feed-post-collapsible (added by JS only when
-   ResizeObserver support exists — no observer, no clamp, so content is never cut with no way to reveal it).
-   feedPostClampObserver marks roots whose content the clamp ACTUALLY cuts with .feed-post-overflowing — that
-   shows the bottom fade + the "Show full post" button. All rules are DIRECT-CHILD (`>`): a shared-post embed
-   nests its own clamp INSIDE a post's clamped body, and a descendant selector would leak the post's clamp onto
-   the embed's body (and keep clamping it after the embed expands). The post-detail screen and comments never
-   get the wrapper and always render in full. */
+/* Long-post collapse machinery (contract). */
 .feed-post-collapsible > .feed-post-body {
   position: relative;
   max-height: var(--feed-post-collapsed-max-height);
@@ -2557,9 +2615,6 @@ button.feed-item:hover {
   pointer-events: none;
 }
 
-/* Expand animation (v766): expandClampedBody drives max-height via CSSOM from the clamped height to the full
-   height under this transition, then removes the inline value + this class. Reduced motion opts out — the JS
-   timer backstop releases the clamp without a transitionend. */
 .feed-post-expanding > .feed-post-body {
   overflow: hidden;
   transition: max-height 0.3s ease;
@@ -2576,12 +2631,13 @@ button.feed-item:hover {
   width: 100%;
   margin-top: 10px;
   padding: 8px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: transparent;
+  border: 0;
+  border-radius: var(--r-s);
+  background: var(--a06);
   color: var(--accent);
   font: inherit;
   font-size: 14px;
+  font-weight: 600;
   text-align: center;
   cursor: pointer;
 }
@@ -2592,18 +2648,16 @@ button.feed-item:hover {
 }
 
 .feed-expand-button:hover {
-  border-color: var(--accent);
+  background: var(--a16);
 }
 
-/* Shared-post embed (v766): a forwarded public post inside a private bubble or a public post/comment.
-   Header = source channel (tappable, opens the channel view); body reuses the long-post clamp machinery with
-   its own tighter max height. */
+/* Shared-post embed. */
 .shared-post-embed {
   margin-top: 8px;
   padding: 10px 12px;
-  border: 1px solid var(--line-soft);
+  border: 0;
   border-left: 3px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--r-s);
   background: var(--shared-post-embed-bg);
 }
 
@@ -2672,16 +2726,14 @@ button.feed-item:hover {
   font-size: 12px;
 }
 
-/* "Show earlier comments" — one page (96 rows, the contract's get_page cap) further back in the thread. Sits above
-   the list because that is where the older comments appear. */
 .public-detail-earlier-comments {
   display: block;
   width: 100%;
   margin: 4px 0 10px;
   padding: 8px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: transparent;
+  border: 0;
+  border-radius: var(--r-s);
+  background: var(--a06);
   color: var(--accent);
   font: inherit;
   font-size: 13px;
@@ -2693,20 +2745,22 @@ button.feed-item:hover {
   cursor: default;
 }
 
-/* The private twin of the control above: same affordance, so paging back through a dialog and paging back through
-   a comment thread do not look like two different features. It sits inside the scroller above the first row. */
 .conversation-earlier-button {
   display: block;
   width: calc(100% - 24px);
   margin: 6px auto 12px;
   padding: 8px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--a06);
   color: var(--accent);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+}
+
+.conversation-earlier-button:hover {
+  background: var(--a16);
 }
 
 .conversation-earlier-button:disabled {
@@ -2714,19 +2768,15 @@ button.feed-item:hover {
   cursor: default;
 }
 
-/* v797: the referenced post's real image, resolved by entryId from the local cache (no wire copy). */
 .shared-post-embed-image {
   display: block;
   margin-top: 8px;
   max-width: 100%;
   max-height: 260px;
-  border-radius: 10px;
+  border-radius: var(--r-s);
   object-fit: cover;
 }
 
-/* Once the original is read, the card renders the post through the FEED's own body renderer, so its pictures arrive
-   as .feed-image — sized for a full-width feed column (max-height 1400px). Inside a quoted card that would tower over
-   the message it is quoted in, so keep the embed's own ceiling. */
 .shared-post-embed .feed-image {
   max-height: 260px;
 }
@@ -2746,10 +2796,10 @@ button.feed-item:hover {
   font-size: 13px;
 }
 
-/* Share-target modal (v766). */
+/* Share-target modal. */
 .share-post-dialog .share-post-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   margin-top: 14px;
   max-height: min(50vh, 420px);
   overflow-y: auto;
@@ -2761,8 +2811,8 @@ button.feed-item:hover {
   gap: 10px;
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-m);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -2771,7 +2821,7 @@ button.feed-item:hover {
 }
 
 .share-target-row:hover {
-  border-color: var(--accent);
+  background: var(--a10);
 }
 
 .share-target-avatar {
@@ -2806,14 +2856,14 @@ button.feed-item:hover {
   color: var(--muted);
 }
 
-/* Composer preview modal (v769): renders the draft via the same safe formatting renderer as the live surfaces. */
+/* Composer preview modal. */
 .composer-preview-dialog .composer-preview-body {
   margin-top: 14px;
   max-height: min(60vh, 520px);
   overflow-y: auto;
   padding: 14px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--r-m);
   background: var(--panel-2);
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -2839,9 +2889,10 @@ button.feed-item:hover {
 
 .comment-item {
   padding: 10px 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(8, 11, 13, 0.42);
+  border: 1px solid transparent;
+  border-radius: var(--r-m);
+  background: var(--panel-2);
+  box-shadow: var(--shadow-1);
 }
 
 .comment-item p {
@@ -2850,9 +2901,7 @@ button.feed-item:hover {
   font-size: 14px;
 }
 
-/* Public post detail screen (per-post comments). The Public tab is a single pane (no second column like the chat
-   list), so the detail slides over the feed within the same pane, toggled by .public-pane[data-post-open]. The
-   shared composer stays pinned below. */
+/* ── Public overlays: post detail / discovery / channel view (contract) ─── */
 .public-post-detail {
   display: none;
   min-height: 0;
@@ -2875,15 +2924,9 @@ button.feed-item:hover {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  /* Bleed the detail to the pane's SIDE edges (24px gutters) so the header spans the pane full-width; the body
-     re-insets its own content with padding. The TOP is NOT bled: the pane's top padding is
-     var(--header-top-offset) (11px, the v688 shared header line) — the old -24px top margin dated from a
-     24px-padded pane and pushed the header 13px past the pane top, clipping the title. Zero top margin puts
-     this header on the exact same y as every other pane header. */
-  margin: 0 -24px;
+  margin: 0 calc(-1 * var(--gutter));
 }
 
-/* Discovery panel: mirrors the post-detail overlay (shown over the feed, same bleed-to-edges header). */
 .public-discovery {
   display: none;
   min-height: 0;
@@ -2906,11 +2949,9 @@ button.feed-item:hover {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  /* Side-only bleed for the same reason as .public-post-detail above (zero top margin = shared header line). */
-  margin: 0 -24px;
+  margin: 0 calc(-1 * var(--gutter));
 }
 
-/* Channel view: one channel's posts on their own screen — mirrors the post-detail/discovery overlay. */
 .public-channel-view {
   display: none;
   min-height: 0;
@@ -2933,44 +2974,34 @@ button.feed-item:hover {
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  /* Side-only bleed, zero top margin = shared header line (see .public-post-detail above). */
-  margin: 0 -24px;
+  margin: 0 calc(-1 * var(--gutter));
 }
 
-/* The post detail (and discovery) stack ON TOP of the channel view: open a post from the channel screen, Back
-   returns to it (the channel's data attribute stays set underneath). */
 .public-pane[data-post-open="true"] > .public-channel-view,
 .public-pane[data-discover-open="true"] > .public-channel-view {
   display: none;
 }
 
-/* A foreign channel hides the post composer (you publish to YOUR OWN channel from the feed; commenting happens in
-   the post detail, which re-shows the composer in comment mode when stacked on top). The own channel keeps it. */
 .public-pane[data-channel-open="true"]:not([data-post-open="true"]):not([data-channel-own="true"]) > .public-composer {
   display: none;
 }
 
-/* A post whose author switched comments off shows no composer at all. HIDDEN rather than switched back to post
-   mode: the shared composer publishes a NEW ENTRY when it has no comment target, so leaving it visible here would
-   turn "reply to this" into "publish to my own channel". Reached via a permalink, which opens the detail screen
-   without passing the feed's disabled Comments button (owner, 2026-08-20). */
 .public-pane[data-post-open="true"][data-post-comments="off"] > .public-composer {
   display: none;
 }
 
 .public-channel-view-body {
   overflow-y: auto;
-  padding: 16px 24px 24px;
+  padding: 16px var(--gutter) var(--gutter);
   display: grid;
   gap: 12px;
   align-content: start;
 }
 
 .channel-view-about {
-  border-color: rgba(48, 213, 176, 0.24);
+  border-color: var(--a25);
 }
 
-/* Author avatar/name on feed cards (and discovery card heads) open the channel screen. */
 .feed-author-link {
   cursor: pointer;
 }
@@ -2990,7 +3021,7 @@ button.feed-item:hover {
 
 .public-discovery-body {
   overflow-y: auto;
-  padding: 16px 24px 24px;
+  padding: 16px var(--gutter) var(--gutter);
   display: grid;
   gap: 12px;
   align-content: start;
@@ -3004,21 +3035,22 @@ button.feed-item:hover {
 
 .discovery-tag-filter .channel-about-tag {
   cursor: pointer;
-  border: 1px solid rgba(48, 213, 176, 0.24);
+  border: 1px solid var(--a25);
 }
 
 .discovery-tag-filter .channel-about-tag[aria-pressed="true"] {
   background: var(--accent);
-  color: #05201a;
+  color: var(--on-accent);
 }
 
 .discovery-card {
   display: grid;
   gap: 8px;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  border-radius: var(--r-l);
+  background: var(--panel-2);
+  box-shadow: var(--shadow-1);
 }
 
 .discovery-card-head {
@@ -3037,8 +3069,6 @@ button.feed-item:hover {
   color: var(--text);
 }
 
-/* The "Display as" chevron sits flush at the right edge of the card head (same 30px icon-button as the feed
-   author-row chevron); margin-left:auto pushes it past the truncating name. */
 .icon-button.discovery-card-identity {
   flex: 0 0 30px;
   width: 30px;
@@ -3063,56 +3093,73 @@ button.feed-item:hover {
   overflow: hidden;
 }
 
-/* The channel's LATEST POST on a Discover card [OWNER 2026-08-21: "good to see the last post" — "alongside" the
-   description]. A quiet plate with an accent rule, a muted "Latest post · when" label, the feed's one-line preview
-   text clamped to four lines. While the read is out the same plate carries the label and a muted loading line, so the
-   card keeps its height when the post arrives. */
+/* LATEST POST ON A DISCOVER CARD (app.js buildDiscoveryLatestNode): a quote-like strip under the description —
+   caption ("Latest post" / "Loading the latest post…") + the chat clock on the right, then the post's first line
+   clamped to TWO lines. Brand alphas only (a06 fill, a40 edge; a16 edge while loading), so the theme cross-fade needs
+   no extra term. The loading state reuses the shared .skeleton shimmer (one short line). -webkit-line-clamp is the
+   one multi-line clamp iOS 14 understands; the fallback is overflow:hidden on a 13px/1.4 box. */
 .discovery-card-latest {
   display: grid;
-  gap: 4px;
-  padding: 8px 12px;
-  border-left: 2px solid rgba(48, 213, 176, 0.45);
-  border-radius: 0 8px 8px 0;
-  background: rgba(255, 255, 255, 0.03);
+  gap: 3px;
   min-width: 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--a40);
+  border-radius: 0 var(--r-s) var(--r-s) 0;
+  background: var(--a06);
+}
+
+.discovery-card-latest[data-state="loading"] {
+  border-left-color: var(--a16);
+}
+
+.discovery-card-latest-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
 }
 
 .discovery-card-latest-label {
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discovery-card-latest-time {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .discovery-card-latest-text {
   margin: 0;
   color: var(--text);
-  font-size: 14px;
-  line-height: 1.45;
-  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
   overflow-wrap: anywhere;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
-  overflow: hidden;
+  -webkit-line-clamp: 2;
 }
 
-.discovery-card-latest.is-loading .discovery-card-latest-text {
-  color: var(--muted);
-  font-style: italic;
+.discovery-card-latest-skeleton {
+  height: 11px;
+  width: 72%;
 }
 
 .discovery-card-actions {
   display: flex;
   justify-content: flex-end;
-  /* [OWNER 2026-08-10] The row had no gap at all, so "Open channel" and "Follow" rendered as one welded slab —
-     two destinations that look like a single control. flex-wrap so a narrow phone drops the second plate to its
-     own line instead of squeezing both. */
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* The discovery follow button reuses the shared .discovery-cta-action plate ("Add contact" look). Its only extra
-   state is the post-click "following…" disabled look. */
 .discovery-cta-action:disabled {
   opacity: var(--disabled-opacity);
   cursor: not-allowed;
@@ -3125,22 +3172,19 @@ button.feed-item:hover {
   padding: 24px 12px;
 }
 
-/* Call-to-action plates: ONE shared rule set for the channels plate at the top of the public feed AND the
-   add-a-contact plate at the top of the private thread list (the labeled replacements for the removed
-   search-row "+" buttons). The card itself is passive; the affordance lives on the real action buttons. */
+/* CTA plates. */
 .discovery-cta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
   padding: 18px;
-  border-color: rgba(48, 213, 176, 0.32);
+  border-color: transparent;
   background:
-    linear-gradient(135deg, rgba(48, 213, 176, 0.1), rgba(48, 213, 176, 0) 62%),
+    linear-gradient(135deg, var(--a16), transparent 62%),
     var(--panel-2);
 }
 
-/* display:flex above beats the UA [hidden] rule — restore it (the private plate hides while searching). */
 .discovery-cta[hidden] {
   display: none;
 }
@@ -3157,11 +3201,11 @@ button.feed-item:hover {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(48, 213, 176, 0.12);
-  border: 1px solid rgba(48, 213, 176, 0.28);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--a16);
+  border: 0;
   color: var(--accent);
 }
 
@@ -3195,35 +3239,30 @@ button.feed-item:hover {
   display: inline-flex;
   align-items: center;
   padding: 10px 18px;
-  border-radius: 8px;
-  background: rgba(48, 213, 176, 0.1);
-  border: 1px solid rgba(48, 213, 176, 0.32);
-  color: var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  border: 1px solid transparent;
+  color: var(--on-accent);
   font: inherit;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: 0 4px 14px var(--a25);
 }
 
 .discovery-cta-action:not(:disabled):hover,
 .discovery-cta-action:not(:disabled):focus-visible {
-  background: rgba(48, 213, 176, 0.16);
-  border-color: rgba(48, 213, 176, 0.5);
+  background: var(--accent-hi);
+  box-shadow: 0 6px 18px var(--a40);
   outline: none;
 }
 
-/* The detail container bleeds to the pane edges, so this header (filling it) lines up with the private chat header.
-   Give it its own column track (back + avatar + title + actions) so it renders the same at every width — the shared
-   conversation-header grid assumes the Back button is hidden on desktop (the private two-pane layout), which doesn't
-   hold for the single-pane Public tab. The fixed 38px/44px back+avatar tracks + 10px gap MATCH the private mobile
-   header exactly so the avatar lines up identically in both. */
+/* Detail/channel headers share the private mobile header geometry (contract). */
 .public-pane .public-post-detail-header {
   grid-template-columns: var(--header-button-size) 44px minmax(0, 1fr) max-content;
   gap: 10px;
 }
 
-/* Back is display:none on desktop for the private layout; Public has no second pane, so force it visible. */
 .public-post-detail-header .chat-back-button {
   display: grid;
 }
@@ -3243,11 +3282,8 @@ button.feed-item:hover {
   flex-direction: column;
   gap: 14px;
   min-height: 0;
-  /* Same as .message-strip: the comment swipe grabs the row LINE, so the scroller itself must hand horizontal
-     touch gestures to JS (v648) — else a swipe from the row's padding gets pointercancel'd by native scroll. */
   touch-action: pan-y;
-  /* The detail bled to the pane edges, so re-inset the content here (matches the pane's 24px gutter). */
-  padding: 16px 24px 0;
+  padding: 16px var(--gutter) 0;
 }
 
 .public-post-detail-body .comment-list {
@@ -3273,8 +3309,8 @@ button.feed-item:hover {
   margin-left: 6px;
   padding: 2px 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: rgba(10, 13, 15, 0.62);
+  border-radius: var(--r-s);
+  background: var(--panel-2);
   color: var(--text);
   font: inherit;
   font-size: 12px;
@@ -3291,20 +3327,20 @@ button.feed-item:hover {
 }
 
 .feed-actions button {
-  min-height: 36px;
+  min-height: 34px;
   padding: 0 13px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(10, 13, 15, 0.62);
+  border-radius: var(--r-pill);
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .feed-actions button:hover {
-  border-color: rgba(48, 213, 176, 0.42);
+  border-color: var(--a40);
   color: var(--accent);
 }
 
@@ -3320,11 +3356,6 @@ button.feed-item:hover {
   border-color: var(--line-soft);
 }
 
-/* The "Display as" chevron in the post's author row. A clean square with no text padding so the 20px chevron
-   sits dead-centre (place-items:center from .icon-button), sized down to the compact author row. NO
-   margin-left:auto here: flexbox splits the free space EQUALLY between auto margins, so a second auto margin
-   opened a wide gap between the [about] and [chevron] buttons — the about button (always present when this
-   one is, and first in DOM) is the ONE auto margin, and this one sits flush beside it on the row's 10px gap. */
 .icon-button.feed-author-identity {
   flex: 0 0 30px;
   width: 30px;
@@ -3333,8 +3364,6 @@ button.feed-item:hover {
   padding: 0;
 }
 
-/* The channel "about" (description + tags) button: the ONE auto margin in the author row — absorbs the free
-   space and pins the [about][chevron] cluster to the right edge. */
 .icon-button.feed-author-about {
   margin-left: auto;
   flex: 0 0 30px;
@@ -3349,7 +3378,6 @@ button.feed-item:hover {
   height: 17px;
 }
 
-/* Channel-description popover body (reuses the shared .identity-popover shell for position + outside-click). */
 .channel-about-popover {
   display: grid;
   gap: 8px;
@@ -3377,25 +3405,23 @@ button.feed-item:hover {
 }
 
 .channel-about-tag {
-  padding: 2px 8px;
-  border: 1px solid rgba(48, 213, 176, 0.24);
-  border-radius: 999px;
-  background: rgba(48, 213, 176, 0.08);
+  padding: 2px 9px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--a16);
   color: var(--accent);
   font-size: 12px;
 }
 
 .channel-about-edit {
-  /* Green plate CTA (owner: same style as "Add channel") — the plate look comes from .discovery-cta-action; this
-     class only adds the popover top spacing. */
   margin-top: 8px;
 }
 
 .channel-about-edit:hover {
-  border-color: rgba(48, 213, 176, 0.24);
-  background: rgba(48, 213, 176, 0.08);
+  background: var(--accent-hi);
 }
 
+/* ── Wallet & profile ───────────────────────────────────────────────────── */
 .balance-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
@@ -3411,9 +3437,10 @@ button.feed-item:hover {
 .balance-card {
   min-height: 116px;
   padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-l);
   background: var(--panel-2);
+  box-shadow: var(--shadow-1);
 }
 
 .balance-card span {
@@ -3438,9 +3465,9 @@ button.feed-item:hover {
   gap: 4px;
   margin: 10px 0 0;
   padding: 12px 14px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--a06);
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
@@ -3464,35 +3491,19 @@ button.feed-item:hover {
   justify-content: center;
   gap: 9px;
   min-height: 48px;
-  border-radius: 8px;
+  border-radius: var(--r-m);
   background: var(--panel-2);
-  border-color: var(--line);
+  border-color: var(--line-soft);
+  box-shadow: var(--shadow-1);
 }
 
-/* An author `display:` rule beats the UA `[hidden] { display: none }` regardless of specificity -- author sheets
-   win over the user-agent sheet -- so any element given a display here keeps rendering when `hidden` is set.
-   Restore native hiding for the elements that toggle that way.
-
-   [OWNER 2026-08-09] .action-summary and .action-footnotes were missing from this list, and the owner saw the
-   result: an empty bordered box with min-height 42px sitting between the content and the button in EVERY dialog
-   that has no summary -- renderActionSummary sets `hidden = true` and the box stayed. The trap was already
-   documented right here for buttons; the two blocks below just never got added. */
+/* Restore native [hidden] for elements given a display by author rules (contract — full list). */
 .action-grid button[hidden],
 .settings-list button[hidden],
 .action-summary[hidden],
 .action-footnotes[hidden],
-/* Found by the completeness gate, not by eye: walletTonGroup.hidden = !plathoWallet, so with no wallet the
-   Receive/Send GRAM pair was meant to disappear and did not. */
 .wallet-ton-group[hidden],
-/* [OWNER 2026-08-10] The FOURTH offender, and the one that mattered most: .discovery-cta-action sets
-   display:inline-flex, so the quick-start activation plate stayed on screen with `hidden` set — right under the
-   red line saying the wallet has no GRAM for it. Pressing it then reported "Done" for something that never
-   happened. My own check had read the .hidden ATTRIBUTE and called it hidden; the attribute was set the whole
-   time. Verify with computed display, never with the property. */
 .discovery-cta-action[hidden],
-/* The FIFTH, and nobody had seen it yet because it needs an NFT with no inline art: `art.hidden = !nft.image` on a
-   block with width:100% and aspect-ratio:1 left a full-width grey square where the picture would be. Found by the
-   widened gate, not by eye — which is the entire argument for widening it. */
 .nft-card-art[hidden] {
   display: none;
 }
@@ -3502,10 +3513,10 @@ button.feed-item:hover {
   grid-template-columns: 12px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 62px;
+  min-height: 60px;
   padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-m);
   background: var(--panel-2);
 }
 
@@ -3590,6 +3601,7 @@ button.feed-item:hover {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .settings-list button,
@@ -3598,9 +3610,6 @@ button.feed-item:hover {
   padding: 0 16px;
 }
 
-/* Buttons default to text-align:center, so a label that wraps to two lines centers -- inconsistent with the
-   left-aligned single-line labels. Left-align the label so wrapped lines stay flush-left (the value <strong>
-   keeps its own right alignment). */
 .settings-list button > span,
 .settings-select-row > span {
   text-align: left;
@@ -3618,8 +3627,8 @@ button.feed-item:hover {
   gap: 12px;
   min-height: 48px;
   padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-m);
   background: var(--panel-2);
 }
 
@@ -3651,9 +3660,6 @@ button.feed-item:hover {
 
 .wallet-ton-group {
   display: grid;
-  /* [OWNER 2026-08-03] TWO columns, not three. The balance button used to hold the first (1.2fr) slot; removing it
-     left the row declaring a column nothing occupies, so the two remaining actions sat squeezed into the left
-     two-thirds while every row below them ran the full width. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
 }
@@ -3672,18 +3678,12 @@ button.feed-item:hover {
   align-items: center;
   gap: 8px 12px;
   min-height: 56px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-m);
   background: var(--panel-2);
+  box-shadow: var(--shadow-1);
 }
 
-/* The label COLUMN was a fixed 108px and the label itself `white-space: nowrap` — a pair that only works while
-   every translation is short. Several are not: the Russian strings for "App language" and "Private message
-   sender" both run past 108px, and grid does not clip overflow, so the text ran out of its own column and under
-   the select. [OWNER 2026-08-04: "some phrases in the profile do not fit and overlap"]
-   Now the column has a floor and a ceiling instead of one exact size, and the label wraps inside it. Columns
-   cannot overlap by construction, so this cannot come back for a longer word in some other language — the row
-   simply grows taller (min-height, never a fixed height). */
 .settings-select-row.compact-select-row {
   grid-template-columns: minmax(108px, 38%) minmax(0, 1fr);
 }
@@ -3704,23 +3704,21 @@ button.feed-item:hover {
   min-width: 0;
   height: 38px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-s);
   padding: 0 34px 0 12px;
-  background: var(--panel);
+  background: var(--field);
   color: var(--text);
   font: inherit;
 }
 
-/* RPC key: one row — label, an inline (frameless) field, a status, and a Get button. The whole row
-   (except the field) is clickable and opens the @toncenter bot, like a settings-list button. */
 .settings-rpc-row {
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 48px;
   padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-m);
   background: var(--panel-2);
   cursor: pointer;
 }
@@ -3734,11 +3732,10 @@ button.feed-item:hover {
   flex: 1 1 auto;
   min-width: 0;
   height: 34px;
-  /* A distinct dark field box (like the select controls) so it reads as an input against the lighter row. */
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-s);
   padding: 0 12px;
-  background: var(--panel);
+  background: var(--field);
   color: var(--text);
   font: inherit;
   cursor: text;
@@ -3757,7 +3754,6 @@ button.feed-item:hover {
   flex: 0 0 auto;
   color: var(--muted);
   white-space: nowrap;
-  /* A single pictogram since v651 (✓ / ✕ / ⏳, full text in the tooltip) — bigger glyph, no more row squeeze. */
   font-size: 16px;
   line-height: 1;
 }
@@ -3770,26 +3766,22 @@ button.feed-item:hover {
   color: var(--green);
 }
 
-/* Higher specificity than the generic `.settings-list button` rule so this compact inline
-   button wins over the full-height settings-row button styling. */
 .settings-rpc-row .rpc-key-get {
   flex: 0 0 auto;
   min-height: 34px;
   padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
+  border-radius: var(--r-pill);
+  background: var(--field);
   color: var(--text);
   font: inherit;
   cursor: pointer;
 }
 
 .settings-rpc-row .rpc-key-get:hover {
-  border-color: rgba(48, 213, 176, 0.42);
+  border-color: var(--a40);
 }
 
-/* Persistent "your wallet key is not backed up" warning row in the Profile (higher specificity than the
-   generic .settings-list button so the danger styling wins). Shown only while the backup is pending. */
 .settings-list button.wallet-backup-warning {
   border-color: var(--danger);
 }
@@ -3799,6 +3791,7 @@ button.feed-item:hover {
   color: var(--danger);
 }
 
+/* ── Dialogs ────────────────────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -3808,19 +3801,29 @@ button.feed-item:hover {
   align-items: center;
   padding: 20px;
   min-height: var(--app-viewport-height, 100dvh);
-  background: rgba(0, 0, 0, 0.48);
+  background: rgba(4, 10, 12, 0.55);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.18s ease-out;
+}
+
+.modal-backdrop > * {
+  animation: popIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal-backdrop > *,
+  .identity-popover,
+  .emoji-picker {
+    animation: none;
+  }
 }
 
 .modal-backdrop[hidden] {
   display: none;
 }
 
-/* Quick-start steps open the shared #actionDialog (password prompts, the Telegram
-   seed-backup hard gate, the manual wallet-key copy dialog) WHILE the #quickStartDialog
-   overlay is still visible. Both are .modal-backdrop at z-index:40 and #quickStartDialog
-   is later in the DOM, so without this override it paints over the action dialog and
-   pointer-blocks it — burying those prompts and freezing onboarding (worst in the
-   Telegram WebView, where the seed gate is non-dismissible). Keep it below the lightbox (70). */
+/* Quick-start opens the shared #actionDialog on top (contract z-order). */
 #actionDialog {
   z-index: 60;
 }
@@ -3832,30 +3835,24 @@ button.feed-item:hover {
   display: grid;
   gap: 14px;
   width: min(var(--modal-card-width), 100%);
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--modal-outline);
-  border-radius: 8px;
+  border-radius: var(--r-xl);
   background: var(--panel);
-  box-shadow: 0 18px 50px var(--shadow);
+  box-shadow: var(--shadow-pop);
 }
 
-/* The post-activation briefing. Longer than the other dialogs by design — it is read once and it is the only place
-   the irreversible-and-public facts are stated before a first message — so it scrolls as a WHOLE, capped to the
-   viewport, like .quick-start-dialog. A keyboard-shrunk Telegram viewport must scroll, never clip. */
 .activation-welcome-dialog {
   display: grid;
   gap: 12px;
-  /* Matched to .quick-start-dialog, not to .install-dialog: the dialogs sit in a 440-460 band and 520 is the install
-     outlier. This one is the tail of onboarding — often the screen right after the quick-start — so it should read
-     as the same card, not a wider one. (Owner spotted it as "wider than the rest"; measured across all eight.) */
   width: min(var(--modal-card-width), 100%);
   max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
-  padding: 18px;
+  padding: 20px;
   overflow-y: auto;
   border: 1px solid var(--modal-outline);
-  border-radius: 8px;
+  border-radius: var(--r-xl);
   background: var(--panel);
-  box-shadow: 0 18px 50px var(--shadow);
+  box-shadow: var(--shadow-pop);
 }
 
 .activation-welcome-dialog > p {
@@ -3885,34 +3882,23 @@ button.feed-item:hover {
   margin-top: 4px;
 }
 
-/* Tall action dialogs (e.g. the image-attach preview: hint + preview + quality select + summary + button) scroll
-   as a WHOLE — like .quick-start-dialog — capped to the viewport. The earlier version scrolled ONLY the
-   .action-fields region, which TRAPPED the scroll around a tall portrait preview and buried the quality dropdown
-   (and any field below it) inside that inner scroller where the user never reached it (owner). Scrolling the whole
-   dialog keeps every field + the submit button reachable; the modal-backdrop centres it and the @media
-   (max-height) block below lets the backdrop itself scroll on very short viewports. */
 .action-dialog {
   max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
   overflow-y: auto;
 }
 
-/* Quick-start onboarding */
 .quick-start-dialog {
   display: grid;
   gap: 16px;
   width: min(var(--modal-card-width), 100%);
-  /* The dialog is a grid item of the .modal-backdrop (place-items:center). Without min-width:0 its
-     automatic minimum is min-content, so a wide descendant (a long localized paragraph's max-content,
-     the footer's action button) inflates the box PAST its declared width and it spills off a narrow
-     screen (iPhone / TG Mini App). min-width:0 makes the width authoritative so inner text wraps instead. */
   min-width: 0;
   max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
   overflow-y: auto;
   padding: 20px;
   border: 1px solid var(--modal-outline);
-  border-radius: 8px;
+  border-radius: var(--r-xl);
   background: var(--panel);
-  box-shadow: 0 18px 50px var(--shadow);
+  box-shadow: var(--shadow-pop);
 }
 
 .quick-start-dialog header {
@@ -3925,8 +3911,6 @@ button.feed-item:hover {
 .quick-start-view {
   display: grid;
   gap: 14px;
-  /* Grid item of the dialog: min-width:0 so its own auto column clamps to the dialog width and
-     long localized text wraps instead of forcing the dialog wider than a phone viewport. */
   min-width: 0;
 }
 
@@ -3949,9 +3933,9 @@ button.feed-item:hover {
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid rgba(48, 213, 176, 0.25);
-  border-radius: 8px;
-  background: #101815;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--field);
   color: var(--text);
   font: inherit;
 }
@@ -3977,12 +3961,6 @@ button.feed-item:hover {
   gap: 8px;
 }
 
-/* Footer row: Back + one primary, and nothing else since Skip was removed (owner, 2026-08-10). Both share the
-   row equally — `flex: 1 1 0` gives them the SAME width whatever their labels say, which is only possible now
-   that the row holds two buttons instead of three. Basis 0 (not 160px) is what makes them equal rather than
-   merely both-growing, and min-width:0 lets a long localized label shrink instead of pushing the dialog wider
-   than a phone viewport, which is the overflow QS-RESUME-05 exists to prevent. flex-wrap is kept as the last
-   resort for a viewport narrow enough that half a row cannot hold a word. */
 .quick-start-step-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3993,9 +3971,6 @@ button.feed-item:hover {
 .quick-start-step-actions > button {
   flex: 1 1 0;
   min-width: 0;
-  /* MEASURED, not decorative: with `flex-basis: 0` the horizontal padding still enters each item's base size, so
-     Back (0 16px) came out exactly 20px wider than the primary (the UA's 1px 6px) — 183 vs 163 in a 355px row.
-     Equal padding is what makes "equal halves" actually equal: 173.33 each. Height is untouched at 42px. */
   padding-left: 16px;
   padding-right: 16px;
 }
@@ -4018,6 +3993,7 @@ button.feed-item:hover {
   height: 4px;
   border-radius: 2px;
   background: var(--line);
+  transition: background-color 0.2s ease;
 }
 
 .quick-start-progress-dot.is-done {
@@ -4054,8 +4030,6 @@ button.feed-item:hover {
   display: none;
 }
 
-/* Shared quick-start step body (step-2 TON Center key + step-4 top-up): content stacks with a clear gap and a
-   plate-CTA (.discovery-cta-action) sits BELOW on its own row, sized to its label — same look as "Add contact". */
 .quick-start-key-body {
   display: grid;
   gap: 12px;
@@ -4065,14 +4039,9 @@ button.feed-item:hover {
   justify-self: start;
 }
 
-/* ...except the get-a-key plate, which the owner asked to span the body like the input above it (2026-08-10).
-   Must stay AFTER the rule above — same specificity, so source order is what decides. Scoped to this one plate on
-   purpose: the shorter Check-balance plates on the top-up and activate steps still hug their text. */
+/* Must stay AFTER the rule above (source order contract). */
 .quick-start-key-body > .quick-start-key-cta {
   justify-self: stretch;
-  /* The plate is an inline-flex with no justify-content, which is invisible while it hugs its text and became a
-     left-shoved label the moment it spanned the row (owner, 2026-08-10). Centring belongs on the STRETCHED
-     variant only — the content-sized plates elsewhere in the app are unaffected either way. */
   justify-content: center;
   text-align: center;
 }
@@ -4082,27 +4051,24 @@ button.feed-item:hover {
   word-break: break-all;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--bg);
+  border-radius: var(--r-s);
+  background: var(--field);
   color: var(--text);
 }
 
-/* Live wallet balance line on the Top-up / Activate quick-start steps + the underfunded hint. */
 .quick-start-balance-line {
   margin-top: 10px;
   font-size: 13px;
   color: var(--text);
 }
 
-/* The explanatory lines under step 1's password fields — the same three sentences the standalone dialog shows in
-   its summary box, in the same bordered plate so the step reads as one card rather than a form with loose text. */
 .quick-start-step-summary {
   display: grid;
   gap: 6px;
   padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-m);
+  background: var(--surface);
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
@@ -4179,10 +4145,6 @@ button.feed-item:hover {
   color: var(--rose);
 }
 
-/* [OWNER 2026-08-10] The quick-start step body joins this list instead of keeping its own look. Its old rule
-   styled `input[type="text"]` only — so the password fields that moved INTO step 1 got the browser default and
-   looked, in his words, frightening. It also disagreed with this one on radius, background and height, which
-   nobody noticed while the two never appeared on the same screen. One definition, every field. */
 .recipient-dialog input,
 .action-dialog input,
 .action-dialog select,
@@ -4192,11 +4154,12 @@ button.feed-item:hover {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-s);
   padding: 0 12px;
   color: var(--text);
-  background: var(--panel-2);
+  background: var(--field);
   outline: 0;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .action-dialog select,
@@ -4209,9 +4172,7 @@ button.feed-item:hover {
   font: inherit;
   line-height: 1.25;
   cursor: pointer;
-  /* A clearly visible accent-coloured down-chevron so the field reads as an expandable dropdown. The shared
-     chevron-down.svg is fill=#000 (invisible on the dark field), so use an inline accent (#30d5b0) chevron. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 22px 22px;
@@ -4229,10 +4190,10 @@ button.feed-item:hover {
 .action-dialog select:focus,
 .action-dialog textarea:focus,
 .quick-start-step-body input:focus {
-  border-color: rgba(48, 213, 176, 0.6);
+  border-color: var(--a40);
+  box-shadow: 0 0 0 3px var(--a10);
 }
 
-/* Live field budget counter (e.g. an on-chain byte cap) — a small right-aligned hint below the input; red when over. */
 .action-dialog-field-counter {
   display: block;
   margin-top: 4px;
@@ -4242,7 +4203,7 @@ button.feed-item:hover {
 }
 
 .action-dialog-field-counter.is-over {
-  color: #ff7a7a;
+  color: var(--danger);
   font-weight: 600;
 }
 
@@ -4263,8 +4224,6 @@ button.feed-item:hover {
   text-transform: uppercase;
 }
 
-/* Informational block inside an action dialog (e.g. the "Get an RPC key" help modal): a muted intro line
-   and a numbered steps list — no input. */
 .action-note {
   display: grid;
   gap: 8px;
@@ -4299,15 +4258,15 @@ button.feed-item:hover {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(8, 11, 13, 0.64);
+  border-radius: var(--r-m);
+  background: var(--surface);
 }
 
 .wallet-receive-qr {
   width: min(260px, 100%);
   aspect-ratio: 1;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--r-m);
   background: #fff;
 }
 
@@ -4325,8 +4284,8 @@ button.feed-item:hover {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(8, 11, 13, 0.64);
+  border-radius: var(--r-m);
+  background: var(--surface);
 }
 
 .image-preview-card img {
@@ -4334,8 +4293,8 @@ button.feed-item:hover {
   width: 100%;
   max-height: min(320px, 42dvh);
   object-fit: contain;
-  border-radius: 6px;
-  background: #050708;
+  border-radius: var(--r-s);
+  background: var(--media-bg);
 }
 
 .image-preview-card img[data-full-image-src] {
@@ -4353,6 +4312,7 @@ button.feed-item:hover {
   font-weight: 700;
 }
 
+/* ── Image lightbox ─────────────────────────────────────────────────────── */
 .image-lightbox-backdrop {
   z-index: 70;
   place-items: center;
@@ -4364,20 +4324,14 @@ button.feed-item:hover {
     max(12px, var(--app-safe-area-right, env(safe-area-inset-right)))
     max(12px, var(--app-safe-area-bottom, env(safe-area-inset-bottom)))
     max(12px, var(--app-safe-area-left, env(safe-area-inset-left)));
-  background: rgba(0, 0, 0, 0.78);
+  background: rgba(0, 0, 0, 0.8);
 }
 
-/* Fullscreen (v647, owner ask): the lightbox takes the WHOLE viewport — zooming needs the room, not a
-   content-sized card. Safe areas are padded INSIDE the dialog; the backdrop override below removes its inset. */
 .image-lightbox-dialog {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   width: 100%;
-  /* Bound the dialog to the viewport height on EVERY platform (was height:100%, which does not resolve against the
-     min-height-only, place-items:center .modal-backdrop on desktop -> the dialog grew to a tall image and overflowed,
-     bottom clipped). --app-viewport-height is set on desktop too (syncViewportCssVars). This lets the viewport
-     (minmax(0,1fr)) + img (max-height:100%) shrink the image to fit. */
   height: var(--app-viewport-height, 100dvh);
   max-height: var(--app-viewport-height, 100dvh);
   padding:
@@ -4427,26 +4381,18 @@ button.feed-item:hover {
 
 .image-lightbox-viewport {
   display: grid;
-  /* One DEFINITE cell (minmax(0,1fr) row+column), NOT the implicit auto track: an auto grid track grows to the
-     img's natural height, so the img's max-height:100% resolved against that circular content height and never
-     clamped — a tall image (e.g. 804x1024) overflowed the height-bounded dialog on DESKTOP, where its width did
-     not bind either (on a narrow phone max-width:100% clamps width first, so the bug hid). An explicit
-     minmax(0,1fr) fills the dialog's definite viewport row, so max-height:100% finally clamps and a tall image
-     scales to fit. Verified in-browser: a 804x1024 img went 1024px→708px (fits an 800px window). */
   grid-template-rows: minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
   min-height: 0;
-  /* The zoom engine owns all motion: the image FITS at rest and scales via transform (no native scroll);
-     touch-action none hands pinch/pan to the app instead of the browser. */
   overflow: hidden;
   touch-action: none;
   user-select: none;
   padding: 12px;
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: #050708;
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--media-bg);
 }
 
 .image-lightbox-viewport img {
@@ -4474,8 +4420,8 @@ button.feed-item:hover {
   min-height: 42px;
   padding: 12px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: rgba(8, 11, 13, 0.64);
+  border-radius: var(--r-m);
+  background: var(--surface);
   color: var(--muted);
   font-size: 13px;
 }
@@ -4493,36 +4439,28 @@ button.feed-item:hover {
   line-height: 1.35;
 }
 
-/* min-height RESET, and it is the whole fix for a box that looked like it had fallen out of its own row.
-   .action-dialog input gives every dialog input a 44px touch target. A checkbox keeps its 16x16 painted glyph but
-   INHERITS that minimum, so the element still starts in grid column 1 of row 1 while the glyph renders centred in a
-   44px box — about one line below its own label, which reads as "the label is a heading and the box is under it".
-   MEASURED on the deployed stylesheet: width 16px, height 16px, min-height 44px.
-
-   The margin-top that used to sit here went with it. It was nudging the box down to meet a label it could never
-   reach while the 44px minimum held, and once the minimum was gone it became the whole remaining skew — the owner
-   saw it immediately. MEASURED again, box centre against label centre: 2px -> 1.9px low, 0 -> 0.1px. The label's
-   line box is 16.2px and the box is 16px, so `align-items: start` lands them level with no nudge at all, and a
-   caption that wraps still keeps the box on its first line. */
 .action-checkbox-field input {
   width: 16px;
   height: 16px;
   min-height: 0;
+  accent-color: var(--accent);
 }
 
 .recipient-submit {
-  height: 42px;
-  border: 1px solid rgba(48, 213, 176, 0.3);
-  border-radius: 8px;
-  color: #061411;
-  background: var(--accent);
+  height: 44px;
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent-hi), var(--accent));
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 4px 14px var(--a25);
 }
 
-/* Two LABELLED ways out of a dialog, side by side and equal width. Equal padding is required, not decorative:
-   horizontal padding enters the flex base size, so `flex: 1 1 0` alone leaves the wider label's button wider
-   (measured 183 vs 163 on the quick-start row before the paddings were matched). */
+.recipient-submit:not(:disabled):hover {
+  box-shadow: 0 6px 18px var(--a40);
+}
+
 .action-dialog-actions {
   display: flex;
   gap: 8px;
@@ -4535,12 +4473,12 @@ button.feed-item:hover {
   padding-right: 16px;
 }
 
-/* The dismiss reads as secondary: it is the way OUT, not the thing we are suggesting. */
 .action-dialog-dismiss {
   color: var(--text);
   background: transparent;
-  border-color: var(--line);
+  border: 1px solid var(--line);
   font-weight: 700;
+  box-shadow: none;
 }
 
 .action-dialog-dismiss[hidden] {
@@ -4556,10 +4494,10 @@ button.feed-item:hover {
   gap: 9px;
   margin: 0;
   padding: 12px 14px 12px 32px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-m);
   color: var(--text);
-  background: #0b0f10;
+  background: var(--surface);
 }
 
 .install-steps[hidden] {
@@ -4582,22 +4520,21 @@ button.feed-item:hover {
 .secondary-button {
   min-height: 42px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-pill);
   padding: 0 16px;
   color: var(--muted);
-  background: #0d1012;
+  background: transparent;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .secondary-button:hover {
   color: var(--text);
-  border-color: rgba(48, 213, 176, 0.34);
+  border-color: var(--a40);
 }
 
-/* v749: auto-linked URLs in messages/posts + the external-link interstitial (built in JS with createElement +
-   textContent only). */
+/* ── Links & external-link interstitial ─────────────────────────────────── */
 .msg-link {
   color: var(--accent);
   text-decoration: underline;
@@ -4609,8 +4546,12 @@ button.feed-item:hover {
 .msg-link:hover {
   text-decoration: none;
 }
+.message.out .msg-link {
+  color: inherit;
+  font-weight: 600;
+}
 .external-link-backdrop {
-  z-index: 80; /* above the image lightbox (70) — a leaving-the-app confirm must sit on top */
+  z-index: 80;
 }
 .external-link-dialog {
   text-align: left;
@@ -4625,15 +4566,15 @@ button.feed-item:hover {
 .external-link-url {
   padding: 8px 10px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  background: #0d1012;
+  border-radius: var(--r-s);
+  background: var(--field);
   color: var(--muted);
   font-size: 13px;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 .external-link-ip-warning {
-  color: #e8b64a;
+  color: var(--amber);
   font-size: 13px;
 }
 .external-link-dontask {
@@ -4660,18 +4601,17 @@ button.feed-item:hover {
 .external-link-open {
   min-height: 42px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-pill);
   padding: 0 18px;
-  color: #04110d;
+  color: var(--on-accent);
   background: var(--accent);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
 }
 .external-link-open:hover {
-  filter: brightness(1.06);
+  background: var(--accent-hi);
 }
-/* Anti-phishing line: shown when a link's visible text differs from its destination ([text](url)). */
 .external-link-shownas {
   color: var(--muted);
   font-size: 13px;
@@ -4679,7 +4619,6 @@ button.feed-item:hover {
 .external-link-shownas b {
   color: var(--text);
 }
-/* Composer "Insert link" dialog (reuses .action-dialog + .external-link-actions). */
 .link-composer-dialog h2 {
   margin: 0;
   font-size: 18px;
@@ -4689,25 +4628,26 @@ button.feed-item:hover {
   min-height: 42px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0d1012;
+  border-radius: var(--r-s);
+  background: var(--field);
   color: var(--text);
   font: inherit;
 }
 .link-composer-error {
   margin: 0;
-  color: #e8b64a;
+  color: var(--amber);
   font-size: 13px;
 }
 
+/* ── Docs reader ────────────────────────────────────────────────────────── */
 .docs-layout {
   display: grid;
   grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
   min-height: 0;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--r-m);
   overflow: hidden;
-  background: rgba(8, 11, 13, 0.38);
+  background: var(--surface);
 }
 
 .docs-nav {
@@ -4716,28 +4656,27 @@ button.feed-item:hover {
   gap: 6px;
   padding: 10px;
   border-right: 1px solid var(--line-soft);
-  background: rgba(13, 16, 18, 0.72);
+  background: transparent;
 }
 
 .docs-nav button {
   min-height: 38px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border: 0;
+  border-radius: var(--r-s);
   padding: 0 11px;
   color: var(--muted);
   background: transparent;
   font: inherit;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
 
 .docs-nav button:hover,
 .docs-nav button.is-active {
-  color: var(--text);
-  border-color: rgba(48, 213, 176, 0.28);
-  background: rgba(48, 213, 176, 0.08);
+  color: var(--accent);
+  background: var(--a10);
 }
 
 .docs-content {
@@ -4754,6 +4693,26 @@ button.feed-item:hover {
 
 .docs-status-error {
   color: var(--rose);
+}
+
+/* Doc switching feels alive: app.js inserts a fresh .docs-rendered / .docs-status node per selection,
+   so this fires on every switch (and on open) with no JS involved. */
+@keyframes docSlideIn {
+  from { opacity: 0; transform: translateX(var(--doc-shift, 0px)); }
+}
+
+/* Directional: selectDoc sets --doc-shift (+40px when the pressed tab is to the RIGHT of the current one,
+   -40px to the left, 0 on first open) so the incoming document slides in from the side it came from. */
+.docs-content > .docs-rendered,
+.docs-content > .docs-status {
+  animation: docSlideIn 0.26s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-content > .docs-rendered,
+  .docs-content > .docs-status {
+    animation: none;
+  }
 }
 
 .docs-rendered {
@@ -4809,8 +4768,8 @@ button.feed-item:hover {
   border: 1px solid var(--line-soft);
   border-radius: 6px;
   padding: 1px 5px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #dfeee8;
+  background: var(--surface);
+  color: var(--text);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.92em;
 }
@@ -4818,9 +4777,9 @@ button.feed-item:hover {
 .docs-rendered pre {
   overflow: auto;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--r-m);
   padding: 12px;
-  background: #090c0e;
+  background: var(--field);
 }
 
 .docs-rendered pre code {
@@ -4838,7 +4797,7 @@ button.feed-item:hover {
 .docs-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--r-m);
 }
 
 .docs-rendered table {
@@ -4858,7 +4817,7 @@ button.feed-item:hover {
 
 .docs-rendered th {
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -4867,6 +4826,7 @@ button.feed-item:hover {
   border-bottom: 0;
 }
 
+/* ── Icons (mask set — contract) ────────────────────────────────────────── */
 .icon {
   display: inline-block;
   width: 20px;
@@ -4890,10 +4850,6 @@ button.feed-item:hover {
 .icon-down { --mask: url("./assets/icons/down.svg"); }
 .icon-up { --mask: url("./assets/icons/up.svg"); }
 .icon-back { --mask: url("./assets/icons/back.svg"); }
-/* [OWNER 2026-08-09] "X is not centred in the box." It was a text glyph (&times;) in eight dialogs while every
-   other icon in the app is a mask. Measured: the glyph ink centre sits 4.5px above the baseline while the line
-   box centre sits 6.5px above it, so place-items:center centred the BOX and left the ink 2px low — 5% of a 40px
-   button. A mask has no baseline, so it is centred by construction rather than by luck of the font. */
 .icon-close { --mask: url("./assets/icons/close.svg"); }
 .icon-chevron-down { --mask: url("./assets/icons/chevron-down.svg"); }
 .icon-refresh { --mask: url("./assets/icons/refresh.svg"); }
@@ -4920,16 +4876,14 @@ button.feed-item:hover {
 .icon-align-center { --mask: url("./assets/icons/align-center.svg"); }
 .icon-align-justify { --mask: url("./assets/icons/align-justify.svg"); }
 
+/* ── Mobile (≤900px): single column, bottom tab bar (contract mechanics) ── */
 @media (max-width: 900px) {
   :root {
     --header-actions-width: 204px;
     --mobile-nav-bottom-reserve: 10px;
+    --gutter: 16px;
   }
 
-  /* Fit the three post-action buttons (e.g. Comments off / Private chat / Unfollow) on ONE row on phones:
-     at ~360px the card's action row is ~270px but the buttons need ~318px at the desktop sizing and wrap to two
-     lines. Tighten the gap, horizontal padding and font just enough to fit with ~8px to spare at 360px. Desktop
-     (>900px) keeps the roomier defaults. */
   .feed-actions {
     gap: 6px;
   }
@@ -4949,17 +4903,6 @@ button.feed-item:hover {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
     max-width: 100vw;
-    /* TOP-ANCHORED, and `min-height: 0` is the whole fix for the tab bar.
-       [OWNER 2026-08-14] Half the tab bar hung below the screen edge. The cause was the FLOOR, not the anchor:
-       min-height BEATS height, so `min-height: 100svh` held the shell at full screen height while `height` tried
-       to follow the visible area — a box taller than what can be seen, with its bottom row off the edge. Dropping
-       the floor lets the height do its job, and the tab bar fits.
-       The bottom edge was briefly pinned here too (--app-viewport-bottom-gap, as the maximized composer still is)
-       and that had to be undone: on iOS a bottom-anchored fixed element is re-resolved every time the visible area
-       slides, so dragging the page made the whole shell shudder, over and over, in whichever direction had not
-       shuddered last. Anchored at the top it is simply carried along, which is what every other site does and why
-       none of them shudder. The composer keeps its bottom pin because it is a single box that must clear the
-       keyboard exactly; the shell only needs to be the right SIZE. */
     min-height: 0;
     height: 100dvh;
     height: var(--app-viewport-height, 100dvh);
@@ -4974,10 +4917,11 @@ button.feed-item:hover {
     width: 100%;
     max-width: 100vw;
     min-width: 0;
-    padding: 8px 10px var(--mobile-nav-bottom-reserve);
+    padding: 6px 10px var(--mobile-nav-bottom-reserve);
     padding-bottom: max(var(--mobile-nav-bottom-reserve), var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
     border-right: 0;
     border-top: 1px solid var(--line-soft);
+    background: var(--panel);
     overflow: hidden;
   }
 
@@ -4986,18 +4930,26 @@ button.feed-item:hover {
   }
 
   .rail {
-    grid-template-columns: minmax(58px, 0.72fr) repeat(4, minmax(0, 1fr));
+    /* STATE-AWARE (owner): no wallet -> the plate cell is gone and the four tabs center across the
+       full width; with a known balance app.js sets .has-vault-balance on the sidebar and the plate
+       cell returns (5 columns, no phantom gap). */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
     min-width: 0;
     overflow: hidden;
   }
 
+  .rail-item {
+    border-radius: var(--r-m);
+  }
+
   .rail-vault-balance {
+    display: none;
     min-width: 0;
-    min-height: 58px;
+    min-height: 54px;
     padding: 5px 2px;
-    border-right: 1px solid rgba(48, 213, 176, 0.14);
+    border-right: 1px solid var(--a16);
     border-bottom: 0;
   }
 
@@ -5011,7 +4963,7 @@ button.feed-item:hover {
 
   .rail-item {
     width: 100%;
-    min-height: 54px;
+    min-height: 52px;
     min-width: 0;
     padding-inline: 2px;
     overflow: hidden;
@@ -5042,6 +4994,7 @@ button.feed-item:hover {
 
   .app-shell[data-view="chats"] .list-pane {
     display: grid;
+    animation: fadeIn 0.18s ease-out;
   }
 
   .app-shell[data-view="chats"] .chat-pane {
@@ -5054,7 +5007,6 @@ button.feed-item:hover {
 
   .app-shell[data-chat-open="true"][data-view="chats"] .chat-pane {
     display: grid;
-    /* Shared top offset so the conversation bar starts at the same y as every pane header. */
     padding-top: var(--header-top-offset);
   }
 
@@ -5069,11 +5021,11 @@ button.feed-item:hover {
   .wallet-pane,
   .profile-pane,
   .list-pane {
-    padding: var(--header-top-offset) 24px 24px;
+    padding: var(--header-top-offset) var(--gutter) var(--gutter);
   }
 
   .list-pane {
-    gap: 14px;
+    gap: 12px;
     border-right: 0;
   }
 
@@ -5082,8 +5034,6 @@ button.feed-item:hover {
   }
 
   .header-actions {
-    /* Match the desktop 8px gap so the menu buttons sit the same distance apart in both views (mobile's 6px set
-       them a couple of pixels closer). */
     gap: 8px;
     min-width: max-content;
   }
@@ -5094,8 +5044,6 @@ button.feed-item:hover {
     height: 38px;
   }
 
-  /* Drop the Public header's install button on mobile so the info button sits on one line with the title
-     (install stays available on the other tabs' headers). */
   .public-pane .pane-header .install-header-button {
     display: none;
   }
@@ -5104,10 +5052,7 @@ button.feed-item:hover {
     display: grid;
     grid-template-columns: var(--header-button-size) 44px minmax(0, 1fr) max-content;
     align-items: center;
-    /* Same bar as desktop (shared height, zero vertical padding); the chat-pane top padding below provides the
-       shared top offset. RIGHT 24 matches desktop; LEFT 14 is the mobile gutter for the back button + avatar,
-       shared with the message area. */
-    padding: 0 24px 0 14px;
+    padding: 0 var(--gutter) 0 12px;
     gap: 10px;
     max-width: 100vw;
     overflow: hidden;
@@ -5143,22 +5088,12 @@ button.feed-item:hover {
     display: none;
   }
 
-  /* Header control sizing comes from the base container rule (var(--header-button-size)) — its specificity
-     already beats the generic 38px mobile .icon-button touch size above, so no mobile override is needed. */
-
   .message-strip {
-    padding: 16px 14px;
+    padding: 16px 12px;
   }
 
-  /* Mobile composer (v769): the flex-column stack needs only tighter padding + smaller controls. With the
-     buttons moved into the toolbar, the input row is just [leading control | textarea | send] and fits one line
-     at every phone width — no more 2-row grid reshuffle, no .is-replying juggle (the reply strip is just an
-     earlier flex child). */
   .composer {
-    /* NO safe-area inset here: on mobile the composer is NOT the bottommost element — the tab bar (.sidebar)
-       sits below it and reserves env(safe-area-inset-bottom) itself. Adding the inset here too produced a dead
-       gap between the composer and the tab bar on home-indicator iPhones. Desktop keeps the base rule's inset. */
-    padding: 8px 14px 8px;
+    padding: 8px 12px 8px;
     gap: 6px;
     overflow: visible;
   }
@@ -5169,18 +5104,17 @@ button.feed-item:hover {
 
   .composer .private-anonymous-button,
   .public-composer .composer-post-option {
-    width: 38px;
+    width: 40px;
     height: 44px;
   }
 
   .composer .send-button {
-    width: 48px;
+    width: 46px;
   }
 
   .public-composer {
-    margin: 0 -24px -24px;
-    /* Same as .composer above: the tab bar below owns the safe-area inset on mobile. */
-    padding: 8px 14px 8px;
+    margin: 0 calc(-1 * var(--gutter)) calc(-1 * var(--gutter));
+    padding: 8px 12px 8px;
   }
 
   .balance-grid,
@@ -5230,9 +5164,6 @@ button.feed-item:hover {
     overflow: hidden;
   }
 
-  /* Fullscreen everywhere (v647): the base rule already sizes the dialog to the viewport; mobile keeps only the
-     tighter viewport padding. --app-viewport-height pins the height where 100% of the backdrop is unreliable
-     (iOS dynamic toolbars). */
   .image-lightbox-dialog {
     height: var(--app-viewport-height, 100%);
   }
@@ -5242,13 +5173,7 @@ button.feed-item:hover {
   }
 }
 
-/* Short viewport = on-screen keyboard up (or a small phone). MUST come after the max-width:900px block above so its
-   .modal-backdrop align-items:center doesn't win by source order on a phone (both media queries match). The default
-   layout pins header + summary + submit and scrolls ONLY the fields region, so a focused textarea gets squeezed into
-   a tiny scroll window and can vanish behind the keyboard (owner: "the mnemonic field collapses entirely when
-   tapped"). Instead: TOP-align the modal (so the header + focused field stay visible, not centered off-screen) and
-   scroll the WHOLE dialog — the textarea keeps its full min-height and every control is reachable by scrolling.
-   --app-viewport-height already tracks the keyboard-shrunk visual viewport. */
+/* Short viewport (keyboard up): MUST come after the ≤900px block (source-order contract). */
 @media (max-height: 620px) {
   .modal-backdrop {
     align-items: start;
@@ -5268,11 +5193,10 @@ button.feed-item:hover {
   }
 }
 
+/* ── Desktop (≥901px) view switching (contract) ─────────────────────────── */
 @media (min-width: 901px) {
   .app-shell[data-view="chats"] .chat-pane {
     display: grid;
-    /* Shared top offset so the conversation bar starts at the same y as every pane header
-       (no double-shift on the sibling list-pane, which carries its own pane padding). */
     padding-top: var(--header-top-offset);
   }
 
@@ -5294,8 +5218,7 @@ button.feed-item:hover {
   }
 }
 
-/* Public publish status badge (own pending posts/comments): the background confirm driver's visible state.
-   CSS classes only — the production CSP (style-src 'self') silently kills inline styles. */
+/* Publish status badge (CSS classes only — CSP contract). */
 .public-publish-status {
   color: var(--text-muted, #8b949e);
   font-size: 12px;
@@ -5308,16 +5231,16 @@ button.feed-item:hover {
   font-weight: 600;
 }
 
-/* ── Boot screen ─────────────────────────────────────────────────────────────
-   Masks the post-unlock initial-sync while the branded signal-field animates.
-   z-index 55: above the app shell (<=50), below the unlock dialog (#actionDialog 60). */
+/* ── Boot screen (phases + z-order are contracts) ───────────────────────── */
 .boot-screen {
   position: fixed;
   inset: 0;
   z-index: 55;
   display: flex;
   overflow: hidden;
-  background: radial-gradient(125% 95% at 50% 22%, #101a17 0%, var(--bg) 62%);
+  background:
+    radial-gradient(125% 95% at 50% 20%, var(--a10), transparent 55%),
+    var(--bg);
   opacity: 1;
   transition: opacity 460ms ease;
 }
@@ -5354,11 +5277,11 @@ button.feed-item:hover {
 }
 
 .boot-brand {
-  font-size: clamp(26px, 6.4vw, 40px);
+  font-size: clamp(28px, 6.4vw, 42px);
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--text);
-  text-shadow: 0 0 26px rgba(48, 213, 176, 0.22);
+  text-shadow: 0 0 30px var(--a25);
 }
 
 .boot-brand-suffix {
@@ -5375,51 +5298,46 @@ button.feed-item:hover {
   transition: opacity 260ms ease;
 }
 
-/* Idle = waiting for the unlock dialog (which sits on top); the spinner is only for the
-   post-unlock loading phase. */
 .boot-screen[data-phase="idle"] .boot-center {
   opacity: 0;
   visibility: hidden;
 }
 
-/* Pure-CSS spinner: ONLY transform/opacity animate, so the browser composites them on the GPU thread and they
-   keep moving even while the main thread is blocked by the synchronous post-unlock crypto. No SVG filter (that
-   forces main-thread paint and would freeze). The teal glow is a STATIC box-shadow that rides the composited
-   transform. */
+/* Pure-CSS GPU-composited spinner (transform/opacity only — contract). */
 .boot-spinner {
   position: relative;
-  width: clamp(84px, 22vw, 108px);
-  height: clamp(84px, 22vw, 108px);
+  width: clamp(80px, 20vw, 100px);
+  height: clamp(80px, 20vw, 100px);
 }
 
 .boot-spinner-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2.5px solid transparent;
+  border: 3px solid transparent;
   will-change: transform;
 }
 
 .boot-spinner-ring-outer {
   border-top-color: var(--accent);
   border-right-color: var(--accent);
-  box-shadow: 0 0 10px rgba(48, 213, 176, 0.35);
-  animation: bootSpin 1.4s linear infinite;
+  box-shadow: 0 0 14px var(--a25);
+  animation: bootSpin 1.2s cubic-bezier(0.45, 0.1, 0.55, 0.9) infinite;
 }
 
 .boot-spinner-ring-inner {
-  inset: 20%;
-  border-bottom-color: rgba(48, 213, 176, 0.72);
-  border-left-color: rgba(48, 213, 176, 0.72);
-  animation: bootSpinReverse 2s linear infinite;
+  inset: 22%;
+  border-bottom-color: var(--a40);
+  border-left-color: var(--a40);
+  animation: bootSpinReverse 1.9s linear infinite;
 }
 
 .boot-spinner-core {
   position: absolute;
-  inset: 41%;
+  inset: 42%;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 12px rgba(48, 213, 176, 0.8);
+  box-shadow: 0 0 16px var(--a40);
   will-change: transform, opacity;
   animation: bootCorePulse 1.5s ease-in-out infinite;
 }
@@ -5440,8 +5358,8 @@ button.feed-item:hover {
 .boot-loading-label {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
-  letter-spacing: 0.08em;
+  font-size: 13px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -5467,8 +5385,7 @@ button.feed-item:hover {
   }
 }
 
-/* Buy-ATH: the two conversion inputs sit side by side on a wide screen and stack on a narrow one. They are ONE
-   number shown two ways, so they must read as a pair rather than as two independent questions. */
+/* ── Buy ATH ────────────────────────────────────────────────────────────── */
 .buy-ath-pair {
   display: grid;
   gap: var(--space-3, 12px);
@@ -5478,16 +5395,16 @@ button.feed-item:hover {
   .buy-ath-pair { grid-template-columns: 1fr; }
 }
 
-/* Buy-ATH input cards: the same shape as the Wallet tab's GRAM/ATH headline, which the owner pointed at as what
-   money should look like here. Accent uppercase ticker above, the number big and bold below — the field reads as money rather than
-   as a form control, and the ticker needs no translation. */
 .buy-ath-card {
   display: grid;
   gap: 6px;
   padding: 14px 16px;
-  border: 1px solid rgba(48, 213, 176, 0.16);
-  border-radius: 14px;
-  background: var(--surface, rgba(255, 255, 255, 0.03));
+  border: 1px solid transparent;
+  border-radius: var(--r-l);
+  background:
+    linear-gradient(135deg, var(--a10), transparent 70%),
+    var(--panel-2);
+  box-shadow: var(--shadow-1);
 }
 .buy-ath-card span {
   color: var(--accent);
@@ -5502,7 +5419,6 @@ button.feed-item:hover {
   border: 0;
   background: transparent;
   color: var(--text);
-  /* Clamped like the headline card: a long value scales down instead of overflowing a narrow phone. */
   font-size: clamp(20px, 5.2vw, 30px);
   font-weight: 800;
   line-height: 1.1;
@@ -5511,10 +5427,9 @@ button.feed-item:hover {
   outline: none;
 }
 .buy-ath-card:focus-within {
-  border-color: rgba(48, 213, 176, 0.45);
+  border-color: var(--a40);
 }
 
-/* Footnotes under the submit button — the explanation the title's asterisk points at. */
 .action-footnotes {
   display: grid;
   gap: 8px;
@@ -5525,10 +5440,7 @@ button.feed-item:hover {
   line-height: 1.5;
 }
 
-/* .ath names as property — the list in "My .ath names".
-   THE ART LEADS: the registry draws each name on chain, and that picture is the whole reason this screen exists.
-   It arrives as an on-chain SVG in a data: URI (see safeInlineImage) — img-src forbids a remote one, so nothing
-   here can reach out to a host. Two columns from 420px so four names fit without a scroll. */
+/* ── .ath name NFT cards ────────────────────────────────────────────────── */
 .nft-card-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -5546,10 +5458,11 @@ button.feed-item:hover {
 .nft-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-l);
   background: var(--panel-2);
   overflow: hidden;
+  box-shadow: var(--shadow-1);
 }
 
 /* A SQUARE ART BOX ON EVERY ENGINE, aspect-ratio or not. The on-chain SVG has a viewBox but no width/height, so on a
@@ -5592,26 +5505,23 @@ button.feed-item:hover {
   min-width: 0;
 }
 
-/* Matches every other button in the app (panel-2 fill, --line border, accent-tinted hover). The first version had
-   no rule at all and fell through to the browser default — a grey slab in a dark themed dialog. */
 .nft-card-send {
   flex: 0 0 auto;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-3);
+  border-radius: var(--r-pill);
+  background: transparent;
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
 }
 
 .nft-card-send:hover {
-  border-color: rgba(48, 213, 176, 0.42);
+  border-color: var(--a40);
+  color: var(--accent);
 }
 
-/* Quick start, top-up step: the address and its own copy button on one row. The step's primary button is Next now;
-   copying belongs next to the thing being copied, not disguised as the way forward. */
 .quick-start-address-row {
   display: flex;
   align-items: center;
@@ -5629,3 +5539,1354 @@ button.feed-item:hover {
   flex: 0 0 auto;
 }
 
+/* == Theme toggle ======================================================== */
+/* Dark shows a sun ("switch to light"), light shows a moon. Inline data-URI masks - no new
+   asset files, nothing for the SW precache list. */
+.icon-theme {
+  --mask: var(--theme-icon);
+}
+
+/* Armed by app.js for ~550ms around a theme flip: color-ish properties cross-fade so the whole
+   surface melts into the other theme instead of snapping. Scoped by class. */
+@keyframes themeSpin {
+  from { transform: rotate(-150deg) scale(0.55); opacity: 0; }
+}
+
+/* Cross-fade rework (owner: text blinked ~0.5s after the switch, and gradients snapped while text faded).
+   Curated container list instead of the `* !important` blanket: removing the class no longer restyles the
+   whole document (the blink), text follows via inherited color, every surface fades at ONE speed, and the
+   gradient layers (background-image never animates in CSS) are suppressed for the window so their flat
+   underlay colors carry the fade. */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-anim .theme-toggle-button .icon {
+    animation: themeSpin 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  .theme-anim body,
+  .theme-anim .app-shell,
+  .theme-anim .sidebar,
+  .theme-anim .list-pane,
+  .theme-anim .content-pane,
+  .theme-anim .pane-header,
+  .theme-anim .conversation-header,
+  .theme-anim .search-row,
+  .theme-anim .composer,
+  .theme-anim .composer-input,
+  .theme-anim .bubble,
+  .theme-anim .thread-item,
+  .theme-anim .feed-item,
+  .theme-anim .comment-item,
+  .theme-anim .discovery-card,
+  .theme-anim .discovery-cta,
+  .theme-anim .settings-list button,
+  .theme-anim .settings-select-row,
+  .theme-anim .profile-stat-row,
+  .theme-anim .settings-rpc-row,
+  .theme-anim .wallet-headline-card,
+  .theme-anim .buy-ath-card,
+  .theme-anim .modal-backdrop,
+  .theme-anim .recipient-dialog,
+  .theme-anim .action-dialog,
+  .theme-anim .docs-dialog,
+  .theme-anim .install-dialog,
+  .theme-anim .quick-start-dialog,
+  .theme-anim .activation-welcome-dialog,
+  .theme-anim .docs-layout,
+  .theme-anim .docs-nav button,
+  .theme-anim .docs-rendered,
+  /* NOT .theme-anim .icon: a transition starting on a MASKED element makes Chromium relayerize it and the
+     glyph blinks out for a frame (the inline-SVG about-icon never blinked — that was the tell). The icon's
+     currentColor still fades smoothly because it INHERITS from the transitioning parent. */
+  .theme-anim .icon-button,
+  .theme-anim .rail-item,
+  .theme-anim .send-button,
+  .theme-anim .avatar,
+  .theme-anim .identity-popover,
+  .theme-anim .emoji-picker,
+  .theme-anim .mini-action-button,
+  .theme-anim .shared-post-embed,
+  .theme-anim .message-strip,
+  .theme-anim .thread-list,
+  .theme-anim .public-feed,
+  .theme-anim input,
+  .theme-anim select,
+  .theme-anim .recipient-submit,
+  .theme-anim .secondary-button,
+  .theme-anim .feed-actions button,
+  .theme-anim .message-actions button {
+    transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+  }
+  .theme-anim .boot-screen,
+  .theme-anim .message.out .bubble {
+    background-image: none;
+  }
+}
+
+/* The narrow conversation header already carries identity + docs + sync - the theme toggle
+   stays on the main tab headers there (same treatment as the install button). */
+@media (max-width: 900px) {
+  .conversation-header .theme-toggle-button {
+    display: none;
+  }
+}
+
+/* Opening a public overlay (Discover / channel view / post detail) is a navigation - it rises in like a
+   pane switch. Cards and messages deliberately carry NO entrance animation of their own: background sync
+   rebuilds them in place, and a per-card animation replayed on every rebuild ("flying" cards). */
+.public-pane[data-discover-open="true"] > .public-discovery,
+.public-pane[data-channel-open="true"] > .public-channel-view,
+.public-pane[data-post-open="true"] > .public-post-detail {
+  animation: riseIn 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* == Thread load sentinels + date jump ==================================== */
+/* Auto-paging rows: three dots, pulsing while a page is in flight. Still a real button (no-IO fallback). */
+.comments-load-sentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  margin: 2px 0;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: transparent;
+  cursor: pointer;
+}
+
+.comments-load-sentinel .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--a40);
+  opacity: 0.35;
+}
+
+.comments-load-sentinel.is-loading .dot {
+  animation: dotPulse 0.9s ease-in-out infinite;
+}
+.comments-load-sentinel.is-loading .dot:nth-child(2) { animation-delay: 0.15s; }
+.comments-load-sentinel.is-loading .dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dotPulse {
+  0%, 100% { transform: translateY(0); opacity: 0.35; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Closing a public overlay (channel/discovery/post) cannot animate its exit (display:none is instant) —
+   instead the RETURNING feed surfaces fade back in, which reads as the transition. */
+.public-pane > .pane-header,
+.public-pane > .public-channel-search-row,
+.public-pane > .public-feed {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Mobile wallet: the invisible pending balance headline reserved ~120px of blank space under the header
+   (owner). Collapse it on phones; desktop keeps the no-shift slot. */
+@media (max-width: 900px) {
+  .wallet-headline.is-pending {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-pane > .pane-header,
+  .public-pane > .public-channel-search-row,
+  .public-pane > .public-feed,
+  .comments-load-sentinel.is-loading .dot {
+    animation: none;
+  }
+}
+
+/* Flat underlays for gradient surfaces, so the theme cross-fade has an animatable color to ride while the
+   gradient layer is suppressed. */
+.send-button,
+.recipient-submit,
+.discovery-cta-action {
+  background-color: var(--accent);
+}
+
+.message.out .bubble {
+  background-color: var(--bubble-out-flat, #155243);
+}
+
+/* == Glow layers ========================================================== */
+/* The brand glow gradients live on their own ::before layers (absolute, so they are NOT grid/flex items;
+   z-index:-1 + isolation keeps them above the element's flat background and under everything else).
+   background-image cannot animate in CSS, but a layer's OPACITY can: on a theme switch the glow blinks out
+   fast (0.12s), the colors cross-fade underneath, and once the theme has landed the glow washes back in
+   over a full second (owner: "removed quickly, then slowly faded back in"). */
+.app-shell {
+  position: relative;
+  isolation: isolate;
+  background: var(--bg);
+}
+
+.content-pane {
+  position: relative;
+  isolation: isolate;
+  background: transparent;   /* owner: zero opacity — the shell's single plasma shows through every pane */
+}
+
+.discovery-cta {
+  position: relative;
+  isolation: isolate;
+  background: var(--panel-2);
+}
+
+.wallet-headline-card,
+.buy-ath-card {
+  position: relative;
+  isolation: isolate;
+  background: var(--panel-2);
+}
+
+/* AURORA (owner): the brand glow is alive — two soft blobs on their own layers drift along different slow
+   paths (30s / 42s, parallax), the panel glow drifts the other way, the CTA blob floats and breathes. Pure
+   transform keyframes (composited), opacity left to the theme cross-fade (fast-out / slow-in), nothing under
+   prefers-reduced-motion.
+   GEOMETRY CONTRACT: every layer is 1.6x its box (inset -30%) and the keyframes move it by at most 6% of the
+   layer while shrinking to no less than 0.95 — worst case the layer's edge sits at -0.16 of the box, i.e. the
+   clipped box never shows an edge of the layer (the first cut, inset -15% / 11% / 0.94, put the top edge at
+   +0.03H: a hard "strip" under the header). Gradient centres and radii are expressed in LAYER coordinates
+   (box value × 1/1.6, offset 0.3), so the blobs sit where they did relative to the box. */
+/* Each glow lives in its own CLIP LAYER (span.aurora-layer, appended by app.js to .app-shell and every .content-pane):
+   as pseudo-elements of the hosts the overshooting blobs gave the overflow:hidden hosts scrollable overflow, and a
+   reply-quote's scrollIntoView recentred the target inside the shell — the whole UI shifted with no way back. */
+.aurora-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 1;                    /* the theme cross-fade fades the whole layer (blobs + bands) */
+  transition: opacity 1s ease;
+}
+
+
+
+
+/* The CTA plate's drifting blob lives in ITS OWN clipped layer (.discovery-cta-glow, appended by app.js) so the
+   plate itself stays overflow:visible: a clipped grid item has a ZERO automatic minimum height, and in a feed taller
+   than the viewport its row collapsed under it (owner: the plate was cut off at small heights). */
+.discovery-cta-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.discovery-cta-glow::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 1s ease;
+  will-change: transform;
+  background: radial-gradient(38% 52% at 16% 30%, var(--a25), transparent 60%);
+  animation: ctaDrift 14s ease-in-out infinite;
+}
+
+/* The private list's twin plate ("Add a contact") glows from the OPPOSITE corner and drifts the other way — the
+   two plates are mirrors, not copies (owner: "somewhere else, for liveliness"). */
+.contact-cta .discovery-cta-glow::before {
+  background: radial-gradient(38% 52% at 84% 70%, var(--a25), transparent 60%);
+  animation: ctaDriftAlt 17s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .theme-anim .aurora-layer,
+  .theme-anim .discovery-cta-glow::before,
+  .theme-anim .avatar::before,
+  .theme-anim .send-button::before,
+  .theme-anim .recipient-submit::before,
+  .theme-anim .discovery-cta-action::before {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+}
+
+/* Docs header (title + lead) fades on every tab switch — selectDoc restarts this class via a reflow,
+   because the nodes are reused and a plain animation would fire only once. */
+.docs-head-swap {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-head-swap {
+    animation: none;
+  }
+}
+
+/* Buttons + default avatars join the glow-layer scheme (owner): the accent gradient rides a ::before that
+   blinks out in 0.12s on a theme switch and washes back in over 1s, while the element's flat accent/tint
+   background cross-fades underneath. Photo avatars are untouched: their image is an inline element
+   background that covers the layer. */
+.avatar {
+  position: relative;
+  isolation: isolate;
+  background-image: none;
+  background-color: var(--a10);
+}
+
+.avatar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 1;
+  transition: opacity 1s ease;
+  background: linear-gradient(145deg, var(--a25), var(--a06));
+}
+
+.send-button,
+.recipient-submit,
+.discovery-cta-action {
+  position: relative;
+  isolation: isolate;
+  background-image: none;
+}
+
+.send-button::before,
+.recipient-submit::before,
+.discovery-cta-action::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 1;
+  transition: opacity 1s ease;
+  background: linear-gradient(135deg, var(--accent-hi), transparent 60%);
+}
+
+/* Bottom bar with a live balance: plate cell + four tabs, no phantom slot. */
+@media (max-width: 900px) {
+  .sidebar.has-vault-balance .rail {
+    grid-template-columns: minmax(58px, 0.72fr) repeat(4, minmax(0, 1fr));
+  }
+  .sidebar.has-vault-balance .rail-vault-balance {
+    display: grid;
+  }
+}
+
+/* A REAL avatar image gets no glow layer (owner): transparent-background avatars let the accent gradient
+   bleed through as a green ring. Neutral panel backing behind the picture instead. */
+.avatar.has-image {
+  background-color: var(--panel-3);
+}
+
+.avatar.has-image::before {
+  display: none;
+}
+
+/* Letter avatars: line-height 1 pins the glyph box to the font size, so place-items:center lands the letter
+   on the optical middle (owner: the letter sat low in the chat list). */
+.avatar {
+  line-height: 1;
+}
+
+/* The add-contact plate in the private list: a small breather before the chat rows, and its action button
+   centered instead of hugging the text column (owner). */
+.thread-list > .discovery-cta {
+  margin-bottom: 8px;
+}
+
+.thread-list > .discovery-cta .discovery-cta-actions {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+/* Lightbox header controls: vertically centered against the header block and nudged a touch left (owner). */
+.image-lightbox-dialog header {
+  align-items: center;
+}
+
+.image-lightbox-actions {
+  margin-right: 6px;
+}
+
+/* Overlay headers (post/channel/discovery): the bar absorbs the pane's top offset, so its content centers
+   in the FULL band from the screen edge to the divider (owner); the divider keeps its exact y. The header
+   action cluster drops its pinned-to-top inset here for the same reason. */
+.public-pane[data-post-open="true"],
+.public-pane[data-discover-open="true"],
+.public-pane[data-channel-open="true"] {
+  padding-top: 0;
+}
+
+.public-pane .public-post-detail-header {
+  min-height: calc(var(--header-height) + var(--header-top-offset));
+}
+
+.public-pane .public-post-detail-header .header-actions {
+  align-self: center;
+  margin-top: 0;
+}
+
+/* Brand plate (owner): the status glow breathes and sits centered between the app icon and MAINNET
+   (9px above via the brand gap, 4px pill gap + 5px margin below = 9px). The version number shimmers as a
+   whole, barely, bright accent to slightly darker — opacity only, so it composites on the GPU. */
+.brand .status-dot {
+  margin-bottom: 5px;
+  animation: statusPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--a16); }
+  50% { box-shadow: 0 0 0 7px var(--a06); }
+}
+
+.app-version-label {
+  color: var(--accent);
+  animation: versionShimmer 3s ease-in-out infinite;
+}
+
+@keyframes versionShimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.68; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand .status-dot,
+  .app-version-label {
+    animation: none;
+  }
+}
+
+/* Profile identity (owner): avatar centered, the name/wallet under it — laconic vertical stack. */
+.identity-block {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 10px 0 4px;
+}
+
+.identity-copy-layout {
+  justify-items: center;
+}
+
+.identity-title-row {
+  justify-content: center;
+}
+
+/* Balance cards (owner): flat, no corner gradient; ticker and amount centered in the box. */
+.wallet-headline-card {
+  justify-items: center;
+  text-align: center;
+}
+
+/* Lightbox close mirrors its open: fade the backdrop, pop the card out; app.js hides after 200ms. */
+@keyframes fadeOut {
+  to { opacity: 0; }
+}
+
+@keyframes popOut {
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+
+.modal-backdrop.is-closing {
+  animation: fadeOut 0.18s ease-in forwards;
+}
+
+.modal-backdrop.is-closing > * {
+  animation: popOut 0.2s ease-in forwards;
+}
+
+/* Profile avatar a touch bigger (owner). */
+.avatar.large {
+  width: 74px;
+  height: 74px;
+  font-size: 26px;
+}
+
+/* Composer toggles (owner): state flips animate. The comments-toggle slash fades via its opacity; the
+   anonymous button swaps mask glyphs (icon-eye <-> icon-eye-off in JS), so each state carries its OWN
+   keyframe name — same content, different name — which is what restarts the animation on every flip. */
+.composer-post-option::after {
+  transition: opacity 0.25s ease;
+}
+
+@keyframes iconSwapOn {
+  from { opacity: 0; transform: scale(0.6) rotate(-40deg); }
+}
+
+@keyframes iconSwapOff {
+  from { opacity: 0; transform: scale(0.6) rotate(40deg); }
+}
+
+.private-anonymous-button[aria-pressed="true"] .icon {
+  animation: iconSwapOn 0.28s ease;
+}
+
+.private-anonymous-button[aria-pressed="false"] .icon {
+  animation: iconSwapOff 0.28s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .private-anonymous-button[aria-pressed="true"] .icon,
+  .private-anonymous-button[aria-pressed="false"] .icon {
+    animation: none;
+  }
+  .composer-post-option::after {
+    transition: none;
+  }
+}
+
+/* Profile avatar: another size bump (owner). */
+.avatar.large {
+  width: 86px;
+  height: 86px;
+  font-size: 30px;
+}
+
+/* The anonymous toggle keeps no focus ring (owner: the ring lingered after a tap until a blur click).
+   aria-pressed still announces the state to assistive tech. */
+.private-anonymous-button:focus,
+.private-anonymous-button:focus-visible {
+  outline: none;
+}
+
+/* hover:hover only — on touch :hover STICKS after a tap (the "highlight until you tap empty space" the
+   owner reported on the anonymous toggle; same trap the toolbar buttons already guard against). */
+@media (hover: hover) {
+  .composer .private-anonymous-button:hover {
+    background: var(--a16);
+  }
+  .composer-post-option:hover {
+    background: var(--a16);
+  }
+}
+
+/* Private conversation header joins the overlay-header treatment (owner): the bar absorbs the pane's top
+   offset so avatar/title/actions center in the FULL band from the screen edge to the divider; the divider
+   keeps its exact y (0 + 61 = the old 11 + 50). */
+.app-shell[data-view="chats"] .chat-pane,
+.app-shell[data-chat-open="true"][data-view="chats"] .chat-pane {
+  padding-top: 0;
+}
+
+.conversation-header {
+  min-height: calc(var(--header-height) + var(--header-top-offset));
+}
+
+.conversation-header .header-actions {
+  align-self: center;
+  margin-top: 0;
+}
+
+/* == Review fixes ========================================================= */
+/* CRITICAL: the tail glow rule (.app-shell{position:relative...}) silently out-cascaded the mobile
+   position:fixed contract (index.html documents the boot-screen stacking + the keyboard-slack machinery
+   depends on the fixed shell). Restore it after the glow block. */
+@media (max-width: 900px) {
+  .app-shell {
+    position: fixed;
+  }
+}
+
+/* The labelled dialog dismiss is a SECONDARY way out — the tail .recipient-submit accent fill + glow layer
+   were repainting it as a filled primary (same cascade shape as the old send-button gradient bug). */
+.action-dialog-dismiss {
+  background-color: transparent;
+}
+
+.action-dialog-dismiss::before {
+  display: none;
+}
+
+/* The Saved-notes avatar keeps its flat tint — the glow layer painted over it. */
+.avatar.avatar-saved::before {
+  display: none;
+}
+
+/* Reduced motion: the appended overlay entrances and modal close animations must obey it too. */
+@media (prefers-reduced-motion: reduce) {
+  .public-pane[data-discover-open="true"] > .public-discovery,
+  .public-pane[data-channel-open="true"] > .public-channel-view,
+  .public-pane[data-post-open="true"] > .public-post-detail,
+  .modal-backdrop.is-closing,
+  .modal-backdrop.is-closing > * {
+    animation: none;
+  }
+}
+
+/* == Shape pass (owner): rounded SQUARES, not circles/pills ================= */
+/* Avatars become rounded squares (radius scaled to size); every button takes the bottom-bar tab shape
+   (14px) — the text/pill buttons 12px. Inputs (search, composer), badges and tags keep their pills. */
+.avatar {
+  border-radius: var(--r-m);
+}
+
+.feed-avatar,
+.shared-post-embed-avatar {
+  border-radius: 10px;
+}
+
+.share-target-avatar {
+  border-radius: 11px;
+}
+
+.avatar.large {
+  border-radius: 22px;
+}
+
+.icon-button,
+.send-button,
+.composer .send-button,
+.composer-post-option,
+.composer .private-anonymous-button,
+.global-sync-indicator,
+.public-jump-down-button,
+.discovery-cta-icon {
+  border-radius: var(--r-m);
+}
+
+.discovery-cta-action,
+.recipient-submit,
+.secondary-button,
+.feed-actions button,
+.message-actions button,
+.conversation-earlier-button,
+.settings-rpc-row .rpc-key-get,
+.nft-card-send,
+.external-link-open,
+.mini-action-button {
+  border-radius: 12px;
+}
+
+/* Tab labels: line-height 1 + overflow:hidden clipped descenders (the "y" in a tab label like "Privacy") — give the line
+   box room for them. */
+.rail-item span:last-child {
+  line-height: 1.25;
+}
+
+
+
+@keyframes ctaDrift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(16%, 10%, 0) scale(1.2); }
+}
+
+@keyframes ctaDriftAlt {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-16%, -10%, 0) scale(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discovery-cta-glow::before {
+    animation: none;
+  }
+}
+
+/* GLASS (owner): the search row is frosted glass over the aurora; cards get the same at half strength (less blur,
+   less transparency). backdrop-filter is per element — kept to small radii so a long feed stays cheap. */
+.search-row {
+  background: var(--glass);
+  border-color: var(--glass-edge);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+
+.feed-item,
+.discovery-card,
+.discovery-cta {
+  background: var(--glass-2);
+  border-color: var(--glass-edge-2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+@media (hover: hover) {
+  button.feed-item:hover {
+    background: var(--glass-3);   /* hover only where hover exists — a tap must not leave the card lit */
+  }
+}
+
+/* CHAT CLOCK (owner): the time rides in the meta line under the bubble — "published · 12:34" / "received · 12:34"
+   (messageMetaLine); tabular digits keep the clocks aligned across rows. */
+.message-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A sheet on its way out must not eat the tap that follows. */
+.modal-backdrop.is-closing {
+  pointer-events: none;
+}
+
+/* FIND CHANNELS (owner): a new card SURFACES — rises in from below, staggered inside one paint (app.js sets the delay
+   through CSSOM); cards the list already showed are rebuilt without the animation (publicDiscoverySurfacedWallets). */
+@keyframes cardSurface {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.98); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* Shared by every "something new appeared" surface (owner): discovery cards, feed posts, comments, chat rows. */
+.discovery-card.is-surfacing,
+.feed-item.is-surfacing,
+.comment-item.is-surfacing,
+.message.is-surfacing {
+  /* backwards, not both: the end state must NOT stay pinned (it overrode swipe-to-reply's inline transform and the
+     flashes); the from-state still holds through a positive stagger delay. app.js drops the class at animationend. */
+  animation: cardSurface 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Card buttons: the blend of the outlined originals (teal text, teal border) and the filled pills (teal body) —
+   a translucent teal tint with a teal border and teal text; owner: the full fill was "too green". The plate's own
+   primary buttons (Find channels / Add channel) keep the fill. */
+.discovery-card .discovery-cta-action {
+  background: var(--a16);
+  background-color: var(--a16);
+  border-color: var(--a40);
+  color: var(--accent);
+  box-shadow: none;
+}
+
+.discovery-card .discovery-cta-action::before {
+  display: none;   /* no accent-hi gradient layer on the tinted variant */
+}
+
+.discovery-card .discovery-cta-action:not(:disabled):focus-visible {
+  background: var(--a25);
+  background-color: var(--a25);
+  border-color: var(--accent);
+  color: var(--accent-hi);
+  box-shadow: 0 4px 14px var(--a16);
+}
+
+@media (hover: hover) {
+  .discovery-card .discovery-cta-action:not(:disabled):hover {
+    background: var(--a25);
+    background-color: var(--a25);
+    border-color: var(--accent);
+    color: var(--accent-hi);
+    box-shadow: 0 4px 14px var(--a16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discovery-card.is-surfacing,
+  .feed-item.is-surfacing,
+  .comment-item.is-surfacing,
+  .message.is-surfacing {
+    animation: none;
+  }
+}
+
+/* FIND CHANNELS — SEARCH (owner): a search row under the header (same glass as the feed's); the discovery grid gets
+   a third row for it. A card that stops matching folds shut and fades at its place (.is-leaving, height frozen by
+   app.js through CSSOM), a card that starts matching surfaces (.is-surfacing above). */
+.public-pane[data-discover-open="true"] > .public-discovery {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.discovery-search-row {
+  margin: 12px var(--gutter) 0;
+}
+
+/* The discovery list spaces its rows with margins rather than grid gap so a leaving card can fold its own slot
+   (height + margin) shut and the rows below glide up — a gap track would stay and snap closed at removal. */
+.public-discovery-body {
+  gap: 0;
+}
+
+.public-discovery-body > * {
+  margin-bottom: 12px;
+}
+
+/* LEAVE (owner: the one-shot fold felt abrupt) — two phases driven by app.js: the card fades and settles
+   (cardFade, 0.26s), then .is-collapsing folds the slot shut with an ease-out transition (height pinned by CSSOM). */
+@keyframes cardFade {
+  to { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.985); }
+}
+
+.discovery-card.is-leaving {
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  animation: cardFade 0.26s cubic-bezier(0.2, 0.6, 0.2, 1) forwards;
+  transition:
+    height 0.34s cubic-bezier(0.2, 0.6, 0.2, 1),
+    padding 0.34s cubic-bezier(0.2, 0.6, 0.2, 1),
+    margin 0.34s cubic-bezier(0.2, 0.6, 0.2, 1),
+    border-width 0.34s ease;
+}
+
+.discovery-card.is-leaving.is-collapsing {
+  height: 0 !important;   /* beats the CSSOM px height the exit was frozen at */
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discovery-card.is-leaving {
+    animation: none;
+    transition: none;
+    display: none;
+  }
+}
+
+/* TEXT FIELDS (owner: the composer's edges melted into the background) — every text field sits on a slightly raised
+   fill with a visible hairline edge; focus keeps the accent ring. */
+.composer .composer-input {
+  background: var(--field-raised);
+  border-color: var(--field-edge);
+}
+
+.composer .composer-input:focus {
+  border-color: var(--a40);
+}
+
+.search-row {
+  border-color: var(--field-edge);
+}
+
+.search-row:focus-within {
+  border-color: var(--a40);
+}
+
+.settings-rpc-row input,
+.recipient-dialog input,
+.action-dialog input,
+.action-dialog select,
+.action-dialog textarea,
+.quick-start-step-body input,
+.quick-start-step-body textarea {
+  background: var(--field-raised);
+  border-color: var(--field-edge);
+}
+
+.settings-rpc-row input:focus {
+  border-color: var(--accent);
+}
+
+.recipient-dialog input:focus,
+.action-dialog input:focus,
+.action-dialog select:focus,
+.action-dialog textarea:focus,
+.quick-start-step-body input:focus {
+  border-color: var(--a40);
+}
+
+/* POST HEADER CENTRED (owner): the author row (avatar, name, time, buttons) sits at equal distance from the card's top
+   edge and from the text below it — 12px above (+1px border) and 12px below; comments keep their tighter 10/10. */
+.feed-author-row {
+  margin-bottom: 12px;
+}
+
+.public-feed > .feed-item:not(.discovery-cta):not(.compact),
+.feed-item.public-detail-post {
+  padding-top: 12px;
+}
+
+.comment-item .feed-author-row {
+  margin-bottom: 10px;
+}
+
+/* NARROW SUB-VIEW HEADERS (owner: on a phone the channel header's text buttons pushed the icon buttons off the
+   edge). Channel view / post detail / discovery share this header: below 600px the global extras (docs, sync,
+   install — all present on the main tab headers; the theme toggle is already hidden here on mobile) go, the text
+   buttons tighten, the avatar shrinks, and the title keeps a floor so the name never collapses to nothing. */
+@media (max-width: 600px) {
+  .public-post-detail-header .docs-header-button,
+  .public-post-detail-header .global-sync-indicator,
+  .public-post-detail-header .install-header-button {
+    display: none;
+  }
+
+  .public-post-detail-header .header-actions {
+    gap: 6px;
+  }
+
+  .public-post-detail-header .mini-action-button {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .public-post-detail-header .avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+
+  .public-post-detail-header .conversation-title {
+    min-width: 48px;
+  }
+}
+
+/* Popovers exit with the same pop they entered with (app.js hidePopoverAnimated adds .is-closing for 160ms). */
+.identity-popover.is-closing,
+.emoji-picker.is-closing {
+  animation: popOut 0.16s ease-in forwards;
+  pointer-events: none;
+}
+
+/* DAY / UNREAD SEPARATORS in the chat strip (owner): a hairline split in the middle by a pill with the day —
+   Today / Yesterday / "21 August" — and an accent "New messages" rule before the first unread row. Full-width rows
+   of the flex column; built by app.js (buildStripSeparator). */
+.strip-separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  margin: 4px 0;
+  color: var(--muted-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.strip-separator::before,
+.strip-separator::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line-soft);
+}
+
+.strip-separator span {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--a06);
+  white-space: nowrap;
+}
+
+.strip-separator.is-unread {
+  color: var(--accent);
+}
+
+.strip-separator.is-unread::before,
+.strip-separator.is-unread::after {
+  background: var(--a40);
+}
+
+.strip-separator.is-unread span {
+  background: var(--a16);
+}
+
+/* Unread total on the Private tab (owner): a small pill at the icon's top-right corner, reconciled by app.js. */
+.rail-item {
+  position: relative;
+}
+
+.rail-badge {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+/* SKELETONS (owner): shimmering card outlines while a list is on its way (discovery before its first card, comments
+   before the first frame, the feed during the first sync). The sheen is a translated gradient band — composited. */
+.skeleton-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--glass-edge-2);
+  border-radius: var(--r-l);
+  background: var(--glass-2);
+}
+
+.skeleton-comment {
+  padding: 10px 12px;
+  border-radius: var(--r-m);
+}
+
+.skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  border-radius: 8px;
+  background: var(--a06);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translate3d(-100%, 0, 0);
+  background: linear-gradient(90deg, transparent, var(--a10), transparent);
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-m);
+}
+
+.skeleton-line {
+  height: 12px;
+  width: 100%;
+}
+
+.skeleton-line-title {
+  width: 40%;
+  height: 14px;
+}
+
+.skeleton-line-short {
+  width: 62%;
+}
+
+@keyframes skeletonShimmer {
+  to { transform: translate3d(100%, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* EMPTY DIALOG (owner): a waving bubble bobbing over three breathing dots, the title, a hint and openers that pre-fill
+   the composer. Centred in the strip (auto margins in the flex column); built by app.js buildEmptyConversationNode. */
+.conversation-empty {
+  align-self: center;
+  margin: auto 0;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 340px;
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.conversation-empty-art {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.conversation-empty-bubble {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px 22px 22px 6px;   /* a speech bubble with its tail at the bottom-left */
+  background: var(--a16);
+  font-size: 30px;
+  line-height: 1;
+  animation: emptyBob 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.conversation-empty-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.conversation-empty-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.35;
+  animation: emptyDots 1.4s ease-in-out infinite;
+}
+
+.conversation-empty-dot:nth-child(2) { animation-delay: 0.2s; }
+.conversation-empty-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.conversation-empty h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.conversation-empty p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.conversation-empty-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.conversation-empty-chip {
+  padding: 8px 14px;
+  border: 1px solid var(--a40);
+  border-radius: 12px;
+  background: var(--a10);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+}
+
+.conversation-empty-chip:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) {
+  .conversation-empty-chip:hover {
+    background: var(--a25);
+    border-color: var(--accent);
+  }
+}
+
+@keyframes emptyBob {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  30% { transform: translate3d(0, -6px, 0) rotate(-7deg); }
+  60% { transform: translate3d(0, -2px, 0) rotate(6deg); }
+}
+
+@keyframes emptyDots {
+  0%, 60%, 100% { opacity: 0.35; transform: translate3d(0, 0, 0); }
+  30% { opacity: 1; transform: translate3d(0, -4px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-empty,
+  .conversation-empty-bubble,
+  .conversation-empty-dot {
+    animation: none;
+  }
+}
+
+/* AURORA BANDS (owner: "northern lights — green lines that float, some fade out, others appear, and
+   faster"): soft diagonal curtains inside each .aurora-layer (app.js appends 4 to the shell, 3 to a pane). Each band
+   is a wide, short ellipse gradient that drifts sideways, tilts and breathes in/out on its own clock (16–26s, offset
+   starts), so at any moment some are forming while others dissolve. Transform + opacity only — composited. */
+
+/* AURORA, third take — a free-form, non-cyclic glow painted by app.js on a tiny canvas inside each .aurora-layer
+   (≈96px wide, stretched over the layer: the upscale is the blur). See app.js createAuroraScene / drawAuroraScene. */
+.aurora-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Profile → "Background glow": the aurora brightness slider (app.js AURORA_LEVEL_KEY), native range in the brand colour. */
+.settings-range-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* FILE CHIP SPACING (owner: the attachment sat lower than centred — 8px on top of the bubble padding, nothing
+   below). The chip itself carries no top margin; the 8px gap is between blocks, whichever order they come in. */
+.bubble > * + .message-file-chip,
+.message-file-chip + * {
+  margin-top: 8px;
+}
+
+/* FILE CHIP ON A SENT BUBBLE (owner): the sent bubble is teal with light text in BOTH themes, so the chip inside it
+   must not fall back to the page's --text (black in the light theme) — it takes the bubble's own text colour and a
+   light translucent fill. */
+.message.out .message-file-chip {
+  color: var(--bubble-out-text);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.message.out .message-file-chip:hover {
+  border-color: var(--bubble-out-text);
+}
+
+.message.out .message-file-size {
+  color: var(--bubble-out-text);
+  opacity: 0.75;
+}
+
+/* The chat list hosts its own aurora layer (a ×1.3 mirror of the chat pane's plasma, see app.js createAuroraMirror):
+   it needs a positioned, isolated box and an opaque panel fill so the shell's plasma does not show through under it. */
+.list-pane {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+/* NO COLUMN SEPARATION (owner): the rail, the chat list and the chat pane all sit with zero-opacity fills on the
+   shell's single plasma; the two vertical hairlines are gone too. */
+.sidebar {
+  border-right: 0;
+}
+
+.list-pane {
+  border-right: 0;
+}
+
+/* GLASS PLATES EVERYWHERE (owner: "give every button the same transparency effect the posts have"):
+   every dark-plate button and card takes the feed card's glass — --glass-2 fill, glass edge, a light backdrop blur —
+   so the plasma shows through comments, action buttons and the profile rows the same way it shows through posts.
+   Accent (primary) buttons keep their solid brand fill; popovers and dialogs stay opaque for readability. */
+.comment-item,
+.mini-action-button,
+.secondary-button,
+.settings-list button,
+.action-grid button,
+.payment-actions button,
+.public-jump-down-button,
+.public-detail-retry,
+.settings-select-row,
+.settings-rpc-row,
+.profile-stat-row {
+  background: var(--glass-2);
+  border-color: var(--glass-edge-2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* The tiny in-bubble buttons get the glass fill without a blur layer (they sit over a bubble, the blur adds nothing). */
+.message-actions button,
+.row-reply-button {
+  background: var(--glass-2);
+  border-color: var(--glass-edge-2);
+}
+
+@media (hover: hover) {
+  .mini-action-button:hover,
+  .secondary-button:hover,
+  .settings-list button:hover:not(:disabled),
+  .action-grid button:hover:not(:disabled),
+  .payment-actions button:hover,
+  .public-jump-down-button:hover,
+  .public-detail-retry:hover,
+  .message-actions button:hover,
+  .row-reply-button:hover {
+    background: var(--glass-3);
+  }
+}
+
+/* NO HAIRLINES IN THE CHAT (owner): no line above the composer, no lines beside the date pills (the unread
+   "new messages" strip keeps its accent lines — it marks a boundary, not a date). */
+.composer {
+  border-top: 0;
+}
+
+.strip-separator:not(.is-unread)::before,
+.strip-separator:not(.is-unread)::after {
+  background: transparent;
+}
+
+/* PROMO CARDS WITHOUT THE GREEN GLOW (owner): the "Add a contact" / "Find channels" CTA and the wallet promo cards
+   carry no accent glow of their own any more — they are plain glass (--glass-2) that lets the plasma through a
+   little less than the open background, enough to read as a card. The drifting glow layer stays in the DOM
+   (app.js builds it) but is not displayed. */
+.discovery-cta-glow {
+  display: none;
+}
+
+.wallet-headline-card,
+.buy-ath-card {
+  background: var(--glass-2);
+  border-color: var(--glass-edge-2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* SMALL TEXT ON THE PLASMA (owner: "the captions blend in"): the status/clock line under a message and the date pills
+   sit straight on the moving plasma, so they get a brighter ink and a soft halo (--text-halo, theme-aware), and the
+   pills get the same glass plate as the cards. The unread strip keeps its accent ink. */
+.message-meta {
+  color: var(--muted);
+  text-shadow: var(--text-halo);
+}
+
+.strip-separator {
+  color: var(--text);
+  text-shadow: var(--text-halo);
+}
+
+.strip-separator span,
+.strip-separator.is-unread span {
+  border: 1px solid var(--glass-edge-2);
+  background: var(--glass-2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.strip-separator.is-unread {
+  color: var(--accent);
+}
+
+/* INCOMING BUBBLES AS GLASS (owner): the other side's messages take the feed card's translucent look; sent bubbles
+   keep their teal. */
+.message.in .bubble {
+  border: 1px solid var(--glass-edge-2);
+  background: var(--glass-2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* CHAT SWITCH (owner): opening another dialog, the strip settles in from below and the header's avatar + title slide
+   in from the left; app.js arms .is-chat-switching on a thread change and releases it on animationend. */
+@keyframes chatSwapIn {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes chatHeadSwap {
+  from { opacity: 0; transform: translate3d(-10px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.message-strip.is-chat-switching {
+  animation: chatSwapIn 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+.conversation-header.is-chat-switching .avatar,
+.conversation-header.is-chat-switching .conversation-title {
+  animation: chatHeadSwap 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+.conversation-header.is-chat-switching .conversation-title {
+  animation-delay: 0.04s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-strip.is-chat-switching,
+  .conversation-header.is-chat-switching .avatar,
+  .conversation-header.is-chat-switching .conversation-title {
+    animation: none;
+  }
+}

@@ -17,7 +17,7 @@
 // user's toncenter budget, and the whole per-client-key rate model (8 rps under one key, one queue inside one
 // client) depends on there being exactly one queue.
 
-import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=78';
+import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=80';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=37';
 
 /**
@@ -93,6 +93,9 @@ const resolveApiKey = (explicit) => explicit ?? globalThis.plathoToncenterApiKey
  *   fail-safe (probeActiveAddresses -> null -> probe everything) engages. Pair it with
  *   `requestOptions: { skipIfRateLimited: false }` so the request waits its turn rather than being dropped.
  */
+/** How much of toncenter's answer a failed /accountStates carries VERBATIM. Enough for a 422 `detail` array; never a whole page. */
+const ACCOUNT_STATES_ERROR_TEXT_MAX = 4096;
+
 export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, requestOptions = null, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
@@ -121,11 +124,18 @@ export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, r
       // conversation's shards — and nothing more, so the cause (toncenter's own `detail`) was thrown away with the
       // body. The status rides on the error too, so a reader can tell a 422 (the request itself was refused: the
       // batch is bisected) from a 5xx/429 (the endpoint is unwell: the caller falls back).
-      let detail = '';
-      try { detail = typeof response.text === 'function' ? String(await response.text()).slice(0, 300) : ''; } catch { detail = ''; }
+      // `responseText` is the body VERBATIM (capped): a 422 `detail` array that names the offending address index
+      // can outgrow the 300-char `detail` excerpt, and shard-reader reads the full shape from here.
+      let text = '';
+      try { text = typeof response.text === 'function' ? String(await response.text()).slice(0, ACCOUNT_STATES_ERROR_TEXT_MAX) : ''; } catch { text = ''; }
+      const detail = text.slice(0, 300);
       const error = new Error(`accountStates failed with HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
       error.status = response.status;
       error.detail = detail;
+      error.responseText = text;
+      // 429 keeps the transport's word for it, so the app's isTonRpcRateLimitError classifies a rate-limited
+      // states batch exactly like a rate-limited getter.
+      if (response.status === 429) error.code = 'RATE_LIMITED';
       throw error;
     }
     return response.json();
@@ -343,7 +353,10 @@ export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: f
       if (!raw) continue;
       let bodyCell;
       try { bodyCell = parseBocBase64(raw); } catch { continue; }
-      out.push({ bodyCell, source: message?.source ?? null, createdLt: message?.created_lt == null ? null : String(message.created_lt) });
+      const createdLt = message?.created_lt == null ? null : String(message.created_lt);
+      // `lt` is the same number under the short name the lanes' paging code reads; `createdAt` (unix seconds, or
+      // null) rides along for a reader that wants to place the body in time without a second request.
+      out.push({ bodyCell, source: message?.source ?? null, createdLt, lt: createdLt, createdAt: message?.created_at ?? null });
     }
     return out;
   };

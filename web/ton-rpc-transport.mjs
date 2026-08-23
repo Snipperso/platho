@@ -1295,7 +1295,15 @@ export function createTonCenterV3Transport(options = {}) {
       }
       if (!response) response = await postThrough(endpointForSend);
       if (!response.ok) {
-        throw await toncenterHttpErrorWithBody('TON RPC sendBoc', response, rateLimitBackoffMs);
+        const error = await toncenterHttpErrorWithBody('TON RPC sendBoc', response, rateLimitBackoffMs);
+        // The CLASSIFICATION travels with the error (the fallback wrapper rethrows it untouched), so a caller can
+        // tell "the chain rejected these bytes" from "the door is broken" without re-parsing the body.
+        error.broadcastVerdict = classifyBroadcastDoorAnswer({
+          status: response.status,
+          body: typeof error.responseBody === 'string' ? error.responseBody : '',
+          exitCode: error.chainExitCode ?? null,
+        }).verdict;
+        throw error;
       }
       // Doors that are not toncenter answer with their own body shapes (tonhub replies {"status":n}), and a
       // success with an empty body is not an error — only an explicit `ok: false` is.
@@ -1725,19 +1733,49 @@ export function firstBroadcastDoorForBytes(bocBytes, config = null) {
  * The owner's console, 2026-08-21: 406, 406, 500 from the three doors in a row, each followed by an INFO line
  * claiming the re-broadcast had gone out — because nobody read the status. This is the reading.
  */
-export function classifyBroadcastDoorAnswer({ status, body } = {}) {
-  const code = Number(status);
+export function classifyBroadcastDoorAnswer({ status, body, exitCode = null } = {}) {
+  const code = status === null || status === undefined ? NaN : Number(status);   // no status at all is NaN, never 0
   const text = typeof body === 'string' ? body : '';
-  const chainExitCode = toncenterBroadcastExitCode(text);
+  const chainExitCode = exitCode ?? toncenterBroadcastExitCode(text);
   const rejectedByChain = code === 406
     || chainExitCode != null
     || /cannot apply external message/i.test(text);
   return {
     status: Number.isFinite(code) ? code : null,
     chainExitCode,
+    exitCode: chainExitCode,                 // the same number under the name the app's shared re-broadcast helper reads
     rejectedByChain,
+    verdict: broadcastVerdictOf({ status: code, rejectedByChain }),
     detail: toncenterHttpErrorDetail(text).slice(0, 200) || null,
   };
+}
+
+/**
+ * The SAME reading as one WORD — what the app's lanes branch on (rebroadcastSignedExternal in app.js), so a caller
+ * never has to re-derive "rejected" from a status and an exit code. Five values, and exactly one per answer:
+ *
+ *   accepted — 2xx: queued for broadcast (NOT executed — delivery is still decided by reading the shard)
+ *   rejected — rejectedByChain above: 406, or any status whose body carries a TVM exit code / the lite-server's
+ *              "cannot apply external message": the chain rejected these exact bytes; re-offering them is pointless
+ *   broken   — 5xx with no verdict in it: the door itself erred; the bytes are still good, try the next door
+ *   refused  — any other 4xx (400/422 malformed, 401/403, 429 budget): the door refused the REQUEST, not the bytes
+ *   unknown  — no HTTP status at all (timeout, network death, aborted upload): delivery is genuinely undecided
+ */
+export const BROADCAST_VERDICT = Object.freeze({
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  BROKEN: 'broken',
+  REFUSED: 'refused',
+  UNKNOWN: 'unknown',
+});
+
+function broadcastVerdictOf({ status, rejectedByChain }) {
+  const code = Number(status);
+  if (!Number.isFinite(code) || code <= 0) return BROADCAST_VERDICT.UNKNOWN;
+  if (code >= 200 && code < 300) return BROADCAST_VERDICT.ACCEPTED;
+  if (rejectedByChain) return BROADCAST_VERDICT.REJECTED;
+  if (code >= 500) return BROADCAST_VERDICT.BROKEN;
+  return BROADCAST_VERDICT.REFUSED;
 }
 
 /**
@@ -1776,16 +1814,19 @@ export async function broadcastThroughNextDoor(boc, options = {}) {
       },
     );
     const status = response?.status ?? null;
+    // `seqno` rides along unread: the seqno these bytes were signed for, handed back so the caller's "was it
+    // consumed" check is made against the right number without keeping a side table.
+    const seqno = options.seqno ?? null;
     if (response && response.ok === false) {
       let body = '';
       try { body = typeof response.text === 'function' ? await response.text() : ''; } catch { body = ''; }
-      return { door: door.id, ...classifyBroadcastDoorAnswer({ status, body }) };
+      return { door: door.id, seqno, ...classifyBroadcastDoorAnswer({ status, body }) };
     }
-    return { door: door.id, status, chainExitCode: null, rejectedByChain: false, detail: null };
+    return { door: door.id, seqno, ...classifyBroadcastDoorAnswer({ status, body: '' }) };
   } catch {
     // Swallowed on purpose. A door that cannot be reached proves nothing about delivery — the earlier copy may
-    // still land, and the next retry simply moves to the next door.
-    return { door: door.id, status: null, chainExitCode: null, rejectedByChain: false, detail: null };
+    // still land, and the next retry simply moves to the next door. The verdict says so: unknown, not rejected.
+    return { door: door.id, seqno: options.seqno ?? null, ...classifyBroadcastDoorAnswer({ status: null, body: '' }) };
   }
 }
 

@@ -2,7 +2,7 @@
 // hoped over. Importing the i18n engine into a data module is safe in both runtimes: it holds the active locale in
 // a module variable, touches the DOM only inside try/catch, and falls back to English when initI18n never ran —
 // which is exactly what the Node tests get, unchanged.
-import { t, tPlural } from './i18n.mjs?v=78';
+import { t, tPlural } from './i18n.mjs?v=80';
 import { messagePreviewText } from './message-plain-text.mjs?v=1';
 
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
@@ -353,7 +353,10 @@ function shortTime(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  // Full LOCAL "YYYY-MM-DD HH:MM" (was a UTC date-only slice). The renderer's date-only display mode
+  // strips the time part at render time, so the pipeline always carries the complete stamp.
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 /**
@@ -410,6 +413,9 @@ export function publicChannelFeedToThread(channel, feed) {
       // the status TWICE (a static stale copy in the meta line + the live badge). The technical entry uid was dropped.
       meta: shortTime(post.createdAt) ?? '',
       publicPostId: post.id,
+      // The full ISO stamp, so the feed can be ordered by TIME across channels (sortPublicFeedItemsByTime); `meta`
+      // above is the minute-resolution display form and is not fit for sorting.
+      publicCreatedAt: post.createdAt,
       publicPostTitle: post.title,
       publicPostText: post.text,
       publicPostBlocks: post.blocks,
@@ -469,6 +475,7 @@ export function publicChannelThreadsToFeedItems(threads) {
     for (const message of messages) {
       items.push({
         id: message.publicPostId,
+        createdAt: message.publicCreatedAt ?? null,
         channelId: thread.publicChannelId,
         createdAt: message.publicCreatedAt ?? null,
         entryId: message.publicEntryId,

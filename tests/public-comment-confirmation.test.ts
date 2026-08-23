@@ -99,7 +99,9 @@ describe('public comment confirmation', () => {
     expect(ticker).toContain('await refreshPublicPostDetailComments();');
     // Bounded to the OPEN post with something of our own still pending — the one exception to
     // "comments load only on thread open", and the reason it is not the walker that rule forbids.
-    expect(ticker).toContain('if (openPublicPostHasPendingComment()) {');
+    // (2026-08-23: also skipped while the reader stands in a newer-than/jumped window of the thread — the refresh's
+    // exit-replace would teleport them mid-read; the confirmation retries next pass.)
+    expect(ticker).toMatch(/if \(openPublicPostHasPendingComment\(\)(?: && ![A-Za-z]+)*\) \{/);
     // Both reads are rate-limit aware — a 429 here used to hammer at the tick cadence.
     expect(ticker.match(/noteTonRpcRateLimit\(error\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });

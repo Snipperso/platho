@@ -14,10 +14,10 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole read lane
 // runs against a stub transport and fixed key-ids, the way the public and intro lanes do.
 
-import { incomingRecordShards } from './conv-discovery.mjs?v=20';
-import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=26';
-import { changeMarkerOf } from './shard-reader.mjs?v=24';
-import { addrKey } from './shard-discovery.mjs?v=21';
+import { incomingRecordShards } from './conv-discovery.mjs?v=22';
+import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=28';
+import { changeMarkerOf } from './shard-reader.mjs?v=26';
+import { addrKey } from './shard-discovery.mjs?v=23';
 
 // Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,
 // it MAY hold older ones the newest-page read did not return. The reader now pages, but only to get PAST junk when an
@@ -75,7 +75,10 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
   // Cumulative since this lane was built (i.e. since unlock). Reported in the on-device diagnostic dump, because
   // "the gate is skipping" and "the gate is skipping EVERYTHING" look identical from the outside — a silent lane
   // is the healthy state here AND the shape of a receive failure, so the counters have to separate them.
-  const laneStats = { read: 0, skipped: 0, absent: 0 };
+  // `failed` counts the shards whose read threw (newest window or an older page) and were skipped this pass —
+  // reported to the caller through readIncoming's onShardFailed too, so a cursor is never advanced over a shard
+  // that was never read.
+  const laneStats = { read: 0, skipped: 0, absent: 0, failed: 0 };
 
   function markShard(key, marker) {
     if (!key || marker === null || marker === undefined) return;
@@ -112,8 +115,16 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
      * Every incoming CONV capsule chain-entry for one conversation across the acceptance window [epochNow-windowW ..
      * epochNow]. Each entry is ready for openPrivateCapsuleChainEntry. Foreign/malformed/wrong-signature bodies are
      * dropped. A shard whose read throws is skipped (its conversation window is best-effort, never fatal to the rest).
+     *
+     * `onShardFailed(address, error)` is called for every shard whose read threw and was skipped (the swallow stays:
+     * the rest of the window is still returned). A caller that advances a scan cursor on a clean pass MUST listen —
+     * the lane's own mark for that shard does not move, but nothing else would tell the caller the pass was short.
      */
-    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null }) {
+    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null, onShardFailed = null }) {
+      const shardFailed = (address, error) => {
+        laneStats.failed += 1;
+        try { onShardFailed?.(address, error); } catch { /* a listener must not break the walk */ }
+      };
       // `shards` lets a caller that already derived these buckets hand them over rather than pay the HKDF twice;
       // `states` lets a caller that batched the accountStates read for MANY conversations at once share the answer
       // (1024 addresses fit one request, so every conversation's window costs one request between them all).
@@ -140,7 +151,7 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
           }
         }
         let messages;
-        try { messages = await readMessagesWithSource(bucket.address); } catch { continue; }
+        try { messages = await readMessagesWithSource(bucket.address); } catch (error) { shardFailed(bucket.address, error); continue; }
         laneStats.read += 1;
         // THE NEWEST WINDOW MAY NOT REACH WHAT WE ALREADY HOLD. The caller knows the highest seq it has stored for
         // this shard (knownSeqOf); if the window is full and its oldest capsule is still above that mark, the bodies
@@ -179,9 +190,11 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
             const oldestLt = oldestLtOf(page);
             if (oldestLt === null) break;                                   // no lt on the wire — cannot page
             let older;
-            // An older page that FAILED leaves no mark on this shard (below): the newest window was read, but the
-            // pass did not see everything it could have, so the next pass must come back even if nobody writes.
-            try { older = await readMessagesWithSource(bucket.address, { endLt: String(oldestLt - 1n) }); } catch { olderReadFailed = true; break; }
+            // An older page that FAILED is a shard NOT READ this pass (below): no mark, nothing returned for it,
+            // and the caller is told. Returning the newest window alone would let the caller's seq high-water jump
+            // OVER the hole — the next pass would then see "oldest seq reaches what I hold" and the bodies between
+            // would be lost exactly as silently as before the backfill existed.
+            try { older = await readMessagesWithSource(bucket.address, { endLt: String(oldestLt - 1n) }); } catch (error) { olderReadFailed = error ?? new Error('older page read failed'); break; }
             if (!older || older.length === 0) break;                        // the history ran out
             pagedBack += 1;
             laneStats.pagedBack = (laneStats.pagedBack ?? 0) + 1;
@@ -197,7 +210,8 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
             console.warn('[conv] incoming shard outran the reader — bodies between seq', known, 'and', stillOldest, 'could not be paged this pass (cap', CONV_MAX_OLDER_BODY_PAGES, 'pages); said once for', bucket.address);
           }
         }
-        if (marker !== null && !olderReadFailed) markShard(key, marker);
+        if (olderReadFailed) { shardFailed(bucket.address, olderReadFailed); continue; }   // see the note at the older read
+        if (marker !== null) markShard(key, marker);
         for (const { bodyCell } of messages ?? []) {
           const parsed = parseCapsulePublishBody(bodyCell);
           if (!parsed) continue;

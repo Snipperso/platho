@@ -2,7 +2,7 @@
 
 Last updated: 18 August 2026
 
-Platho is a static application that talks directly to the TON blockchain. There
+Platho is a static application that talks directly to the GRAM blockchain. There
 is no company holding your funds, no server storing your messages and no support
 desk that can reverse a mistake. These terms exist mainly to make the
 consequences of that plain before you rely on it.
@@ -11,9 +11,9 @@ By using Platho you accept the terms below.
 
 ## 1. What Platho is
 
-Platho is a self-custodial messenger and TON wallet. It runs in your browser or
+Platho is a self-custodial messenger and GRAM wallet. It runs in your browser or
 inside Telegram as a Mini App. It publishes messages and transactions directly
-from your device to the TON blockchain.
+from your device to the GRAM blockchain.
 
 We are not a bank, a custodian, a payment service or a broker. We never take
 possession of your funds and we cannot move, freeze or return them.
@@ -59,7 +59,7 @@ would elsewhere.
 
 ## 5. Availability
 
-Platho depends on the TON blockchain and on public node providers we do not
+Platho depends on the GRAM blockchain and on public node providers we do not
 operate. Any of them may be slow, rate-limited, unreachable or blocked in your
 country. We do not promise that the application will be available, complete or
 correct at any given moment.

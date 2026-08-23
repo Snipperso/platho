@@ -21,7 +21,7 @@ We do not ask for an email address, a phone number or a name.
 
 - Your 24-word recovery phrase, and the wallet and messaging keys derived from it.
 - Your message history and drafts.
-- Your settings, including an optional API key for a public TON node provider.
+- Your settings, including an optional API key for a public GRAM node provider.
 
 This data is stored in your browser's local storage and is encrypted with a
 password you choose (AES-GCM-256 with PBKDF2-SHA-256 key derivation). We never
@@ -33,7 +33,7 @@ phrase it cannot be restored by us or by anyone else.
 **Private messages are encrypted on your device** before they are published, and
 only the intended recipient can read their contents.
 
-**Public posts are not encrypted.** They are written to the TON blockchain in
+**Public posts are not encrypted.** They are written to the GRAM blockchain in
 plain text, and they are permanent: neither we, nor an administrator, nor a
 government, nor you as their author can remove them. Do not publish anything
 publicly that you would need to withdraw later.
@@ -45,7 +45,7 @@ activity of that address can be associated with you.
 
 ## Third parties your device contacts
 
-The application has no server of ours to talk to, so it talks to public TON
+The application has no server of ours to talk to, so it talks to public GRAM
 infrastructure directly. When you use Platho, your browser sends requests to:
 
 - `toncenter.com`

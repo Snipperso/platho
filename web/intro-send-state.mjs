@@ -22,6 +22,19 @@ const toHex = (value) => {
   return [...value].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
+const B64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+/** Bytes -> base64url (no padding) — the shape every consumer of a key id reads. */
+const base64urlOfBytes = (bytes) => {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i], b = bytes[i + 1], c = bytes[i + 2];
+    out += B64URL[a >> 2] + B64URL[((a & 3) << 4) | ((b ?? 0) >> 4)]
+      + (b === undefined ? '' : B64URL[((b & 15) << 2) | ((c ?? 0) >> 6)])
+      + (c === undefined ? '' : B64URL[c & 63]);
+  }
+  return out;
+};
+
 const fromHex = (hex) => {
   const text = String(hex ?? '').trim();
   if (!/^[0-9a-fA-F]+$/.test(text) || text.length % 2 !== 0) throw new Error('intro-send-state: invalid hex');
@@ -33,10 +46,20 @@ const fromHex = (hex) => {
 /**
  * Encode a pending INTRO send for the encrypted history.
  *
- * A plain JSON clone CANNOT carry it and would fail quietly: kRoot/introNonce/peerKeyId are Uint8Arrays, which
- * JSON turns into objects with numeric keys, and r/viewTag are BigInts, which JSON refuses outright. Handing
+ * A plain JSON clone CANNOT carry it and would fail quietly: kRoot/introNonce are Uint8Arrays, which JSON turns
+ * into objects with numeric keys, and r/viewTag are BigInts, which JSON refuses outright. Handing
  * upsertConversationKRoot a byte-shaped object instead of bytes is worse than having nothing, so every field that
  * is not a plain number or string is converted explicitly here and back in the reviver.
+ *
+ * peerKeyId is the peer's key id STRING (base64url, bundle.keyId — computeHybridKeyId) everywhere it is consumed,
+ * never bytes. It rides through VERBATIM: the old hex round-trip passed the string out unchanged and then threw on
+ * the way back in (base64url is not hex, and 43 characters is odd), which nulled the WHOLE record — so no INTRO send
+ * ever survived a reload, and a retry after reload minted a second INTRO instead of re-offering the first. Bytes (a
+ * legacy shape, if any) are carried as base64url so the revived value has the consumers' type. [ISS-02]
+ *
+ * `seqno` / `seqnoConsumedAt`: the wallet seqno the external was signed for, and when (if ever) the chain was seen
+ * to have moved past it — a re-broadcast after reload reads the door's answer against the former and stops on the
+ * latter, exactly like the CONV half (convDirectSend).
  */
 export function serializeIntroDirectSend(send) {
   if (!send) return null;
@@ -46,13 +69,15 @@ export function serializeIntroDirectSend(send) {
     boc: send.boc ?? null,
     kRoot: toHex(send.kRoot),
     introNonce: toHex(send.introNonce),
-    peerKeyId: toHex(send.peerKeyId),
+    peerKeyId: send.peerKeyId == null ? null : (typeof send.peerKeyId === 'string' ? send.peerKeyId : base64urlOfBytes(send.peerKeyId)),
     peerWallet: send.peerWallet ?? null,
     epoch: send.epoch == null ? null : Number(send.epoch),
     bucket: send.bucket == null ? null : Number(send.bucket),
     expectedEntryId: big(send.expectedEntryId),
     r: big(send.r),
     viewTag: big(send.viewTag),
+    seqno: send.seqno == null ? null : Number(send.seqno),
+    seqnoConsumedAt: Number(send.seqnoConsumedAt) || 0,
   };
 }
 
@@ -68,13 +93,15 @@ export function reviveIntroDirectSend(raw) {
       boc: raw.boc ?? null,
       kRoot: raw.kRoot ? fromHex(raw.kRoot) : null,
       introNonce: raw.introNonce ? fromHex(raw.introNonce) : null,
-      peerKeyId: raw.peerKeyId ? fromHex(raw.peerKeyId) : null,
+      peerKeyId: raw.peerKeyId == null || raw.peerKeyId === '' ? null : String(raw.peerKeyId),
       peerWallet: raw.peerWallet ?? null,
       epoch: raw.epoch == null ? null : Number(raw.epoch),
       bucket: raw.bucket == null ? null : Number(raw.bucket),
       expectedEntryId: raw.expectedEntryId == null ? null : BigInt(raw.expectedEntryId),
       r: raw.r == null ? null : BigInt(raw.r),
       viewTag: raw.viewTag == null ? null : BigInt(raw.viewTag),
+      seqno: raw.seqno == null ? null : Number(raw.seqno),
+      seqnoConsumedAt: Number(raw.seqnoConsumedAt) || 0,
     };
   } catch {
     return null;

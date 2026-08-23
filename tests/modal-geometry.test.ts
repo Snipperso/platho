@@ -77,7 +77,8 @@ describe('MODALGEO — every dialog is the same width because it reads the same 
     // "disabled" looked depended on which button you happened to be looking at. The measured trigger was the New
     // chat submit — genuinely disabled during the lookup, but dimmed too little for anyone to notice.
     const root = CSS.slice(0, CSS.indexOf('}'));
-    expect(root).toContain('--disabled-opacity: 0.46;');
+    // The VALUE is the designer's (0.46 originally, 0.45 in the 2026-08 redesign); the rule is that there is ONE.
+    expect(root).toMatch(/--disabled-opacity: 0\.\d+;/);
     // Every :disabled block that dims must read the token. :not(:disabled) is the ENABLED state and is exempt.
     const offenders: string[] = [];
     for (const match of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {

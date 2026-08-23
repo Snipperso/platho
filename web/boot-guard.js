@@ -23,6 +23,15 @@
 (function () {
   'use strict';
 
+  // Apply the user's forced theme BEFORE first paint (this script loads in <head>, ahead of <body>), so a
+  // light-theme user never sees a dark flash. Unset key = follow the system (prefers-color-scheme).
+  try {
+    var plathoTheme = localStorage.getItem('platho.theme.v1');
+    if (plathoTheme === 'light' || plathoTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', plathoTheme);
+    }
+  } catch (e) { /* storage unavailable -- system theme applies */ }
+
   // Post-load grace for the app to reach 'ready'. Small on purpose: 'ready' is set at the
   // end of the module's top-level execution, which completes before 'load' fires, so a
   // healthy boot is already 'ready' here; the grace only covers minor async settling.

@@ -87,12 +87,14 @@ describe('public channel avatar source', () => {
     ]) {
       const fn = app.slice(app.indexOf(opener), app.indexOf(next));
       expect(fn.length, `${opener} slice must not collapse`).toBeGreaterThan(300);
-      expect(fn, `${opener} must hydrate its results`).toContain('void hydratePublicDiscoveryAvatars(results, token);');
+      // Since the 2026-08 redesign the hydration is SERIALIZED (hydratePublicDiscoveryAvatarsOnce: one pass at a time,
+      // the newest request queued behind it) — the same loader, behind a one-at-a-time gate.
+      expect(fn, `${opener} must hydrate its results`).toContain('void hydratePublicDiscoveryAvatarsOnce(results, token);');
       // AFTER the cards are painted: the list must never wait on a profile read per wallet before showing anything.
       expect(
         fn.indexOf('renderPublicDiscovery({ loading: false })'),
         `${opener} must paint the cards first`,
-      ).toBeLessThan(fn.indexOf('void hydratePublicDiscoveryAvatars'));
+      ).toBeLessThan(fn.indexOf('void hydratePublicDiscoveryAvatarsOnce(results, token)'));
     }
     // ...and it takes the SAME staleness guard the results themselves take, so a closed or re-run sweep cannot
     // repaint the screen from a pass that belongs to the previous one.

@@ -47,11 +47,19 @@ describe('private history loads a window, not everything', () => {
     // Both append paths must consult it BEFORE inserting.
     // (2026-08-22: the id lookup falls back to the own-echo match for a capsule read back off the own outgoing shard —
     // the store check still follows, BEFORE the insert.)
-    const singleAnchor = 'const existing = findMessageByCapsuleId(opened.capsule?.id) ?? findOwnEchoForChainCopy(targetThread, entry, opened);';
-    expect(app.indexOf(singleAnchor), 'the single-part append keeps the id lookup first').toBeGreaterThan(-1);
-    const single = app.slice(app.indexOf(singleAnchor), app.indexOf(singleAnchor) + 900);
+    // (2026-08-23, design integration: the own-echo match is a SECOND lookup after the id one, and the store check
+    // still follows both, BEFORE the insert.)
+    const singleHead = app.indexOf('async function appendOpenedCapsuleMessage(');
+    expect(singleHead).toBeGreaterThan(-1);
+    const single = app.slice(singleHead, singleHead + 1_800);
+    const singleAnchor = 'const existing = findMessageByCapsuleId(opened.capsule?.id);';
+    expect(single.indexOf(singleAnchor), 'the single-part append keeps the id lookup first').toBeGreaterThan(-1);
+    expect(single.indexOf('findOwnEchoForChainCopy('), 'then the own-echo match').toBeGreaterThan(single.indexOf(singleAnchor));
     expect(single).toMatch(/capsuleAlreadyStored\(opened\.capsule\?\.id\)[\s\S]{0,40}return true;/);
-    const multi = app.slice(app.indexOf('const existing = parts.map((part) => findMessageByCapsuleId'), app.indexOf('const existing = parts.map((part) => findMessageByCapsuleId') + 700);
+    expect(single.indexOf('capsuleAlreadyStored('), 'the store check comes after the lookups and before the insert')
+      .toBeGreaterThan(single.indexOf('findOwnEchoForChainCopy('));
+    expect(single.indexOf('insertThreadMessage(targetThread, message);')).toBeGreaterThan(single.indexOf('capsuleAlreadyStored('));
+    const multi = app.slice(app.indexOf('const existing = parts.map((part) => findMessageByCapsuleId'), app.indexOf('const existing = parts.map((part) => findMessageByCapsuleId') + 1_400);
     expect(multi).toMatch(/parts\.some\(\(part\) => capsuleAlreadyStored\(part\.opened\?\.capsule\?\.id\)\)[\s\S]{0,40}return true;/);
     // A capsule stored during THIS session must join the set, or the next re-delivery in the same session dupes it.
     expect(app).toMatch(/rememberStoredCapsuleIds\(message\);/);

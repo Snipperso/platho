@@ -359,8 +359,9 @@ describe('PWA runtime config guard', () => {
     // Usernames are shown canonically (no ".ath"): displayIdentityLabel routes the non-wallet branch
     // through canonicalUsernameDisplay. Full coverage in PWA-CANONICAL-USERNAME-01.
     expect(app).toMatch(/function displayIdentityLabel\(identity\)[\s\S]*canonicalUsernameDisplay\(identity\.label \?\? identity\.value \?\? ''\)/);
-    expect(css).toMatch(/\.identity-label-ton\s*\{\s*color:\s*#9fd3f2;/);
-    expect(css).toMatch(/\.identity-label-platho\s*\{\s*color:\s*#8fdcc8;/);
+    expect(css).toMatch(/\.identity-label-ton\s*\{\s*color:\s*var\(--id-ton\);/);
+    expect(css).toMatch(/\.identity-label-platho\s*\{\s*color:\s*var\(--id-platho\);/);
+    expect(css, 'and the two tones are distinct, per theme').toMatch(/--id-ton: #9fd3f2;\s*\n\s*--id-platho: #8fdcc8;/);
     expect(app).toMatch(/function identityDisplayOptions\(thread\)[\s\S]*subtitle: t\('chat\.localName'\)[\s\S]*uniqueDisplayIdentityVariants\(thread\)/);
     expect(EN_STRINGS['chat.localName']).toBe('Local name');
     expect(app).toMatch(/thread\.displayIdentity = selected\.identity \?\? null/);
@@ -411,7 +412,7 @@ describe('PWA runtime config guard', () => {
     // Public "Display as" menu reuses the same option builder + popover as Private.
     expect(app).toMatch(/function showPublicChannelDisplayPopover\(channel, anchor\)/);
     expect(app).toMatch(/options: identityDisplayOptions\(context\)/);
-    expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pin = null \}\)/);
+    expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pinned = null, onTogglePin = null \}\)/);
 
     // The user's OWN wallet channel offers their OWN linked username (.ath) as a "Display as" option too: it
     // never arrives via received posts (you don't receive your own), so contactDisplayContextForWallet injects
@@ -641,12 +642,12 @@ describe('PWA runtime config guard', () => {
     // The settings-list grid column must be capped at the container width, else its widest child (the RPC-key
     // row's label + input placeholder + "recommended" + Get) sizes the implicit auto column past a narrow
     // phone viewport and stretches every Profile row off the right edge.
-    expect(css).toMatch(/\.settings-list\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\);\s*\}/);
+    expect(css).toMatch(/\.settings-list\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\);/);
     // A settings/select-row label that wraps to two lines must stay flush-left (buttons default to
     // text-align:center, which would center the wrapped label and look inconsistent with single-line rows).
     expect(css).toMatch(/\.settings-list button > span,\s*\.settings-select-row > span\s*\{\s*text-align: left/);
     expect(css).toMatch(/\.chat-pane\s*{[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;/);
-    expect(css).toMatch(/\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: 64px minmax\(0, 1fr\) max-content;[\s\S]*overflow: hidden;/);
+    expect(css).toMatch(/\.conversation-header\s*{[\s\S]*display: grid;[\s\S]*grid-template-columns: \d+px minmax\(0, 1fr\) max-content;[\s\S]*overflow: hidden;/);
     expect(css).toMatch(/\.composer\s*{[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;/);
     expect(css).toMatch(/\.message-strip\s*{[\s\S]*display: flex;[\s\S]*flex-direction: column;[\s\S]*overflow-y: auto;/);
     expect(css).toMatch(/\.message-strip::before\s*{[\s\S]*margin-top: auto;/);
@@ -659,24 +660,30 @@ describe('PWA runtime config guard', () => {
     // ONE container-scoped rule sizes + fills every header control (identity chevron, docs, install, discover,
     // edit, back, refresh) — a new header button can never be missed by a per-class list.
     expect(readFileSync('web/index.html', 'utf8')).toMatch(/class="[^"]*\bidentity-menu-button\b[^"]*"[^>]*id="identityMenuButton"/);
-    expect(css).toMatch(/\.pane-header \.icon-button,\s*\.public-header-actions \.icon-button,\s*\.conversation-header \.icon-button\s*{\s*width: var\(--header-button-size\);\s*height: var\(--header-button-size\);\s*background: #0d1012;/);
+    // ONE rule for every header control, addressed by container — the size is the shared token, and the plate is
+    // whatever the theme says (a literal in the older build, transparent over the plasma since the redesign).
+    expect(css).toMatch(/\.pane-header \.icon-button,\s*\.public-header-actions \.icon-button,\s*\.conversation-header \.icon-button\s*{\s*width: var\(--header-button-size\);\s*height: var\(--header-button-size\);\s*background: [^;]+;/);
     // Action clusters pin to the bar TOP at the shared inset (font-scale-proof), same formula as the public
     // absolute cluster (top offset + inset) — so buttons sit at one y on every tab by construction.
     expect(css).toMatch(/\.pane-header \.header-actions,\s*\.conversation-header \.header-actions\s*{\s*align-self: start;\s*margin-top: var\(--header-button-inset\);/);
     expect(css).toMatch(/\.public-pane \.public-header-actions\s*{\s*position: absolute;\s*top: calc\(var\(--header-top-offset\) \+ var\(--header-button-inset\)\);/);
     expect(css).not.toMatch(/\.conversation-header \.docs-header-button,\s*\n?\s*\.conversation-header \.install-header-button\s*{\s*width: 40px/);
     expect(css).not.toMatch(/@media \(min-width: 680px\) and \(max-width: 900px\)/);
-    expect(css).toMatch(/\.public-pane,\s*\.wallet-pane,\s*\.profile-pane,\s*\.list-pane\s*{\s*padding: var\(--header-top-offset\) 24px 24px;/);
-    expect(css).toMatch(/\.list-pane\s*{\s*gap: 14px;\s*border-right: 0;\s*}/);
+    // Every pane starts at the shared header offset and keeps the shared gutter on the other three sides. The gutter
+    // is a token since the redesign, and the list pane states the same padding in its own rule (it has its own row
+    // template and its own border) rather than sharing the selector list.
+    expect(css).toMatch(/\.public-pane,\s*\.wallet-pane,\s*\.profile-pane\s*{[\s\S]{0,200}?padding: var\(--header-top-offset\) var\(--gutter\) var\(--gutter\);/);
+    expect(css).toMatch(/\.list-pane\s*{[\s\S]{0,240}?padding: var\(--header-top-offset\) var\(--gutter\) var\(--gutter\);/);
     // (v730: an explanatory comment now sits between margin and padding — the mobile composer padding is
     // inset-free because the tab bar below owns the safe area; see the mobile-block pins in PWA-MSG-01.)
-    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 -24px -24px;[\s\S]{0,260}?padding: 8px 14px/);
+    expect(css).toMatch(/\.public-composer\s*{\s*margin: 0 calc\(-1 \* var\(--gutter\)\) calc\(-1 \* var\(--gutter\)\);/);
     // Public composer is consistent with Private: full-bleed (no right gap). v769: the "+" add-menu and its
     // attachment button are gone (moved into the formatting toolbar); the public composer's leading input-row
     // control is the comments toggle, sized like the private anon button at both breakpoints.
     expect(css).toMatch(/\.public-composer\s*{[\s\S]*?max-width: none;/);
     expect(css).toMatch(/\.composer-post-option\s*{[\s\S]*?width: 44px;\s*height: 44px;/);
-    expect(css).toMatch(/\.composer \.private-anonymous-button,\s*\.public-composer \.composer-post-option\s*{\s*width: 38px;\s*height: 44px;/);
+    // The two composers' leading control is the SAME size at each breakpoint (the exact width is the designer's).
+    expect(css).toMatch(/\.composer \.private-anonymous-button,\s*\.public-composer \.composer-post-option\s*{\s*width: \d+px;\s*height: 44px;/);
     expect(css).toMatch(/\.balance-grid,\s*\.action-grid,\s*\.wallet-ton-group\s*{\s*grid-template-columns: 1fr;/);
     expect(app).toMatch(/walletBalanceInfoEndpoint/);
     expect(app).toMatch(/createTonRpcTransport/);
@@ -923,7 +930,10 @@ describe('PWA runtime config guard', () => {
     expect(enCopy).toMatch(/On-chain size/);
     expect(app).toMatch(/requestCompressedImageFile/);
     expect(enCopy).toMatch(/The final WebP bytes are encrypted before publish and verified by CapsuleHub hashes/);
-    expect(enCopy).toMatch(/The final WebP bytes are public in the accepted TON transaction body and verified by CapsuleHub hashes/);
+    // (the currency the user spends is GRAM everywhere in the copy — the rebrand; the SERVICE names it does not own,
+    // TON Center and TON DNS, keep theirs, or the instructions cannot be followed)
+    expect(enCopy).toMatch(/The final WebP bytes are public in the accepted GRAM transaction body and verified by CapsuleHub hashes/);
+    expect(enCopy, 'the toncenter key is found under its real name').toMatch(/TON Center API key/);
     expect(app).not.toMatch(/remain in on-chain capsules/);
     expect(app).toMatch(/encodeCanvasToWebp/);
     expect(app).toMatch(/isWebpBytes/);
@@ -1155,8 +1165,10 @@ describe('PWA runtime config guard', () => {
     // the tab bar on home-indicator iPhones (inset ~30px). Desktop keeps the base rule's inset (composer IS the
     // bottom edge there). Pin: the mobile block's composer paddings are inset-free, the sidebar reserve remains.
     const mobileBlock = css.slice(css.indexOf('@media (max-width: 900px)'));
-    expect(mobileBlock).toMatch(/\.composer\s*{[\s\S]{0,900}?padding: 8px 14px 8px;/);
-    expect(mobileBlock).toMatch(/\.public-composer\s*{[\s\S]{0,300}?padding: 8px 14px 8px;/);
+    // The horizontal number is the designer's; what is pinned is the SHAPE — a plain three-value padding with no
+    // safe-area term in it (the sidebar below reserves the inset, asserted next).
+    expect(mobileBlock).toMatch(/\.composer\s*{[\s\S]{0,900}?padding: 8px \d+px 8px;/);
+    expect(mobileBlock).toMatch(/\.public-composer\s*{[\s\S]{0,300}?padding: 8px \d+px 8px;/);
     expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,700}?padding-bottom: max\(var\(--mobile-nav-bottom-reserve\), var\(--app-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\);/);
     expect(css).toMatch(/\.message\[data-status="sending"\] \.bubble/);
     expect(app).toMatch(/function identityDisplayKey/);
@@ -1383,7 +1395,9 @@ describe('PWA runtime config guard', () => {
     );
     expect(syncSource).not.toMatch(/Promise\.all\(/);
     expect(syncSource).toMatch(/entries = await lane\.readIncoming\(\{\s*\n\s*kRoot, selfKeyId, peerKeyId, epochNow, windowW: plan\.windowW, shards, states: shardStates,/);
-    expect(syncSource).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, localRecipientKeyPair/);
+    expect(syncSource).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, keyPair, ownCopies/);
+    expect(syncSource, 'the pass reads through the keys it started with, never the live global')
+      .toMatch(/const keyPair = localRecipientKeyPair;\s*const tornDown = \(\) => convKeyStore !== store \|\| localRecipientKeyPair !== keyPair;/);
     // The shard-state probe that decides WHICH histories to read is one awaited batch before the loop, not a read
     // per conversation racing the others — same serial rule, applied to the pass that was added to make it cheap.
     expect(syncSource).toMatch(/const shardStates = await readConvShardStates\(plans\);/);
@@ -1463,7 +1477,11 @@ describe('PWA runtime config guard', () => {
     // 3. A RED terminal needs BOTH: the external is provably dead (past max age) AND the read was authoritative
     // (scan reached the bottom, or the shard is past my seq so it never accepted it). An inconclusive read at the
     // deadline leaves the optimistic green — a false red on an endpoint outage would be worse than a late truth.
-    expect(confirm).toMatch(/if \(ageMs >= CONV_CONFIRM_MAX_AGE_MS\) \{\s*\n\s*if \(res\.complete \|\| res\.seqShort\) markConvDeliveryUnlanded\(thread, message\);/);
+    // Terminal = the age budget is spent OR the chain has provably moved past the external's seqno (2026-08: the
+    // seqno reading ends the wait in seconds instead of eight minutes). Either way the red is only painted on
+    // PROOF — a complete scan, or a shard that never accepted this seq.
+    expect(confirm).toMatch(/const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS \|\| seqnoTerminal;/);
+    expect(confirm).toMatch(/if \(terminal\) \{\s*\n\s*if \(res\.complete \|\| res\.seqShort\) markConvDeliveryUnlanded\(thread, message\);/);
     // 4. The red terminal is a STATUS, not a button (the owner's chosen model).
     expect(app).toMatch(/message\.meta = 'not delivered: the shard did not store it — resend';/);
     expect(app).toMatch(/message\.privateManualRetryAvailable = false;/);
@@ -1482,7 +1500,11 @@ describe('PWA runtime config guard', () => {
     );
     expect(direct.length).toBeGreaterThan(0);
     expect(direct).toMatch(/if \(captured\?\.boc && \(Date\.now\(\) - captured\.at\) <= DIRECT_SEND_REBROADCAST_WINDOW_MS\)/);
-    expect(direct).toMatch(/transport\.sendBoc\(\{ boc: captured\.boc, walletAddress: plathoWallet\.address \}\)/);
+    // Through the ONE re-broadcast helper (door rotation + verdict + the signed seqno — DOORS-07), and never at all
+    // once the chain has provably moved past that seqno: there is nothing left to re-send, the confirm settles it.
+    expect(direct).toMatch(/if \(!\(Number\(captured\.seqnoConsumedAt\) > 0\)\) \{/);
+    expect(direct).toMatch(/const answer = await rebroadcastSignedExternal\(captured\.boc, captured\.seqno \?\? null, transport\);/);
+    expect(direct).toMatch(/if \(answer\.verdict === BROADCAST_VERDICT\.REJECTED && await directSendSeqnoConsumed\(captured, transport\)\) \{/);
   });
 
 
@@ -1733,7 +1755,7 @@ describe('PWA runtime config guard', () => {
     expect(settleSource).toMatch(/markPrivateMessageManualRecovery\(context, error, privateSendBlockedStatusText\(error\)\)/);
     expect(css).toMatch(/\.message-actions \{[\s\S]*display: flex;/);
     expect(css).toMatch(/\.message\.out \.message-actions \{[\s\S]*justify-self: end;/);
-    expect(css).toMatch(/\.message-actions button \{[\s\S]*min-height:\s*18px;[\s\S]*font-weight:\s*400;/);
+    expect(css).toMatch(/\.message-actions button \{[\s\S]*min-height:\s*\d+px;[\s\S]*font-weight:\s*400;/);
   });
 
   it('PWA-SEND-02E: transient RPC verification outages retry instead of cancelling Vault publish/check flows', () => {
@@ -2368,7 +2390,7 @@ describe('PWA runtime config guard', () => {
     // every other failure lands in the catch, which never touches globalThis.plathoVaultBinding and returns it as-is.
     // So no error classification can go wrong and no transient read can clear an active composer binding.
     expect(activationSource).toMatch(/if \(!isKeyShardUninitError\(readError\)\) throw readError;/);
-    expect(activationSource).toMatch(/catch \(error\) \{[\s\S]{0,600}?return globalThis\.plathoVaultBinding \?\? null;/);
+    expect(activationSource).toMatch(/catch \(error\) \{[\s\S]{0,1600}?return globalThis\.plathoVaultBinding \?\? null;/);
     expect(activationSource).not.toMatch(/delete globalThis\.plathoVaultBinding/);
     expect(activationSource).toMatch(/setText\(vaultRecordStatus, t\('vault\.keysPending'\)\)/);
     expect(EN_STRINGS['vault.activated']).toBe('activated');
@@ -2425,13 +2447,18 @@ describe('PWA runtime config guard', () => {
     // restore, the cold sync of every conversation) had run keyless, with the key sitting in the very file being
     // imported, and the Profile field empty until that boot ended. The wallet is decrypted by then, so the key is
     // decrypted and applied first; the wallet-switch still goes through activateImportedEncryptedWalletRecord.
+    // (2026-08-23) The key now travels INTO the activation and is applied at its point of no return — after the
+    // record is written, still ahead of bootCrypto's first chain read. Applied before the write it survived an
+    // activation that threw on the write itself: the OLD wallet left stored, under the NEW wallet's key.
     expect(importSource).toMatch(/decryptToncenterApiKeyFromBackup\(parsed\.toncenterApiKeyEnc, wallet\)/);
-    expect(importSource).toMatch(/applyToncenterApiKey\(restoredApiKey\.trim\(\)\)/);
-    expect(importSource).toMatch(/return activateImportedEncryptedWalletRecord\(wallet, record\);/);
-    expect(importSource.indexOf('applyToncenterApiKey(restoredApiKey.trim())'), 'the key is applied BEFORE the boot')
-      .toBeLessThan(importSource.indexOf('activateImportedEncryptedWalletRecord(wallet, record)'));
+    expect(importSource).toMatch(/return activateImportedEncryptedWalletRecord\(wallet, record, \{ toncenterApiKey: restoredApiKey\?\.trim\(\) \|\| null \}\);/);
     expect(importSource).not.toMatch(/const restored = await activateImportedEncryptedWalletRecord/);
     expect(importSource).not.toMatch(/plathoWallet = wallet/);
+    expect(helperSource).toMatch(/if \(toncenterApiKey\) applyToncenterApiKey\(toncenterApiKey\);/);
+    const keyIndex = helperSource.indexOf('applyToncenterApiKey(toncenterApiKey)');
+    expect(helperSource.indexOf('await writeEncryptedPlathoWalletRecord(record)'), 'the record is committed first')
+      .toBeLessThan(keyIndex);
+    expect(keyIndex, 'and the key is in place before the first chain read').toBeLessThan(helperSource.indexOf('await bootCrypto()'));
   });
 
   it('PWA-WALLET-REPLACE-04: locked wallet replacement still compares against the active runtime owner marker', () => {
@@ -2628,31 +2655,50 @@ describe('PWA runtime config guard', () => {
     const fn = app.slice(app.indexOf('async function refreshVaultActivationStatus('), app.indexOf('// ── Boot screen'));
     // (1) the transient catch re-arms.
     const transient = fn.slice(fn.lastIndexOf('} catch (error) {'));
-    expect(transient).toMatch(/schedulePlathoActivationReread\(rawWalletAddress\(plathoWallet\?\.address\)\);/);
+    // Only for the wallet the READ was issued for, and only when the failure was at the read itself (a config fault —
+    // no provider — is not transient and gets no ladder).
+    expect(transient).toMatch(/if \(rereadFor && rawWalletAddress\(plathoWallet\?\.address\) === rereadFor\) schedulePlathoActivationReread\(rereadFor\);/);
     // (2) both definitive branches clear it — after the binding is WRITTEN, so a clear cannot precede the answer.
     const notRegistered = fn.slice(fn.indexOf('if (!registeredMine) {'), fn.indexOf("setText(vaultRecordStatus, t('vault.activationRequired'))"));
     expect(notRegistered).toMatch(/globalThis\.plathoVaultBinding = \{ walletAddress: forWallet, user: \{ exists: view\?\.exists === true, current_key_id: 0n \}, keyRecord: null \};\s*clearPlathoActivationReread\(\);/);
     const registered = fn.slice(fn.indexOf('const user = {'), fn.indexOf("setText(vaultRecordStatus, t('vault.activated'))"));
     expect(registered).toMatch(/globalThis\.plathoVaultBinding = \{ walletAddress: forWallet, user, keyRecord: null \};\s*clearPlathoActivationReread\(\);/);
-    const walletChange = app.slice(app.indexOf('function queueVaultRefreshAfterWalletChange()'), app.indexOf('async function resolveUsernameRegistryProvider()'));
-    expect(walletChange).toMatch(/clearPlathoActivationReread\(\);/);
+    // A wallet SWITCH and a LOCK both tear the per-wallet runtime state down, and the ladder goes with it — that is
+    // the one place a wallet change passes through, so the ladder can never climb for a wallet that is gone. (The
+    // scheduler also restarts itself when asked for a different wallet — asserted below.)
+    const teardown = app.slice(app.indexOf('function clearWalletScopedRuntimeState('), app.indexOf('function lockPlathoWallet('));
+    expect(teardown.length, 'the teardown slice must not collapse').toBeGreaterThan(400);
+    expect(teardown).toMatch(/clearPlathoActivationReread\(\);/);
+    const lock = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('function lockPlathoWallet(') + 2_500);
+    expect(lock).toMatch(/clearPlathoActivationReread\(\);/);
     // (3) the ladder itself: rising, one per wallet, hidden tab re-arms the same rung, a switched wallet stops it.
     const ladder = app.slice(app.indexOf('const PLATHO_ACTIVATION_REREAD_DELAYS_MS'), app.indexOf('async function refreshVaultActivationStatus('));
     const delays = /const PLATHO_ACTIVATION_REREAD_DELAYS_MS = \[([^\]]+)\];/.exec(ladder)?.[1]?.split(',').map((s) => Number(s.replace(/_/g, '').trim())) ?? [];
     expect(delays.length).toBeGreaterThanOrEqual(6);
     for (let i = 1; i < delays.length; i += 1) expect(delays[i], 'rising').toBeGreaterThanOrEqual(delays[i - 1]);
     expect(delays[0], 'the first rung is quick — the first re-ask usually lands').toBeLessThanOrEqual(5_000);
-    expect(ladder).toMatch(/if \(plathoActivationRereadWallet !== forWalletRaw\) \{\s*clearPlathoActivationReread\(\);/);
+    expect(ladder).toMatch(/if \(plathoActivationRereadWallet && plathoActivationRereadWallet !== forWalletRaw\) clearPlathoActivationReread\(\);/);
     expect(ladder).toMatch(/if \(plathoActivationRereadTimer\) return;/);
-    expect(ladder).toMatch(/if \(!plathoWallet\?\.address \|\| rawWalletAddress\(plathoWallet\.address\) !== forWalletRaw\) \{ clearPlathoActivationReread\(\); return; \}/);
-    expect(ladder).toMatch(/if \(document\.hidden\) \{ schedulePlathoActivationReread\(forWalletRaw\); return; \}/);
+    // Bounded: past the last rung the ladder parks until a definite answer, a wallet change or a lock resets it —
+    // under a dead RPC this must not climb forever.
+    expect(ladder).toMatch(/if \(plathoActivationRereadStep >= PLATHO_ACTIVATION_REREAD_DELAYS_MS\.length\) return;/);
+    expect(ladder).toMatch(/if \(rawWalletAddress\(plathoWallet\?\.address\) !== forWalletRaw\) \{ clearPlathoActivationReread\(\); return; \}/);
+    // NOT gated on document.hidden, deliberately: seven reads over eight minutes cost nothing, and the binding is
+    // exactly what the composer gates on the moment the tab comes back — which is the case the owner reported.
     expect(ladder).toMatch(/refreshVaultActivationStatus\(\)\.catch\(\(\) => \{\}\);/);
     // (4) a caller's flags are honoured against the refresh in flight.
     const refreshNow = app.slice(app.indexOf('async function refreshVaultNow('), app.indexOf('function queueVaultPostTransactionRefresh('));
-    expect(refreshNow).toMatch(/const covered = vaultRefreshInFlightFlags\s*&& \(!includeActivation \|\| vaultRefreshInFlightFlags\.includeActivation\)\s*&& \(!includeStats \|\| vaultRefreshInFlightFlags\.includeStats\);/);
-    expect(refreshNow).toMatch(/return vaultRefreshPromise\.then\(\(\) => refreshVaultNow\(wanted\), \(\) => refreshVaultNow\(wanted\)\);/);
+    // A caller who asks for MORE than the refresh in flight was asked for waits for the NEXT one instead of being
+    // handed a balance-only pass as if it had answered their question.
+    expect(refreshNow).toMatch(/const running = vaultRefreshInFlightFlags \?\? \{ includeActivation: false, includeStats: false \};/);
+    expect(refreshNow).toMatch(/const missingActivation = includeActivation && !running\.includeActivation;/);
+    expect(refreshNow).toMatch(/const missingStats = includeStats && !running\.includeStats;/);
+    expect(refreshNow).toMatch(/if \(!missingActivation && !missingStats\) return vaultRefreshPromise;/);
     expect(refreshNow).toMatch(/vaultRefreshInFlightFlags = \{ includeActivation, includeStats \};/);
-    expect(refreshNow).toMatch(/vaultRefreshPromise = null;\s*vaultRefreshInFlightFlags = null;/);
+    // The late caller TOPS UP: it waits for the running refresh (whatever its outcome), lets the lock go with a
+    // macrotask-free delay(0) hop, then runs ONLY the jobs the running one did not cover. Nothing overlaps.
+    expect(refreshNow).toMatch(/return vaultRefreshPromise\s*\.catch\(\(\) => null\)\s*\.then\(\(\) => delay\(0\)\)\s*\.then\(\(\) => refreshVaultNow\(\{ includeActivation: missingActivation, includeStats: missingStats \}\)\);/);
+    expect(refreshNow).toMatch(/vaultRefreshInFlightFlags = null;/);
   });
 
   it('PWA-CONVRESTORE-01: a never-scanned conversation scans from its birth, and the sync reads BOTH sides of it', () => {
@@ -2665,29 +2711,38 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('if (imported > 0) { renderThreads(); renderConversation(); }'));
     // (1) birth, from the record's own stamps, seconds (a ms stamp tolerated), earliest of current + retired roots.
-    expect(sync).toMatch(/const birthSeconds = \[record\.adoptedCreatedAt, \.\.\.\(record\.kRootsForRead \?\? \[\]\)\.map\(\(entry\) => entry\.adoptedAt\)\]/);
-    expect(sync).toMatch(/\.map\(\(value\) => \(value > 1e12 \? Math\.floor\(value \/ 1000\) : value\)\);/);
-    expect(sync).toMatch(/const birthFrom = birthSeconds\.length > 0 \? epochFromCreatedAtSeconds\(Math\.min\(\.\.\.birthSeconds\)\) : steadyFrom;/);
-    expect(sync).toMatch(/const cursorFrom = \(record\.lastScannedEpoch == null \|\| fullRescan\)\s*\? Math\.min\(steadyFrom, birthFrom\)\s*: Math\.min\(steadyFrom, Number\(record\.lastScannedEpoch\)\);/);
+    const birth = app.slice(app.indexOf('function convBirthEpoch(record, epochNow) {'), app.indexOf('const cooperativeYield ='));
+    expect(birth.length, 'the birth-epoch helper must exist').toBeGreaterThan(200);
+    expect(birth).toMatch(/const stamps = \[record\?\.adoptedCreatedAt, \.\.\.\(record\?\.kRootsForRead \?\? \[\]\)\.map\(\(entry\) => entry\?\.adoptedAt\)\]/);
+    expect(birth, 'a millisecond stamp is tolerated, not read as a date decades away')
+      .toMatch(/\.map\(\(stamp\) => \(stamp > 1e12 \? Math\.floor\(stamp \/ 1000\) : stamp\)\);/);
+    expect(birth).toMatch(/birth = epochFromCreatedAtSeconds\(Math\.min\(\.\.\.stamps\)\)/);
+    expect(birth, 'a birth in the future is no birth at all').toMatch(/return Number\.isFinite\(birth\) && birth <= epochNow \? birth : null;/);
+    expect(sync).toMatch(/const cold = record\.lastScannedEpoch == null;/);
+    expect(sync).toMatch(/const birthEpoch = convBirthEpoch\(record, epochNow\);/);
+    expect(sync).toMatch(/const from = \(forceFull \|\| cold\) \? \(birthEpoch \?\? steadyFrom\) : Number\(record\.lastScannedEpoch\);/);
     // A manual "Sync messages" (forceIndexRescan) is a full re-walk: every conversation reads from its birth this pass.
-    expect(sync).toMatch(/const fullRescan = options\?\.forceIndexRescan === true;/);
+    expect(sync).toMatch(/const forceFull = options\?\.forceIndexRescan === true;/);
     expect(app).toMatch(/async function syncConvCapsulesFromShards\(options = \{\}\)/);
     const button = app.slice(app.indexOf('forceHistoryRetry: true,') - 400, app.indexOf('forceHistoryRetry: true,') + 120);
     expect(button).toMatch(/forceIndexRescan: true/);
     // Still capped at retention, still at least the steady window.
-    expect(sync).toMatch(/const scanFrom = Math\.max\(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, cursorFrom\);/);
+    expect(sync).toMatch(/const scanFrom = Math\.max\(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, Math\.min\(steadyFrom, from\)\);/);
     // (2) both directions derived per root, both probed, both read through the same lane call and marks.
-    expect(sync).toMatch(/shards: await incomingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\),\s*outgoing: await outgoingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\),/);
+    // TWO GROUPS PER ROOT on one list — the peer's direction and this device's own — derived, probed and read alike.
+    expect(sync).toMatch(/rootShards\.push\(\{ kRoot, group: 'incoming', shards: await incomingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\) \}\);/);
+    expect(sync).toMatch(/rootShards\.push\(\{ kRoot, group: 'outgoing', shards: await outgoingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\) \}\);/);
     const probe = app.slice(app.indexOf('async function readConvShardStates(plans)'), app.indexOf('async function syncConvCapsulesFromShards('));
-    expect(probe).toMatch(/for \(const shard of \[\.\.\.root\.shards, \.\.\.\(root\.outgoing \?\? \[\]\)\]\)/);
-    expect(sync).toMatch(/shardGroups\.push\(\{ kRoot, shards, side: 'incoming' \}\);\s*if \(outgoing\?\.length\) shardGroups\.push\(\{ kRoot, shards: outgoing, side: 'outgoing' \}\);/);
-    expect(sync).toMatch(/for \(const \{ kRoot, shards, side \} of shardGroups\) \{/);
+    expect(probe, 'the probe answers for every shard the pass may read, in one request')
+      .toMatch(/for \(const root of plan\.rootShards\)[\s\S]{0,200}?for \(const shard of root\.shards\)/);
+    expect(sync).toMatch(/for \(const \{ kRoot, group, shards \} of plan\.rootShards\) \{/);
     // The OWN capsule must be opened AS SENDER: CONV header0 carries no sender label, so without openAsSenderKeyId the
     // recipient path runs, the tag fails, and the own message is dropped as "someone else's" (the first stand build).
-    expect(sync).toMatch(/\.\.\.\(side === 'outgoing' \? \{ openAsSenderKeyId: localRecipientKeyPair\.keyId \} : \{\}\),/);
+    expect(sync).toMatch(/const ownCopies = group === 'outgoing';/);
+    expect(sync).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, keyPair, ownCopies\s*\? \{ enforceExpiry: false, openAsSenderKeyId: introKeyIdString\(selfKeyId\) \}\s*: \{ enforceExpiry: false \}\);/);
     // And a cold pass says what it did, per conversation, so a restore that came back short is diagnosable.
-    expect(sync).toMatch(/console\.info\('\[conv\] cold conversation'/);
-    expect(sync).toMatch(/console\.info\('\[conv\] cold scan this pass:'/);
+    expect(sync).toMatch(/console\.info\('\[conv\] cold conversation', \{/);
+    expect(sync).toMatch(/console\.info\('\[conv\] cold scan', \{ conversations: coldConversations, of: conversations, shards: coldShards, manual: forceFull \}\);/);
     expect(app).toMatch(/import \{ outgoingRecordShard, incomingRecordShards, outgoingRecordShards \} from '\.\/conv-discovery\.mjs\?v=\d+';/);
     // The opened capsule decides the side: the sender's own copy renders 'out' (this is what makes the restore
     // agree with the local echo instead of duplicating it).
@@ -2701,12 +2756,20 @@ describe('PWA runtime config guard', () => {
     // transports are built and before any lane reads — and writes every change back; armed once per module.
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/import \{ readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling \} from '\.\/shard-reader\.mjs\?v=\d+';/);
-    const runtime = app.slice(app.indexOf('function installConfiguredTonRuntime('), app.indexOf('// Client-direct RPC: load the user\'s own toncenter API key'));
-    expect(runtime).toMatch(/if \(!statesBatchCeilingPersistenceArmed\) \{\s*statesBatchCeilingPersistenceArmed = true;/);
-    expect(runtime).toMatch(/const STATES_BATCH_CEILING_STORAGE_KEY = 'platho\.toncenter\.statesBatchCeiling\.v1';/);
-    expect(runtime).toMatch(/if \(Number\.isFinite\(storedCeiling\) && storedCeiling > 0\) seedStatesBatchCeiling\(storedCeiling\);/);
-    expect(runtime).toMatch(/subscribeStatesBatchCeiling\(\(ceiling\) => \{\s*try \{ globalThis\.localStorage\?\.setItem\(STATES_BATCH_CEILING_STORAGE_KEY, String\(ceiling\)\); \}/);
-    expect(app).toMatch(/let statesBatchCeilingPersistenceArmed = false;\s*function installConfiguredTonRuntime\(/);
+    const runtime = app.slice(app.indexOf('function installConfiguredTonRuntime('), app.indexOf('if (!globalThis.plathoTonRpcTransport && typeof globalThis.fetch'));
+    expect(runtime.length, 'the runtime slice must not collapse').toBeGreaterThan(600);
+    // Armed ONCE, however many times the runtime is (re)installed — the handle doubles as the guard.
+    expect(app).toMatch(/let statesBatchCeilingPersistence = null;/);
+    expect(runtime).toMatch(/if \(!statesBatchCeilingPersistence\) \{/);
+    expect(app).toMatch(/const TONCENTER_STATES_BATCH_CEILING_STORAGE_KEY = 'platho\.toncenter\.statesBatchCeiling\.v1';/);
+    // Seeded from storage BEFORE the transport is built, so the very first scan pass runs at the learned size. The
+    // raw getItem value goes straight in: shard-reader treats null / '' / garbage as "nothing stored" and keeps the
+    // default rather than reading it as a zero and clamping to the floor.
+    expect(runtime).toMatch(/seedStatesBatchCeiling\(globalThis\.localStorage\?\.getItem\(TONCENTER_STATES_BATCH_CEILING_STORAGE_KEY\)\);/);
+    expect(runtime.indexOf('seedStatesBatchCeiling('), 'seeded before the transport is built').toBeGreaterThan(-1);
+    expect(runtime).toMatch(/statesBatchCeilingPersistence = subscribeStatesBatchCeiling\(\(ceiling\) => \{\s*try \{ globalThis\.localStorage\?\.setItem\(TONCENTER_STATES_BATCH_CEILING_STORAGE_KEY, String\(ceiling\)\); \}/);
+    const seed = readFileSync('web/shard-reader.mjs', 'utf8');
+    expect(seed).toMatch(/if \(value === null \|\| value === undefined \|\| value === ''\) return statesBatchCeiling;/);
   });
 
   it('PWA-CONVRESTORE-02: an own capsule read back off the outgoing shard MERGES into its local echo, never stands beside it', () => {
@@ -2723,28 +2786,43 @@ describe('PWA runtime config guard', () => {
     // (1)
     expect(app).toMatch(/message\.chainEntryId = String\(Math\.min\(\.\.\.parts\.map\(\(part\) => part\.seq\)\)\);[\s\S]{0,900}?message\.convShardAddress = route\.address;/);
     // (2)
-    const echo = app.slice(app.indexOf('function findOwnEchoForChainCopy(thread, entry, opened)'), app.indexOf('function findMessageByCapsuleId(capsuleId)'));
-    expect(echo).toMatch(/if \(!thread \|\| seq === null \|\| opened\?\.openedAs !== 'sender'\) return null;/);
-    expect(echo).toMatch(/if \(message\?\.type !== 'out' \|\| String\(message\.chainEntryId \?\? ''\) !== seq\) continue;/);
-    expect(echo).toMatch(/if \(message\.convShardAddress === address\) return \{ thread, message \};/);
-    expect(echo).toMatch(/Math\.abs\(echoMs - chainMs\) <= 5_000\) return \{ thread, message \};/);
+    // The matcher takes the BUILT copy (its type, seq range, shard and signed time already resolved) and searches the
+    // thread's own 'out' messages that carry no capsule id — the echoes.
+    const echo = app.slice(app.indexOf('function findOwnEchoForChainCopy(thread, copy) {'), app.indexOf('async function absorbOwnChainCopy('));
+    expect(echo.length, 'the matcher slice must not collapse').toBeGreaterThan(800);
+    expect(echo).toMatch(/if \(!thread \|\| copy\?\.type !== 'out'\) return null;/);
+    expect(echo).toMatch(/if \(message === copy \|\| message\?\.type !== 'out'\) continue;/);
+    expect(echo, 'an echo is a message with no capsule of its own')
+      .toMatch(/if \(message\.capsule\?\.id \|\| \(Array\.isArray\(message\.capsules\) && message\.capsules\.length > 0\)\) continue;/);
+    // (shard, seq) is the exact identity — a multipart copy matches anywhere in the echo's [first..last] seq range,
+    // and the same seq in ANOTHER shard is another send, never this one.
+    expect(echo).toMatch(/if \(copySeq < first \|\| copySeq > last\) continue;/);
+    expect(echo).toMatch(/if \(sameConvShardAddress\(echoShard, copyShard\)\) return message;/);
+    // ...and where a side carries no address (an echo from before the send stamped one), the signed time within a
+    // few seconds is the fallback.
+    expect(echo).toMatch(/Math\.abs\(copyAt - echoAt\) <= CONV_OWN_ECHO_TIME_SLACK_MS\) return message;/);
+    expect(app).toMatch(/const CONV_OWN_ECHO_TIME_SLACK_MS = \d[\d_]*;/);
     const single = app.slice(app.indexOf('async function appendOpenedCapsuleMessage('), app.indexOf('async function appendOpenedPrivatePartsMessage('));
-    expect(single).toMatch(/const existing = findMessageByCapsuleId\(opened\.capsule\?\.id\) \?\? findOwnEchoForChainCopy\(targetThread, entry, opened\);/);
+    expect(single).toMatch(/const echo = message\.type === 'out' \? findOwnEchoForChainCopy\(targetThread, message\) : null;/);
+    expect(single).toMatch(/if \(echo\) return absorbOwnChainCopy\(targetThread, echo, message\);/);
     const multi = app.slice(app.indexOf('async function appendOpenedPrivatePartsMessage('), app.indexOf('function isPrivateOpenKeyMismatchError('));
-    expect(multi).toMatch(/\?\? \(anchor \? findOwnEchoForChainCopy\(targetThread, anchor\.entry, anchor\.opened\) : null\);/);
+    expect(multi).toMatch(/const echo = message\.type === 'out' \? findOwnEchoForChainCopy\(targetThread, message\) : null;/);
+    expect(multi).toMatch(/if \(echo\) return absorbOwnChainCopy\(targetThread, echo, message\);/);
     // (3)
     expect(app).toMatch(/const meta = parts\[0\]\?\.opened\?\.openedAs === 'sender' \? 'published' : 'received';/);
-    // (4)
-    expect(app).toMatch(/const OWN_SEND_TIME_SLACK_MS = 5_000;/);
-    expect(app).toMatch(/function rememberStoredOwnSend\(threadId, message, createdAtMs = null\)/);
-    expect(app).toMatch(/function ownSendStoredNear\(threadId, createdAtMs\)/);
-    expect(app).toMatch(/if \(header\?\.type === 'out' && header\?\.threadId\) rememberStoredOwnSend\(header\.threadId, \{ type: 'out' \}, Number\(header\.createdAt\)\);/);
-    expect(app).toMatch(/rememberStoredCapsuleIds\(message\);\s*rememberStoredOwnSend\(thread\.id, message, stored\.createdAt\);/);
-    expect(single).toMatch(/if \(opened\?\.openedAs === 'sender' && ownSendStoredNear\(targetThread\.id, capsuleSenderCreatedAtMs\(opened\)\)\) return true;/);
-    expect(multi).toMatch(/if \(anchor\?\.opened\?\.openedAs === 'sender' && ownSendStoredNear\(targetThread\.id, capsuleSenderCreatedAtMs\(anchor\.opened\)\)\) return true;/);
+    // (4) — and ONLY beyond the loaded window: inside it the in-memory search above is authoritative and a
+    // time-proximity guess must never override it.
+    expect(app).toMatch(/function ownSendStoredNear\(threadId, atMs, slackMs = CONV_OWN_ECHO_TIME_SLACK_MS\)/);
+    expect(app).toMatch(/function rememberStoredOwnSendTime\(threadId, createdAt\)/);
+    expect(app).toMatch(/function indexStoredOwnSendTimes\(headers\)/);
+    const beyond = app.slice(app.indexOf('function ownEchoStoredBeyondWindow(thread, copy) {'), app.indexOf('function ownEchoStoredBeyondWindow(thread, copy) {') + 400);
+    expect(beyond).toMatch(/if \(!threadHistoryHasMore\(thread\.id\)\) return false;/);
+    expect(beyond).toMatch(/return ownSendStoredNear\(thread\.id, messageCreatedAtMs\(copy\)\);/);
+    expect(single).toMatch(/if \(message\.type === 'out' && ownEchoStoredBeyondWindow\(targetThread, message\)\) return true;/);
+    expect(multi).toMatch(/if \(message\.type === 'out' && ownEchoStoredBeyondWindow\(targetThread, message\)\) return true;/);
     // The echo match runs BEFORE the store checks, the store checks BEFORE the insert.
     expect(single.indexOf('findOwnEchoForChainCopy(')).toBeLessThan(single.indexOf('capsuleAlreadyStored(opened.capsule?.id)'));
-    expect(single.indexOf('ownSendStoredNear(')).toBeLessThan(single.indexOf('insertThreadMessage(targetThread, message)'));
+    expect(single.indexOf('ownEchoStoredBeyondWindow(')).toBeLessThan(single.indexOf('insertThreadMessage(targetThread, message)'));
   });
 
   it('PWA-CLEAR-01: "Clear local data" deletes EVERY platho IndexedDB store — the conversation keys and cursors included', () => {
@@ -2755,21 +2833,27 @@ describe('PWA runtime config guard', () => {
     // window. The wipe now names every store this wallet and deployment can have created, and — where the browser
     // enumerates — everything under the `platho-` prefix.
     const app = readFileSync('web/app.js', 'utf8');
-    const names = app.slice(app.indexOf('async function plathoLocalIndexedDbNames()'), app.indexOf('async function clearPlathoLocalData()'));
-    expect(names.length, 'the wipe routine is found').toBeGreaterThan(0);
+    // The list is of BASE names, and each is deleted in its three spellings — bare (legacy), deployment-scoped, and
+    // deployment+wallet-scoped for the current wallet — so it covers strictly more than naming the current spelling
+    // of each store would. Anything else under the prefix is caught by the enumeration below.
+    const baseNames = app.slice(app.indexOf('const PLATHO_LOCAL_INDEXED_DB_BASE_NAMES = Object.freeze(['), app.indexOf('const PLATHO_LOCAL_INDEXED_DB_PREFIX'));
+    expect(baseNames.length, 'the base-name list is found').toBeGreaterThan(0);
     for (const must of [
-      'currentMessageHistoryDbName()',
-      'currentReplayDbName()',
-      'currentConvKeyDbName()',
-      'currentIntroReplayDbName()',
-      "scopedIndexedDbName('platho-profile-avatar-media-v1')",
-      "scopedIndexedDbName('platho-public-comments-v1')",
-      "scopedIndexedDbName('platho-public-post-media-v1')",
+      'LEGACY_MESSAGE_HISTORY_DB_NAME',   // the encrypted message history
+      'LEGACY_REPLAY_DB_NAME',            // replay store + intro cursors
+      "'platho-intro-replay-v1'",         // the INTRO lane's own replay guard
+      "'platho-conv-keys-v1'",            // sealed K_roots AND the per-conversation scan cursors — the one that broke
+      "'platho-profile-avatar-media-v1'",
+      "'platho-public-comments-v1'",
+      "'platho-public-post-media-v1'",
     ]) {
-      expect(names, `the wipe names ${must}`).toContain(must);
+      expect(baseNames, `the wipe names ${must}`).toContain(must);
     }
-    expect(app).toMatch(/const PLATHO_INDEXED_DB_PREFIX = 'platho-';/);
-    expect(names).toMatch(/if \(name\.startsWith\(PLATHO_INDEXED_DB_PREFIX\)\) names\.add\(name\);/);
+    const names = app.slice(app.indexOf('async function plathoLocalIndexedDbNames()'), app.indexOf('function clearDocumentCookies()'));
+    expect(names.length, 'the wipe routine is found').toBeGreaterThan(0);
+    expect(names, 'each base name in all three spellings').toMatch(/names\.add\(baseName\);\s*names\.add\(scopedIndexedDbName\(baseName\)\);\s*names\.add\(walletScopedIndexedDbName\(baseName\)\);/);
+    expect(app).toMatch(/const PLATHO_LOCAL_INDEXED_DB_PREFIX = 'platho-';/);
+    expect(names).toMatch(/if \(typeof name === 'string' && name\.startsWith\(PLATHO_LOCAL_INDEXED_DB_PREFIX\)\) names\.add\(name\);/);
     // Every store the app opens is under that prefix, or the enumeration would miss it.
     const opened = [...app.matchAll(/(?:walletScopedIndexedDbName|scopedIndexedDbName)\('([^']+)'/g)].map((m) => m[1]);
     expect(opened.length).toBeGreaterThan(3);
@@ -3854,7 +3938,7 @@ describe('PWA runtime config guard', () => {
       expect(I18N_STRINGS[locale]['public.profileTagsBudget'], `${locale}:tagsBudget`).toBeTruthy();
     }
     expect(css).toMatch(/\.action-dialog-field-counter \{[\s\S]*?text-align: right;/);
-    expect(css).toMatch(/\.action-dialog-field-counter\.is-over \{[\s\S]*?color: #ff7a7a;/);
+    expect(css).toMatch(/\.action-dialog-field-counter\.is-over \{[\s\S]*?color: var\(--danger\);/);
   });
 
   it('PWA-POPOVER-SCROLL-01: the anchored identity/channel-about popover closes on scroll (not only outside-click)', () => {
@@ -3913,8 +3997,9 @@ describe('PWA runtime config guard', () => {
     expect(discoveryHeader).toMatch(/global-sync-indicator/);
     expect(discoveryHeader).toMatch(/install-header-button/);
     expect(css).not.toMatch(/margin: -24px -24px 0;/);
-    expect(css).toMatch(/\.public-pane\[data-post-open="true"\] > \.public-post-detail \{[\s\S]*?margin: 0 -24px;/);
-    expect(css).toMatch(/\.public-pane\[data-discover-open="true"\] > \.public-discovery \{[\s\S]*?margin: 0 -24px;/);
+    // (the gutter is a token since the 2026-08 redesign — the same 24px, named once)
+    expect(css).toMatch(/\.public-pane\[data-post-open="true"\] > \.public-post-detail \{[\s\S]*?margin: 0 calc\(-1 \* var\(--gutter\)\);/);
+    expect(css).toMatch(/\.public-pane\[data-discover-open="true"\] > \.public-discovery \{[\s\S]*?margin: 0 calc\(-1 \* var\(--gutter\)\);/);
     expect(app).toMatch(/function buildDiscoveryCtaCard\(\)/);
     expect(app).toMatch(/function shouldShowDiscoveryCta\(\)/);
     // The plate is the ONLY entry point for add-channel-by-address since the search-row "+" was removed:
@@ -3985,7 +4070,7 @@ describe('PWA runtime config guard', () => {
     // a just-created empty dialog floats up via its createdAtMs stamp (threadLastActivityMs fallback).
     // [2026-08-21] The partition moved into thread-list-order.mjs (My notes → pinned by recency → the rest by
     // recency) so the share sheet orders the same way; PWA-PIN-01 proves the rule, this pins that the list uses it.
-    expect(render).toMatch(/const ordered = orderThreadsForList\(visibleThreads, \{ isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs \}\);/);
+    expect(render).toMatch(/const ordered = orderThreadsForList\(visibleThreads, \{\s*isSaved: isSavedMessagesThread,\s*isPinned: isThreadPinned,\s*lastActivityMs: threadLastActivityMs,\s*\}\);/);
     expect(app).toMatch(/function threadLastActivityMs\(thread\) \{/);
     // Newest message wins (messages are ascending; scan from the end for a resolvable time); an empty dialog falls
     // back to its creation stamp, unknown -> 0 (sinks).
@@ -4038,7 +4123,9 @@ describe('PWA runtime config guard', () => {
     // Touch devices: native selection callout suppressed on rows (long-press is the copy action there).
     expect(css).toMatch(/@media \(hover: none\) \{[\s\S]*?-webkit-touch-callout: none;/);
     // Armed swipe ring stays visible on OUTGOING bubbles (their border-color override loses to this rule).
-    expect(css).toMatch(/\.message\.out\.swipe-armed \.bubble \{\s*border-color: var\(--accent\);/);
+    // Armed = an accent OUTLINE on the bubble (a 2px ring since the redesign, a border colour before it): the
+    // reader must see the row has caught, and the colour is the accent either way.
+    expect(css).toMatch(/\.message\.out\.swipe-armed \.bubble \{\s*(?:border-color: var\(--accent\)|box-shadow: 0 0 0 2px var\(--accent\));/);
     // Avatar tap-to-view: dataset url + delegated click that skips avatars inside interactive elements.
     expect(app).toMatch(/node\.dataset\.avatarUrl = imageUrl;/);
     expect(app).toMatch(/\.closest\?\.\('\.avatar\[data-avatar-url\]'\)/);
@@ -4065,15 +4152,31 @@ describe('PWA runtime config guard', () => {
       const start = Math.max(before.lastIndexOf('\nfunction '), before.lastIndexOf('\nasync function '));
       return /function\s+([A-Za-z0-9_$]+)/.exec(app.slice(start, match.index))?.[1] ?? '<anonymous>';
     });
-    expect(callers.sort()).toEqual(['loadEarlierPublicPostComments', 'refreshPublicPostDetailComments']);
+    expect(callers.sort()).toEqual([
+      'loadEarlierPublicPostComments',        // the older-end sentinel of the open thread
+      'loadNewerPublicPostComments',          // the newer-end pager of the open thread (newest-first)
+      'readPublicCommentWindow',              // one probe window of the open thread
+      'refreshPublicPostDetailComments',      // the open thread's own refresh
+    ]);
+    // …and every one of them is bounded by the OPEN post: a read for a post nobody is looking at is the walker the
+    // rule forbids, whatever it is called.
+    for (const caller of ['async function loadEarlierPublicPostComments(', 'async function loadNewerPublicPostComments(']) {
+      const body = app.slice(app.indexOf(caller), app.indexOf(caller) + 1_200);
+      expect(body.length, `${caller} slice must not collapse`).toBeGreaterThan(200);
+      expect(body, `${caller} reads only for the post on screen`).toMatch(/const item = publicPostDetailItem;[\s\S]{0,240}?if \(!item/);
+    }
+    expect(app.slice(app.indexOf('async function readPublicCommentWindow('), app.indexOf('async function readPublicCommentWindow(') + 1_400))
+      .toContain('if (!publicPostDetailOpen) break;');
     // refreshPublicPostDetailComments fires on user actions — opening the post detail + the retry button — plus
     // ONE bounded exception added 1.0.19: the post-publish confirm ladder. The rule being protected is about
     // SCALE ("no walker may read comments for posts nobody is looking at"), and that read is its opposite: the
     // post is OPEN, and only while a comment THIS USER just published is still unconfirmed. Without it the badge
     // stayed at "confirming" until the user closed and reopened the post, because the channel walk cannot see
     // thread comments at all. The bound is asserted, not assumed:
-    expect(app.match(/refreshPublicPostDetailComments\(\);/g)?.length ?? 0).toBe(3);
-    expect(app).toMatch(/if \(openPublicPostHasPendingComment\(\)\) \{\s*try \{ await refreshPublicPostDetailComments\(\);/);
+    // Five call sites, every one of them the open post's own: the refresh button, the open, the pager's tail-reached
+    // top-up, the throttled-first-read retry, and the confirm ladder's bounded exception.
+    expect(app.match(/refreshPublicPostDetailComments\(\);/g)?.length ?? 0).toBe(5);
+    expect(app).toMatch(/if \(openPublicPostHasPendingComment\(\)[^)]*\) \{\s*[\s\S]{0,400}?try \{ await refreshPublicPostDetailComments\(\);/);
     const bound = app.slice(
       app.indexOf('function openPublicPostHasPendingComment('),
       app.indexOf('function anyPendingPublicFeedItem('),
@@ -4084,9 +4187,28 @@ describe('PWA runtime config guard', () => {
     expect(bound).toMatch(/cachedCommentsForPost\(publicPostDetailItem\)\.some\(\(comment\) => isPendingPublicFeedItem\(comment\)\)/);
     // And it is reachable ONLY from the confirm ladder — never from a sync pass or a plain timer.
     expect(app.match(/openPublicPostHasPendingComment\(\)/g)?.length ?? 0).toBe(2);
-    // ...and the earlier-page read fires only from its button, never a timer or a sync pass.
-    expect(app.match(/loadEarlierPublicPostComments\(\);/g)?.length ?? 0).toBe(1);
-    expect(app).toContain("earlier.addEventListener('click', () => { loadEarlierPublicPostComments(); });");
+    // ...and the earlier-page read fires only from the OPEN thread's own affordances — the sentinel coming into
+    // view, its tap, the scroll-driven twin (IntersectionObserver does not fire everywhere) and the paced retry that
+    // only runs while that sentinel is still on screen. Four ways to reach one thread's older page; no timer that
+    // reads a thread nobody is looking at, which is the rule.
+    const earlierCallers = [...app.matchAll(/loadEarlierPublicPostComments\(\);/g)].map((match) => {
+      const before = app.slice(0, match.index);
+      const start = Math.max(before.lastIndexOf('\nfunction '), before.lastIndexOf('\nasync function '), before.lastIndexOf('\nconst '));
+      return /(?:function|const)\s+([A-Za-z0-9_$]+)/.exec(app.slice(start, match.index))?.[1] ?? '<anonymous>';
+    });
+    expect([...new Set(earlierCallers)].sort()).toEqual([
+      'buildCommentsLoadSentinel',            // the sentinel's own tap
+      'publicCommentsSentinelObserver',       // the sentinel scrolled into view, and the scroll-driven twin beside it
+      'schedulePublicCommentsRetry',          // the paced retry, gated on the sentinel still being in view
+    ]);
+    const scrollTwin = app.slice(app.indexOf('let detailScrollCheckQueued = false;'), app.indexOf('let stripScrollCheckQueued = false;'));
+    expect(scrollTwin.length, 'the scroll-twin slice must not collapse').toBeGreaterThan(300);
+    expect(scrollTwin, 'the scroll twin reads only while the detail is open').toContain('if (!body || !publicPostDetailOpen) return;');
+    const retry = app.slice(app.indexOf('function schedulePublicCommentsRetry('), app.indexOf('function schedulePublicCommentsRetry(') + 1_200);
+    expect(retry, 'and the retry only while its sentinel is on screen').toMatch(/if \(!near\) \{[\s\S]{0,160}?return; \}/);
+    // (the button became a load SENTINEL in the 2026-08 redesign — still tappable, and still the only way a user
+    // reaches an older page by hand)
+    expect(app).toMatch(/node\.addEventListener\('click', \(\) => \{\s*if \(direction === 'newer'\) loadNewerPublicPostComments\(\);\s*else loadEarlierPublicPostComments\(\);\s*\}\);/);
     // The pre-warm on the "Comments" button render is LOCAL-ONLY (IndexedDB) — zero chain reads.
     const warm = app.slice(app.indexOf('async function warmPublicPostCommentsCache'), app.indexOf('function openPublicPostDetail'));
     expect(warm.length).toBeGreaterThan(0);
@@ -4334,7 +4456,7 @@ describe('PWA runtime config guard', () => {
     // divert (asserted below) runs BEFORE the message reaches any thread — so a prefs capsule still never becomes
     // a chat message. The pre-thread divert inside the CapsuleHub walk went with that walk.
     const convScan = app.slice(app.indexOf('async function syncConvCapsulesFromShards'), app.indexOf('async function syncPrivateCapsulesFromChain('));
-    expect(convScan).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, localRecipientKeyPair/);
+    expect(convScan).toMatch(/opened = await openPrivateCapsuleChainEntry\(found\.entry, keyPair, ownCopies/);
     // (2026-08-22: the meta is 'received' for a peer's capsule and 'published' for an own capsule read back off the
     // outgoing shard — decided per group right above the call.)
     expect(app).toMatch(/const meta = parts\[0\]\?\.opened\?\.openedAs === 'sender' \? 'published' : 'received';/);
@@ -4403,7 +4525,9 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
     // The dialog's select shows a clearly visible accent down-chevron (the shared chevron-down.svg is fill=#000,
     // invisible on the dark field) so users see it's an expandable dropdown.
-    expect(css).toMatch(/\.recipient-dialog select \{[\s\S]*?cursor: pointer;[\s\S]*?data:image\/svg\+xml,[\s\S]*?fill='%2330d5b0'/);
+    // The chevron is drawn by the stylesheet (never a native arrow), from the themed token since the redesign.
+    expect(css).toMatch(/\.recipient-dialog select \{[\s\S]*?cursor: pointer;[\s\S]*?background-image: var\(--select-chevron\);/);
+    expect(css).toMatch(/--select-chevron: url\("data:image\/svg\+xml,[\s\S]*?fill='%2330d5b0'/);
     // openActionDialog supports an async validateSubmit gate; the submit handler keeps the dialog open on ok:false.
     expect(app).toMatch(/validateSubmit: config\.validateSubmit \?\? null/);
     const submit = app.slice(app.indexOf("actionForm?.addEventListener('submit'"), app.indexOf("document.addEventListener('click'"));
@@ -4460,7 +4584,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('// ── Boot screen'),
     );
     expect(activation).toMatch(/if \(!isKeyShardUninitError\(readError\)\) throw readError;\s*\n\s*view = \{ exists: false \};/);
-    expect(activation).toMatch(/catch \(error\) \{[\s\S]{0,600}?return globalThis\.plathoVaultBinding \?\? null;/);
+    expect(activation).toMatch(/catch \(error\) \{[\s\S]{0,1600}?return globalThis\.plathoVaultBinding \?\? null;/);
     // The downgrade guard and its per-wallet memory are gone with the read that needed them.
     expect(app).not.toMatch(/lastKnownActivatedVaultWalletRaw/);
     expect(app).not.toMatch(/function isTransientVaultActivationDowngrade\(/);
@@ -4649,13 +4773,13 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.public-pane \.public-post-detail-header \{\s*grid-template-columns: var\(--header-button-size\) 44px minmax\(0, 1fr\) max-content;\s*gap: 10px;/);
     // Both conversation headers are exactly the shared header height, flush (zero vertical padding), matching
     // every other tab's pane header. A comment sits between the two declarations, so skip it.
-    expect(css).toMatch(/\.conversation-header \{\s*min-height: var\(--header-height\);[\s\S]*?padding: 0 24px;/);
+    expect(css).toMatch(/\.conversation-header \{\s*min-height: var\(--header-height\);[\s\S]*?padding: 0 var\(--gutter\);/);
     // The chat-pane top padding (BOTH breakpoints) then lands the conversation bar at the shared top offset, so
     // its action buttons sit at the same y as every pane header (uniform header-button height across tabs).
     expect(css).toMatch(/\.app-shell\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: var\(--header-top-offset\);/);
     expect(css).toMatch(/\.app-shell\[data-chat-open="true"\]\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: var\(--header-top-offset\);/);
     // The mobile conversation header carries no vertical padding of its own (the bar is the shared height).
-    expect(css).toMatch(/padding: 0 24px 0 14px;/);
+    expect(css).toMatch(/padding: 0 var\(--gutter\) 0 \d+px;/);
   });
 
   it('PWA-CHAT-SCROLL-01: only the act of sending moves the dialog — status ticks patch in place, restores use the live position', () => {
@@ -4797,7 +4921,8 @@ describe('PWA runtime config guard', () => {
     // omitted image content ("post content is immutable"), so the reused article stayed image-less — the sync repaired
     // the DATA but the signature/DOM never changed ("the image showed once then vanished"). Now image presence is in
     // the signature, so the stripped(0)->hydrated(1) transition invalidates the reused article and it rebuilds.
-    const sigFn = app.slice(app.indexOf('function publicFeedItemRenderSignature(item, avatarUrlMemo)'), app.indexOf('function publicFeedItemRenderSignature(item, avatarUrlMemo)') + 1600);
+    // (the 2026-08 redesign added the locale and timestamp-mode terms above it, so the function is longer)
+    const sigFn = app.slice(app.indexOf('function publicFeedItemRenderSignature(item, avatarUrlMemo)'), app.indexOf('function buildShowOlderButton('));
     expect(sigFn).toMatch(/block\?\.type === 'image' && block\.url\)\.length\}\$\{item\.imageUrl \? 'i' : ''\}/);
     // The persist strip (the reason image presence is mutable) is unchanged — the heavy data stays out of localStorage.
     const subs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
@@ -4946,15 +5071,21 @@ describe('PWA runtime config guard', () => {
     const css = readFileSync('web/styles.css', 'utf8');
     const feedCell = css.slice(css.indexOf('.public-pane > .public-feed {'), css.indexOf('.public-pane > .public-feed {') + 120);
     expect(feedCell, 'the feed states its row').toMatch(/grid-row: 3;/);
-    const jumpCss = css.slice(css.indexOf('\n.public-jump-down-button {', css.indexOf('.mini-action-button')), css.indexOf('.public-jump-down-button:hover'));
+    // THE BUTTON'S OWN BLOCK — the one that places it. The selector also appears in shared chrome lists
+    // (transitions, the pressed state), so the block is found by the declaration that matters rather than by the
+    // first occurrence of the name: taking the wrong one silently asserted over other rules' declarations.
+    const jumpBlocks = [...css.matchAll(/(^|\})([^{}]*\.public-jump-down-button[^{}]*)\{([^{}]*)\}/g)]
+      .map((m) => m[3]);
+    const jumpCss = jumpBlocks.find((body) => body.includes('grid-row:')) ?? '';
     expect(jumpCss.length, 'the button rule slice must not collapse').toBeGreaterThan(200);
     expect(jumpCss, 'the button claims the same cell').toMatch(/grid-row: 3;/);
     expect(jumpCss).toMatch(/align-self: end;/);
     expect(jumpCss, 'a hand-measured offset from the pane bottom is what caused the overlap')
       .not.toMatch(/position: absolute|bottom: calc\(/);
     // Round icon button: equal width/height and no padding, or the arrow sits off-centre in a pill.
-    expect(jumpCss).toMatch(/width: 38px;/);
-    expect(jumpCss).toMatch(/min-height: 38px;/);
+    const jumpWidth = /width: (\d+)px;/.exec(jumpCss)?.[1] ?? null;
+    expect(jumpWidth, 'the button states its width').toBeTruthy();
+    expect(jumpCss, 'square, so the circle is a circle').toMatch(new RegExp(`min-height: ${jumpWidth}px;`));
     expect(jumpCss).toMatch(/border-radius: 50%;/);
     expect(jumpCss).toMatch(/justify-content: center;/);
   });
@@ -5116,7 +5247,7 @@ describe('PWA runtime config guard', () => {
     // The permalink row leads: it is the only target that reaches someone who has no Platho account yet.
     expect(shareList).toMatch(/icon: 'link',[\s\S]*?shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = orderThreadsForList\(/);
     const shareCss = readFileSync('web/styles.css', 'utf8');
-    expect(shareCss).toMatch(/--modal-outline: rgba\(48, 213, 176, 0\.5\);/);
+    expect(shareCss).toMatch(/--modal-outline: rgba\(48, 213, 176, 0\.\d+\);/);
     expect(shareCss).toMatch(/\.recipient-dialog,\s*\.action-dialog,\s*\.docs-dialog,\s*\.install-dialog \{[\s\S]*?border: 1px solid var\(--modal-outline\);/);
     // Every locale ships the share strings (OPSEC key parity) — incl. the v793 copy-to-clipboard trio.
     for (const locale of Object.keys(I18N_STRINGS)) {
@@ -7140,11 +7271,12 @@ describe('PWA runtime config guard', () => {
     const resume = app.slice(app.indexOf('function resumePendingPublicPublishConfirmations('));
     const body = resume.slice(0, resume.indexOf('\n}\n') + 3);
     const rebroadcastIdx = body.indexOf('rebroadcastPublicPublish(');
-    const terminalIdx = body.indexOf("publishStatus: 'public publish failed'");
+    const terminalIdx = body.lastIndexOf('publishStatus: failedStatus');
     expect(rebroadcastIdx, 'the resume knows how to re-send').toBeGreaterThan(-1);
     expect(terminalIdx, 'and still knows how to give up').toBeGreaterThan(rebroadcastIdx);
     expect(body, 'bounded by the external validity window, not by the give-up deadline')
-      .toMatch(/retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS/);
+      .toMatch(/Number\(retained\.validUntil\) > 0 \? Number\(retained\.validUntil\) \* 1000 : Number\(retained\.at \?\? 0\) \+ DIRECT_SEND_REBROADCAST_WINDOW_MS/);
+    expect(body).toMatch(/if \(retainedValidUntilMs !== null && Date\.now\(\) < retainedValidUntilMs\) \{/);
     expect(body, 'and throttled, because the resume fires on every focus')
       .toMatch(/PUBLIC_REBROADCAST_MIN_INTERVAL_MS/);
   });
@@ -7160,26 +7292,42 @@ describe('PWA runtime config guard', () => {
     //   (4) the settle is seconds, and the post/comment terminal labels are kept apart.
     const app = readFileSync('web/app.js', 'utf8');
     // (1)
-    const helper = app.slice(app.indexOf('function publicRetainedExternalFromSend(result)'), app.indexOf('const PUBLIC_CONSUMED_SETTLE_MS'));
-    expect(helper).toMatch(/const boc = result\?\.result\?\.pendingBoc \?\? null;\s*if \(!boc\) return null;/);
-    expect(helper).toMatch(/seqno: result\?\.result\?\.pendingSeqno \?\? null,\s*validUntil: result\?\.result\?\.pendingValidUntil \?\? null,/);
-    expect(helper).toMatch(/consumedAt: null,/);
-    expect(app).toMatch(/publishStatus: 'public published, confirming',\s*publicDirectSend: publicRetainedExternalFromSend\(result\),/);
-    expect(app).toMatch(/publishStatus: 'comment published, confirming',\s*publicDirectSend: publicRetainedExternalFromSend\(result\),/);
+    const helper = app.slice(app.indexOf('function publicRetainedExternalFromSend(result)'), app.indexOf('async function rebroadcastPublicPublish('));
+    expect(helper).toMatch(/const boc = result\?\.result\?\.pendingBoc \?\? null;\s*if \(typeof boc !== 'string' \|\| !boc\) return null;/);
+    expect(helper).toMatch(/seqno: result\?\.result\?\.pendingSeqno \?\? null,[^\n]*\n\s*validUntil: result\?\.result\?\.pendingValidUntil \?\? null,/);
+    expect(helper).toMatch(/rebroadcastAt: null,/);
+    // Both paths retain it — and a send that carried no bytes to keep leaves the record exactly as before.
+    expect(app).toMatch(/const retainedPost = publicRetainedExternalFromSend\(result\);/);
+    expect(app).toMatch(/publishStatus: 'public published, confirming', \.\.\.\(retainedPost \? \{ publicDirectSend: retainedPost \} : \{\}\)/);
+    expect(app).toMatch(/const retainedComment = publicRetainedExternalFromSend\(result\);/);
+    expect(app).toMatch(/publishStatus: 'comment published, confirming', \.\.\.\(retainedComment \? \{ publicDirectSend: retainedComment \} : \{\}\)/);
     // (2)
     const rebroadcast = app.slice(app.indexOf('async function rebroadcastPublicPublish(job, retained)'), app.indexOf('function resumePendingPublicPublishConfirmations()'));
-    expect(rebroadcast).toMatch(/const answer = await broadcastThroughNextDoor\(retained\.boc\);/);
-    expect(rebroadcast).toMatch(/if \(answer\?\.rejectedByChain && Number\(answer\.chainExitCode\) === 133 && !retained\.consumedAt\) \{/);
-    expect(rebroadcast).toMatch(/consumedAt: Date\.now\(\) \} \}\);/);
-    // The keyless fallback stays on the line right after the rotation (DOORS-07 reads exactly that adjacency).
-    expect(rebroadcast).toMatch(/const answer = await broadcastThroughNextDoor\(retained\.boc\);\s*\n\s*if \(!answer\) await transport\.sendBoc\(/);
+    // Through the ONE helper every lane re-sends with: it rotates the door (falling back to the primary only when no
+    // door is configured — DOORS-07) and hands back the door's classified verdict with the signed seqno.
+    expect(rebroadcast).toMatch(/const answer = await rebroadcastSignedExternal\(retained\.boc, retained\.seqno \?\? null, transport\);/);
+    expect(rebroadcast).toMatch(/if \(answer\.verdict === BROADCAST_VERDICT\.ACCEPTED\) \{/);
+    // A chain rejection asks the CHAIN, not the door: exit 133 is symmetric (a node that has not applied our previous
+    // external answers it for bytes that are still good), so one fresh seqno read decides — and only a CONSUMED seqno
+    // stops the re-sends.
+    expect(rebroadcast).toMatch(/if \(answer\.verdict === BROADCAST_VERDICT\.REJECTED\) \{/);
+    expect(rebroadcast).toMatch(/const consumed = await directSendSeqnoConsumed\(retained, transport\);/);
+    expect(rebroadcast).toMatch(/if \(consumed\) \{\s*persistPublicPublishProgress\(job, \{ publicDirectSend: \{ \.\.\.retained, rebroadcastAt: Date\.now\(\), seqnoConsumedAt: Date\.now\(\)/);
+    expect(app).toMatch(/const WALLET_V5_INVALID_SEQNO_EXIT_CODE = 133;/);
     // (3)
-    const resume = app.slice(app.indexOf('function resumePendingPublicPublishConfirmations()'), app.indexOf('function resumePendingPublicPublishConfirmations()') + 4000);
-    expect(resume).toMatch(/if \(retained\?\.consumedAt\) \{\s*if \(Date\.now\(\) - Number\(retained\.consumedAt\) >= PUBLIC_CONSUMED_SETTLE_MS\) \{/);
-    expect(resume.indexOf('retained?.consumedAt'), 'the consumed check comes BEFORE the re-broadcast window').toBeLessThan(resume.indexOf('retainedAgeMs <= DIRECT_SEND_REBROADCAST_WINDOW_MS'));
+    const resume = app.slice(app.indexOf('function resumePendingPublicPublishConfirmations()'), app.indexOf('function resumePendingPublicPublishConfirmations()') + 5000);
+    expect(resume).toMatch(/const consumedAgeMs = Number\(retained\?\.seqnoConsumedAt\) > 0 \? Date\.now\(\) - Number\(retained\.seqnoConsumedAt\) : -1;/);
+    expect(resume).toMatch(/if \(consumedAgeMs >= PUBLIC_CONSUMED_SETTLE_MS/);
+    expect(resume.indexOf('consumedAgeMs'), 'the consumed check comes BEFORE the re-broadcast window')
+      .toBeLessThan(resume.indexOf('rebroadcastPublicPublish('));
+    // …and a COMMENT is never terminalled while its thread is closed: the only read that can retire a pending comment
+    // (refreshPublicPostDetailComments -> retireConfirmedLocalPublicComments) runs only with the detail open, so the
+    // settle's premise does not hold for it. It stays 'confirming' — no re-sends either way, the seqno is spent.
+    expect(resume).toMatch(/!\(kind === 'comment' && !publicPostDetailOpenFor\(channelId, post\)\)/);
     // (4)
     expect(app).toMatch(/const PUBLIC_CONSUMED_SETTLE_MS = 10_000;/);
-    expect(resume).toMatch(/publishStatus: kind === 'comment' \? 'comment failed' : 'public publish failed'/);
+    expect(resume).toMatch(/const failedStatus = kind === 'comment' \? 'comment failed' : 'public publish failed';/);
+    expect(resume).toMatch(/persistPublicPublishProgress\(\{ channelId, localId: item\.id, publishState: null \}, \{ publishStatus: failedStatus \}\);/);
   });
 
   it('persists and revives the INTRO send state, and never rebuilds a send that reached the wallet', () => {
@@ -7351,7 +7499,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/const delayMs = PUBLIC_VISIBILITY_SCHEDULE_MS\[attempt\] \?\? PUBLIC_VISIBILITY_TAIL_MS;/);
     // Same tick: the channel walk, the open thread's re-read (1.0.19), then the resume. The window is generous
     // because what matters is the ORDER and the shared tick, not the byte distance between them.
-    expect(app).toMatch(/try \{ await syncPublicChannels\(\); \}[\s\S]{0,1400}?resumePendingPublicPublishConfirmations\(\);/);
+    expect(app).toMatch(/try \{ await syncPublicChannels\(\); \}[\s\S]{0,2400}?resumePendingPublicPublishConfirmations\(\);/);
 
     // ...and it STOPS. A terminaled record keeps a truthy publishStatus (that flag marks the local copy the merge
     // must carry), so re-arming on "anything pending" would spin forever.
@@ -7461,7 +7609,9 @@ describe('PWA runtime config guard', () => {
     // The knocker rotates doors rather than re-knocking on the one that already has it.
     const force = app.slice(app.indexOf('function forcePlathoActivationDelivery()'),
       app.indexOf('function forcePlathoActivationDelivery()') + 1800);
-    expect(force, 'the knocker stopped rotating doors').toContain('broadcastThroughNextDoor(boc)');
+    // The signed seqno rides with the bytes (a door's answer is only meaningful against it); the door's verdict is
+    // deliberately NOT read here — activation is confirmed by the account read below, not by a POST.
+    expect(force, 'the knocker stopped rotating doors').toContain('broadcastThroughNextDoor(pending.boc, { seqno: pending.seqno })');
     expect(force, 'the knocker no longer re-reads activation').toContain('refreshVaultActivationStatus()');
     expect(force, 'the knocker never gives up on a landed account').toContain('hasActivePlathoAccount()');
 
@@ -7504,7 +7654,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(now - Number\(send\.lastRebroadcastAt \?\? 0\) < DIRECT_SEND_CONFIRM_REBROADCAST_MS\) return;/);
     // NEVER a rebuild here: that would bump the conversation seq and seal a new capsule, double-publishing if the
     // first copy was merely late. Only the captured bytes go back out.
-    expect(app).toMatch(/await transport\.sendBoc\(\{ boc: send\.boc, walletAddress: plathoWallet\.address \}\)/);
+    // Through the ONE re-broadcast helper (door rotation + verdict + the signed seqno) — see DOORS-07.
+    expect(app).toMatch(/const answer = await rebroadcastSignedExternal\(send\.boc, send\.seqno \?\? null, transport\);/);
     // Re-armed after a reload too — the record is persisted, which is what covers "the app was closed".
     expect(app).toContain('convDirectSend: safeJsonClone(message.convDirectSend) ?? null,');
   });
@@ -7519,30 +7670,36 @@ describe('PWA runtime config guard', () => {
 
     // 1. The door's answer is classified in ONE place and ridden back to the caller.
     expect(transport).toContain('export function classifyBroadcastDoorAnswer(');
-    expect(transport).toMatch(/return \{ door: door\.id, \.\.\.classifyBroadcastDoorAnswer\(\{ status, body \}\) \};/);
+    // The classification is ONE word the caller branches on — accepted / rejected / broken / refused / unknown —
+    // carried back with the status, the exit code and the seqno the bytes were signed for.
+    expect(transport).toContain('export const BROADCAST_VERDICT = Object.freeze({');
+    expect(transport).toMatch(/return \{ door: door\.id, seqno, \.\.\.classifyBroadcastDoorAnswer\(\{ status, body \}\) \};/);
+    expect(transport).toMatch(/verdict: broadcastVerdictOf\(\{ status: code, rejectedByChain \}\),/);
 
     // 2. The wallet seqno the bytes are signed against is persisted with them — it is what turns a door's verdict
     // into a chain fact (a fresh seqno read), rather than trusting a possibly-lagging node.
     expect(app).toContain('seqno: result?.result?.pendingSeqno ?? null,');
     const rebroadcast = app.slice(
       app.indexOf('async function rebroadcastPendingDirectSend('),
-      app.indexOf('const CONV_CONFIRM_CONSUMED_SETTLE_MS'),
+      app.indexOf('function markConvDeliveryUnverified('),
     );
     // 3. Refused by the chain → one fresh seqno read decides consumed vs lagging-node; consumed stops re-sending.
-    expect(rebroadcast).toMatch(/if \(send\.consumedAt\) return;/);
-    expect(rebroadcast).toMatch(/if \(answer\?\.rejectedByChain\) \{\s*\n\s*await noteConvExternalRefused\(send, transport, answer\);/);
-    expect(rebroadcast).toMatch(/chainSeqno = await getPlathoWalletSeqno\(plathoWallet, transport\);/);
-    expect(rebroadcast).toMatch(/const consumed = chainSeqno != null && Number\.isFinite\(signed\) && Number\(chainSeqno\) > signed;/);
-    expect(rebroadcast).toMatch(/if \(consumed\) \{\s*\n\s*send\.consumedAt = Date\.now\(\);/);
+    expect(rebroadcast).toMatch(/if \(Number\(send\.seqnoConsumedAt\) > 0\) return;/);
+    expect(rebroadcast).toMatch(/const answer = await rebroadcastSignedExternal\(send\.boc, send\.seqno \?\? null, transport\);/);
+    expect(rebroadcast).toMatch(/if \(answer\.verdict === BROADCAST_VERDICT\.REJECTED\) \{/);
+    expect(rebroadcast).toMatch(/if \(await directSendSeqnoConsumed\(send, transport\)\) send\.seqnoConsumedAt = Date\.now\(\);/);
+    const consumedCheck = app.slice(app.indexOf('async function directSendSeqnoConsumed('), app.indexOf('async function directSendSeqnoConsumed(') + 1_200);
+    expect(consumedCheck).toMatch(/getPlathoWalletSeqno\(plathoWallet, transport\)/);
     // 4. The INFO line is printed only for an ACCEPTED re-send; a refusal is logged as what it is.
-    expect(rebroadcast).toMatch(/if \(answer && answer\.status != null && answer\.status >= 400\) \{[\s\S]{0,400}?return;\s*\n\s*\}\s*\n\s*console\.info\('\[conv\] re-broadcast pending external while awaiting the shard'/);
+    expect(rebroadcast).toMatch(/if \(answer\.verdict === BROADCAST_VERDICT\.ACCEPTED\) \{[\s\S]{0,400}?console\.info\('\[conv\] re-broadcast pending external while awaiting the shard'/);
+    expect(rebroadcast).toMatch(/console\.warn\('\[conv\] re-broadcast rejected by the chain'/);
 
     // 5. The confirm goes terminal early on a consumed+settled external, with the SAME authority rule as the
     // deadline (complete scan or seqShort) — and the deadline rule itself is untouched (PWA-CONV-DELIVERY-01).
-    const confirm = app.slice(app.indexOf('async function runConvDeliveryConfirm'), app.indexOf('function markConvDeliveryUnlanded'));
-    expect(confirm).toMatch(/const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS \|\| consumedSettled;/);
-    expect(confirm).toMatch(/if \(consumedSettled && \(res\.complete \|\| res\.seqShort\)\) \{ markConvDeliveryUnlanded\(thread, message\); return; \}/);
-    expect(app).toMatch(/const CONV_CONFIRM_CONSUMED_SETTLE_MS = 10_000;/);
+    const confirm = app.slice(app.indexOf('async function runConvDeliveryConfirm'), app.indexOf('function markConvDeliveryUnverified'));
+    expect(confirm).toMatch(/const terminal = ageMs >= CONV_CONFIRM_MAX_AGE_MS \|\| seqnoTerminal;/);
+    expect(confirm).toMatch(/const consumedNow = Number\(send\.seqnoConsumedAt\) > 0 \? Date\.now\(\) - Number\(send\.seqnoConsumedAt\) : -1;/);
+    expect(app).toMatch(/const CONV_CONFIRM_SEQNO_CONSUMED_TERMINAL_MS = 10_000;/);
 
     // 6. The INTRO scan's twin of the same disease — a body that could not be fetched was re-fetched every pass
     // forever under a misleading TypeError — backs off instead, and the handler names a null capsule honestly.
@@ -7551,6 +7708,10 @@ describe('PWA runtime config guard', () => {
     expect(runner).toMatch(/if \(fetchCapsule && capsule == null\) \{[\s\S]{0,400}?noteUnfetchable\(key, hit\);/);
     expect(runner).toMatch(/if \(pending && passIndex < pending\.notBeforePass\) \{ undelivered\.add\(hit\.key\); continue; \}/);
     expect(handler).toMatch(/'capsule' in delivery && delivery\.capsule == null/);
+    // …and the replay guard records the nonce only AFTER the adoption lands, so a failed write cannot turn the next
+    // pass's read into a permanent "replay" and lose the first contact.
+    expect(handler).toMatch(/const checkOnlyGuard = introReplayGuard\s*\? \{ has: \(key\) => introReplayGuard\.has\(key\), add: async \(key\) => \{ nonceToRecord = key; \} \}\s*: undefined;/);
+    expect(handler).toMatch(/if \(introReplayGuard && nonceToRecord !== null\) await introReplayGuard\.add\(nonceToRecord\);/);
   });
 
   it('PWA-SEQNOLANE-01: every wallet external leaves through ONE lane, and a sync pass writes nothing after a teardown', () => {
@@ -7559,6 +7720,9 @@ describe('PWA runtime config guard', () => {
     // and the shard never saw seq 1 — the red "not delivered" on the owner's screen. The floor is raised only AFTER
     // a broadcast, so two resolvers in flight see the same floor; only a lane in the wallet closes it.
     const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
+    // Every external that RESOLVES a seqno takes the lane; one carrying an explicit seqno (an idempotent re-broadcast
+    // of already-signed bytes) reads nothing and signs nothing, so parking it behind a predecessor would only delay
+    // the one thing that can end the wait.
     expect(wallet).toMatch(/export async function sendPlathoWalletTransaction\(wallet, transaction, options = \{\}\) \{\s*\n\s*if \(options\.seqno !== undefined\) return sendPlathoWalletTransactionInLane\(wallet, transaction, options\);\s*\n\s*return withWalletSendLane\(wallet, \(\) => sendPlathoWalletTransactionInLane\(wallet, transaction, options\)\);/);
     // The tail is detached from the task's outcome, or one failed send wedges every later one (the SENDLANE lesson).
     expect(wallet).toMatch(/const tail = previous\.then\(\(\) => gate\);/);
@@ -7573,7 +7737,8 @@ describe('PWA runtime config guard', () => {
     const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('async function syncPrivateCapsulesFromChain('));
     expect(sync).toMatch(/const store = convKeyStore;\s*\n\s*const keyPair = localRecipientKeyPair;\s*\n\s*const tornDown = \(\) => convKeyStore !== store \|\| localRecipientKeyPair !== keyPair;/);
     expect(sync.match(/if \(tornDown\(\)\) return privateSyncResult\(\{ ok: false, reason: 'torn_down', scanComplete: false \}\);/g)?.length,
-      'after the state batch, at the top of each conversation, and before the append').toBe(3);
+      'after the state batch, at the top of each conversation, around the reads, and before the append')
+      .toBeGreaterThanOrEqual(3);
     expect(sync).toMatch(/if \(convClean && !tornDown\(\)\) await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
     expect(sync, 'the live global must not be dereferenced after the first await').not.toMatch(/await convKeyStore\./);
   });
@@ -7597,7 +7762,7 @@ describe('PWA runtime config guard', () => {
     // lane's half); this pins that the app passes the mark, keyed the same way the mark is kept.
     const app = readFileSync('web/app.js', 'utf8');
     const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('async function syncPrivateCapsulesFromChain('));
-    expect(sync).toMatch(/knownSeqOf: \(bucket\) => convBucketSeqHighWater\(String\(bucket \?\? ''\)\),/);
+    expect(sync).toMatch(/knownSeqOf: forceFull \? \(\) => 0 : convBucketSeqHighWater,/);
     // The same key the app advances: the lane's bucket.address is what the app stores the mark under.
     expect(sync).toContain("const bucket = String(found.address ?? '');");
     expect(sync).toContain('advanceConvBucketSeqHighWater(bucket, seq)');
@@ -7614,28 +7779,49 @@ describe('PWA runtime config guard', () => {
     // answer in memory only; the remembered list (the row's cold number) was never reconciled, and nothing ran the
     // read until the dialog was opened.
     const app = readFileSync('web/app.js', 'utf8');
-    const load = app.slice(app.indexOf('async function loadOwnedUsernameNfts('), app.indexOf('function usernameNftCardNode('));
+    const load = app.slice(app.indexOf('function renderMyUsernamesStatus()'), app.indexOf('function usernameNftCardNode('));
     // 1. A complete read forgets what is gone and remembers what was found; an incomplete read may only add.
-    expect(load).toContain('reconcileKnownPlathoUsernames(result);');
-    expect(load).toMatch(/function reconcileKnownPlathoUsernames\(result\) \{[\s\S]*?for \(const label of ownedLabels\) addKnownPlathoUsername\(label, owner\);[\s\S]*?if \(result\.complete !== true\) return;/);
-    expect(load).toContain('removeKnownPlathoUsername(label, owner);');
-    expect(load).toContain("if (readLinkedPlathoUsername(owner)?.label === label) clearLinkedPlathoUsername(owner);");
+    expect(load).toContain('reconcileKnownPlathoUsernames(result, wallet);');
+    expect(load).toMatch(/function reconcileKnownPlathoUsernames\(result, owner = plathoWallet\?\.address\) \{/);
+    expect(load).toMatch(/const canonical = \(label\) => canonicalUsernameDisplay\(String\(label \?\? ''\)\)\.trim\(\)\.toLowerCase\(\);/);
+    // A name the chain vouches for is ADDED whether the read was complete or not — a fact is a fact.
+    expect(load).toMatch(/const found = new Set\(result\.owned\.map\(\(nft\) => canonical\(nft\.label\)\)\.filter\(Boolean\)\);/);
+    expect(load).toMatch(/kept\.push\(`\$\{name\}\.ath`\);/);
+    // The LINKED name is not stripped here: its verified stamp is expired and the one chokepoint that knows how to
+    // give a name up safely (re-verify, fall back to another owned name, never strip on a degraded read) is queued.
+    expect(load).toMatch(/writeLinkedPlathoUsername\(\{ \.\.\.linked, verified_at: 0 \}, owner\);/);
+    expect(load).toMatch(/queueUsernameHygiene\(\(\) => reconcileOwnLinkedUsername\(\)\);/);
     // FORGET ONLY ON PROOF [OWNER 2026-08-22: "sometimes at unlock the linked username does not load"]. A name is
     // forgotten (and unlinked) only when the chain named it TRANSFERRED — authoritative, another owner, label proven
     // — never on mere absence from a complete list; and a candidate derivation that failed leaves the list incomplete
     // instead of silently dropping the name from it.
-    expect(load).toMatch(/const transferredLabels = new Set\(\(result\.transferred \?\? \[\]\)\.map/);
-    expect(load).toMatch(/if \(ownedLabels\.has\(label\) \|\| !transferredLabels\.has\(label\)\) continue;/);
+    expect(load).toMatch(/const lost = new Set\(\(Array\.isArray\(result\.transferred\) \? result\.transferred : \[\]\)\.map\(\(nft\) => canonical\(nft\.label\)\)\.filter\(Boolean\)\);/);
+    // FORGET ONLY ON PROOF: a stored name survives unless the chain read it as somebody else's. "Not found" — a
+    // failed derivation, a check that threw, an indexer that answered short, even a complete read that did not meet
+    // it — is NOT forgotten; acting on absence is what made the linked name "sometimes drop on unlock".
+    expect(load).toMatch(/const kept = stored\.filter\(\(label\) => found\.has\(canonical\(label\)\) \|\| !lost\.has\(canonical\(label\)\)\);/);
     expect(load).toMatch(/let candidateFailures = 0;[\s\S]*?\} catch \{\s*candidateFailures \+= 1;\s*\}/);
-    expect(load).toMatch(/const result = candidateFailures > 0 \? \{ \.\.\.collected, complete: false, candidateFailures \} : collected;/);
+    // A name that could not even be turned into a candidate was never ASKED about — it is not "not owned": the
+    // collector folds that count into `complete`, and an incomplete list may only add, never forget.
+    expect(load).toMatch(/candidateFailures,/);
+    const ownedModule = readFileSync('web/username-nft-owned.mjs', 'utf8');
+    expect(ownedModule).toMatch(/complete: indexerError === null && indexerAddresses !== null && unverified === 0 && candidateFailureCount === 0,/);
     expect(load).not.toMatch(/usernameNftCandidateFromLabel\([\s\S]{0,200}?\)\.catch\(\(\) => null\)/);
     // 2. "Complete" is honest about a verification that threw — otherwise a transient read failure could forget a name.
     const owned = readFileSync('web/username-nft-owned.mjs', 'utf8');
     expect(owned).toContain('complete: indexerError === null && indexerAddresses !== null && unverified === 0');
     // 3. One real check per wallet per session, after the first paint, from the wallet identity render.
-    expect(load).toMatch(/function scheduleOwnedUsernamesBootCheck\(\) \{[\s\S]*?if \(!address \|\| ownedUsernameNftsCheckedFor === address \|\| ownedUsernameNftsInFlight\) return;/);
-    const render = app.slice(app.indexOf('function renderWalletIdentity('), app.indexOf('function renderWalletIdentity(') + 3000);
-    expect(render).toContain('scheduleOwnedUsernamesBootCheck();');
+    expect(load).toMatch(/function scheduleOwnedUsernameNftsSessionCheck\(\) \{[\s\S]*?if \(!owner \|\| ownedUsernameNftsSessionChecked\.has\(owner\) \|\| ownedUsernameNftsInFlight\) return;/);
+    // A rate-limited attempt RE-ARMS (the row would otherwise quote "N+" for the whole session); it runs on the
+    // username-hygiene lane so it never overlaps another username resolve.
+    expect(load).toMatch(/queueUsernameHygiene\(async \(\) => \{/);
+    expect(load).toMatch(/if \(tonRpcLimited\(\)\) \{ ownedUsernameNftsSessionChecked\.delete\(owner\); return; \}/);
+    // From the row's own paint (renderMyUsernamesStatus), which every wallet-identity render reaches: the row shows
+    // what the device REMEMBERS at once and schedules the one real read behind that first paint.
+    const row = app.slice(app.indexOf('function renderMyUsernamesStatus()'), app.indexOf('function scheduleOwnedUsernameNftsSessionCheck()'));
+    expect(row.length, 'the row slice must not collapse').toBeGreaterThan(400);
+    expect(row).toContain('scheduleOwnedUsernameNftsSessionCheck();');
+    expect(app).toMatch(/renderMyUsernamesStatus\(\);/);
   });
 
   it('PWA-PIN-01: a contact can be PINNED from the chevron menu — kept at the top, pinned ones still ordered by freshness', async () => {
@@ -7665,23 +7851,28 @@ describe('PWA runtime config guard', () => {
 
     const app = readFileSync('web/app.js', 'utf8');
     // The list AND the share sheet order through the one rule.
-    expect(app).toMatch(/const ordered = orderThreadsForList\(visibleThreads, \{ isSavedMessages: isSavedMessagesThread, lastActivityMs: threadLastActivityMs \}\);/);
-    expect(app).toMatch(/const contacts = orderThreadsForList\(\s*\n\s*visible\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\),/);
+    expect(app).toMatch(/const ordered = orderThreadsForList\(visibleThreads, \{\s*isSaved: isSavedMessagesThread,\s*isPinned: isThreadPinned,\s*lastActivityMs: threadLastActivityMs,\s*\}\);/);
+    expect(app).toMatch(/const contacts = orderThreadsForList\(visible, \{\s*isSaved: isSavedMessagesThread,\s*isPinned: isThreadPinned,\s*lastActivityMs: threadLastActivityMs,\s*\}\)\.filter\(\(thread\) => !isSavedMessagesThread\(thread\)\);/);
     expect(app, 'no second recency sort of the thread list survives').not.toMatch(/\.sort\(\(a, b\) => threadLastActivityMs\(b\) - threadLastActivityMs\(a\)\)/);
     // The flag lives in the per-counterparty display store (device-local, like the local name), every writer of that
     // record leaves it alone unless asked, and the thread picks it up on hydrate.
     expect(app).toMatch(/const pinned = value\.pinned === true;\s*\n\s*if \(!displayIdentity && !localLabel && !pinned\) return null;/);
-    expect(app).toMatch(/pinned: typeof preference\?\.pinned === 'boolean' \? preference\.pinned : existingPinned,/);
+    expect(app).toMatch(/const pinned = typeof preference\?\.pinned === 'boolean'\s*\?\s*preference\.pinned\s*:\s*\(readContactDisplayPreference\(counterpartyWallet\)\?\.pinned === true\);/);
     expect(app).toContain("pinned: normalized.pinned === true,");
     expect(app).toMatch(/thread\.pinned = stored\?\.pinned === true;/);
     // The menu row: a labeled action (Pin / Unpin + the device-local hint), only for a pinnable Private dialog.
-    expect(app).toMatch(/pinLabel\.textContent = pin\.pinned \? t\('chat\.unpinContact'\) : t\('chat\.pinContact'\);/);
+    expect(app).toMatch(/pinLabel\.textContent = pinned \? t\('chat\.unpinContact'\) : t\('chat\.pinContact'\);/);
     expect(app).toContain("pinType.textContent = t('chat.pinHint');");
-    expect(app).toMatch(/const pinnable = Boolean\(ownerWalletFromThread\(thread\)\) && !isSavedMessagesThread\(thread\);/);
-    expect(app).toMatch(/pin: pinnable \? \{ pinned: thread\.pinned === true, onToggle: \(\) => toggleThreadPinned\(thread\) \} : null,/);
-    const toggle = app.slice(app.indexOf('function toggleThreadPinned(thread) {'), app.indexOf('function showIdentityPopover(thread, anchor) {'));
-    expect(toggle).toContain('writeContactDisplayPreference(wallet, {');
-    expect(toggle).toContain('pinned,');
+    // Offered for a dialog whose PEER WALLET is known and is not the own one — the store keys on that wallet, so
+    // "My notes" (own wallet) and an unresolved peer have nothing to pin. The Public channel header offers the same
+    // row for the same wallet, so a channel and its private dialog share one pin, as they share the local name.
+    expect(app).toMatch(/const pinWallet = isSavedMessagesThread\(thread\) \? null : ownerWalletFromThread\(thread\);/);
+    expect(app).toMatch(/pinned: pinWallet \? isContactPinned\(pinWallet\) : null,/);
+    expect(app).toMatch(/onTogglePin: pinWallet \? \(next\) => setContactPinned\(pinWallet, next\) : null,/);
+    const toggle = app.slice(app.indexOf('function setContactPinned(counterpartyWallet, pinned) {'), app.indexOf('function contactDisplayContextForWallet('));
+    expect(toggle.length, 'the setter slice must not collapse').toBeGreaterThan(120);
+    expect(toggle).toContain('writeContactDisplayPreference(counterpartyWallet, {');
+    expect(toggle).toContain('pinned: pinned === true,');
     expect(toggle).toContain('renderThreads();');
     // Every locale names the action.
     const { I18N_STRINGS, I18N_LOCALES } = await import('../web/i18n-strings.mjs');
@@ -7761,7 +7952,8 @@ describe('PWA runtime config guard', () => {
 
     // Tightening is only safe because the confirm reads bypass the cache — a "has my write landed" question must
     // never be answerable from a cache filled before the write. The spacing is no longer what protects it.
-    const confirm = app.slice(app.indexOf('async function runConvDeliveryConfirm('), app.indexOf('async function runConvDeliveryConfirm(') + 2200);
+    const confirm = app.slice(app.indexOf('async function runConvDeliveryConfirm('), app.indexOf('async function rebroadcastPendingDirectSend('));
+    expect(confirm.length, 'the confirm slice must not collapse').toBeGreaterThan(2_000);
     expect(confirm.match(/cacheTtlMs: 0, priority: 'critical'/g)?.length, 'both readers read fresh').toBe(2);
 
     // Both publish paths arm the check; a comment is the twin that gets forgotten.

@@ -214,6 +214,6 @@ describe('PEERNAME — the peer .ath travels on the wire and is verified before 
     expect(fn.slice(0, 200)).toContain('isSavedMessagesThread(thread)');
     // …and the popover really does always offer the action the button now exposes.
     const popover = APP.slice(APP.indexOf('function showIdentityPopover(thread, anchor) {'));
-    expect(popover.slice(0, 900)).toContain('onSetLocalName:');
+    expect(popover.slice(0, 1_400), 'the pin row (2026-08-21) sits before it, so the window is wider').toContain('onSetLocalName:');
   });
 });

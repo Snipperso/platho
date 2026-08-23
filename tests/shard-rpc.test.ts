@@ -113,10 +113,28 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     expect(states.get(bad)?.status, 'the refused address is UNKNOWN, present, unmarked').toBe('unknown');
     expect(states.get(bad)?.refused).toBe(true);
     expect(states.get(bad)?.lastLt ?? null, 'no marker — a lane reads it and remembers nothing').toBeNull();
-    // Bisected, not abandoned: [3] → [2] + [1]; [2] = [good1, bad] → [good1] + [bad]. Five requests, no throw.
-    expect(urls.length).toBe(5);
+    // The FastAPI body above NAMES the position (detail[].loc = ["query","address",<i>]), and since 2026-08-23 the
+    // reader reads that shape too (refusedIndexFromBody, next to the Go-style "index N of address" text RPC-04D
+    // measured): the named address is excised and the rest re-asked in ONE request. Two requests, no throw.
+    expect(urls.length).toBe(2);
     // And the reason is in the error text now, not only the status.
     await expect(readAccountStates([bad], { request })).resolves.toBeTruthy();   // single refused → unknown, no throw
+
+    // A 422 whose body does NOT say which address is still BISECTED, not abandoned: [3] → [2] + [1];
+    // [2] = [good1, bad] → [good1] + [bad]. Five requests, the refused one UNKNOWN, the rest read.
+    __resetRefusedAddressesForTests();
+    const blindUrls: string[] = [];
+    const blindFetch = async (url: string) => {
+      blindUrls.push(String(url));
+      const asked = new URL(String(url)).searchParams.getAll('address');
+      if (asked.includes(bad)) return { ok: false, status: 422, text: async () => '{"detail":"invalid address"}' } as any;
+      return { ok: true, status: 200, json: async () => ({ accounts: asked.map((a) => ({ address: a, status: 'active', balance: '1', data_hash: 'h', last_transaction_lt: '9' })) }) } as any;
+    };
+    const blind = await readAccountStates([good1, bad, good2], { request: createShardStatesRequest({ endpoint: ENDPOINT, fetch: blindFetch, strict: true }) });
+    expect(blind.get(good1)?.status).toBe('active');
+    expect(blind.get(good2)?.status).toBe('active');
+    expect(blind.get(bad)?.status).toBe('unknown');
+    expect(blindUrls.length, 'an unnamed refusal bisects: [3] → [2] + [1] → [1] + [1]').toBe(5);
     const plain = createShardStatesRequest({ endpoint: ENDPOINT, fetch: async () => ({ ok: false, status: 422, text: async () => '{"detail":"why"}' }) as any });
     await expect(plain({ path: '/accountStates?address=x' })).rejects.toThrow(/HTTP 422: \{"detail":"why"\}/);
   });
@@ -274,13 +292,18 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
     // every batch size; halving to single addresses would then cost 2N requests, each waiting out the endpoint's
     // deadline, with the one serial pump held for all of it. So the split stops at the floor (32): a batch at or
     // below it that still times out has its addresses marked UNANSWERED this pass, and the next pass starts small
-    // from the remembered ceiling. 256 addresses, every batch timing out: 256, 128x2, 64x4, 32x8 — 15 requests, not 511.
+    // from the remembered ceiling. 256 addresses, every batch timing out. The halves are cut at the LIVE ceiling
+    // (2026-08-23, design-integration review): the first half's own deadlines lower it, and the sibling is never
+    // re-asked at a size the endpoint has just refused — 256, 128, 64, 32, 32 (the first 64's halves), 32, 32 (the
+    // sibling 64 is already cut at the floor), then the sibling 128 as 4 x 32: 11 requests, not 15 (a sibling re-asked
+    // at its pre-deadline size, one more timeout per level) and never 511.
     __resetRefusedAddressesForTests();
     const addrs = Array.from({ length: 256 }, (_, i) => '0:' + (0x300 + i).toString(16).padStart(2, '0').repeat(32).slice(0, 64));
-    let requests = 0;
-    const request = async () => { requests += 1; throw Object.assign(new Error('accountStates failed with HTTP 422: {"error":"context deadline exceeded"}'), { status: 422, detail: '{"error":"context deadline exceeded"}' }); };
+    const sizes: number[] = [];
+    const request = async ({ addresses }: { addresses: string[] }) => { sizes.push(addresses.length); throw Object.assign(new Error('accountStates failed with HTTP 422: {"error":"context deadline exceeded"}'), { status: 422, detail: '{"error":"context deadline exceeded"}' }); };
     const states = await readAccountStates(addrs, { request });
-    expect(requests, '1 + 2 + 4 + 8 — split stops at the floor').toBe(15);
+    expect(sizes, 'the split stops at the floor and never re-asks a sibling at a refused size').toEqual([256, 128, 64, 32, 32, 32, 32, 32, 32, 32, 32]);
+    expect(sizes.length, 'bounded: 11 requests for 256 addresses, not 2N').toBe(11);
     expect(states.size, 'every address answered in the map').toBe(256);
     expect([...states.values()].every((row) => row.status === 'unknown' && row.unanswered === true && row.refused === false), 'all unanswered, none refused').toBe(true);
     expect(__statesBatchCeilingForTests(), 'the ceiling sits at the floor for the next pass').toBe(32);

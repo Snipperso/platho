@@ -10,7 +10,7 @@
 import { outgoingBucketKey, incomingBucketKeys, outgoingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=3';
 import {
   recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey, RECOVERY_MAX_SLOTS,
-} from './shard-discovery.mjs?v=21';
+} from './shard-discovery.mjs?v=23';
 
 // Portable big-endian bytes -> bigint (the on-chain bucket_key is a uint256 = the 32 HKDF bytes, big-endian).
 const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
