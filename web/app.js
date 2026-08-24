@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=59';
+} from './public-channel-subscriptions.mjs?v=64';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -189,6 +189,7 @@ import { createConvReadLane } from './conv-lane.mjs?v=32';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=28';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=24';
 import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=26';
+import { sha256 as nobleSha256 } from './vendor/@noble/hashes/sha2.js';
 import { orderThreadsForList } from './thread-list-order.mjs?v=2';
 import { reconcileKeyedRows } from './keyed-rows.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
@@ -253,7 +254,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=82';
+} from './i18n.mjs?v=87';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -273,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.1';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.2';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2632,6 +2633,10 @@ document.addEventListener('focusin', (event) => {
   holdPageAtTopWhileKeyboardArrives();
 }, { passive: true });
 
+// The height below which a dialog stops being centred and rides the top instead — i.e. "the keyboard is up".
+// One number, read by syncViewportCssVars and by nothing else; the stylesheet keys off the attribute it writes.
+const APP_VIEWPORT_SHORT_PX = 620;
+
 function syncViewportCssVars() {
   // Inside Telegram the WebView height is governed by the client (viewportStableHeight),
   // not window.visualViewport — using the latter alone clips content under Telegram's header.
@@ -2676,6 +2681,12 @@ function syncViewportCssVars() {
   // Telegram keeps its own authority: its client-reported height still caps the result.
   const rounded = Math.max(0, Math.round(telegramHeight > 0 ? Math.min(telegramHeight, height || telegramHeight) : height));
   document.documentElement.style.setProperty('--app-viewport-height', `${rounded}px`);
+  // AND THE ONE FLAG THE DIALOGS READ. It used to be `@media (max-height: 620px)`, which asks the LAYOUT viewport
+  // — a second opinion on the same question, and on iOS a slower one: after a keyboard dismiss the layout viewport
+  // is restored lazily, so the query stayed matched while this number was already right, and the dialog stayed
+  // pinned to the top [OWNER 2026-08-24]. Written from the SAME number, on the same line, so they cannot drift.
+  if (rounded > 0 && rounded <= APP_VIEWPORT_SHORT_PX) document.documentElement.dataset.appViewportShort = 'true';
+  else delete document.documentElement.dataset.appViewportShort;
   // THE KEYBOARD'S SCROLL IS STALE THE MOMENT WE RESIZE, so undo it — once, here, and nowhere else.
   //
   // [MEASURED in the installed app] MAX scroll 386, off 386, shell up 386 — all three equal to the keyboard's
@@ -4070,12 +4081,30 @@ function setThreadAvatarNode(node, thread) {
   // child node: both branches below rewrite the avatar's content, and a child would be wiped on the next render.
   if (isThreadPinned(thread) && !isSavedMessagesThread(thread)) node.dataset.pinned = 'true';
   else delete node.dataset.pinned;
+  // The same reasoning for MUTED: one place, so a silenced contact cannot look silenced in the list and ordinary
+  // in the header. Without a mark the setting is invisible and reads as not having worked.
+  //
+  // A CHILD, not a pseudo-element: ::after is the pin's and ::before is the avatar's own glow layer, and taking
+  // that one stripped the layer from every muted contact. Appended AFTER the branches below have written the
+  // avatar's content, since two of them rewrite innerHTML and would drop it.
+  const muted = isThreadMuted(thread) && !isSavedMessagesThread(thread);
+  if (muted) node.dataset.muted = 'true';
+  else delete node.dataset.muted;
+  const restoreMuteBadge = () => {
+    node.querySelector(':scope > .avatar-mute-badge')?.remove();
+    if (!muted) return;
+    const badge = document.createElement('span');
+    badge.className = 'avatar-mute-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    node.append(badge);
+  };
   if (isSavedMessagesThread(thread)) {
     node.classList.remove('has-image');
     node.classList.add('avatar-saved');
     node.style.backgroundImage = '';
     delete node.dataset.avatarUrl;
     node.innerHTML = SAVED_MESSAGES_AVATAR_SVG;
+    restoreMuteBadge();
     return;
   }
   node.classList.remove('avatar-saved');
@@ -4089,6 +4118,7 @@ function setThreadAvatarNode(node, thread) {
     node.style.backgroundImage = '';
     delete node.dataset.avatarUrl;
     node.innerHTML = ANONYMOUS_AVATAR_SVG;
+    restoreMuteBadge();
     return;
   }
   node.classList.remove('avatar-anonymous');
@@ -4096,6 +4126,7 @@ function setThreadAvatarNode(node, thread) {
   // thread.avatar can carry a stale initial from an older label (history snapshot restore), which made the
   // letter flip between renders depending on which code path wrote it last (owner: "sometimes U, sometimes A").
   setAvatarNode(node, threadDisplayLabel(thread) || thread?.avatar, thread?.avatarImageUrl);
+  restoreMuteBadge();
 }
 
 /** No local name, and no identity beyond the wallet address itself — the same test the channel-name resolver uses. */
@@ -4182,11 +4213,12 @@ function normalizeContactDisplayPreference(value) {
   const displayIdentity = normalizeRecipientIdentity(value.displayIdentity) ?? null;
   const rawLabel = typeof value.localLabel === 'string' ? value.localLabel.trim() : '';
   const localLabel = rawLabel.length > 0 ? rawLabel : null;
-  // "Pin contact": a third LOCAL field next to the local label. Strictly boolean true — anything else (absent on
-  // every entry written before the flag existed) reads as unpinned, so old entries need no migration.
+  // "Pin contact" and "Mute contact": LOCAL flags next to the local label. Strictly boolean true — anything else
+  // (absent on every entry written before each flag existed) reads as off, so old entries need no migration.
   const pinned = value.pinned === true;
-  if (!displayIdentity && !localLabel && !pinned) return null;
-  return { displayIdentity, localLabel, pinned };
+  const muted = value.muted === true;
+  if (!displayIdentity && !localLabel && !pinned && !muted) return null;
+  return { displayIdentity, localLabel, pinned, muted };
 }
 
 function readContactDisplayPreference(counterpartyWallet) {
@@ -4227,6 +4259,7 @@ function writeContactDisplayPreference(counterpartyWallet, preference) {
         displayIdentity: normalized.displayIdentity,
         localLabel: normalized.localLabel,
         pinned: normalized.pinned === true,
+        muted: normalized.muted === true,
       }));
     }
   } catch {
@@ -4242,11 +4275,50 @@ function isContactPinned(counterpartyWallet) {
   return readContactDisplayPreference(counterpartyWallet)?.pinned === true;
 }
 
+/**
+ * "MUTE CONTACT" — the fourth per-counterparty local flag, and it silences rather than blocks.
+ *
+ * [OWNER 2026-08-24: "add mute to the chevron, so a user can choose not to receive messages from a contact. And
+ * unmute too."] What it can honestly do is stop them COUNTING: a message is published to the chain by its sender,
+ * and nothing on this device can prevent it being written or read. So a muted contact's messages still arrive and
+ * are still there when the dialog is opened — they raise no unread count, which is what feeds both the row's badge
+ * and the Private tab's. The hint says exactly that, rather than promising a delivery block we cannot perform.
+ *
+ * Local and per device, like the other three: it lives in the same entry, next to the pin.
+ */
+function isContactMuted(counterpartyWallet) {
+  return readContactDisplayPreference(counterpartyWallet)?.muted === true;
+}
+
+function setContactMuted(counterpartyWallet, muted) {
+  const stored = readContactDisplayPreference(counterpartyWallet);
+  writeContactDisplayPreference(counterpartyWallet, {
+    displayIdentity: stored?.displayIdentity ?? null,
+    localLabel: stored?.localLabel ?? null,
+    pinned: stored?.pinned === true,
+    muted: muted === true,
+  });
+  const thread = findThreadByIdentityVariants(threads, privateWalletIdentityVariants(counterpartyWallet));
+  if (thread) {
+    thread.muted = muted === true;
+    // Muting clears what has already piled up — otherwise the badge the user just silenced stays on screen until
+    // they open the dialog, which reads as the setting not having worked.
+    if (muted === true) thread.unreadCount = 0;
+  }
+  renderThreads();
+  refreshChatsRailBadge();
+}
+
+function isThreadMuted(thread) {
+  return thread?.muted === true;
+}
+
 function setContactPinned(counterpartyWallet, pinned) {
   const stored = readContactDisplayPreference(counterpartyWallet);
   writeContactDisplayPreference(counterpartyWallet, {
     displayIdentity: stored?.displayIdentity ?? null,
     localLabel: stored?.localLabel ?? null,
+    muted: stored?.muted === true,
     pinned: pinned === true,
   });
   // Mirror onto the live thread (if any) so the next render orders it without re-reading storage per row; a thread
@@ -4960,6 +5032,28 @@ async function handleServiceWorkerControllerChange() {
   window.location.reload();
 }
 
+/**
+ * EVERY OVERLAY THE UNLOCKED SESSION OWNS, dismissed in one call.
+ *
+ * The lock tears down the session that put these on screen, so they go with it — otherwise a window outlives its
+ * own keys and sits over a locked app, which is both a wrong picture and a real leak (the image lightbox holds a
+ * decrypted photo). It also clears the way for the unlock prompt, which refuses to open over another dialog.
+ *
+ * A LIST, not a chain of one-offs: the action dialog used to be the only thing the lock closed, and it happened to
+ * take the lightbox with it ONLY when the lightbox had been opened from inside it. Anything added here later is
+ * covered by construction. The password dialog is deliberately absent — it belongs to the LOCKED state, and this
+ * function only ever runs while a wallet is still live.
+ */
+function closeSessionOverlays() {
+  closeActionDialog(null);
+  closeImageLightbox();
+  closeNewChatDialog();
+  closeSharePostDialog();
+  closeAppearanceDialog();
+  closeDocsDialog();
+  hideIdentityPopover();
+}
+
 function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   if (!plathoWallet) {
     reloadForPendingServiceWorkerAppShellUpdate();
@@ -4987,7 +5081,14 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   // still up there was no prompt and no boot-screen mask either, and the app just sat there unlocked-looking.
   // Only reachable with a live wallet (the guard on the first line of this function), so the dialog is by
   // definition of the unlocked session — never the password dialog, which only runs while locked.
-  closeActionDialog(null);
+  //
+  // ALL OF THEM, NOT THE ACTION DIALOG ALONE [OWNER 2026-08-24: "I was looking at an image, then closed the window
+  // and saw the lock screen. The image lightbox definitely ignores the app lock — it behaves differently from
+  // every other modal. Put it on the common mechanism."] Exactly the defect the note above describes, one window
+  // over: the lock closed the action dialog, and the action dialog closes the lightbox — but a lightbox opened
+  // straight from a message has no action dialog above it, so nothing closed it and the picture stayed on top of
+  // a locked app. Naming every overlay in one place is what stops the next window being forgotten too.
+  closeSessionOverlays();
   plathoWallet = null;
   localIdentity = null;
   ownedUsernameNftsVerified = null;   // the chain count belongs to the wallet being torn down, not the next one
@@ -5445,9 +5546,11 @@ function hydrateThreadDisplayFromContactStore(thread) {
   if (own && sameWalletAddress(wallet, own)) { thread.contactDisplaySynced = true; return false; }
   thread.contactDisplaySynced = true;
   const stored = readContactDisplayPreference(wallet);
-  // The pin rides the same entry (runtime mirror on the thread, read by thread-list-order via isThreadPinned). Set it
-  // BEFORE the display compare: a pinned-only entry carries no display choice and must not count as one.
+  // The pin and the mute ride the same entry (runtime mirrors on the thread, read by thread-list-order via
+  // isThreadPinned and by markIncomingThreadMessage via isThreadMuted). Set BEFORE the display compare: an entry
+  // that carries only a flag carries no display choice and must not count as one.
   thread.pinned = stored?.pinned === true;
+  thread.muted = stored?.muted === true;
   const storedDisplay = stored && (stored.displayIdentity || stored.localLabel) ? stored : null;
   if (!storedDisplay) {
     if (thread.displayIdentity || thread.localLabel) {
@@ -5908,7 +6011,10 @@ async function openEditChannelProfileDialog() {
 // Generic "Display as" popover used by BOTH the Private conversation header and the Public channel
 // detail header. The caller supplies the option list, the current selection, and what to do when an
 // option / the local-name action is picked.
-function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pinned = null, onTogglePin = null }) {
+function renderDisplayAsPopover({
+  options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName,
+  pinned = null, onTogglePin = null, muted = null, onToggleMute = null,
+}) {
   if (!anchor) return;
   const popover = ensureIdentityPopover();
   popover.setAttribute('role', 'menu');
@@ -5943,6 +6049,24 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       onTogglePin(!pinned);
     });
   }
+  // "Mute contact" / "Unmute contact" — the second action, built the same way. `muted === null` means the row is
+  // not offered (the own wallet / Saved), exactly as with the pin.
+  let muteRow = null;
+  if (muted !== null && typeof onToggleMute === 'function') {
+    muteRow = document.createElement('button');
+    muteRow.type = 'button';
+    muteRow.className = 'identity-variant identity-variant-action';
+    muteRow.setAttribute('role', 'menuitem');
+    const muteLabel = document.createElement('strong');
+    muteLabel.textContent = muted ? t('chat.unmuteContact') : t('chat.muteContact');
+    const muteType = document.createElement('span');
+    muteType.textContent = t('chat.muteHint');
+    muteRow.append(muteLabel, muteType);
+    muteRow.addEventListener('click', () => {
+      hideIdentityPopover();
+      onToggleMute(!muted);
+    });
+  }
   // Local name at the very top: when none is set yet, the "Set local name" action sits above the identities. (When
   // one IS set it's the first option in the loop below, carrying an edit pencil — already at the top.)
   if (!localLabelExists) {
@@ -5957,7 +6081,6 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
     localNameRow.append(localNameLabel, localNameType);
     localNameRow.addEventListener('click', openEdit);
     popover.append(localNameRow);
-    if (pinRow) popover.append(pinRow);
   }
   for (const option of options ?? []) {
     if (option.key === 'local-label') {
@@ -5980,7 +6103,6 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       editButton.addEventListener('click', openEdit);
       row.append(selectRow, editButton);
       popover.append(row);
-      if (pinRow && !pinRow.isConnected) popover.append(pinRow);
       continue;
     }
     if (option.identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS && option.identity.value) {
@@ -6031,7 +6153,17 @@ function renderDisplayAsPopover({ options, selectedKey, localLabelExists, anchor
       onSelect(selected);
     }));
   }
-  if (pinRow && !pinRow.isConnected) popover.append(pinRow); // no local-name row to follow (defensive) — still offered
+  // ACTIONS ARE NOT A DISPLAY CHOICE [OWNER 2026-08-24: "the items need grouping properly. 'Display as' is only
+  // about the way the contact is SHOWN, and we have mute going in there and pin already in there"]. Correct: the
+  // title covers the local name and the identity options above, and neither pinning nor muting is a way of showing
+  // anybody. So they get their own heading, after the list they never belonged to.
+  const actionRows = [pinRow, muteRow].filter(Boolean);
+  if (actionRows.length > 0) {
+    const actionsTitle = document.createElement('div');
+    actionsTitle.className = 'identity-popover-title';
+    actionsTitle.textContent = t('chat.contactActions');
+    popover.append(actionsTitle, ...actionRows);
+  }
   popover.classList.remove('is-closing');   // a reopen mid-exit owns the node again (hidePopoverAnimated stands down)
   popover.hidden = false; // unhide FIRST so positionIdentityPopover can measure the real height (bounded by the CSS max-height)
   positionIdentityPopover(popover, anchor);
@@ -6055,6 +6187,8 @@ function showIdentityPopover(thread, anchor) {
     localLabelExists: Boolean(thread.localLabel),
     pinned: pinWallet ? isContactPinned(pinWallet) : null,
     onTogglePin: pinWallet ? (next) => setContactPinned(pinWallet, next) : null,
+    muted: pinWallet ? isContactMuted(pinWallet) : null,
+    onToggleMute: pinWallet ? (next) => setContactMuted(pinWallet, next) : null,
     anchor,
     onSelect: (selected) => {
       thread.displayIdentity = selected.identity ?? null;
@@ -6086,6 +6220,8 @@ function showPublicChannelDisplayPopover(channel, anchor) {
     localLabelExists: Boolean(context.localLabel),
     pinned: pinnable ? isContactPinned(wallet) : null,
     onTogglePin: pinnable ? (next) => setContactPinned(wallet, next) : null,
+    muted: pinnable ? isContactMuted(wallet) : null,
+    onToggleMute: pinnable ? (next) => setContactMuted(wallet, next) : null,
     anchor,
     onSelect: (selected) => {
       // Re-read the local label from the store at click time (not the captured context): the user may
@@ -6548,7 +6684,12 @@ function openImageLightbox(src, meta = '') {
   imageLightboxPreviousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   resetImageLightboxZoom();
   imageLightboxImage.src = src;
-  if (imageLightboxMeta) imageLightboxMeta.textContent = meta || t('common.finalCompressedImage');
+  if (imageLightboxMeta) {
+    // A fresh open owns the caption: a 'Saved' confirmation left over from the previous picture must not be
+    // restored on top of this one when its timer fires.
+    delete imageLightboxMeta.dataset.caption;
+    imageLightboxMeta.textContent = meta || t('common.finalCompressedImage');
+  }
   if (imageLightboxDownloadButton) imageLightboxDownloadButton.disabled = false;
   imageLightboxDialog.classList.remove('is-closing');
   imageLightboxDialog.hidden = false;
@@ -6786,16 +6927,93 @@ function imageLightboxDownloadFilename(src) {
   return `platho-image-${stamp}.${imageDownloadExtension(src)}`;
 }
 
-function downloadImageLightboxImage() {
+/**
+ * A data: URL as a Blob, decoded HERE rather than through fetch().
+ *
+ * Not an optimisation: iOS only opens a share sheet from inside the gesture that asked for it, and an `await
+ * fetch(...)` first is enough to lose that. The images this viewer shows arrive as data URLs (a private one rides
+ * inside its capsule), so the decode can be synchronous and the sheet still counts as user-initiated.
+ */
+function blobFromDataUrl(dataUrl) {
+  const match = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(String(dataUrl ?? ''));
+  if (!match) return null;
+  const type = match[1] || 'application/octet-stream';
+  if (!match[2]) return new Blob([decodeURIComponent(match[3])], { type });
+  const binary = atob(match[3]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+
+/**
+ * SAVE THE PICTURE — and on iPhone that is not a download [OWNER 2026-08-24: "on the iPhone the image from the
+ * viewer doesn't save. Something flickers and that's it … the download isn't visible anywhere. On Android it saves
+ * with no problem."]
+ *
+ * `<a download>` is what every other platform wants and what iOS Safari IGNORES: the attribute does nothing there,
+ * so the click navigated for an instant and came back — the flicker, and no file. The platform's own way to put a
+ * picture in the camera roll is the share sheet ("Save Image"), which is what canShare({files}) offers.
+ *
+ * Returns the outcome instead of announcing it: only the caller knows what its surface can say. A dismissed sheet
+ * is the user changing their mind, not a failure.
+ */
+async function saveImageOutOfPlatho(src, filename) {
+  if (!src) return 'failed';
+  const blob = src.startsWith('data:') ? blobFromDataUrl(src) : null;
+  // THE PROVEN PATH, and it was already in this file [OWNER 2026-08-24: "but we do download things on the iPhone
+  // somehow — the wallet key, for instance"]. Right, and that is the whole answer: downloadJsonFile makes a BLOB
+  // URL and clicks an <a download> at it, and that works on iPhone.
+  //
+  // So the first diagnosis was wrong. iOS does not ignore the download attribute; it refuses a `data:` URL — which
+  // is exactly what this handler used to hand it, because a private image travels as a data URL inside its
+  // capsule. Converting first makes this the same one path everywhere, with no platform branch at all. The share
+  // sheet is gone with the branch: on a desktop it turned a download into a share sheet, which is not a nicer
+  // download — it is a different action the user did not ask for.
+  const href = blob ? URL.createObjectURL(blob) : src;
+  try {
+    if (isTelegramEnv() && blob && navigator.canShare?.({ files: [new File([blob], filename, { type: blob.type })] })) {
+      // The ONE place a click cannot work: <a download>.click() fails silently inside Telegram's WebView (the same
+      // reason downloadJsonFile shows a manual-copy dialog there). A file has nothing to copy manually, so the
+      // system sheet is the only way out — and there it IS the user's only option, not a substituted one.
+      await navigator.share({ files: [new File([blob], filename, { type: blob.type || 'image/webp' })] });
+      return 'shared';
+    }
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = filename;
+    link.rel = 'noreferrer';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    return 'downloaded';
+  } catch (error) {
+    if (error?.name === 'AbortError') return 'dismissed';   // the user closed the sheet themselves
+    console.error(error);
+    return 'failed';
+  } finally {
+    if (blob) window.setTimeout(() => URL.revokeObjectURL(href), 10_000);
+  }
+}
+
+async function downloadImageLightboxImage() {
   const src = imageLightboxImage?.currentSrc || imageLightboxImage?.src;
   if (!src) return;
-  const link = document.createElement('a');
-  link.href = src;
-  link.download = imageLightboxDownloadFilename(src);
-  link.rel = 'noreferrer';
-  document.body.append(link);
-  link.click();
-  link.remove();
+  const outcome = await saveImageOutOfPlatho(src, imageLightboxDownloadFilename(src));
+  // A share sheet showed the user something happened and a dismissal was their own doing; the other two outcomes
+  // are invisible without this — which is the second half of the owner's report ("the download isn't visible
+  // anywhere"). The confirmation goes in the viewer's OWN caption line: the control is an icon button, so
+  // replacing its text would replace the icon.
+  const said = outcome === 'downloaded' ? t('common.imageSaved')
+    : outcome === 'failed' ? t('common.imageSaveFailed')
+    : null;
+  if (!said || !imageLightboxMeta) return;
+  const caption = imageLightboxMeta.dataset.caption ?? imageLightboxMeta.textContent;
+  imageLightboxMeta.dataset.caption = caption;
+  imageLightboxMeta.textContent = said;
+  window.setTimeout(() => {
+    if (imageLightboxMeta.textContent !== said) return;   // a reopen already put its own caption back
+    imageLightboxMeta.textContent = imageLightboxMeta.dataset.caption ?? caption;
+  }, 1800);
 }
 
 function closeActionDialog(result = null) {
@@ -8749,9 +8967,43 @@ function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet) {
 const PERMALINK_RESERVED_SEGMENTS = new Set(['assets', 'vendor', 'privacy', 'terms']);
 // Second segment is the feed entryId (epochTag.shardSeq.entryId) — all digits, so it can never be mistaken for a
 // username (which is [a-z0-9_-]{4,16}, no dots) and the two segments cannot swap places.
-const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:-]{4,80})\/(\d+\.\d+\.\d+)\/?$/;
+// `~` joins the name to the author fingerprint (see permalinkWalletFingerprint). It cannot be confused with either
+// half: a username is [a-z0-9_-] and a wallet address is base64url, so neither can contain one.
+const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:~-]{4,90})\/(\d+\.\d+\.\d+)\/?$/;
 
-/** The author segment for a post's link: the registry-verified .ath if there is one, else the wallet address. */
+/**
+ * A NAME CAN CHANGE HANDS; A POST CANNOT [OWNER 2026-08-24: "if someone shares a link with a username and then
+ * passes the username to another person, the link can be substituted for a post by the NEW owner"].
+ *
+ * A post link resolves its name to a wallet AT OPEN TIME, so after a transfer the same URL points at whoever holds
+ * the name now. Two outcomes, and the second is the dangerous one: either that account has no entry with this id
+ * and the link simply breaks, or it HAS one — an entry id is unique within a channel, not across the chain, and
+ * early ids are small numbers that collide readily — and a different person's post opens with nothing to show that
+ * anything was swapped.
+ *
+ * So a post link carries a fingerprint of the author's wallet and the open refuses on a mismatch. Eight base36
+ * characters of a sha256, i.e. 40 bits: an accidental collision is out of the question, and forging one means
+ * grinding a vanity wallet AFTER already acquiring the name, to hijack links to posts one does not own.
+ *
+ * SYNCHRONOUS on purpose — the link is built inside a render, and an async digest there would mean either a
+ * pending link or plumbing a promise through the feed. The vendored sha256 is synchronous.
+ *
+ * A CHANNEL link deliberately has NO fingerprint [OWNER: "a channel link should lead to the channel of whoever
+ * owns the username, that's normal"]. A channel link names an IDENTITY, and the identity is the name; a post link
+ * names a piece of CONTENT, and content belongs to whoever wrote it.
+ */
+const PERMALINK_FINGERPRINT_CHARS = 8;
+
+function permalinkWalletFingerprint(authorWallet) {
+  const raw = rawWalletAddress(authorWallet);
+  if (!raw) return null;
+  const digest = nobleSha256(new TextEncoder().encode(raw));
+  let value = 0n;
+  for (let i = 0; i < 5; i += 1) value = (value << 8n) | BigInt(digest[i]);   // 40 bits
+  return value.toString(36).padStart(PERMALINK_FINGERPRINT_CHARS, '0');
+}
+
+/** The author segment for a CHANNEL link: the registry-verified .ath if there is one, else the wallet address. */
 function publicPostPermalinkAuthorSegment(authorWallet) {
   const wallet = rawWalletAddress(authorWallet);
   if (!wallet) return null;
@@ -8767,13 +9019,31 @@ function publicPostPermalink(item) {
   if (!sharedPostShardCoordinates(item.entryId)) return null;   // a pre-shard v1 id has no addressable row
   const segment = publicPostPermalinkAuthorSegment(item.authorWallet);
   if (!segment) return null;
-  return `${location.origin}/${segment}/${item.entryId}`;
+  // The fingerprint rides ONLY on a name. A wallet-address segment already IS the author, so there is nothing for
+  // a transfer to change and nothing to check.
+  const named = segment !== displayWalletAddress(rawWalletAddress(item.authorWallet));
+  const fingerprint = named ? permalinkWalletFingerprint(item.authorWallet) : null;
+  const author = fingerprint ? `${segment}~${fingerprint}` : segment;
+  return `${location.origin}/${author}/${item.entryId}`;
 }
 
-/** {author, entryId} for a permalink path, or null. Pure — resolution of `author` happens on chain. */
+/**
+ * {author, fingerprint, entryId} for a permalink path, or null. Pure — resolution of `author` happens on chain.
+ *
+ * A link made before fingerprints existed has no `~` and parses with fingerprint null. Those keep opening exactly
+ * as they did: they are already out in the world, and breaking them would be a second defect on top of the first.
+ * Only what a fingerprint CAN answer is answered.
+ */
 function parsePublicPostPermalink(pathname) {
   const match = PUBLIC_POST_PERMALINK_RE.exec(String(pathname ?? ''));
-  return match ? { author: decodeURIComponent(match[1]), entryId: match[2] } : null;
+  if (!match) return null;
+  const segment = decodeURIComponent(match[1]);
+  const cut = segment.indexOf('~');
+  return {
+    author: cut < 0 ? segment : segment.slice(0, cut),
+    fingerprint: cut < 0 ? null : segment.slice(cut + 1),
+    entryId: match[2],
+  };
 }
 
 // A CHANNEL link is the same idea one segment shorter: https://platho.app/<username|wallet>. Sharing a channel is
@@ -8867,11 +9137,23 @@ async function shareLinkOutOfPlatho(url, title = '') {
  * The author segment -> a wallet address. An address (raw or user-friendly) is taken as itself; anything else is
  * a .ath name and is resolved through the registry, which is the only authority on who owns a name TODAY.
  */
-async function resolvePermalinkAuthorWallet(author) {
+/**
+ * The wallet a post link names — and, when the link carries a fingerprint, a REFUSAL rather than a substitution.
+ *
+ * A name resolves to whoever holds it now. If the link was made while somebody else held it, the fingerprint will
+ * not match, and the honest answer is to say the name changed hands. Opening the current holder's post instead
+ * would be the silent swap this exists to prevent (see permalinkWalletFingerprint).
+ */
+class PermalinkOwnerChangedError extends Error {}
+
+async function resolvePermalinkAuthorWallet(author, fingerprint = null) {
   const direct = rawWalletAddress(author);
-  if (direct) return direct;
+  if (direct) return direct;   // an address IS the author; a fingerprint would add nothing to check
   const owner = await resolvePlathoUsernameOwner(author);
-  return rawWalletAddress(owner?.ownerWallet) ?? null;
+  const wallet = rawWalletAddress(owner?.ownerWallet) ?? null;
+  if (!wallet || !fingerprint) return wallet;
+  if (permalinkWalletFingerprint(wallet) !== fingerprint) throw new PermalinkOwnerChangedError('permalink author changed');
+  return wallet;
 }
 
 /**
@@ -8881,12 +9163,19 @@ async function resolvePermalinkAuthorWallet(author) {
  * able to copy it back out of the address bar. On failure it is cleared, so a reload lands in the normal app
  * instead of retrying a link that cannot resolve.
  */
+/** Which of the three honest answers a failed post link deserves. */
+function permalinkFailureMessage(error) {
+  if (error instanceof PermalinkOwnerChangedError) return t('public.linkOwnerChanged');
+  if (error instanceof UsernameNotRegisteredError) return t('public.linkNoSuchName');
+  return t('public.linkNotFound');
+}
+
 async function openPublicPostFromPermalink(link) {
   if (!link) return false;
   setView('public');
   setPublicStatus(t('public.openingLink'));
   try {
-    const wallet = await resolvePermalinkAuthorWallet(link.author);
+    const wallet = await resolvePermalinkAuthorWallet(link.author, link.fingerprint);
     if (!wallet) throw new Error('permalink author does not resolve to a wallet');
     const post = await fetchPermalinkPostFromChain(link.entryId, wallet);
     if (!post) throw new Error('permalink post not found on chain');
@@ -8896,7 +9185,7 @@ async function openPublicPostFromPermalink(link) {
     return true;
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[public] permalink open failed', link, error);
-    setPublicStatus(error instanceof UsernameNotRegisteredError ? t('public.linkNoSuchName') : t('public.linkNotFound'));
+    setPublicStatus(permalinkFailureMessage(error));
     clearPublicPostPermalinkFromAddressBar();
     return false;
   }
@@ -15204,8 +15493,9 @@ function markThreadRead(thread) {
 }
 
 function markIncomingThreadMessage(thread) {
-  // Saved never self-badges unread: every message there is the user's own.
-  if (!thread || isSavedMessagesThread(thread) || isThreadConversationVisible(thread)) return;
+  // Saved never self-badges unread: every message there is the user's own. A MUTED contact does not badge either —
+  // one place to silence, because this count is what both the row's badge and the Private tab's total read.
+  if (!thread || isSavedMessagesThread(thread) || isThreadMuted(thread) || isThreadConversationVisible(thread)) return;
   thread.unreadCount = threadUnreadCount(thread) + 1;
 }
 
@@ -17301,6 +17591,9 @@ async function requestWalletPasswordInput({
 async function requestNewWalletStoragePassword(title = t('wallet.encryptLocalWalletTitle'), {
   passwordManagerUsername = PLATHO_WALLET_PASSWORD_MANAGER_USERNAME,
   passwordManagerNetworkGlobalId = plathoWalletNetworkOptions().networkGlobalId,
+  // Extra summary lines for callers whose situation the standard three do not cover — a password CHANGE has one
+  // consequence a first-time encryption does not (see changeStoredPlathoWalletPassword).
+  extraSummary = [],
 } = {}) {
   let hint = t('wallet.setLocalPasswordHint', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH, recommended: PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH });
   let tone = 'muted';
@@ -17318,6 +17611,7 @@ async function requestNewWalletStoragePassword(title = t('wallet.encryptLocalWal
         t('wallet.passwordNotSentSummary'),
         t('wallet.passwordManagerSummary', { min: PLATHO_WALLET_PASSWORD_MIN_LENGTH, recommended: PLATHO_WALLET_PASSWORD_RECOMMENDED_LENGTH }),
         t('wallet.recoveryPhraseEncryptedSummary'),
+        ...extraSummary,
       ],
     });
     if (!result) return null;
@@ -17442,9 +17736,19 @@ async function changeStoredPlathoWalletPassword() {
   const newPassword = await requestNewWalletStoragePassword(t('wallet.setNewPasswordTitle'), {
     passwordManagerUsername: wallet.address,
     passwordManagerNetworkGlobalId: wallet.networkGlobalId,
+    // Said BEFORE the change is committed, because afterwards is too late to decide against it.
+    extraSummary: [t('wallet.keyFileKeepsExportPassword')],
   });
   if (!newPassword) return false;
   await writeStoredPlathoWallet(wallet, newPassword);
+  // THE EXPORTED FILE IS A BACKUP OF THE OLD PASSWORD [OWNER 2026-08-24: "if a person changes the password in the
+  // app, they'll have to export the wallet key again, right?"]. exportEncryptedWalletKeyFile writes the stored
+  // record AS IT STANDS, so a file saved earlier still opens — with the password that was just replaced. The key
+  // inside is untouched, so nothing is lost; what is lost is the owner's ability to open their own backup with the
+  // password they now know. That is precisely the state the backup-pending flag exists to keep asking about, so
+  // the change puts it back: the warning row returns (marking already refreshes it) and its tap runs the export
+  // under the new password.
+  markWalletKeyBackupPending(wallet.address);
   plathoWallet = wallet;
   localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
   markWalletUnlocked();

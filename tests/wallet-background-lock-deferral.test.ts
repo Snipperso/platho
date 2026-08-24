@@ -147,6 +147,10 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
     // closeActionDialog reduced to its guard and its effect; the compensating resumeWalletUnlockPrompt it also
     // schedules is modelled by the return doors below, which call the real one.
     function closeActionDialog() { if (!activeActionDialog) return; activeActionDialog = null; }
+    // The lock now sweeps every overlay the session owned (closeSessionOverlays), not the action dialog alone —
+    // the rest are no-ops in this harness, which has no DOM; what it models is that the sweep runs and the dialog
+    // it closes really goes.
+    function closeSessionOverlays() { closeActionDialog(); }
 
     ${fn('vaultSendNeedsKeyNow')}
     ${fn('shouldDeferLockForActiveSend')}
@@ -346,10 +350,16 @@ describe('background wallet lock deferral', () => {
       expect(body, `${door} must settle the deferred lock`).toContain('enforceBackgroundGraceLockOnReturn();');
     }
     expect(app, 'the Telegram-only timer is gone; there is one deferral primitive now').not.toMatch(/telegramBackgroundLockTimer|scheduleTelegramBackgroundLock|clearTelegramBackgroundLockTimer/);
-    // The lock closes the dialog the ended session owned. Asserted on the source because the counter-case that
-    // matters — the loop that would put it straight back — lives in an async function this harness cannot run.
+    // The lock closes EVERY overlay the ended session owned. Asserted on the source because the counter-case that
+    // matters — the loop that would put one straight back — lives in an async function this harness cannot run.
+    //
+    // It was one call, closeActionDialog, until the owner found the gap it left [2026-08-24]: the action dialog
+    // closes the image lightbox in turn, but a lightbox opened straight from a message has no action dialog above
+    // it, so a decrypted photo stayed on screen over a locked app. The sweep is now a named list
+    // (closeSessionOverlays), which is what stops the next window being forgotten — see PWA-LIGHTBOX-LOCK-01.
     const lockBody = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('const TELEGRAM_BACKGROUND_LOCK_GRACE_MS'));
-    expect(lockBody, 'the modal goes with the session that owned it').toContain('closeActionDialog(null);');
+    expect(lockBody, 'the overlays go with the session that owned them').toContain('closeSessionOverlays();');
+    expect(app).toMatch(/function closeSessionOverlays\(\) \{[\s\S]{0,400}?closeActionDialog\(null\);[\s\S]{0,400}?closeImageLightbox\(\);/);
     const seedGate = app.slice(app.indexOf('async function enforceTelegramSeedBackupGate('), app.indexOf('function showTelegramManualExportDialog('));
     expect(seedGate, 'the one dialog loop that re-opens on null must stop when the wallet is gone')
       .toMatch(/for \(let attempt[\s\S]{0,600}?if \(plathoWallet\?\.address !== wallet\.address\) return;[\s\S]{0,80}?await openActionDialog\(/);

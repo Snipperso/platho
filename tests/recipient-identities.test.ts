@@ -256,6 +256,14 @@ describe('.ath tier on the avatar', () => {
       expect(css).toContain(`.avatar[data-tier="${tier}"] {`);
       // With a photo the fill is hidden, so the tier moves to a ring — the one case where it matters most.
       expect(css).toContain(`.avatar.has-image[data-tier="${tier}"] {`);
+      // background-COLOR: the `background` shorthand resets the cover/center the base rule fits a picture with,
+      // which showed the dark corner of the 512px plate as a black square.
+      expect(css).toMatch(new RegExp(`\\.avatar\\[data-tier="${tier}"\\] \\{\\s*\\n\\s*background-color: #[0-9a-f]{6};`));
+      // [OWNER 2026-08-24: "green on gold is not great. Make the text dark green maybe."] Brand green on metal is
+      // both illegible and off — the monogram takes the ONE ink both bands carry.
+      expect(css).toMatch(new RegExp(`\\.avatar\\[data-tier="${tier}"\\] \\{[^}]*color: var\\(--tier-ink\\);`));
     }
+    // Defined ONCE: gold is gold in every theme, so ink that followed the theme would go pale on one of them.
+    expect((css.match(/--tier-ink:/g) ?? []).length, 'never redefined in a theme override').toBe(1);
   });
 });

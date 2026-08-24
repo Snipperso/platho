@@ -78,6 +78,15 @@
      token. COMMON keeps --id-platho: it is the default, and colouring it would say nothing. */
   --id-platho-epic: #e7c469;
   --id-platho-rare: #c6d2dc;
+  /* Ink for a monogram sitting ON the metal. Defined ONCE and deliberately absent from the theme overrides below:
+     gold and silver are the same gold and silver in every theme, so ink that followed the theme would go pale on
+     one of them.
+     READS AS BLACK ON PURPOSE — do not "fix" it. Relative luminance 0.019: under roughly 3% of white the eye stops
+     resolving hue and calls any colour black, so this green is green only in the file. [OWNER 2026-08-24: "it went
+     black, looks good, but you set a different colour, seems like something is broken" → shown the measurement,
+     "if everything's fine, then let it stay".] A visibly green ink costs contrast — the lightest one that still
+     reads as green scores 3.4:1 on gold against this one's 4.68:1 — and the owner kept the contrast. */
+  --tier-ink: #0d2b23;
   --bubble-in: #1b242b;
   --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
   --bubble-out-text: #e9fdf6;
@@ -92,6 +101,7 @@
   --shared-post-embed-bg: #121b21;
   --scrollbar: rgba(148, 165, 162, 0.38);
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+  --mute-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a7b4bd' d='M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z'/%3E%3Cpath stroke='%23a7b4bd' stroke-width='2.4' d='M3 3l18 18'/%3E%3C/svg%3E");
   --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
   --badge-ring: #12564a;               /* the unread pill's outline: deep brand green, never the panel's black */
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -152,6 +162,7 @@
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+    --mute-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7785' d='M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z'/%3E%3Cpath stroke='%236b7785' stroke-width='2.4' d='M3 3l18 18'/%3E%3C/svg%3E");
     --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
     --badge-ring: #0b6a58;
     }
@@ -213,6 +224,7 @@
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
+    --mute-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7785' d='M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z'/%3E%3Cpath stroke='%236b7785' stroke-width='2.4' d='M3 3l18 18'/%3E%3C/svg%3E");
     --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
     --badge-ring: #0b6a58;
     }
@@ -1053,17 +1065,32 @@ html[data-platho-telegram="true"] .install-header-button {
 /* A TIER YOU CAN SEE WITHOUT READING [OWNER 2026-08-24: "let's colour the icon for silver and gold too. Make the
    background so it's immediately clear it's silver."] Set from the SAME tone that colours the name
    (applyAvatarTier), so the two can never disagree.
+   background-IMAGE, never the `background` shorthand: the shorthand resets every background-* it does not mention,
+   which here means the `cover` + `center` the base .avatar rule uses to fit a picture into the circle. [OWNER
+   2026-08-24: "a black square instead of the avatar" on a four-letter name.] MEASURED: with the shorthand a tier
+   avatar computed background-size auto / position 0% 0%, so a 512px logo was drawn at full size from its top-left
+   corner and the 44px window showed the dark corner of the plate. The colour is stated separately so a monogram
+   avatar still reads as metal.
    A flat fill would read as "some yellow square"; metal is read from the BAND of light across it, which is why
-   each is a three-stop diagonal — bright, dark, bright — rather than one colour. The monogram goes dark, because
-   dark ink on metal is what is legible on both of these. */
+   each is a three-stop diagonal — bright, dark, bright — rather than one colour. The monogram goes dark GREEN
+   [OWNER 2026-08-24: "green on gold is not great. Make the text dark green maybe."] — the brand hue taken down far
+   enough to stay legible on the darkest point of both bands (measured 4.6:1 on gold, 5.8:1 on silver). */
 .avatar[data-tier="epic"] {
+  background-color: #b8862f;
+  color: var(--tier-ink);
+}
+
+.avatar[data-tier="epic"]::before {
   background: linear-gradient(145deg, #f6e0a0 0%, #b8862f 52%, #edcd7d 100%);
-  color: #33280f;
 }
 
 .avatar[data-tier="rare"] {
+  background-color: #93a2b0;
+  color: var(--tier-ink);
+}
+
+.avatar[data-tier="rare"]::before {
   background: linear-gradient(145deg, #f2f6fa 0%, #93a2b0 52%, #d6e0e8 100%);
-  color: #1e262c;
 }
 
 /* With a photo the fill is hidden, so the tier moves to a RING — otherwise a holder who set a picture would lose
@@ -2349,20 +2376,36 @@ a .avatar.has-image,
   box-shadow: none;
 }
 
-/* The padding the bubble gave up reappears on whatever else it holds, so text keeps the inset it always had. */
-.bubble.has-media > .message-text-block,
+/* The inset the bubble gave up reappears on what it holds — and TEXT takes it as PADDING, never as a margin
+   [OWNER 2026-08-24: "the last word is right at the edge of the post, and the next message has a normal inset"].
+   A margin lives OUTSIDE the box: it can collapse into a neighbour's, and on this bubble — overflow-clipped, so its
+   height is COMPUTED rather than grown by its content — a bottom margin on the last child is a value an engine may
+   or may not count. Chromium counts it (measured: identical 11px under the last line with and without a picture,
+   across in/out, wide/tall, flat/formatted), the owner's WebKit evidently does not, and the reader sees the last
+   line pressed against the frame. Padding is part of the box, so there is nothing left for an engine to disagree
+   about. Blocks carrying their OWN frame (reply quote, shared post, file chip) keep margins: for them the inset
+   must stay outside, or it would land inside their card instead of around it. */
+.bubble.has-media > .message-text-block {
+  padding: var(--bubble-pad-y) var(--bubble-pad-x);
+}
+
+/* With the text holding the whole inset, the sibling gap would be added ON TOP of it — one source, not two. */
+.bubble.has-media > .message-image + .message-text-block,
+.bubble.has-media > .message-text-block + .message-image {
+  margin-top: 0;
+}
+
 .bubble.has-media > .message-payment-block,
 .bubble.has-media > .message-file-chip {
   padding-left: var(--bubble-pad-x);
   padding-right: var(--bubble-pad-x);
 }
 
-.bubble.has-media > .message-text-block:first-child,
 .bubble.has-media > .message-reply-quote:first-child {
   margin-top: var(--bubble-pad-y);
 }
 
-.bubble.has-media > *:last-child:not(.message-image) {
+.bubble.has-media > *:last-child:not(.message-image):not(.message-text-block) {
   margin-bottom: var(--bubble-pad-y);
 }
 
@@ -3928,6 +3971,18 @@ button.feed-item:hover {
   font: inherit;
 }
 
+/* A SETTINGS ROW'S SELECT KEEPS THE SETTINGS SIZE, WHEREVER IT LIVES [OWNER 2026-08-24: "the dropdowns in the
+   cosmetics section are so fat. Make them like the ones in the Profile tab"].
+   MEASURED: 54px tall inside the Appearance dialog against 38px in the profile, from `.action-dialog select
+   { min-height: 56px }` — the dialogs' rule for a big FORM field, which beats `height: 38px` because a min-height
+   always does, and ties on specificity so source order handed it the win. A row of settings is not a form: the
+   control belongs to the row, not to the window it happens to be shown in. */
+.settings-list .settings-select-row select {
+  min-height: 0;
+  height: 38px;
+  padding: 0 34px 0 12px;
+}
+
 .settings-rpc-row {
   display: flex;
   align-items: center;
@@ -5403,24 +5458,32 @@ button.feed-item:hover {
   }
 }
 
-/* Short viewport (keyboard up): MUST come after the ≤900px block (source-order contract). */
-@media (max-height: 620px) {
-  .modal-backdrop {
-    align-items: start;
-    overflow-y: auto;
-    padding-top: max(8px, var(--app-safe-area-top, env(safe-area-inset-top)));
-    padding-bottom: 8px;
-  }
-  .action-dialog,
-  .quick-start-dialog {
-    max-height: none;
-    overflow: visible;
-  }
-  .action-dialog > .action-fields {
-    flex: 0 0 auto;
-    overflow: visible;
-    min-height: auto;
-  }
+/* SHORT VIEWPORT (keyboard up) — driven by the height WE MEASURE, not by a media query.
+   [OWNER 2026-08-24: "when I hide the keyboard the dialog sometimes stays at the top, though it should come back
+   down into the space the keyboard left."] The lift worked; the return did not, and only sometimes — the signature
+   of two sources of truth disagreeing. `@media (max-height)` asks the LAYOUT viewport, while everything else here
+   follows the VISUAL one (syncViewportCssVars, and the measured numbers in its comment). On iOS the layout
+   viewport is restored lazily after a keyboard dismiss — WebKit 191204 territory — so the query stayed matched
+   while the height we write was already correct, and the dialog stayed up.
+   The attribute is set by the same function that writes --app-viewport-height, from the same number, so the two
+   cannot drift apart. MUST still come after the ≤900px block (source-order contract). */
+:root[data-app-viewport-short="true"] .modal-backdrop {
+  align-items: start;
+  overflow-y: auto;
+  padding-top: max(8px, var(--app-safe-area-top, env(safe-area-inset-top)));
+  padding-bottom: 8px;
+}
+
+:root[data-app-viewport-short="true"] .action-dialog,
+:root[data-app-viewport-short="true"] .quick-start-dialog {
+  max-height: none;
+  overflow: visible;
+}
+
+:root[data-app-viewport-short="true"] .action-dialog > .action-fields {
+  flex: 0 0 auto;
+  overflow: visible;
+  min-height: auto;
 }
 
 /* ── Desktop (≥901px) view switching (contract) ─────────────────────────── */
@@ -6140,6 +6203,25 @@ button.feed-item:hover {
   background: var(--panel-2) var(--pin-badge-icon) center / 10px 10px no-repeat;
   box-shadow: 0 0 0 1.5px var(--panel);
   pointer-events: none;
+}
+
+/* MUTED sits on the OPPOSITE corner from the pin, because a contact can be both and two badges on one corner
+   would stack into a blob. Same plate + themed glyph + ring construction, so the two read as one family.
+   A CHILD ELEMENT, not ::before — that pseudo already carries the avatar's glow layer (the gradient that
+   cross-fades on a theme switch), and taking it for a badge silently stripped that layer from every muted
+   contact. The pin can stay a pseudo because ::after is free; there is no third one, so this one is a node,
+   re-appended by setThreadAvatarNode after it rewrites the avatar's content. */
+.avatar > .avatar-mute-badge {
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--panel-2) var(--mute-badge-icon) center / 10px 10px no-repeat;
+  box-shadow: 0 0 0 1.5px var(--panel);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* The share sheet's avatars are smaller (34px) — the badge follows, or it eats the face. */

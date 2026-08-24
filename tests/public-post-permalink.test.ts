@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
+import { sha256 as nobleSha256 } from '../web/vendor/@noble/hashes/sha2.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PERMALINKS — platho.app/<username|wallet>/<epochTag.shardSeq.entryId>
@@ -24,7 +25,7 @@ const caddy = readFileSync('deploy/Caddyfile', 'utf8');
 /** Lift the pure link functions out of app.js and RUN them, with the app-level helpers they touch stubbed. */
 function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: string }> = {}) {
   const start = app.indexOf('const PERMALINK_RESERVED_SEGMENTS');
-  const end = app.indexOf('/** {author, entryId} for a permalink path');
+  const end = app.indexOf('function parsePublicPostPermalink(');
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
   const parseStart = app.indexOf('function parsePublicPostPermalink(');
@@ -40,7 +41,9 @@ function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: st
     const sharedPostShardCoordinates = (id) => (/^\\d+\\.\\d+\\.\\d+$/.test(String(id)) ? {} : null);
   `;
   // eslint-disable-next-line no-new-func
-  return new Function(`${prelude}\n${source}\nreturn { publicPostPermalink, publicPostPermalinkAuthorSegment, parsePublicPostPermalink };`)();
+  // The REAL sha256 is handed in, not stubbed: a fingerprint computed here has to be the one the app builds, or
+  // this file would be checking a shape rather than the value a shared link actually carries.
+  return new Function('nobleSha256', `${prelude}\n${source}\nreturn { publicPostPermalink, publicPostPermalinkAuthorSegment, parsePublicPostPermalink, permalinkWalletFingerprint };`)(nobleSha256);
 }
 
 const WALLET = `0:${'ab'.repeat(32)}`;
@@ -48,8 +51,10 @@ const WALLET = `0:${'ab'.repeat(32)}`;
 describe('public post permalinks', () => {
   it('PERMA-01: the link is /<name>/<entryId> when the name is registry-verified, /<address>/<entryId> otherwise', () => {
     const named = loadPermalinkFunctions({ [WALLET]: { verifiedUsername: 'alice.ath' } });
+    // The name is followed by the author's fingerprint, so a later transfer of "alice" cannot repoint this link
+    // at somebody else's post (PERMA-11..13).
     expect(named.publicPostPermalink({ entryId: '441.0.0', authorWallet: WALLET }))
-      .toBe('https://platho.app/alice/441.0.0');
+      .toBe(`https://platho.app/alice~${named.permalinkWalletFingerprint(WALLET)}/441.0.0`);
     // No verified name -> the address, which always resolves. An UNVERIFIED claim must never reach a link.
     const anon = loadPermalinkFunctions({ [WALLET]: {} });
     const link = anon.publicPostPermalink({ entryId: '441.0.0', authorWallet: WALLET });
@@ -98,9 +103,11 @@ describe('public post permalinks', () => {
 
   it('PERMA-04: the path parses back, and only a real permalink path does', () => {
     const { parsePublicPostPermalink } = loadPermalinkFunctions();
-    expect(parsePublicPostPermalink('/alice/441.0.0')).toEqual({ author: 'alice', entryId: '441.0.0' });
-    expect(parsePublicPostPermalink('/alice/441.0.0/')).toEqual({ author: 'alice', entryId: '441.0.0' });
-    expect(parsePublicPostPermalink(`/UQabcdefgh/441.0.0`)).toEqual({ author: 'UQabcdefgh', entryId: '441.0.0' });
+    // A link shared before fingerprints existed parses with fingerprint null and keeps opening as it did.
+    expect(parsePublicPostPermalink('/alice/441.0.0')).toEqual({ author: 'alice', fingerprint: null, entryId: '441.0.0' });
+    expect(parsePublicPostPermalink('/alice/441.0.0/')).toEqual({ author: 'alice', fingerprint: null, entryId: '441.0.0' });
+    expect(parsePublicPostPermalink(`/UQabcdefgh/441.0.0`)).toEqual({ author: 'UQabcdefgh', fingerprint: null, entryId: '441.0.0' });
+    expect(parsePublicPostPermalink('/alice~3ud30s2b/441.0.0')).toEqual({ author: 'alice', fingerprint: '3ud30s2b', entryId: '441.0.0' });
     // The app's own routes and asset paths must not look like a permalink, or a normal load would try to open one.
     for (const path of ['/', '/index.html', '/assets/icons/chat.svg', '/docs/about-platho.md', '/alice', '/alice/441']) {
       expect(parsePublicPostPermalink(path), path).toBeNull();
@@ -176,10 +183,16 @@ describe('public post permalinks', () => {
       app.indexOf('async function openPublicPostFromPermalink('),
       app.indexOf('function clearPublicPostPermalinkFromAddressBar('),
     );
-    // "No such name" and "the chain would not answer" are DIFFERENT facts and the registry already separates them.
-    expect(open).toContain('error instanceof UsernameNotRegisteredError');
-    expect(open).toContain("t('public.linkNoSuchName')");
-    expect(open).toContain("t('public.linkNotFound')");
+    // "No such name", "the chain would not answer" and "that name changed hands" are THREE different facts, and
+    // the last one arrived with the fingerprint (PERMA-11..13) — calling it "not found" would be a lie, because
+    // the post exists and is simply not the one this link is entitled to open.
+    expect(open).toContain('setPublicStatus(permalinkFailureMessage(error));');
+    const chooser = app.slice(app.indexOf('function permalinkFailureMessage(error)'), app.indexOf('async function openPublicPostFromPermalink('));
+    expect(chooser.length, 'the chooser slice must not collapse').toBeGreaterThan(120);
+    expect(chooser).toContain('error instanceof UsernameNotRegisteredError');
+    expect(chooser).toContain("t('public.linkNoSuchName')");
+    expect(chooser).toContain("t('public.linkNotFound')");
+    expect(chooser).toContain("t('public.linkOwnerChanged')");
     // Cleared only on failure — the URL IS the permalink, and a reader who wants to pass it on copies it from
     // the address bar. Clearing it on success would take that away.
     expect(open).toContain('clearPublicPostPermalinkFromAddressBar();');
@@ -202,5 +215,66 @@ describe('public post permalinks', () => {
     // outcome rather than a bare return, so a caller that confirms a copy on screen stays silent for a dismissal.
     expect(primitive).toContain("if (error?.name === 'AbortError') return 'dismissed';");
     expect(primitive).toContain('copyTextToClipboard(url)');
+  });
+});
+
+describe('a post link survives its author renaming, and refuses rather than substitutes', () => {
+  // [OWNER 2026-08-24: "if someone shares a link with a username and then passes the username to another person,
+  // the link can be substituted for a post by the NEW owner". Confirmed in the source: the name resolves to a
+  // wallet AT OPEN TIME. Two outcomes, and the second is the dangerous one — either the new holder has no entry
+  // with this id and the link breaks, or they HAVE one (an entry id is unique within a channel, not across the
+  // chain, and early ids are small numbers that collide readily) and a different person's post opens with nothing
+  // to show it was swapped.]
+  //
+  // A CHANNEL link deliberately keeps the old behaviour [OWNER: "a channel link should lead to the channel of
+  // whoever owns the username, that's normal"] — it names an IDENTITY, and the identity is the name. A post link
+  // names CONTENT, which belongs to whoever wrote it.
+  it('PERMA-11: a post link carries a fingerprint of the author wallet; a channel link does not', () => {
+    expect(app).toMatch(/const PERMALINK_FINGERPRINT_CHARS = 8;/);
+    expect(app).toMatch(/function permalinkWalletFingerprint\(authorWallet\) \{[\s\S]{0,400}?nobleSha256\(new TextEncoder\(\)\.encode\(raw\)\)/);
+    // SYNCHRONOUS: the link is built inside a render, so an async digest would mean a pending link or a promise
+    // threaded through the feed. The vendored sha256 is synchronous.
+    expect(app).toMatch(/import \{ sha256 as nobleSha256 \} from '\.\/vendor\/@noble\/hashes\/sha2\.js';/);
+    expect(app, 'the digest must not be awaited in the render path').not.toMatch(/await permalinkWalletFingerprint/);
+    // 40 bits: an accidental collision is out of the question, and forging one means grinding a vanity wallet
+    // AFTER already acquiring the name, to hijack links to posts one does not own.
+    expect(app).toMatch(/for \(let i = 0; i < 5; i \+= 1\) value = \(value << 8n\) \| BigInt\(digest\[i\]\);/);
+    // Only on a NAME. A wallet-address segment already IS the author — nothing for a transfer to change.
+    expect(app).toMatch(/const fingerprint = named \? permalinkWalletFingerprint\(item\.authorWallet\) : null;/);
+    // And the channel link is built from the bare segment, with no fingerprint appended.
+    expect(app).toMatch(/function publicChannelPermalink\(authorWallet\) \{\s*\n\s*const segment = publicPostPermalinkAuthorSegment\(authorWallet\);\s*\n\s*return segment \? `\$\{location\.origin\}\/\$\{segment\}` : null;/);
+  });
+
+  it('PERMA-12: the open REFUSES on a mismatch instead of showing the new holder post', () => {
+    expect(app).toMatch(/class PermalinkOwnerChangedError extends Error \{\}/);
+    expect(app).toMatch(/if \(permalinkWalletFingerprint\(wallet\) !== fingerprint\) throw new PermalinkOwnerChangedError/);
+    // An address resolves to itself, so there is nothing a fingerprint could add — and demanding one would break
+    // every address link ever shared.
+    expect(app).toMatch(/const direct = rawWalletAddress\(author\);\s*\n\s*if \(direct\) return direct;/);
+    // Only the POST opener passes the fingerprint; the channel opener must not.
+    expect(app).toMatch(/const wallet = await resolvePermalinkAuthorWallet\(link\.author, link\.fingerprint\);/);
+    expect(app).toMatch(/const wallet = await resolvePermalinkAuthorWallet\(link\.author\);\s*\n\s*if \(!wallet\) throw new Error\('channel link author does not resolve to a wallet'\);/);
+    // Three distinct answers, because "not found" would be a lie when the name simply changed hands.
+    expect(app).toMatch(/function permalinkFailureMessage\(error\) \{[\s\S]{0,300}?PermalinkOwnerChangedError\) return t\('public\.linkOwnerChanged'\);/);
+  });
+
+  it('PERMA-13: links shared before fingerprints existed keep working', () => {
+    // They are already out in the world. Breaking them would be a second defect on top of the first; what a
+    // fingerprint cannot answer is simply not answered for them.
+    expect(app).toMatch(/const cut = segment\.indexOf\('~'\);/);
+    expect(app).toMatch(/author: cut < 0 \? segment : segment\.slice\(0, cut\),/);
+    expect(app).toMatch(/fingerprint: cut < 0 \? null : segment\.slice\(cut \+ 1\),/);
+    expect(app, 'a missing fingerprint is not a mismatch').toMatch(/if \(!wallet \|\| !fingerprint\) return wallet;/);
+    // The separator cannot be confused with either half: a username is [a-z0-9_-] and an address is base64url.
+    expect(app).toContain('const PUBLIC_POST_PERMALINK_RE = /^\\/([A-Za-z0-9_.:~-]{4,90})\\/(\\d+\\.\\d+\\.\\d+)\\/?$/;');
+  });
+
+  it('PERMA-14: every locale can say that the name changed hands', async () => {
+    const { I18N_STRINGS } = await import('../web/i18n-strings.mjs');
+    const locales = Object.keys(I18N_STRINGS);
+    expect(locales.length).toBeGreaterThanOrEqual(10);
+    for (const locale of locales) {
+      expect(I18N_STRINGS[locale]['public.linkOwnerChanged'], `${locale} needs the message`).toBeTruthy();
+    }
   });
 });

@@ -18,7 +18,7 @@ const html = readFileSync('web/index.html', 'utf8');
 /** Lift the pure link functions out of app.js and RUN them, with the app-level helpers they touch stubbed. */
 function loadChannelLinkFunctions(profiles: Record<string, { verifiedUsername?: string }> = {}) {
   const sharedStart = app.indexOf('const PERMALINK_RESERVED_SEGMENTS');
-  const sharedEnd = app.indexOf('/** {author, entryId} for a permalink path');
+  const sharedEnd = app.indexOf('function parsePublicPostPermalink(');
   const channelStart = app.indexOf('const PUBLIC_CHANNEL_PERMALINK_USERNAME_RE');
   const channelEnd = app.indexOf('/**\n * Open the channel a link names');
   expect(sharedStart).toBeGreaterThan(-1);
@@ -143,6 +143,13 @@ describe('CHANLINK — a channel is shareable on its own', () => {
     // chooseShareLink used to carry its own copy of the share-sheet-then-clipboard dance; a second copy is how
     // the two drift apart (one gains an AbortError branch, the other does not).
     expect(app).toContain('async function shareLinkOutOfPlatho(');
-    expect((app.match(/navigator\.share\(/g) ?? []).length).toBe(1);
+    // ONE call sharing a LINK — which is what this gate is about. A share of FILES is a different action with a
+    // different payload and a different fallback (there is no clipboard answer for an image), so it is counted
+    // separately rather than folded into this primitive: a wrapper that only forwards its argument would satisfy
+    // the count while giving the two paths nothing in common.
+    const linkShares = app.match(/navigator\.share\((?!\{ files)/g) ?? [];
+    expect(linkShares.length, 'every link share is shareLinkOutOfPlatho').toBe(1);
+    const fileShares = app.match(/navigator\.share\(\{ files/g) ?? [];
+    expect(fileShares.length, 'the image save inside Telegram — see saveImageOutOfPlatho').toBe(1);
   });
 });

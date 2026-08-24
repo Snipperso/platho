@@ -102,6 +102,24 @@ function unique(items: string[]): string[] {
 
 
 describe('PWA runtime config guard', () => {
+  it('PWA-CSS-PARSE-01: the stylesheet has no stray comment terminator swallowing the rule after it', () => {
+    // A rule that follows a doubled `*/` DOES NOT EXIST: the parser reads the leftover prose as the start of a
+    // selector, keeps reading through the real selector after it, and drops the whole thing at the first `}`. It
+    // fails silently — no console error, the file still loads, only one rule is quietly gone. [OWNER 2026-08-24:
+    // green monogram on the gold avatar.] There the .avatar[data-tier="epic"] fill AND ink had been eaten for a
+    // day; only the ::before gradient underneath made it look like the tier was working at all.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const strays: number[] = [];
+    let inComment = false;
+    for (let i = 0; i < css.length - 1; i += 1) {
+      if (!inComment && css[i] === '/' && css[i + 1] === '*') { inComment = true; i += 1; continue; }
+      if (inComment && css[i] === '*' && css[i + 1] === '/') { inComment = false; i += 1; continue; }
+      if (!inComment && css[i] === '*' && css[i + 1] === '/') strays.push(css.slice(0, i).split('\n').length);
+    }
+    expect(strays, 'a `*/` outside any comment, at these lines').toEqual([]);
+    expect(inComment, 'an unterminated comment eats the rest of the file').toBe(false);
+  });
+
   it('PWA-WALLET-01: receive QR generator renders a TON transfer code', async () => {
     const { createQrSvg, createQrSvgDataUrl } = await import('../web/qr-code.mjs');
     const uri = 'ton://transfer/UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH';
@@ -412,7 +430,7 @@ describe('PWA runtime config guard', () => {
     // Public "Display as" menu reuses the same option builder + popover as Private.
     expect(app).toMatch(/function showPublicChannelDisplayPopover\(channel, anchor\)/);
     expect(app).toMatch(/options: identityDisplayOptions\(context\)/);
-    expect(app).toMatch(/function renderDisplayAsPopover\(\{ options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName, pinned = null, onTogglePin = null \}\)/);
+    expect(app).toMatch(/function renderDisplayAsPopover\(\{\s*\n\s*options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName,\s*\n\s*pinned = null, onTogglePin = null, muted = null, onToggleMute = null,\s*\n\}\)/);
 
     // The user's OWN wallet channel offers their OWN linked username (.ath) as a "Display as" option too: it
     // never arrives via received posts (you don't receive your own), so contactDisplayContextForWallet injects
@@ -898,7 +916,11 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['avatar.feeUpTo']).toMatch(/up to \{amount\} GRAM/);
     expect(enCopy).toMatch(/Preview final image/);
     expect(html).toMatch(/id="imageLightboxDialog"/);
-    expect(html).toMatch(/Full-size preview/);
+    // "Full size", not "Full-size preview" [OWNER 2026-08-24: "why is it a preview, by the way?"]. A preview is of
+    // something you are about to send; the same window also opens pictures somebody else already sent, and there
+    // is nothing to preview about those.
+    expect(html).toMatch(/Full size/);
+    expect(html, 'the misnomer must not come back').not.toMatch(/Full-size preview/);
     expect(html).toMatch(/id="imageLightboxDownloadButton"/);
     expect(html).toMatch(/class="icon icon-download"/);
     expect(html).toMatch(/<div class="image-lightbox-viewport">\s*<img id="imageLightboxImage" alt="Full-size final image preview" draggable="false" data-i18n-alt="dialog\.fullSizeImageAlt">\s*<\/div>\s*<\/section>\s*<\/div>/);
@@ -920,12 +942,24 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/@media \(max-width: 900px\)[\s\S]*\.modal-backdrop\s*{\s*align-items: center;/);
     // v725: on a short viewport (on-screen keyboard up) a dialog TOP-aligns and the backdrop scrolls the WHOLE
     // dialog (dialog max-height:none) so a focused textarea keeps its height instead of collapsing behind the
-    // keyboard. MUST come after the max-width:900px block so it wins by source order (both media queries match).
-    const shortVpIdx = css.indexOf('@media (max-height: 620px)');
+    // keyboard. MUST come after the max-width:900px block so it wins by source order.
+    //
+    // DRIVEN BY THE HEIGHT WE MEASURE, not by @media (max-height) [OWNER 2026-08-24: "when I hide the keyboard the
+    // dialog sometimes stays at the top, though it should come back down"]. The lift worked and the return did
+    // not, only sometimes — two sources of truth disagreeing. A media query asks the LAYOUT viewport while
+    // everything else here follows the VISUAL one, and on iOS the layout viewport is restored lazily after a
+    // keyboard dismiss, so the query stayed matched while the height we write was already right.
+    expect(css, 'the layout-viewport query is gone, not merely bypassed').not.toMatch(/@media \(max-height: 620px\)/);
+    const shortVpIdx = css.indexOf(':root[data-app-viewport-short="true"] .modal-backdrop');
     expect(shortVpIdx).toBeGreaterThan(css.indexOf('@media (max-width: 900px)'));
-    const shortVp = css.slice(shortVpIdx, shortVpIdx + 420);
-    expect(shortVp).toMatch(/\.modal-backdrop \{\s*align-items: start;\s*overflow-y: auto;/);
-    expect(shortVp).toMatch(/\.action-dialog,\s*\n\s*\.quick-start-dialog \{\s*max-height: none;\s*overflow: visible;/);
+    const shortVp = css.slice(shortVpIdx, shortVpIdx + 620);
+    expect(shortVp).toMatch(/\.modal-backdrop \{\s*\n\s*align-items: start;\s*\n\s*overflow-y: auto;/);
+    expect(shortVp).toMatch(/\.action-dialog,\s*\n:root\[data-app-viewport-short="true"\] \.quick-start-dialog \{\s*\n\s*max-height: none;\s*\n\s*overflow: visible;/);
+    // The flag is written by the SAME function that writes the height, from the same number, on the same pass —
+    // which is what makes drift impossible rather than merely unlikely.
+    expect(app).toMatch(/const APP_VIEWPORT_SHORT_PX = 620;/);
+    expect(app).toMatch(/document\.documentElement\.style\.setProperty\('--app-viewport-height', `\$\{rounded\}px`\);/);
+    expect(app).toMatch(/if \(rounded > 0 && rounded <= APP_VIEWPORT_SHORT_PX\) document\.documentElement\.dataset\.appViewportShort = 'true';\s*\n\s*else delete document\.documentElement\.dataset\.appViewportShort;/);
     // The base action-dialog scrolls as a WHOLE (like quick-start), NOT via an inner .action-fields scroller that
     // trapped the scroll around a tall image preview and buried the quality dropdown below it (owner). So no
     // fields-only overflow scroller, and the whole dialog is capped + scrollable.
@@ -2085,6 +2119,24 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function activateImportedEncryptedWalletRecord\([\s\S]*?markWalletKeyBackupDone\(wallet\.address\)/);
     // Re-surface: a wallet that exists but is unbacked-up re-opens the quick-start jumped to the export step.
     expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*openQuickStartAtBackup\(\);\s*return true;/);
+    // A PASSWORD CHANGE MAKES THE SAVED FILE A BACKUP OF THE OLD PASSWORD [OWNER 2026-08-24: "if a person changes
+    // the password in the app, they'll have to export the wallet key again, right?"]. The export writes the stored
+    // record as it stands, so the earlier file still opens — under the password that was just replaced. The key
+    // inside is unchanged, so nothing is lost except the owner's ability to open their own backup with what they
+    // now know, which is exactly what this flag is for. Before the change it was never raised again: pending was
+    // set only at creation and cleared on export/import, so the warning stayed silent through any number of
+    // password changes.
+    const change = app.slice(app.indexOf('async function changeStoredPlathoWalletPassword()'), app.indexOf('async function loadPlathoWallet()'));
+    expect(change.length, 'the slice really spans the change-password function').toBeGreaterThan(600);
+    expect(change).toMatch(/await writeStoredPlathoWallet\(wallet, newPassword\);[\s\S]*?markWalletKeyBackupPending\(wallet\.address\);/);
+    // Ordered: pending is raised only AFTER the new record is committed, or a failed write would leave the owner
+    // warned about a password change that did not happen.
+    expect(change.indexOf('markWalletKeyBackupPending'), 'after the write, not before')
+      .toBeGreaterThan(change.indexOf('await writeStoredPlathoWallet'));
+    // And said BEFORE the change is committed, in the dialog that takes the new password — afterwards is too late
+    // to decide against it.
+    expect(change).toMatch(/extraSummary: \[t\('wallet\.keyFileKeepsExportPassword'\)\]/);
+    expect(app).toMatch(/\.\.\.extraSummary,/);
     expect(app).toMatch(/function openQuickStartAtBackup\(\)[\s\S]*quickStartStepIndexByKey\('export'\)/);
     // The export step is keyed so the lookup is robust to reordering.
     expect(app).toMatch(/key: 'export',\s*title: \(\) => t\('quickstart\.backupKeyTitle'\)/);
@@ -2682,7 +2734,10 @@ describe('PWA runtime config guard', () => {
     const teardown = app.slice(app.indexOf('function clearWalletScopedRuntimeState('), app.indexOf('function lockPlathoWallet('));
     expect(teardown.length, 'the teardown slice must not collapse').toBeGreaterThan(400);
     expect(teardown).toMatch(/clearPlathoActivationReread\(\);/);
-    const lock = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('function lockPlathoWallet(') + 2_500);
+    // Sliced to the NEXT function, not by a character count — a fixed window stops covering the tail of the one
+    // it is meant to police the moment anything is added above the line it checks.
+    const lock = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('function lockPlathoWalletForBackground('));
+    expect(lock.length, 'the lock slice must not collapse').toBeGreaterThan(1_000);
     expect(lock).toMatch(/clearPlathoActivationReread\(\);/);
     // (3) the ladder itself: rising, one per wallet, hidden tab re-arms the same rung, a switched wallet stops it.
     const ladder = app.slice(app.indexOf('const PLATHO_ACTIVATION_REREAD_DELAYS_MS'), app.indexOf('async function refreshVaultActivationStatus('));
@@ -4075,7 +4130,9 @@ describe('PWA runtime config guard', () => {
     // yet — a self-note restored from chain currently reads 'received'. Cosmetic only: DIRECTION is decided by
     // isSelfOpenedCapsule above, and the Saved-relocation heal keys off type+publish meta, neither of which this
     // wording feeds. Tracked on the roadmap with the rest of the self-note lane.)
-    expect(app).toMatch(/if \(!thread \|\| isSavedMessagesThread\(thread\) \|\| isThreadConversationVisible\(thread\)\) return;/);
+    // A MUTED contact joins the two that never badge — one place to silence, because this count feeds both the
+    // row's badge and the Private tab's total.
+    expect(app).toMatch(/if \(!thread \|\| isSavedMessagesThread\(thread\) \|\| isThreadMuted\(thread\) \|\| isThreadConversationVisible\(thread\)\) return;/);
     // 'Saved' is a RENDER-ONLY display name (threadDisplayLabel feeds the contact store + the own public
     // channel name — storing it would rename the channel everywhere).
     expect(app.match(/isSavedMessagesThread\(thread\) \? t\('chat\.myNotes'\) : threadDisplayLabel\(thread\)/g)?.length ?? 0).toBe(2);
@@ -4117,6 +4174,109 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function formatThreadListTimestamp\(ms\)/);
     expect(render).toMatch(/time\.textContent = lastMs !== null \? formatThreadListTimestamp\(lastMs\) : '';/);
     expect(render).not.toMatch(/time\.textContent = thread\.time;/);
+  });
+
+  it('PWA-LIGHTBOX-LOCK-01: the image viewer is dismissed by the lock like every other overlay, and it saves on iPhone', () => {
+    // [OWNER 2026-08-24: "I was looking at an image, then closed the window and saw the lock screen. The image
+    // lightbox definitely ignores the app lock — it behaves differently from every other modal. Put it on the
+    // common mechanism." And: "on the iPhone the image from the viewer doesn't save. Something flickers and
+    // that's it … the download isn't visible anywhere. On Android it saves with no problem."]
+    const app = readFileSync('web/app.js', 'utf8');
+    // THE LOCK SWEEPS A LIST, not one dialog. It used to close the action dialog only — which closes the lightbox
+    // in turn, but ONLY when the lightbox was opened from inside it. A lightbox opened straight from a message
+    // had nothing above it, so a decrypted photo stayed on screen over a locked app.
+    expect(app).toMatch(/function closeSessionOverlays\(\) \{/);
+    const sweep = app.slice(app.indexOf('function closeSessionOverlays() {'), app.indexOf('function lockPlathoWallet('));
+    expect(sweep.length, 'the sweep slice must not collapse').toBeGreaterThan(120);
+    for (const closer of ['closeActionDialog(null)', 'closeImageLightbox()', 'closeNewChatDialog()',
+      'closeSharePostDialog()', 'closeAppearanceDialog()', 'closeDocsDialog()', 'hideIdentityPopover()']) {
+      expect(sweep, `${closer} belongs to the unlocked session`).toContain(closer);
+    }
+    // The password dialog is NOT swept: it belongs to the locked state, and this only runs with a live wallet.
+    expect(sweep).not.toMatch(/closePasswordDialog|passwordDialog/);
+    const lock = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('function lockPlathoWalletForBackground('));
+    expect(lock).toContain('closeSessionOverlays();');
+    expect(lock, 'the lock must not go back to closing one dialog by hand').not.toMatch(/^\s*closeActionDialog\(null\);$/m);
+
+    // SAVING WORKS THE SAME WAY EVERYWHERE, and the proof was already in this file [OWNER 2026-08-24: "but we do
+    // download things on the iPhone somehow — the wallet key, for instance"]. downloadJsonFile makes a BLOB URL and
+    // clicks an <a download> at it, and that works on iPhone. So iOS does not ignore the download attribute — it
+    // refuses a data: URL, which is what this handler used to hand it, because a private image travels as a data
+    // URL inside its capsule. Convert first and there is no platform branch left to get wrong.
+    expect(app).toMatch(/async function saveImageOutOfPlatho\(src, filename\) \{/);
+    expect(app).toMatch(/const blob = src\.startsWith\('data:'\) \? blobFromDataUrl\(src\) : null;/);
+    expect(app).toMatch(/const href = blob \? URL\.createObjectURL\(blob\) : src;/);
+    expect(app).toMatch(/URL\.revokeObjectURL\(href\)/);
+    expect(app).toMatch(/function blobFromDataUrl\(dataUrl\) \{/);
+    // A FIRST ATTEMPT REACHED FOR THE SHARE SHEET and was withdrawn: gated on the capability, it turned every
+    // desktop download into a share sheet [OWNER: "right now trying to download offers to share. Is that what you
+    // wanted?"]. The sheet survives ONLY where a click cannot work at all — inside Telegram's WebView, where
+    // <a download>.click() fails silently and a file has nothing to copy manually instead.
+    expect(app).toMatch(/if \(isTelegramEnv\(\) && blob && navigator\.canShare\?/);
+    expect(app, 'no platform test may decide between sharing and downloading').not.toMatch(/isIosDevice\(\) && blob/);
+    expect(app, 'a dismissed sheet is the user changing their mind, not a failure').toMatch(/if \(error\?\.name === 'AbortError'\) return 'dismissed';/);
+    // AND IT SAYS SO. The control is an icon button, so the outcome goes in the viewer's own caption line.
+    expect(app).toMatch(/const said = outcome === 'downloaded' \? t\('common\.imageSaved'\)/);
+    expect(app).toMatch(/: outcome === 'failed' \? t\('common\.imageSaveFailed'\)/);
+    expect(app, 'a reopen owns the caption, so a stale confirmation is not restored over the next picture')
+      .toMatch(/delete imageLightboxMeta\.dataset\.caption;/);
+  });
+
+  it('PWA-MUTE-01: a contact can be muted from the chevron, and the menu is grouped by what its items DO', () => {
+    // [OWNER 2026-08-24: "add mute to the chevron, so a user can choose not to receive messages from a contact.
+    // And unmute too." Then, on the result: "the items need grouping properly. 'Display as' is only about the way
+    // the contact is SHOWN, and we have mute going in there and pin already in there".]
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // SILENCE, NOT A BLOCK — and the copy must not promise otherwise. A message is published to the chain by its
+    // sender; nothing on this device can stop it being written or read. What mute can honestly do is stop it
+    // counting, in the ONE place that feeds both the row's badge and the Private tab's total.
+    expect(app).toMatch(/function isContactMuted\(counterpartyWallet\) \{\s*\n\s*return readContactDisplayPreference\(counterpartyWallet\)\?\.muted === true;/);
+    expect(app).toMatch(/function isThreadMuted\(thread\) \{\s*\n\s*return thread\?\.muted === true;/);
+    expect(app).toMatch(/isThreadMuted\(thread\) \|\| isThreadConversationVisible\(thread\)\) return;/);
+    // Muting clears what has already piled up: a badge that survives the setting reads as the setting failing.
+    expect(app).toMatch(/if \(muted === true\) thread\.unreadCount = 0;/);
+    // It rides the SAME per-counterparty entry as the pin and the local name — one store, four fields.
+    expect(app).toMatch(/muted: normalized\.muted === true,/);
+    expect(app).toMatch(/thread\.muted = stored\?\.muted === true;/);
+    // GROUPED BY WHAT THEY DO: the title covers the local name and the identity options; pin and mute are actions
+    // on the contact and sit under their own heading, after the list they never belonged to.
+    expect(app).toMatch(/const actionRows = \[pinRow, muteRow\]\.filter\(Boolean\);/);
+    expect(app).toMatch(/actionsTitle\.textContent = t\('chat\.contactActions'\);/);
+    expect(app, 'the pin must no longer be interleaved with the display options')
+      .not.toMatch(/if \(pinRow && !pinRow\.isConnected\) popover\.append\(pinRow\)/);
+    // Offered in BOTH chevrons (private header, public channel), and never for the own wallet — same gate as pin.
+    expect((app.match(/onToggleMute: \w+ \? \(next\) => setContactMuted\(\w+, next\) : null,/g) ?? []).length).toBe(2);
+    // VISIBLE IN THE LIST, or the setting is invisible and reads as not having worked. Opposite corner from the
+    // pin, because a contact can be both and two badges on one corner would stack into a blob.
+    expect(app).toMatch(/const muted = isThreadMuted\(thread\) && !isSavedMessagesThread\(thread\);/);
+    // A CHILD ELEMENT, not ::before — that pseudo already carries the avatar's GLOW LAYER (the gradient that
+    // cross-fades on a theme switch), and taking it for a badge silently stripped that layer from every muted
+    // contact. ::after is the pin's, and there is no third pseudo, so this one is a node.
+    expect(css).toContain('.avatar > .avatar-mute-badge {');
+    expect(css, 'the badge must not squat on the glow layer again').not.toMatch(/\.avatar\[data-muted="true"\]::before/);
+    expect(app).toMatch(/badge\.className = 'avatar-mute-badge';/);
+    // Two of the three branches rewrite innerHTML, so the badge is re-appended on EVERY exit or it is dropped.
+    expect((app.match(/restoreMuteBadge\(\);/g) ?? []).length, 'saved, anonymous and ordinary avatars').toBe(3);
+    expect((css.match(/--mute-badge-icon:/g) ?? []).length, 'dark + system-light + toggled-light').toBe(3);
+  });
+
+  it('PWA-APPEARANCE-02: a settings row keeps the settings size, even inside a dialog', () => {
+    // [OWNER 2026-08-24: "the dropdowns in the cosmetics section are so fat. Make them like the ones in the Profile
+    // tab".] MEASURED: 54px tall in the Appearance dialog against 38px in the profile — `.action-dialog select
+    // { min-height: 56px }`, the dialogs' rule for a big FORM field, beat `height: 38px` (a min-height always does)
+    // and tied on specificity, so source order handed it the win. A row of settings is not a form: the control
+    // belongs to the row, not to the window it happens to be shown in.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    expect(css).toMatch(/\.settings-list \.settings-select-row select \{\s*\n\s*min-height: 0;\s*\n\s*height: 38px;/);
+    // The dialogs' own big-field rule stays — it is right for the fields it was written for.
+    expect(css, 'the form-field rule must not be deleted to fix this').toMatch(/\.action-dialog select,\s*\n\.recipient-dialog select \{[\s\S]{0,200}?min-height: 56px;/);
+    // And the rows carry the same modifier the profile's do, so the label/control split matches as well.
+    const dialog = html.slice(html.indexOf('id="appearanceDialog"'), html.indexOf('id="appearanceDialog"') + 3000);
+    expect(dialog.length, 'the dialog slice must not collapse').toBeGreaterThan(500);
+    expect((dialog.match(/class="settings-select-row compact-select-row"/g) ?? []).length, 'theme + background').toBe(2);
+    expect(dialog, 'no plain settings row left behind').not.toMatch(/class="settings-select-row"/);
   });
 
   it('PWA-APPEARANCE-01: one modal owns the theme and the background, the app arrives quiet, and the boot screen agrees', () => {
@@ -4383,10 +4543,15 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The bubble hands its padding to the content, so nothing has to be cancelled and nothing can be clipped.
     expect(css).toMatch(/\.bubble\.has-media \{\s*\n\s*width: fit-content;\s*\n\s*max-width: 100%;\s*\n\s*padding: 0;\s*\n\s*overflow: hidden;/);
-    expect(css).toMatch(/\.bubble\.has-media > \.message-text-block,[\s\S]{0,200}?padding-left: var\(--bubble-pad-x\);/);
+    // TEXT TAKES THE INSET AS PADDING [OWNER 2026-08-24: "the word 'букв' is right at the edge of the post, and the
+    // next message has a normal inset"]. A margin sits outside the box, and on a bubble whose height is computed
+    // (overflow-clipped) rather than grown, the last child's bottom margin is a value an engine may or may not
+    // count — Chromium counted it, the owner's WebKit did not, and the last line ended up against the frame.
+    expect(css).toMatch(/\.bubble\.has-media > \.message-text-block \{\s*\n\s*padding: var\(--bubble-pad-y\) var\(--bubble-pad-x\);\s*\n\}/);
+    expect(css, 'and NOT as a margin that can be collapsed or dropped').not.toMatch(/\.bubble\.has-media > \*:last-child:not\(\.message-image\) \{/);
     // The picture sizes ITSELF against both caps, so a wide one is limited by the width and a tall one by the
     // height — and the whole of it is shown either way.
-    const media = css.slice(css.indexOf('.bubble.has-media > .message-image {'), css.indexOf('.bubble.has-media > .message-text-block,'));
+    const media = css.slice(css.indexOf('.bubble.has-media > .message-image {'), css.indexOf('.bubble.has-media > .message-text-block {'));
     expect(media.length, 'the slice really spans the picture rule').toBeGreaterThan(300);
     expect(media).toMatch(/width: auto;\s*\n\s*height: auto;/);
     expect(media, 'capped by the FRAME, not by a token wider than it').toMatch(/max-width: 100%;/);
@@ -8471,7 +8636,10 @@ describe('PWA runtime config guard', () => {
     expect(app, 'no second recency sort of the thread list survives').not.toMatch(/\.sort\(\(a, b\) => threadLastActivityMs\(b\) - threadLastActivityMs\(a\)\)/);
     // The flag lives in the per-counterparty display store (device-local, like the local name), every writer of that
     // record leaves it alone unless asked, and the thread picks it up on hydrate.
-    expect(app).toMatch(/const pinned = value\.pinned === true;\s*\n\s*if \(!displayIdentity && !localLabel && !pinned\) return null;/);
+    // The mute flag joined the entry beside the pin (owner, 2026-08-24). Both are strictly `=== true`, so every
+    // entry written before either existed reads as off and needs no migration — and an entry carrying ONLY a flag
+    // must still survive normalisation, or muting a contact with no local name would erase itself on the next read.
+    expect(app).toMatch(/const pinned = value\.pinned === true;\s*\n\s*const muted = value\.muted === true;\s*\n\s*if \(!displayIdentity && !localLabel && !pinned && !muted\) return null;/);
     expect(app).toMatch(/const pinned = typeof preference\?\.pinned === 'boolean'\s*\?\s*preference\.pinned\s*:\s*\(readContactDisplayPreference\(counterpartyWallet\)\?\.pinned === true\);/);
     expect(app).toContain("pinned: normalized.pinned === true,");
     expect(app).toMatch(/thread\.pinned = stored\?\.pinned === true;/);
@@ -8498,7 +8666,11 @@ describe('PWA runtime config guard', () => {
     // AN ATTRIBUTE + A PSEUDO-ELEMENT, never a child node: both branches of that function rewrite the avatar's
     // content (a letter, the Saved pencil's innerHTML, an image background), so a badge appended as a child would
     // be wiped by the next patch of the row — which runs on every sync tick.
-    expect(avatarFn, 'the badge is not a child node').not.toMatch(/appendChild|\.append\(/);
+    expect(avatarFn, 'the pin badge is not a child node').not.toMatch(/appendChild\(|pinBadge|\.append\(pin/);
+    // THE MUTE BADGE IS A CHILD, and deliberately so: ::after is taken by the pin above and ::before by the
+    // avatar's glow layer, so there is no third pseudo left. It pays the price this rule names — it is
+    // re-appended after every content rewrite, on all three exits (PWA-MUTE-01 counts them).
+    expect(avatarFn).toMatch(/restoreMuteBadge\(\);/);
     const pinCss = readFileSync('web/styles.css', 'utf8');
     expect(pinCss).toMatch(/\.avatar\[data-pinned="true"\]::after \{[\s\S]*?background: var\(--panel-2\) var\(--pin-badge-icon\)/);
     // ::before is the glow layer — the badge must not take it (it would paint the pin behind the avatar, z-index -1).
