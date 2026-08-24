@@ -8,6 +8,10 @@
   --theme-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8ZM11 1h2v3h-2ZM11 20h2v3h-2ZM1 11h3v2H1ZM20 11h3v2h-3ZM4.2 5.6l1.4-1.4 2.1 2.1-1.4 1.4ZM16.3 17.7l1.4-1.4 2.1 2.1-1.4 1.4ZM4.2 18.4l2.1-2.1 1.4 1.4-2.1 2.1ZM16.3 6.3l2.1-2.1 1.4 1.4-2.1 2.1Z'/%3E%3C/svg%3E");
   /* geometry contracts (JS/layout-load-bearing — keep) */
   --message-media-width: 320px;
+  /* The bubble's padding, as tokens, because the image cancels it with a negative margin to sit flush against the
+     frame — two literals in two files would drift and leave a hairline of plate down one side. */
+  --bubble-pad-y: 9px;
+  --bubble-pad-x: 13px;
   --message-card-width: calc(var(--message-media-width) + 28px);
   --feed-post-collapsed-max-height: 480px;
   --shared-post-embed-max-height: 220px;
@@ -25,6 +29,11 @@
   --r-s: 10px;
   --r-m: 14px;
   --r-l: 18px;
+  /* Messages of one burst sit tight so the group reads as a single sending; a NEW group opens the gap again
+     [OWNER 2026-08-24: "let the messages be a bit closer … so it looks harmonious and it is clear the messages
+     were sent at the same time" — the space between them is the plasma showing through]. */
+  --message-gap-tight: 3px;
+  --message-gap-group: 10px;
   --r-xl: 20px;
   --r-pill: 999px;
   /* dark palette */
@@ -64,6 +73,11 @@
   --a40: rgba(48, 213, 176, 0.4);
   --id-ton: #9fd3f2;
   --id-platho: #8fdcc8;
+  /* TIER COLOURS FOR .ath NAMES (owner): four characters is EPIC, five is RARE — gold and silver, the same two
+     the NFT art marks them with, so the scarcity is visible where the name actually appears and not only on the
+     token. COMMON keeps --id-platho: it is the default, and colouring it would say nothing. */
+  --id-platho-epic: #e7c469;
+  --id-platho-rare: #c6d2dc;
   --bubble-in: #1b242b;
   --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
   --bubble-out-text: #e9fdf6;
@@ -122,6 +136,8 @@
     --a40: rgba(15, 157, 129, 0.45);
     --id-ton: #2b7ab8;
     --id-platho: #0e8a72;
+    --id-platho-epic: #8a6b12;
+    --id-platho-rare: #5a6672;
     --bubble-in: #ffffff;
     /* Same branded bubble in BOTH themes (owner): an outgoing message looks identical everywhere. */
     --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
@@ -181,6 +197,8 @@
     --a40: rgba(15, 157, 129, 0.45);
     --id-ton: #2b7ab8;
     --id-platho: #0e8a72;
+    --id-platho-epic: #8a6b12;
+    --id-platho-rare: #5a6672;
     --bubble-in: #ffffff;
     /* Same branded bubble in BOTH themes (owner): an outgoing message looks identical everywhere. */
     --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
@@ -942,6 +960,14 @@ html[data-platho-telegram="true"] .install-header-button {
   color: var(--id-platho);
 }
 
+.identity-label-platho-epic {
+  color: var(--id-platho-epic);
+}
+
+.identity-label-platho-rare {
+  color: var(--id-platho-rare);
+}
+
 .thread-time {
   justify-self: end;
   max-width: 72px;
@@ -1022,6 +1048,32 @@ html[data-platho-telegram="true"] .install-header-button {
   width: 64px;
   height: 64px;
   font-size: 24px;
+}
+
+/* A TIER YOU CAN SEE WITHOUT READING [OWNER 2026-08-24: "let's colour the icon for silver and gold too. Make the
+   background so it's immediately clear it's silver."] Set from the SAME tone that colours the name
+   (applyAvatarTier), so the two can never disagree.
+   A flat fill would read as "some yellow square"; metal is read from the BAND of light across it, which is why
+   each is a three-stop diagonal — bright, dark, bright — rather than one colour. The monogram goes dark, because
+   dark ink on metal is what is legible on both of these. */
+.avatar[data-tier="epic"] {
+  background: linear-gradient(145deg, #f6e0a0 0%, #b8862f 52%, #edcd7d 100%);
+  color: #33280f;
+}
+
+.avatar[data-tier="rare"] {
+  background: linear-gradient(145deg, #f2f6fa 0%, #93a2b0 52%, #d6e0e8 100%);
+  color: #1e262c;
+}
+
+/* With a photo the fill is hidden, so the tier moves to a RING — otherwise a holder who set a picture would lose
+   the mark entirely, which is the one case where it matters most. */
+.avatar.has-image[data-tier="epic"] {
+  box-shadow: inset 0 0 0 2px #d8ad4e;
+}
+
+.avatar.has-image[data-tier="rare"] {
+  box-shadow: inset 0 0 0 2px #b9c6d2;
 }
 
 .avatar.avatar-saved {
@@ -1196,7 +1248,9 @@ html[data-platho-telegram="true"] .install-header-button {
 .message-strip {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  /* The TIGHT gap is the default, because most rows in a busy strip continue a burst; a row that STARTS a group
+     buys the space back below. Doing it this way round means a group of six looks like one sending rather than six. */
+  gap: var(--message-gap-tight);
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1204,6 +1258,21 @@ html[data-platho-telegram="true"] .install-header-button {
   /* Swipe-to-reply: the container yields horizontal touch gestures to JS (contract). */
   touch-action: pan-y;
   padding: 20px var(--gutter);
+}
+
+/* A group opener and the day/unread separators restore the full breathing room the tight default gave up. */
+.message[data-group-start="true"],
+.strip-separator,
+.conversation-earlier-button {
+  margin-top: calc(var(--message-gap-group) - var(--message-gap-tight));
+}
+
+.message-strip > *:first-child {
+  margin-top: 0;
+}
+
+.strip-separator {
+  margin-bottom: calc(var(--message-gap-group) - var(--message-gap-tight));
 }
 
 .message-strip::before {
@@ -1458,7 +1527,7 @@ a .avatar.has-image,
   width: fit-content;
   min-width: 0;
   max-width: 100%;
-  padding: 9px 13px;
+  padding: var(--bubble-pad-y) var(--bubble-pad-x);
   border-radius: var(--r-l);
   background: var(--bubble-in);
   border: 0;
@@ -2241,6 +2310,67 @@ a .avatar.has-image,
   box-shadow: var(--shadow-1);
 }
 
+/* THE PICTURE FILLS THE FRAME [OWNER 2026-08-24: "just make the image take up the whole space of the green frame.
+   And if the photo was sent with text, let it take that space too, but leave room for the text below."]
+   The bubble keeps everything that makes it a message — its fill, its corners, the small corner naming the
+   speaker. What changes is that the picture stops sitting INSIDE the padding and cancels it, so it reaches the
+   frame on three sides; text, when there is any, keeps the padding and sits under it. */
+/* THE FRAME FITS THE PICTURE, NOT THE PICTURE THE FRAME [OWNER 2026-08-24: "why did the screenshot not fit? it
+   could have fitted the picture itself, maybe by making it smaller. And it did the wide picture strangely, with
+   mistakes. The middle-sized one came out well."]
+   The first cut pinned the bubble to the media width and cropped whatever did not fit (object-fit: cover). That is
+   why a phone screenshot — tall and narrow — lost its bottom half instead of simply arriving smaller.
+   So the padding is dropped from the bubble and handed to the text instead. Nothing has to be cancelled with a
+   negative margin any more, nothing can be clipped, and the picture is free to size itself: it grows to the frame
+   when it can and shrinks below it when its shape demands, with the bubble following. Whole picture, no bars, no
+   crop, in either direction — the rule names neither .in nor .out. */
+.bubble.has-media {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;   /* the frame's corners clip the picture — that is what makes it look built-in */
+}
+
+.bubble.has-media > .message-image {
+  display: block;
+  width: auto;
+  height: auto;
+  /* Sized by BOTH caps at once: a wide picture is limited by the width, a tall one by the height, and either way
+     the whole of it is shown. A screenshot at 9:19.5 lands ~194x420 — small, but entire, and a tap opens it. */
+  /* 100%, i.e. THE FRAME ITSELF — not the old media token. The bubble is already capped by .message's own
+     max-width (82% of the strip, or the card width), and a picture allowed to be wider than that overflowed and
+     was clipped by the overflow:hidden above — measured: a 320px picture inside a 288px bubble lost 32px. */
+  max-width: 100%;
+  max-height: 400px;
+  min-width: 0;
+  margin: 0 auto;     /* centred, for when a long caption makes the bubble wider than the picture */
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* The padding the bubble gave up reappears on whatever else it holds, so text keeps the inset it always had. */
+.bubble.has-media > .message-text-block,
+.bubble.has-media > .message-payment-block,
+.bubble.has-media > .message-file-chip {
+  padding-left: var(--bubble-pad-x);
+  padding-right: var(--bubble-pad-x);
+}
+
+.bubble.has-media > .message-text-block:first-child,
+.bubble.has-media > .message-reply-quote:first-child {
+  margin-top: var(--bubble-pad-y);
+}
+
+.bubble.has-media > *:last-child:not(.message-image) {
+  margin-bottom: var(--bubble-pad-y);
+}
+
+.bubble.has-media > .message-reply-quote {
+  margin-left: var(--bubble-pad-x);
+  margin-right: var(--bubble-pad-x);
+}
+
 .feed-image {
   display: block;
   width: auto;
@@ -2940,12 +3070,17 @@ button.feed-item:hover {
   color: var(--muted);
 }
 
+/* NO HAIRLINE ABOVE THE THREAD [OWNER 2026-08-24: "under the comments I see a strip, it should not be there"] —
+   the third time the same artefact has been reported (PWA-NO-DIVIDERS-01 took the conversation header's rule and
+   the tab bar's). The reason is unchanged: on a surface that sits directly on the plasma, a full-width --line-soft
+   rule does not read as a subtle separation, it reads as a dark bar painted across the screen. The gap above the
+   list already separates it from the heading, so nothing is lost with the line. */
 .comment-list {
   display: grid;
   gap: 8px;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid var(--line-soft);
+  border-top: 0;
 }
 
 .comment-item {
@@ -5536,12 +5671,22 @@ button.feed-item:hover {
 }
 
 /* ── .ath name NFT cards ────────────────────────────────────────────────── */
+/* THE LIST DOES NOT SCROLL ITSELF — THE DIALOG DOES, like every other modal here [OWNER 2026-08-24: "just fix this
+   stupid bug with the usernames already", and, reading it correctly: "this modal of yours doesn't scroll like our
+   other modals"].
+   It had `max-height: 58vh; overflow-y: auto`, which gave the grid a DEFINITE height — and that is what broke the
+   cards. A grid sizes its rows from their intrinsic contribution, and the art frame's square comes from
+   `padding-bottom: 100%`, whose percentage contributes ZERO to intrinsic height. So the rows measured as just the
+   foot (~40px), the leftover space was shared out among them (measured: six rows of exactly 68.5px, filling the
+   box), and the frame then painted its real 298px and was clipped by the card's overflow:hidden. That is the strip
+   in the owner's screenshots — the art was never missing, it was cut to a sliver by a row sized without it.
+   With no height of its own the rows size in normal flow, where the percentage resolves: card 338px, art 298px
+   whole, and the dialog scrolls the way the rest do. MEASURED before / after: card 66 -> 338, dialog scrollable
+   590/574 -> 2267/749. */
 .nft-card-list {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
-  max-height: 58vh;
-  overflow-y: auto;
 }
 
 @media (min-width: 420px) {
@@ -6076,7 +6221,8 @@ button.feed-item:hover {
 
 /* Profile identity [OWNER 2026-08-23: "this stands in a column and takes too much room — better the avatar on
    the left and the platho name on the right"]. The redesign stacked avatar-over-name and centred it; with an 86px
-   avatar that block ran ~150px tall before the first setting. Back to a ROW: the avatar keeps its size, the name
+   avatar that block measured 176px tall before the first setting, against 98px for a row at 375px wide (124px at
+   320px, where the wallet line wraps). Back to a ROW: the avatar keeps its size, the name
    and wallet line ride beside it, and the block costs only the avatar's own height. Left-aligned, not centred —
    a centred name beside a left avatar would drift with the name's length. */
 .identity-block {

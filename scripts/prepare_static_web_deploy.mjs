@@ -43,6 +43,7 @@ const ROOT_RUNTIME_FILES = new Set([
   'message-plain-text.mjs',
   'public-channel-subscriptions.mjs',
   'thread-list-order.mjs',
+  'keyed-rows.mjs',
   'recipient-identities.mjs',
   'encrypted-message-store.mjs',
   'pwa-contract-transactions.mjs',

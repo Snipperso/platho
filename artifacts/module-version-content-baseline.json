@@ -68,12 +68,12 @@
     "sha256": "9c45e27d8b6a3bed431641d0e2d09af40271ddd82def381f69e6ac0210c31e9f"
   },
   "i18n-strings.mjs": {
-    "version": "83",
-    "sha256": "d04b9bbc73a36c6421b565da160dcb6dc53b0c43b77d4c47a9bcbfdaea5ec33f"
+    "version": "84",
+    "sha256": "2065a55e0109a8e2f97a53868dc07aca138267befa1c6c956010d30b6682d6b1"
   },
   "i18n.mjs": {
-    "version": "81",
-    "sha256": "a636e7f2944332d844ecf3f7e27ed878a68a22e50d8403ccd9afbae7d28d25e7"
+    "version": "82",
+    "sha256": "116fba50c257fc78ae81db11b989403e1c09220d5cdf90165ef439fd0b3227f5"
   },
   "intro-bucket.mjs": {
     "version": "21",
@@ -135,6 +135,10 @@
     "version": "4",
     "sha256": "aa55ddfe32dc413213565920eea16718e0bf0afb337389eacab30af0a9f9b499"
   },
+  "keyed-rows.mjs": {
+    "version": "1",
+    "sha256": "cfbf632e17ac6c04c9a150e844637801d900d7f8ad7bbce5e6aea02d2262c1d6"
+  },
   "market-stability-buy-send.mjs": {
     "version": "8",
     "sha256": "4d952b30c94932a09dc6b305ca408ea0a4d10a5b4cafe079355d75efa355cfe2"
@@ -176,8 +180,8 @@
     "sha256": "69c3ccf72c8f4542b93baca73a387db181803d4a310ab0590bbc26dc93df9216"
   },
   "public-channel-subscriptions.mjs": {
-    "version": "57",
-    "sha256": "30ae4b1032fee5769b24bbc5e57a04c41be49d0a79d7700f1682a708141416a6"
+    "version": "59",
+    "sha256": "a750428246aeabcc1adc5baa7dcfa349c1fae7ff7c2b0f7c0e2e86bebf7ff074"
   },
   "public-lane-send.mjs": {
     "version": "22",
@@ -212,8 +216,8 @@
     "sha256": "1e57a437e0328a21087d0ecd324b52f07f51e5a996759fd94ef0d663223b3eae"
   },
   "recipient-identities.mjs": {
-    "version": "6",
-    "sha256": "034c36edf98d52cba98da04e097e046cb35c2bdafecc9ae9a8a118f824ca10c2"
+    "version": "7",
+    "sha256": "9488e4d9e2498c662446c46d32b03bf6e923c6874645796795a3915e11d76930"
   },
   "recovery-blob.mjs": {
     "version": "6",
@@ -256,8 +260,8 @@
     "sha256": "f2206ca91724a6b58f4b98002f78999df2f1525300f8d40e2a840feba613c9ca"
   },
   "styles.css": {
-    "version": "352",
-    "sha256": "1f149efff382c963ff4a891108ac3747b3d5e934cccb3a7286a0eed195d0994d"
+    "version": "364",
+    "sha256": "4cc4a8dc6ba751715ba708b016f04890de09170521ebd918ea1a9ec7f5191cbd"
   },
   "thread-list-order.mjs": {
     "version": "2",

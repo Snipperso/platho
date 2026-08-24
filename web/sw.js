@@ -1,14 +1,14 @@
 // GENERATED — do not edit by hand. `node scripts/bump_module_versions.mjs --run` derives this from the content of
 // every asset listed below, so it moves on any deploy that changes anything and never on one that changes nothing.
 // It was a hand-bumped counter until 2026-08-09; a missed bump meant a changed icon reached no device at all.
-const CACHE_NAME = 'platho-pwa-75e20269a5c7';
+const CACHE_NAME = 'platho-pwa-a4776e117a31';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=352',
-  './app.js?v=b21acaf1e',
-  './i18n.mjs?v=81',
-  './i18n-strings.mjs?v=83',
+  './styles.css?v=364',
+  './app.js?v=bfd3f729b',
+  './i18n.mjs?v=82',
+  './i18n-strings.mjs?v=84',
   './boot-signal-field.mjs?v=2',
   './boot-signal-worker.js?v=2',
   './vendor/telegram-web-app.js?v=1',
@@ -16,9 +16,10 @@ const ASSETS = [
   './platho-config.mjs?v=126',
   './capsule-part-policy.mjs?v=10',
   './message-pricing-policy.mjs?v=14',
-  './public-channel-subscriptions.mjs?v=57',
+  './public-channel-subscriptions.mjs?v=59',
   './thread-list-order.mjs?v=2',
-  './recipient-identities.mjs?v=6',
+  './keyed-rows.mjs?v=1',
+  './recipient-identities.mjs?v=7',
   './channels/platho.app/feed.json',
   './encrypted-message-store.mjs?v=6',
   './platho-wallet.mjs?v=38',
@@ -244,7 +245,7 @@ async function navigationResponse(event) {
     // This used to cache every fresh shell it fetched, which quietly broke the one property the cache exists
     // for. The shell and the asset URLs it names are versioned together and precached together under one
     // CACHE_NAME; writing a NEWER shell into the CURRENT cache leaves the pair mismatched — a shell asking for
-    // ./app.js?v=b21acaf1e while the cache holds ./app.js?v=b21acaf1e. Online nobody notices, the network fills the gap.
+    // ./app.js?v=bfd3f729b while the cache holds ./app.js?v=bfd3f729b. Online nobody notices, the network fills the gap.
     // Offline the app will not start at all: MEASURED 2026-08-20, during the outage, the owner's own device
     // showed "resource failed: app.js?v=bf36260a7" from the boot guard while every byte it needed to run sat in
     // the cache under the previous version's URL.
@@ -296,7 +297,7 @@ async function cachedIgnoringVersion(request) {
  * This was stale-while-revalidate: serve the cached copy, then fetch the same file again in the background "in
  * case it changed". For this app that background fetch can never find anything, and it is not free.
  *
- * Every module URL here carries its content's version (./app.js?v=b21acaf1e<hash>, ./conv-lane.mjs?v=32). A changed file
+ * Every module URL here carries its content's version (./app.js?v=bfd3f729b<hash>, ./conv-lane.mjs?v=32). A changed file
  * gets a changed URL — that is the whole point of the scheme — so a cached response for a given URL cannot go
  * stale. The unversioned entries (icons, the manifest, the docs) do not need revalidating either: they are
  * refreshed by the INSTALL, which re-fetches the whole list with cache:'reload' whenever CACHE_NAME moves.

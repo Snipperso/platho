@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   RECIPIENT_IDENTITY_TYPES,
@@ -5,7 +6,10 @@ import {
   createRecipientThread,
   findThreadByIdentityVariants,
   identityKey,
+  identityTone,
   parseRecipientIdentity,
+  plathoUsernameTier,
+  PLATHO_USERNAME_TIERS,
   preferredInboundIdentity,
   primaryThreadIdentity,
   recipientIdentityFromThreadId,
@@ -181,5 +185,77 @@ describe('PWA recipient identity routing', () => {
       `wallet_address:${FRIENDLY_ADDRESS}`,
       'platho_nft:alice.ath',
     ]);
+  });
+});
+
+describe('.ath name tiers', () => {
+  // [OWNER 2026-08-24: "we have ordinary usernames (6+ letters), rare (5) and epic (4). On the NFT picture we mark
+  // that with colours — gold, silver. Maybe we should mark 4-5 letter usernames with gold and silver in the app
+  // too?"] Yes — and from ONE definition of where a tier begins, because the mint price already had those same
+  // boundaries written out separately. Two copies is how the price and the colour end up disagreeing.
+  it('ATHTIER-01: four characters is epic, five is rare, six and up is common', () => {
+    expect(plathoUsernameTier('nova')).toBe(PLATHO_USERNAME_TIERS.EPIC);
+    expect(plathoUsernameTier('atlas')).toBe(PLATHO_USERNAME_TIERS.RARE);
+    expect(plathoUsernameTier('platho')).toBe(PLATHO_USERNAME_TIERS.COMMON);
+    expect(plathoUsernameTier('sixteencharacter')).toBe(PLATHO_USERNAME_TIERS.COMMON);
+    // The .ath suffix is stripped before counting, and stripped as a LITERAL — an unescaped dot in that regex
+    // would eat the last four characters of any name, making "xxath" (a genuine 5-letter name) look like a 1.
+    expect(plathoUsernameTier('nova.ath')).toBe(PLATHO_USERNAME_TIERS.EPIC);
+    expect(plathoUsernameTier('xxath')).toBe(PLATHO_USERNAME_TIERS.RARE);
+    // Not a mintable name at all — no tier, rather than a wrong one.
+    expect(plathoUsernameTier('abc')).toBeNull();
+    expect(plathoUsernameTier('seventeencharacte')).toBeNull();
+    expect(plathoUsernameTier('')).toBeNull();
+    expect(plathoUsernameTier(null)).toBeNull();
+  });
+
+  it('ATHTIER-02: the tone carries the tier, and only for a .ath name', () => {
+    const ath = (value: string) => ({ type: RECIPIENT_IDENTITY_TYPES.PLATHO_NFT, value });
+    expect(identityTone(ath('nova.ath'))).toBe('platho-epic');
+    expect(identityTone(ath('atlas.ath'))).toBe('platho-rare');
+    // COMMON keeps the plain tone: it is the default case, and colouring it too would say nothing.
+    expect(identityTone(ath('platho.ath'))).toBe('platho');
+    // Other identity kinds are untouched — a wallet is not scarce and a .ton name is not ours to grade.
+    expect(identityTone({ type: RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS, value: 'UQabc' })).toBe('wallet');
+    expect(identityTone({ type: RECIPIENT_IDENTITY_TYPES.TON_DNS, value: 'foo.ton' })).toBe('ton');
+    expect(identityTone(null)).toBe('wallet');
+  });
+
+  it('ATHTIER-03: every tone the tier can produce has a colour, in all three theme blocks', () => {
+    // A tone with no rule renders as inherited text — the name would silently lose its colour instead of gaining
+    // one, which is the failure this feature is most likely to have.
+    const css = readFileSync('web/styles.css', 'utf8');
+    for (const tone of ['platho-epic', 'platho-rare']) {
+      expect(css, `${tone} needs a rule`).toContain(`.identity-label-${tone} {\n  color: var(--id-${tone});\n}`);
+    }
+    // dark, system-light and toggled-light — a token defined once would leave one theme with no colour at all.
+    expect((css.match(/--id-platho-epic:/g) ?? []).length).toBe(3);
+    expect((css.match(/--id-platho-rare:/g) ?? []).length).toBe(3);
+    // And the price reads the same tier function rather than repeating the lengths.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function localUsernameMintPriceAtomic\(username\) \{\s*\n\s*const tier = plathoUsernameTier\(username\);/);
+    expect(app, 'the old length ladder must be gone, not merely bypassed').not.toMatch(/if \(length === 4\) return USERNAME_PRICE_4_CHARS_ATOMIC;/);
+  });
+});
+
+describe('.ath tier on the avatar', () => {
+  it('ATHTIER-04: the icon wears the tier too, from the SAME tone as the name', () => {
+    // [OWNER 2026-08-24: "let's colour the icon for silver and gold too. Make the background so it's immediately
+    // clear it's silver."] A flat fill reads as "some yellow square"; metal is read from the band of light across
+    // it, so each tier is a three-stop diagonal — bright, dark, bright.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // ONE mapping from tone to tier, so a name and its avatar cannot disagree about what a name is worth.
+    expect(app).toMatch(/function applyAvatarTier\(node, tone\) \{[\s\S]{0,240}?const tier = tone === 'platho-epic' \? 'epic' : tone === 'platho-rare' \? 'rare' : null;/);
+    expect(app, 'and it CLEARS the mark, or a reused row keeps another contact\'s metal').toMatch(/if \(tier\) node\.dataset\.tier = tier;\s*\n\s*else delete node\.dataset\.tier;/);
+    // Applied where every thread avatar routes through — list, conversation header, share sheet — and on the
+    // public author's, whose title is already painted in the same tone.
+    expect(app).toMatch(/applyAvatarTier\(node, threadDisplayTone\(thread\)\);/);
+    expect(app).toMatch(/applyAvatarTier\(publicPostDetailAvatar, authorTone\);/);
+    for (const tier of ['epic', 'rare']) {
+      expect(css).toContain(`.avatar[data-tier="${tier}"] {`);
+      // With a photo the fill is hidden, so the tier moves to a ring — the one case where it matters most.
+      expect(css).toContain(`.avatar.has-image[data-tier="${tier}"] {`);
+    }
   });
 });

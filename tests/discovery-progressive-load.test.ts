@@ -121,7 +121,11 @@ describe('DISCOVERSTREAM — beacons are reported as they are read', () => {
     // (publicDiscoveryProgress, from the painter's frames); only a FINISHED sweep may say "nothing found".
     const render = app.slice(app.indexOf('function renderPublicDiscovery(options'));
     const body = render.slice(0, render.indexOf('function discoveryCardIdentityButton'));
-    expect(body).toContain('status.textContent = publicDiscoveryStatusText(progress, { shownCount: shown.length, loading, error: options.error === true });');
+    // The list is reconciled (KEYROW-*), so the status is a keyed entry like every other child — its text is
+    // computed once, up front, because the signature is what decides whether the line is rebuilt at all.
+    expect(body).toContain('const statusText = publicDiscoveryStatusText(progress, { shownCount: shown.length, loading, error: options.error === true });');
+    expect(body).toContain("key: 'status',");
+    expect(body).toContain('status.textContent = statusText;');
     const statusText = app.slice(app.indexOf('function publicDiscoveryStatusText(progress'), app.indexOf('function updatePublicDiscoveryStatusLine'));
     expect(statusText).toContain('const sweeping = loading || progress !== null;');
     expect(statusText).toContain('if (sweeping) return publicDiscoverySweepStatusText(progress);');

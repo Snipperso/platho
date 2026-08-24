@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-23T14:41:54.453Z",
+  "generatedAt": "2026-08-24T08:24:32.772Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,9 +8,9 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 257,
-    "totalBytes": 6288356,
-    "bundleSha256": "2bb5a8c623c0b054e0daa30d437cca77056192af12174b3193240db06493fe06",
+    "fileCount": 258,
+    "totalBytes": 6339751,
+    "bundleSha256": "3b701a05f11516e64aa182ec6e7b63350eec34c15b49e26d1974585442b2e821",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -24,8 +24,8 @@
       },
       {
         "path": "app.js",
-        "bytes": 1650248,
-        "sha256": "21acaf1ef9252392c9392b136ae52c72809b86fc3fa607ab4bda58a4d9a8e1e0"
+        "bytes": 1684439,
+        "sha256": "fd3f729bc727d49436ac857b3cc56657d9004c9dc07ca424af1a41aca4d93557"
       },
       {
         "path": "assets/icons/about.svg",
@@ -544,8 +544,8 @@
       },
       {
         "path": "docs/privacy-policy.md",
-        "bytes": 3305,
-        "sha256": "33bca8de23cbaa0d47e95ca05b994fa739dd75150b258b048a5a9415e4b0cb3d"
+        "bytes": 3304,
+        "sha256": "c8752382a6f3bf626ab1dd27c0087107f05b65b0ad7a685064a66e23a5c41c53"
       },
       {
         "path": "docs/privacy-policy.pt.md",
@@ -594,8 +594,8 @@
       },
       {
         "path": "docs/terms-of-use.md",
-        "bytes": 3776,
-        "sha256": "e332af34dd1cbd52c11cc673a10931e404a6c6c7221ccf333c62a09dd0d2d114"
+        "bytes": 3772,
+        "sha256": "d727f305909e850d53859fa828f0d5860c85de5dae5b2e35812cc1eb98d86ea3"
       },
       {
         "path": "docs/terms-of-use.pt.md",
@@ -619,18 +619,18 @@
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 701934,
-        "sha256": "d04b9bbc73a36c6421b565da160dcb6dc53b0c43b77d4c47a9bcbfdaea5ec33f"
+        "bytes": 701835,
+        "sha256": "2065a55e0109a8e2f97a53868dc07aca138267befa1c6c956010d30b6682d6b1"
       },
       {
         "path": "i18n.mjs",
         "bytes": 4608,
-        "sha256": "a636e7f2944332d844ecf3f7e27ed878a68a22e50d8403ccd9afbae7d28d25e7"
+        "sha256": "116fba50c257fc78ae81db11b989403e1c09220d5cdf90165ef439fd0b3227f5"
       },
       {
         "path": "index.html",
-        "bytes": 73844,
-        "sha256": "1bde2202f29b48424ef770f16c1f045806355b921989b35ac9736bcbed90260d"
+        "bytes": 73841,
+        "sha256": "b73ab3bef8d8321144b5bdefedb98e2c5cd9f2281f13fd9e02e29d90ea481a02"
       },
       {
         "path": "intro-bucket.mjs",
@@ -718,6 +718,11 @@
         "sha256": "aa55ddfe32dc413213565920eea16718e0bf0afb337389eacab30af0a9f9b499"
       },
       {
+        "path": "keyed-rows.mjs",
+        "bytes": 7792,
+        "sha256": "cfbf632e17ac6c04c9a150e844637801d900d7f8ad7bbce5e6aea02d2262c1d6"
+      },
+      {
         "path": "manifest.webmanifest",
         "bytes": 686,
         "sha256": "85ab00d6129da88c2014fe0f398e30dc1e9fd1aee3029b9eb64bfb0bb56afbd8"
@@ -759,8 +764,8 @@
       },
       {
         "path": "privacy.html",
-        "bytes": 4858,
-        "sha256": "9cfad5952b1fdb5c9a0c832bc99c45b642bfccfcb35b7e7373386891aa6402fd"
+        "bytes": 4857,
+        "sha256": "671fe1077c0155308f23eb2cee98a93e3307e930e7b77266dadbd7624b7fd9d2"
       },
       {
         "path": "profile-avatar-media-store.mjs",
@@ -774,8 +779,8 @@
       },
       {
         "path": "public-channel-subscriptions.mjs",
-        "bytes": 26746,
-        "sha256": "30ae4b1032fee5769b24bbc5e57a04c41be49d0a79d7700f1682a708141416a6"
+        "bytes": 26694,
+        "sha256": "a750428246aeabcc1adc5baa7dcfa349c1fae7ff7c2b0f7c0e2e86bebf7ff074"
       },
       {
         "path": "public-lane-send.mjs",
@@ -819,8 +824,8 @@
       },
       {
         "path": "recipient-identities.mjs",
-        "bytes": 8981,
-        "sha256": "034c36edf98d52cba98da04e097e046cb35c2bdafecc9ae9a8a118f824ca10c2"
+        "bytes": 10463,
+        "sha256": "9488e4d9e2498c662446c46d32b03bf6e923c6874645796795a3915e11d76930"
       },
       {
         "path": "recovery-blob.mjs",
@@ -874,18 +879,18 @@
       },
       {
         "path": "styles.css",
-        "bytes": 166616,
-        "sha256": "1f149efff382c963ff4a891108ac3747b3d5e934cccb3a7286a0eed195d0994d"
+        "bytes": 174684,
+        "sha256": "4cc4a8dc6ba751715ba708b016f04890de09170521ebd918ea1a9ec7f5191cbd"
       },
       {
         "path": "sw.js",
-        "bytes": 15513,
-        "sha256": "03eab91c2ed3c8d1ea33e4daf15b6be322c4d5cd66073b051731df4556250654"
+        "bytes": 15539,
+        "sha256": "279e4a10c926b017ab24f5699ebc2d9780191d325eaa88a1288f982bddaa1c83"
       },
       {
         "path": "terms.html",
-        "bytes": 5301,
-        "sha256": "cfc56b4f1c08c88d15ab4cf44ac5c5517a65e18e5726bb2ad19fafa6b805226f"
+        "bytes": 5297,
+        "sha256": "76a159bc5641620ba3929803e94eedbe82bf9e10f9991c860242e11cd88f6779"
       },
       {
         "path": "thread-list-order.mjs",

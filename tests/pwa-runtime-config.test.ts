@@ -768,7 +768,12 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publicChannelStorage/);
     expect(app).toMatch(/readPublicChannelFeedCache\(publicChannelStorage\(\)\)/);
     expect(app).toMatch(/writePublicChannelSubscriptions\(publicChannelStorage\(\), publicChannelSubscriptions\)/);
-    expect(app).toMatch(/scopedStorageKey\(PUBLIC_READ_CURSORS_STORAGE_KEY\)/);
+    // Reading positions are deployment-scoped like everything else, through ONE store rather than a copied
+    // try/JSON.parse per map — the feed's per-channel cursors and a thread's per-post comment cursor share it.
+    expect(app).toMatch(/function readScopedJsonMap\(storageKey\) \{[\s\S]{0,300}?scopedStorageKey\(storageKey\)/);
+    expect(app).toMatch(/function writeScopedJsonMap\(storageKey, value\) \{[\s\S]{0,300}?scopedStorageKey\(storageKey\)/);
+    expect(app).toMatch(/publicReadCursors = readScopedJsonMap\(PUBLIC_READ_CURSORS_STORAGE_KEY\);/);
+    expect(app).toMatch(/publicCommentReadCursors = readScopedJsonMap\(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY\);/);
     expect(app).toMatch(/localStorageOrNull\(\)\?\.clear\(\)/);
     expect(app).toMatch(/globalThis\.sessionStorage\?\.clear\?\.\(\)/);
     expect(app).toMatch(/indexedDB\.databases\(\)/);
@@ -930,9 +935,10 @@ describe('PWA runtime config guard', () => {
     expect(enCopy).toMatch(/On-chain size/);
     expect(app).toMatch(/requestCompressedImageFile/);
     expect(enCopy).toMatch(/The final WebP bytes are encrypted before publish and verified by CapsuleHub hashes/);
-    // (the currency the user spends is GRAM everywhere in the copy — the rebrand; the SERVICE names it does not own,
-    // TON Center and TON DNS, keep theirs, or the instructions cannot be followed)
-    expect(enCopy).toMatch(/The final WebP bytes are public in the accepted GRAM transaction body and verified by CapsuleHub hashes/);
+    // (the currency the user spends is GRAM everywhere in the copy — the rebrand. The CHAIN is still TON, and so
+    // are the services it does not own: TON Center, TON DNS. This assertion itself pinned "GRAM transaction body"
+    // for a day, which is how the wrong name reached the boot screen — see PWA-BRAND-01.)
+    expect(enCopy).toMatch(/The final WebP bytes are public in the accepted TON transaction body and verified by CapsuleHub hashes/);
     expect(enCopy, 'the toncenter key is found under its real name').toMatch(/TON Center API key/);
     expect(app).not.toMatch(/remain in on-chain capsules/);
     expect(app).toMatch(/encodeCanvasToWebp/);
@@ -1566,7 +1572,7 @@ describe('PWA runtime config guard', () => {
     expect(submitSource).toMatch(/messageInput\.value = ''/);
     // After sending, focus returns to the composer so the user can keep typing without re-tapping the field
     // (clicking the send button moved focus to the button / would drop the mobile keyboard).
-    expect(submitSource).toMatch(/messageInput\?\.focus\(\)/);
+    expect(submitSource, 'and through the iOS-safe helper — see PWA-IOS-FOCUS-01').toMatch(/focusComposerField\(messageInput\)/);
     expect(submitSource).toMatch(/await settlePrivateComposerSendError\(sendContext, error\)/);
     expect(submitSource).not.toMatch(/restorePrivateDraftAfterUnsentMessage/);
     expect(settleSource).toMatch(/privateSendPreflightStatusText\(error\)/);
@@ -3418,6 +3424,20 @@ describe('PWA runtime config guard', () => {
     expect(art).toMatch(/inset:\s*0/);
     expect(art).toMatch(/object-fit:\s*cover/);
     expect(art).not.toMatch(/aspect-ratio/);
+
+    // AND THE LIST MUST NOT SCROLL ITSELF [OWNER 2026-08-24: "just fix this stupid bug with the usernames already"
+    // — and, reading it correctly: "this modal of yours doesn't scroll like our other modals"]. The square above
+    // was correct all along; what cut the art to a strip was the list owning a height.
+    //
+    // A grid sizes its rows from their INTRINSIC contribution, and a percentage padding contributes zero to that.
+    // Given `max-height: 58vh; overflow-y: auto` the grid had a definite height, measured each row as just the foot
+    // (~40px), shared the leftover space among them — six rows of exactly 68.5px, filling the box — and the frame
+    // then painted its real 298px and was clipped by the card's overflow:hidden. MEASURED: card 66px with the
+    // height, 338px without it; the dialog 590/574 (not scrollable) versus 2267/749 (scrollable).
+    const list = /(^|[,}])\s*\.nft-card-list\s*\{([^}]*)\}/m.exec(css)?.[2] ?? '';
+    expect(list.length, 'the list rule must actually be found').toBeGreaterThan(20);
+    expect(list, 'a height here re-breaks the art it has nothing to do with').not.toMatch(/max-height|height:/);
+    expect(list, 'and the dialog does the scrolling, as it does everywhere else').not.toMatch(/overflow/);
   });
 
   it('PWA-DIALOG-CLOSE-ICON-01: the dialog close control is a mask icon, not a text glyph', () => {
@@ -4023,16 +4043,16 @@ describe('PWA runtime config guard', () => {
   it('PWA-CONTACT-CTA-01: private add-a-contact plate replaces the search-row "+" and opens the new-chat dialog', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
-    // One persistent plate node, pinned FIRST in the thread list; row reconciliation skips it.
+    // One persistent plate node, pinned FIRST in the thread list. It is now a keyed entry like every other child
+    // (KEYROW-*) rather than a node the reconciliation loop had to be told to skip: its key comes first, so it
+    // lands first, and the primitive's own sweep replaces the hand-written "everything else goes" branch.
     expect(app).toMatch(/function ensureContactCtaCard\(\)/);
     expect(app).toMatch(/add\.addEventListener\('click', openNewChatDialog\);/);
-    expect(app).toMatch(/else if \(node !== privateContactCtaCard\) node\.remove\(\);/);
-    expect(app).toMatch(/contactCta\.hidden = q\.length > 0;/);
-    expect(app).toMatch(/threadList\.insertBefore\(contactCta, threadList\.firstElementChild\)/);
-    // The pre-F3 migration probe must look at the first ROW (the plate legitimately has no _refs) —
-    // a firstElementChild probe would wipe and rebuild every row on every render.
-    expect(app).toMatch(/threadList\.querySelector\(':scope > \[data-thread\]'\)/);
-    expect(app).not.toMatch(/threadList\.firstElementChild && !threadList\.firstElementChild\._refs/);
+    expect(app).toMatch(/key: 'cta',\s*\n\s*sig: 'cta',\s*\n\s*build: \(\) => ensureContactCtaCard\(\),/);
+    expect(app).toMatch(/ensureContactCtaCard\(\)\.hidden = q\.length > 0;/);
+    expect(app, 'the plate is the first entry, so it is the first child').toMatch(
+      /const entries = \[\{[\s\S]{0,600}?key: 'cta',/,
+    );
     // hidden must actually hide the flex card (the UA [hidden] rule loses to display:flex).
     expect(css).toMatch(/\.discovery-cta\[hidden\]\s*\{\s*display:\s*none;/);
     expect(EN_STRINGS['chat.contactCtaTitle']).toBe('Add a contact');
@@ -4269,6 +4289,7 @@ describe('PWA runtime config guard', () => {
     // And the two the owner named, stated positively so a re-add is loud.
     expect(css).toMatch(/\.conversation-header \{[\s\S]{0,200}?border-bottom: 0;/);
     expect(css).toMatch(/\.sidebar \{[\s\S]{0,900}?border-top: 0;/);
+    expect(css).toMatch(/\.comment-list \{[\s\S]{0,200}?border-top: 0;/);
     // The tab plates keep an even margin to the screen edge — an asymmetric floor under a transparent bar reads as a
     // band of its own; a home-indicator device still gets its full inset through the max().
     expect(css).toMatch(/--mobile-nav-bottom-reserve: 6px;/);
@@ -4296,6 +4317,319 @@ describe('PWA runtime config guard', () => {
     expect(badge, 'the count must not twitch as it grows').toMatch(/font-variant-numeric: tabular-nums;/);
     expect((css.match(/--badge-ring:/g) ?? []).length, 'dark + system-light + toggled-light').toBe(3);
     expect(css, 'and it is a green, never the panel plate').toMatch(/--badge-ring: #[0-9a-f]{6};/);
+  });
+
+  it('PWA-MESSAGE-SHAPE-01: a burst sits tight, and the bubble keeps the shape it always had', () => {
+    // [OWNER 2026-08-24: "let the messages be a bit closer … so it looks harmonious and it is clear the messages
+    // were sent at the same time" — the space between them is the plasma showing through, so a burst that is not
+    // tight reads as six separate sendings.]
+    const css = readFileSync('web/styles.css', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    // TIGHT is the default, because most rows in a busy strip continue a burst; a row that STARTS a group buys the
+    // room back. Doing it this way round is what makes a run of six look like one sending. MEASURED: 3px / 10px.
+    expect(css).toMatch(/--message-gap-tight: 3px;/);
+    expect(css).toMatch(/--message-gap-group: 10px;/);
+    expect(css).toMatch(/\.message-strip \{[\s\S]*?gap: var\(--message-gap-tight\);/);
+    expect(css).toMatch(/\.message\[data-group-start="true"\],\s*\n\.strip-separator,\s*\n\.conversation-earlier-button \{\s*\n\s*margin-top: calc\(var\(--message-gap-group\) - var\(--message-gap-tight\)\);/);
+    expect(css, 'the first row must not be pushed off the top').toMatch(/\.message-strip > \*:first-child \{\s*\n\s*margin-top: 0;\s*\n\}/);
+    // A row opens a group when the row before it ENDED one — the same run boundary the status line uses, so the
+    // two can never disagree about where a burst starts and stops.
+    expect(app).toMatch(/const groupStart = messageIndex === 0 \|\| showMetaFor\[messageIndex - 1\] === true;/);
+    expect(app).toMatch(/if \(groupStart\) row\.dataset\.groupStart = 'true';/);
+    expect(app, 'and it rides the signature, or a row keeps a boundary that has moved').toMatch(/groupStart \? 'open' : 'cont',/);
+
+    // THE BUBBLE'S SHAPE IS UNCHANGED, and that is a decision, not an omission [OWNER 2026-08-24, after two passes
+    // at it: "put the message design back the way it was before this fuss with the images"]. The body is rounded
+    // and the corner on the SPEAKER's side is the small one; an attempt to inverse that (square body, one big
+    // curl) was built, shown, and rejected. This pins the original so a third attempt has to be deliberate.
+    expect(css).toMatch(/\.bubble \{[\s\S]*?border-radius: var\(--r-l\);/);
+    expect(css).toMatch(/\.message\.in \.bubble \{\s*\n\s*border-bottom-left-radius: 6px;\s*\n\}/);
+    expect(css).toMatch(/\.message\.out \.bubble \{[\s\S]*?border-bottom-right-radius: 6px;\s*\n\s*border-bottom-left-radius: var\(--r-l\);/);
+    expect(css, 'the corner tokens went with the reverted design').not.toMatch(/--bubble-corner|--bubble-curl/);
+    // And an image is a normal bubble's content again: no media-only frame, no class for one.
+    expect(css, 'the media-only bubble was reverted').not.toMatch(/is-media-only/);
+    expect(app, 'and nothing still marks one').not.toMatch(/is-media-only/);
+  });
+
+  it('PWA-AURORA-RIPPLE-01: the plasma canvas is sized by what the device can actually blur, not by what it claims', () => {
+    // [OWNER 2026-08-24: "the plasma has a ripple, small, but it is there" — then, naming the cause: "it ripples
+    // because of px".] The canvas is small and stretched, so the ripple is Skia's own dither inside it, magnified.
+    // Two things were supposed to hide that: the upscale, and a blur in canvas space. Safari before 18 HAS
+    // ctx.filter and ignores it — so the devices the report came from had no blur at all and a raw dither.
+    const app = readFileSync('web/app.js', 'utf8');
+    // The feature test paints a dot through a blur and looks whether it spread. `'filter' in ctx` cannot answer it.
+    expect(app).toMatch(/function auroraCanvasBlurWorks\(\) \{/);
+    expect(app).toMatch(/ctx\.filter = 'blur\(2px\)';\s*\n\s*ctx\.fillStyle = '#fff';\s*\n\s*ctx\.fillRect\(4, 4, 1, 1\);/);
+    expect(app, 'the answer is the SPREAD, not the property').toMatch(/auroraCanvasBlurAnswer = row\[3 \* 4 \+ 3\] > 0 \|\| row\[5 \* 4 \+ 3\] > 0;/);
+    expect(app, 'measured once — it cannot change within a page').toMatch(/if \(auroraCanvasBlurAnswer !== null\) return auroraCanvasBlurAnswer;/);
+    // Without a blur the pixels have to do the whole job, so the canvas gets more of them.
+    expect(app).toMatch(/const budget = auroraCanvasBlurWorks\(\) \? 4 : 1\.6;/);
+    expect(app).toMatch(/Math\.min\(auroraCanvasBlurWorks\(\) \? 360 : 560, Math\.round\(lw \/ budget\)\)/);
+    // The height follows the LAYER's aspect, so the upscale stays uniform — an anisotropic stretch would turn
+    // round dither into stripes, which is a worse ripple than the one being fixed.
+    expect(app).toMatch(/const ch = Math\.max\(64, Math\.min\(1200, Math\.round\(cw \* lh \/ lw\)\)\);/);
+  });
+
+  it('PWA-MESSAGE-MEDIA-02: the frame fits the picture — whole, never cropped, in both directions', () => {
+    // [OWNER 2026-08-24: "just make the image take up the whole space of the green frame … and if the photo was
+    // sent with text, leave room for the text below", "and not only the green one, the other person's too", then
+    // on the result: "why did the screenshot not fit? it could have fitted the picture itself, maybe by making it
+    // smaller. And it did the wide picture strangely, with mistakes. The middle-sized one came out well."]
+    //
+    // The first cut pinned the bubble to the media width and cropped the rest (object-fit: cover) — which is why a
+    // phone screenshot lost its bottom half instead of arriving smaller. The frame follows the picture now.
+    // MEASURED after the change: 1170x2532 -> 185x400 whole; 1600x500 -> 286x89 whole; 1200x800 -> 288x192 whole.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    // The bubble hands its padding to the content, so nothing has to be cancelled and nothing can be clipped.
+    expect(css).toMatch(/\.bubble\.has-media \{\s*\n\s*width: fit-content;\s*\n\s*max-width: 100%;\s*\n\s*padding: 0;\s*\n\s*overflow: hidden;/);
+    expect(css).toMatch(/\.bubble\.has-media > \.message-text-block,[\s\S]{0,200}?padding-left: var\(--bubble-pad-x\);/);
+    // The picture sizes ITSELF against both caps, so a wide one is limited by the width and a tall one by the
+    // height — and the whole of it is shown either way.
+    const media = css.slice(css.indexOf('.bubble.has-media > .message-image {'), css.indexOf('.bubble.has-media > .message-text-block,'));
+    expect(media.length, 'the slice really spans the picture rule').toBeGreaterThan(300);
+    expect(media).toMatch(/width: auto;\s*\n\s*height: auto;/);
+    expect(media, 'capped by the FRAME, not by a token wider than it').toMatch(/max-width: 100%;/);
+    expect(media).toMatch(/max-height: 400px;/);
+    expect(media, 'no crop — that is what lost the screenshot').not.toMatch(/object-fit/);
+    expect(media, 'centred for when a caption makes the bubble wider than the picture').toMatch(/margin: 0 auto;/);
+    // MEASURED: a picture capped at var(--message-media-width) (320px) inside a bubble the message caps at 288px
+    // overflowed by 32px and was clipped. The frame is the only honest cap.
+    expect(media).not.toMatch(/max-width: var\(--message-media-width\)/);
+    // DIRECTION-AGNOSTIC BY CONSTRUCTION: the selector names neither .in nor .out.
+    expect(css, 'the rule must not pick a side').not.toMatch(/\.message\.(in|out) \.bubble\.has-media/);
+    // Marked in JS: a :has() would be ignored by the older WebViews here, leaving one picture inset among flush ones.
+    expect(app).toMatch(/if \(bubble\.querySelector\('\.message-image'\)\) bubble\.classList\.add\('has-media'\);/);
+    expect(css).not.toMatch(/:has\(> ?\.message-image\)/);
+  });
+
+  it('PWA-MESSAGE-MEDIA-01: a burst is stamped once, at its end', () => {
+    // [OWNER 2026-08-24: "for messages sent in one batch with the same received/published and time — write it only
+    // on the last message".] Six lines reading "received · 00:03" under six bubbles say one thing six times.
+    //
+    // This test used to carry a second half, about images without a plate — that design was built, shown, and
+    // withdrawn ("put the message design back the way it was before this fuss with the images"). What survived the
+    // episode is this: the grouping, and the tighter spacing it feeds (PWA-MESSAGE-SHAPE-01).
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/const showMetaFor = messages\.map\(\(message, index\) => \{/);
+    expect(app, 'the last message of a run always keeps its line').toMatch(/if \(!next\) return true;/);
+    expect(app, 'a divider breaks a run — a line hidden behind one reads as missing').toMatch(/if \(next === conversationOpenFirstUnreadRef\) return true;/);
+    expect(app).toMatch(/if \(messageDayKey\(messageCreatedAtMs\(next\)\) !== messageDayKey\(messageCreatedAtMs\(message\)\)\) return true;/);
+    expect(app, 'and the other side speaking is a new run').toMatch(/if \(next\.type !== message\.type\) return true;/);
+    expect(app).toMatch(/return messageMetaLine\(next\) !== messageMetaLine\(message\);/);
+    // It rides the row's SIGNATURE, or the row above would keep the line the arriving message has just taken over.
+    expect(app).toMatch(/sig: privateMessageRenderSignature\(message, showMeta, groupStart\),/);
+    expect(app).toMatch(/showMeta \? 'meta' : 'nometa',/);
+    // The status attribute is set whether or not the line is drawn — it drives the sending/failed styling.
+    expect(app).toMatch(/if \(metaText\) row\.dataset\.status = messageStatusKey\(message\);/);
+  });
+
+  it('PWA-BRAND-01: the NETWORK is TON, the COIN is GRAM — and a blanket rebrand may not confuse the two', () => {
+    // [OWNER 2026-08-24: "you went and replaced TON with GRAM everywhere, and now the boot screen says 'Directly on
+    // the GRAM network'. That's a disaster … people already tell us it looks vibe-coded." Then, the rule itself:
+    // "where it speaks about the NETWORK it is TON, where it speaks about the COIN it is GRAM."]
+    //
+    // The rebrand that renamed the currency to GRAM was deliberate; renaming the chain with it was not. Seventy
+    // strings across ten locales had TON turned into GRAM — the boot tagline, the quick-start pitch, the "accepted
+    // TON transaction body" hints, "TON network fees" — plus the English terms/privacy pages, which called the
+    // blockchain itself GRAM while all nine translations still said TON.
+    //
+    // This gate polices the NETWORK sense only. Amounts, balances, fees and prices are the coin and stay GRAM;
+    // "network fees" with no brand in front of it is fine, and a Hindi sentence that happens to put GRAM next to
+    // the word "network" is not an offence — which is why this looks for the brand ATTACHED to the network noun.
+    const surfaces = [
+      'web/i18n-strings.mjs', 'web/index.html', 'web/terms.html', 'web/privacy.html',
+      'web/docs/terms-of-use.md', 'web/docs/privacy-policy.md',
+    ];
+    const networkSense = [
+      /GRAM blockchain/i, /GRAM network fee/i, /GRAM-Netzwerk/i, /GRAM 区块链/, /GRAM ブロックチェーン/,
+      /сети GRAM/i, /блокчейн GRAM/i, /GRAM transaction body/i, /client-direct on GRAM/i,
+      /messenger on GRAM/i, /GRAM wallet QR/i, /GRAM recovery phrase/i,
+    ];
+    for (const file of surfaces) {
+      const text = readFileSync(file, 'utf8');
+      for (const pattern of networkSense) {
+        expect(text, `${file}: the chain is TON, not the coin's name`).not.toMatch(pattern);
+      }
+    }
+    // Stated positively too, so a future sweep that empties these strings is loud rather than silently green.
+    const i18n = readFileSync('web/i18n-strings.mjs', 'utf8');
+    expect(i18n).toMatch(/"boot\.tagline": "End-to-end \+ post-quantum encrypted\. Client-direct on TON\."/);
+    expect(i18n).toMatch(/"boot\.tagline": "Сквозное \+ постквантовое шифрование\. Напрямую в сети TON\."/);
+    expect((i18n.match(/Client-direct on TON|Direct sur TON|Direkt auf TON|Directo en TON|Direto na TON|直连 TON|सीधे TON पर|Langsung di TON|TON に直接接続|Напрямую в сети TON/g) ?? []).length,
+      'the tagline says TON in all ten locales').toBe(10);
+    // And the third-party services keep their own names — the same lesson, learned once already.
+    expect((i18n.match(/TON Center/g) ?? []).length, 'the RPC service is TON Center in every locale').toBeGreaterThanOrEqual(50);
+    expect(i18n, 'nobody may rename someone else\'s service').not.toMatch(/GRAM Center|GRAM DNS/);
+  });
+
+  it('PWA-IOS-FOCUS-01: nothing that raises the keyboard may let the browser scroll the page', () => {
+    // [OWNER 2026-08-24: "there is still an iPhone bug … the interface flies up, it accounts for the keyboard the
+    // way Android does, and on iPhone that must not be done. We fixed it, but it looks like some branch was
+    // missed."] Measured against the source: the cure — focus({ preventScroll: true }) — existed in exactly ONE
+    // place, the composer's maximize toggle, while sixteen other composer focus calls used a plain focus().
+    //
+    // A plain focus() asks the browser to bring the field into view, and iOS does that by scrolling the PAGE at the
+    // moment of focus, while the shell is still full height and the composer sits where the keyboard is about to
+    // be. The shell then shrinks and the page keeps the scroll it was given. The app positions the composer above
+    // the keyboard itself, so the browser's help is never wanted.
+    //
+    // The rule, not the seventeen instances: ONE helper, and no bare .focus() left on anything that takes text.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function focusComposerField\(field\) \{\s*\n\s*if \(!field \|\| field\.disabled\) return;\s*\n\s*field\.focus\(\{ preventScroll: true \}\);\s*\n\}/);
+    // Every focus in the file goes through it, except the one that focuses a BUTTON (no keyboard, and a dialog's
+    // initial focus belongs on its cancel).
+    const bare = [...app.matchAll(/^.*[A-Za-z)\]]\.focus\(\).*$/gm)]
+      .map((match) => match[0].trim())
+      .filter((line) => !line.includes('focusComposerField'));
+    expect(bare, `a bare .focus() is back: ${bare.join(' | ')}`).toEqual(['cancelBtn.focus();']);
+    // And the helper is really used across the composer surfaces, not merely defined.
+    expect((app.match(/focusComposerField\(/g) ?? []).length).toBeGreaterThanOrEqual(18);
+    for (const field of ['messageInput', 'publicMessageInput', 'editorEl', 'el', 'recipientInput', 'urlInput']) {
+      expect(app, `${field} is focused through the helper`).toMatch(new RegExp(`focusComposerField\\(${field}\\)`));
+    }
+
+    // THE TAP IS THE OTHER HALF, and it is the one the owner sees [OWNER 2026-08-24: "our problem was that I TAP
+    // the composer and the interface flies up … you are talking about the maximize, not the place with the
+    // problem"]. preventScroll cannot reach it — on a tap nothing of ours calls focus(); the browser focuses the
+    // field and iOS scrolls the PAGE to reveal it. The single scrollTo(0,0) that used to answer this fires on the
+    // one frame the measured height changes, and iOS animates its keyboard, so the scroll can land after it. The
+    // correction is therefore HELD across the keyboard's arrival rather than spent on a frame.
+    expect(app).toMatch(/const IOS_FOCUS_SCROLL_WATCH_MS = \d{3,4};/);
+    expect(app).toMatch(/function holdPageAtTopWhileKeyboardArrives\(\) \{\s*\n\s*if \(!isIosDevice\(\)\) return;/);
+    expect(app, 'it stops by itself').toMatch(/if \(performance\.now\(\) < iosFocusScrollWatchUntil\) \{\s*\n\s*iosFocusScrollFrame = requestAnimationFrame\(settle\);/);
+    expect(app, 'one delegated listener, so a field added later is covered').toMatch(
+      /document\.addEventListener\('focusin', \(event\) => \{[\s\S]{0,400}?holdPageAtTopWhileKeyboardArrives\(\);\s*\n\}, \{ passive: true \}\);/,
+    );
+    // The OTHER iOS cure — refusing the page drag while the keyboard is up (WebKit 191204) — is a different
+    // defect and must stay untouched; a "fix" that removed it would bring back dragging the app off the top.
+    expect(app).toMatch(/function armPageDragRefusal\(event\)/);
+    expect(app).toMatch(/function refusePageDragWhileKeyboardIsUp\(event\)/);
+  });
+
+  it('PWA-IOS-SELECT-01: the selection grips may widen a selection — the page refusal is not allowed to eat that drag', () => {
+    // [OWNER 2026-08-24, correcting his own first report of "cannot select text": "текст выделяется то, но его
+    // нельзя расширить используя полоски"] — on the iPhone a long press DOES select, and neither grip will widen
+    // the selection afterwards.
+    //
+    // The cause is ours and it is one line of reasoning that was half right. refusePageDragWhileKeyboardIsUp
+    // calls preventDefault on every touchmove of a gesture that began on something with nothing to scroll, and a
+    // composer holding one line of text is exactly that. Its note said "selection on iOS starts from a long
+    // press, not a drag, so nothing is taken away" — true of MAKING a selection (WebKit decides the long press on
+    // a timer and hands the page a touchcancel when it wins, so no touchmove of ours is in the way) and false of
+    // EXTENDING one, which is a drag: WebKit defers the handle gesture until the page has said whether it
+    // prevents the touchmove, and a prevented touchmove fails the gesture. The grip does not move.
+    //
+    // The exception is a LIVE selection — two ends, in the field that has focus — and not "this is an editable",
+    // which is the blanket exemption [OWNER 2026-08-15: "you can still pull the page out by the text field"] that
+    // was removed for good reason and must not come back by the back door.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function focusedEditableHoldsLiveSelection\(\) \{/);
+    // Both shapes of "selected": a contenteditable answers through document.getSelection(), an input/textarea
+    // keeps its selection to itself (and throws for the types that have none, hence the guard).
+    const holds = app.slice(app.indexOf('function focusedEditableHoldsLiveSelection()'), app.indexOf('function armPageDragRefusal('));
+    expect(holds).toMatch(/try \{ return active\.selectionEnd > active\.selectionStart; \} catch \{ return false; \}/);
+    expect(holds).toMatch(/!selection\.isCollapsed/);
+    // The armer asks it, and asks it BEFORE the ancestor walk (a one-line composer has nothing to scroll, so the
+    // walk would arm the refusal and the question would never be reached).
+    const armer = app.slice(app.indexOf('function armPageDragRefusal('), app.indexOf('function refusePageDragWhileKeyboardIsUp('));
+    expect(armer).toMatch(/if \(focusedEditableHoldsLiveSelection\(\)\) return;[\s\S]*?for \(let node = event\.target/);
+    // ...and the discrimination stays IN the helper: the armer must still not wave a field through for being one.
+    expect(armer, 'the blanket editable exemption was the hole and stays closed').not.toMatch(/isContentEditable|closest\('input/);
+    // The keyboard gate and the scroller rule are untouched — this is a narrower exception, not a retreat.
+    expect(armer).toContain('KEYBOARD_PRESENT_PX');
+    expect(armer).toMatch(/node\.scrollHeight > node\.clientHeight\) return;/);
+
+    // AND THE FLAG FALLS WITH ITS GESTURE. It was raised at touchstart and nothing lowered it, so it outlived the
+    // gesture that armed it — and iOS does not always open a sequence with a touchstart the page can see: WebKit
+    // sends touchcancel the moment the selection assistant claims the touch, and whatever arrives after that is
+    // no longer ours to refuse.
+    expect(app).toMatch(/function releasePageDragRefusal\(\) \{\s*\n\s*pageDragRefusalArmed = false;\s*\n\}/);
+    expect(app).toMatch(/document\.addEventListener\('touchend', releasePageDragRefusal, \{ passive: true \}\);/);
+    expect(app).toMatch(/document\.addEventListener\('touchcancel', releasePageDragRefusal, \{ passive: true \}\);/);
+  });
+
+  it('PWA-IOS-STRIP-01: the page is held at the top for as long as the keyboard is up, not for a fixed 900ms', () => {
+    // [OWNER 2026-08-24: an empty dark strip along the bottom, BELOW the tab bar, "sometimes", on tapping the
+    // message field.] The strip is bare <body>: the shell is position:fixed and a fixed element does not stay
+    // fixed while the keyboard is up (WebKit 191204), so a page carrying an offset of N draws the shell N higher
+    // and leaves N pixels of nothing under the bar. Same defect as "the interface flies up", measured small —
+    // [MEASURED in the installed app] MAX scroll 386, off 386, shell up 386 were one event, and any part of that
+    // left behind is a proportional strip.
+    //
+    // holdPageAtTopWhileKeyboardArrives answers the ARRIVAL and expires on a clock, which is a guess at how long
+    // iOS takes; the offset can also land later (the caret moving while typing, a keyboard that changes size, a
+    // return to a still-focused field that fires no focusin). A deadline cannot cover those — the CONDITION can,
+    // and the frame loop that runs for exactly that condition was already there to carry it.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function iosPageIsCarryingTheKeyboardsScroll\(\) \{/);
+    const carrying = app.slice(
+      app.indexOf('function iosPageIsCarryingTheKeyboardsScroll()'),
+      app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'),
+    );
+    // Three conditions, all of them load-bearing: only WebKit scrolls the page for a focused field; only a
+    // non-zero offset is worth a correction; and only while the keyboard is up is that offset illegitimate.
+    expect(carrying).toMatch(/if \(!isIosDevice\(\)\) return false;/);
+    expect(carrying).toMatch(/if \(\(window\.scrollY \|\| document\.documentElement\.scrollTop \|\| 0\) === 0\) return false;/);
+    expect(carrying).toMatch(/window\.innerHeight - viewport\.height\) >= KEYBOARD_PRESENT_PX/);
+    // Carried by the loop that already runs while the keyboard is up, so it costs no new frames.
+    const live = app.slice(app.indexOf('function keepViewportVarsLiveWhileComposerIsOpen()'), app.indexOf('function pinOpenThreadsToEndAfterViewportChange()'));
+    expect(live).toMatch(/if \(iosPageIsCarryingTheKeyboardsScroll\(\)\) window\.scrollTo\(0, 0\);/);
+    // The loop still stops itself, and still recomputes the SIZES only when the latch moved — an open, unchanged
+    // keyboard must write no geometry at all, or the writes breathe with the reading's noise (that is the shudder).
+    expect(live).toMatch(/if \(!viewportVarsLoopWanted\(\)\) \{ viewportVarsFrame = 0; return; \}/);
+    expect(live).toMatch(/if \(writeVisibleBottomGap\(\)\) syncViewportCssVars\(\);/);
+    // And the 1.0.28 hack stays dead: the correction is bounded by the keyboard, never hung off the scroll event
+    // (that one fought the owner's own drag and snapped back when he let go).
+    expect(app, 'the scroll-fighting hack must not return').not.toMatch(/addEventListener\('scroll',[^)]*scrollTo/);
+    // Both halves are present: the arrival watch AND the condition-bounded hold.
+    expect(app).toMatch(/function holdPageAtTopWhileKeyboardArrives\(\) \{/);
+  });
+
+  it('PWA-KEYED-ROWS-01: every long list updates through the ONE reconciliation primitive, and none of them wipes itself', () => {
+    // [OWNER 2026-08-23, relaying user reports: "big dialogs and opening posts with lots of comments load the
+    // system heavily … the phone gets hot", then: "make it work consistently, not through the primitive here and
+    // any old way there".] Measured before the change: a 960-comment post built 10,560 rows to show 960, because
+    // the thread was wiped and rebuilt twice per loaded page. After: 960 rows, 9.5x less wall-clock on a desktop.
+    //
+    // The rule this gate holds is the consistency one. A list that grows and re-renders must go through
+    // reconcileKeyedRows — a second, hand-written reconciliation is exactly what this replaced (there were two,
+    // in the feed and the thread list, and four lists that had none).
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/import \{ reconcileKeyedRows \} from '\.\/keyed-rows\.mjs\?v=\d+';/);
+    // Shipped like every other module: precached by the worker and carried by the deploy bundle. A module the
+    // app imports but the package omits is a white screen offline, not a slow list.
+    expect(readFileSync('web/sw.js', 'utf8')).toMatch(/'\.\/keyed-rows\.mjs\?v=\d+',/);
+    expect(readFileSync('scripts/prepare_static_web_deploy.mjs', 'utf8')).toMatch(/'keyed-rows\.mjs',/);
+    // All six lists, by the container each one owns.
+    for (const container of [
+      'messageStrip',              // the private conversation
+      'commentList',               // a post's comments
+      'publicFeed',                // the public feed
+      'threadList',                // the chat list
+      'publicDiscoveryBody',       // find channels
+      'publicChannelViewBody',     // one channel's posts
+    ]) {
+      expect(app, `${container} is reconciled, not rebuilt`).toMatch(
+        new RegExp(`reconcileKeyedRows\\(${container},`),
+      );
+    }
+    // AND NO WIPES except the three deliberate ones, each of which changes the list's SUBJECT — a different
+    // conversation, a different channel, a different post — where no row could be reused and reusing one would
+    // risk a key from the previous subject matching (a chain entry id is unique per channel, not per chain).
+    const wipes = [...app.matchAll(/(\w+)\.(?:innerHTML = ''|replaceChildren\(\))/g)]
+      .map((match) => match[1])
+      .filter((name) => ['messageStrip', 'publicFeed', 'threadList', 'publicDiscoveryBody', 'publicChannelViewBody', 'publicPostDetailBody'].includes(name));
+    expect(wipes.sort()).toEqual([
+      'messageStrip',            // thread switch
+      'messageStrip',            // and the "no conversation open" branch, which shows an empty strip on purpose
+      'publicChannelViewBody',   // channel switch
+      'publicFeed',              // the empty-feed branch, which has no rows by definition
+      'publicPostDetailBody',    // the chrome around the comment list; the list itself is carried across
+    ]);
+    // The comment list survives that one wipe — it is the growing part, and the reason this work exists.
+    expect(app).toMatch(/const keptCommentList = renderedPostKey && renderedPostKey === publicPostDetailRenderedKey\s*\n\s*\? publicPostDetailBody\.querySelector\('\.comment-list'\)\s*\n\s*: null;/);
+    expect(app, 'and never across two different posts').toMatch(/publicPostDetailRenderedKey = null; \/\/ the next open reconciles against nothing/);
   });
 
   it('PWA-IDENTITY-ROW-01: the profile identity is a row — avatar left, name right — and the avatar stays square', () => {
@@ -4592,8 +4926,9 @@ describe('PWA runtime config guard', () => {
     );
     // The feed render must NOT call appendPublicItemComments (the inline-comment-loading the owner asked to remove).
     expect(renderFeedSource).not.toMatch(/appendPublicItemComments\(/);
-    // The renderer itself still exists — the post detail screen reuses it for the comment list.
-    expect(app).toMatch(/function appendPublicItemComments\(article, item\)/);
+    // The renderer itself still exists — the post detail screen reuses it for the comment list. It now also takes
+    // the PREVIOUS render's list node, which is what lets the thread be reconciled instead of rebuilt (KEYROW-*).
+    expect(app).toMatch(/function appendPublicItemComments\(article, item, keptList = null\)/);
   });
 
   it('PWA-PUBLIC-BUTTON-COMMENTS-TEXT: the per-post action button is "Comments", viewable without a wallet, and opens the post detail', () => {
@@ -5029,16 +5364,28 @@ describe('PWA runtime config guard', () => {
     // timer resets on every scroll event), so restoring it mid-scroll jumped to a pre-gesture position.
     expect(renderSource).toMatch(/const stripMeasurable = messageStrip\.clientHeight > 0 && messageStrip\.scrollHeight > 0;/);
     expect(renderSource).toMatch(/messageStrip\.scrollTop = prevConversationScrollTop;/);
-    // A status-only re-render patches the existing rows in place and never touches the scroller.
-    expect(renderSource).toMatch(/!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch\(thread\)/);
-    expect(app).toMatch(/function applyConversationStatusOnlyPatch\(thread\)/);
-    // Anything that changes row STRUCTURE falls through to the full rebuild: a meta node appearing or
-    // disappearing, payment action buttons (derived from the meta text), the manual Retry affordance.
-    expect(app).toMatch(/if \(\(metaText !== ''\) !== row\.hasMeta\) return false;/);
-    // (the payment special-case in the incremental-render diff went with the block type it guarded)
-    expect(app).toMatch(/privateMessageShouldShowManualActions\(message\)\) !== row\.showManual\) return false;/);
+    // A status-only re-render never touches the scroller. This used to be a hand-written fast path that compared a
+    // positional snapshot of the last render; the strip is now reconciled (KEYROW-*), so the same question is
+    // answered by what the reconciliation actually DID — a row rebuilt in place is not a change of shape, a row
+    // arriving, leaving or moving is. The status text itself is part of the row's signature, so a tick rebuilds
+    // exactly that one row.
+    expect(app, 'the old positional fast path is gone, not merely bypassed').not.toMatch(/applyConversationStatusOnlyPatch/);
+    expect(renderSource).toMatch(/const stripDelta = reconcileKeyedRows\(messageStrip, stripEntries\);/);
+    expect(renderSource).toMatch(
+      /const stripShapeChanged = stripDelta\.added \+ stripDelta\.dropped \+ stripDelta\.moved \+ stripDelta\.swept > 0;/,
+    );
+    expect(renderSource).toMatch(
+      /if \(!conversationThreadChanged && !conversationNewOutbound && !ownSendScrollToEnd\s*\n\s*&& !conversationOpenScrollUnsettled && !stripShapeChanged\) return;/,
+    );
+    // What makes a status tick rebuild ONE row rather than none or all of them: the status line and its key are in
+    // the row's signature, and the row's key is the message OBJECT (a key collision here would drop a message).
+    expect(app).toMatch(/function privateMessageRenderSignature\(message, showMeta = true, groupStart = false\) \{[\s\S]{0,400}?messageMetaLine\(message\),\s*\n\s*messageStatusKey\(message\),/);
+    expect(app).toMatch(/privateMessageShouldShowManualActions\(message\) \? 'ma' : '',/);
+    expect(app).toMatch(/const privateMessageRowKeys = new WeakMap\(\);/);
+    expect(renderSource).toMatch(/key: privateMessageRowKey\(message\),/);
     // The scroll listener tracks the bottom-pin state immediately — no debounce timer to lag behind a gesture.
-    const listenerSource = app.slice(app.indexOf('function rememberConversationScroll()'), app.indexOf('function applyConversationStatusOnlyPatch'));
+    const listenerSource = app.slice(app.indexOf('function rememberConversationScroll()'), app.indexOf('function firstUnreadIncomingMessageRef'));
+    expect(listenerSource, 'the slice must actually reach the listener').toMatch(/messageStrip/);
     expect(listenerSource).not.toMatch(/setTimeout/);
     // A fresh outbound tail remains the ONLY smooth scroll-to-end.
     expect(renderSource).toMatch(/else if \(ownSendScrollToEnd\) \{[\s\S]*?behavior: 'smooth'/);
@@ -5060,7 +5407,11 @@ describe('PWA runtime config guard', () => {
     // First unread = the oldest of the last `unreadCount` INCOMING, walking the sorted messages from the tail.
     expect(app).toMatch(/function firstUnreadIncomingMessageRef\(thread, unreadCount\) \{[\s\S]*?messages\[i\]\?\.type === 'in'[\s\S]*?if \(seenIncoming >= n\) return messages\[i\]/);
     // The anchor: land on the latest (bottom) UNLESS the first unread sits above the last screen -> put it at the top.
-    expect(app).toMatch(/function applyConversationOpenScroll\(\) \{[\s\S]*?if \(rowTopWithinStrip < maxScrollTop - 4\) \{\s*\n\s*setConversationScrollTop\(rowTopWithinStrip\);[\s\S]*?setConversationScrollTop\(messageStrip\.scrollHeight\);/);
+    // The anchor rule itself is ONE function, shared with a post's comment thread, which asks the same question:
+    // land at the end unless the first unread would be scrolled off the top by doing so. The private strip passes
+    // its own setter so a scroll it causes is not mistaken for the reader scrolling away.
+    expect(app).toMatch(/function anchorScrollerToFirstUnread\(scroller, firstUnreadRow, setScrollTop\) \{[\s\S]*?if \(rowTopWithinScroller < maxScrollTop - 4\) \{\s*\n\s*setScrollTop\(rowTopWithinScroller\);[\s\S]*?setScrollTop\(scroller\.scrollHeight\);/);
+    expect(app).toMatch(/const anchoredToUnread = anchorScrollerToFirstUnread\(messageStrip, firstUnreadRow, setConversationScrollTop\);/);
     // Set up on OPEN (thread change), after the sort so the first-unread ref is resolved against the final order.
     expect(renderSource).toMatch(/conversationOpenFirstUnreadRef = firstUnreadIncomingMessageRef\(thread, conversationOpenUnreadCount\);\s*\n\s*conversationOpenScrollUnsettled = true;/);
     // The first-unread row is tagged so applyConversationOpenScroll can find it.
@@ -5536,9 +5887,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(publicChannelViewOpen && publicChannelViewChannelId === item\.channelId\) \{\s*publicChannelPreviewChannelId = item\.channelId;/);
     // ...(4) the view rebuild restores the reader's position by ARTICLE ANCHOR, not raw scrollTop (the v752 feed
     // lesson: content prepended above otherwise shoves the reader; WebKit has no overflow-anchor)...
-    const renderFn = app.slice(app.indexOf('function renderPublicChannelView('), app.indexOf('function renderPublicChannelView(') + 7200);
+    // Sliced to the NEXT function, not to a character count: a fixed window silently stops covering the tail of
+    // the function the moment it grows, and the assertions below then pass for lack of text to fail on.
+    const renderFn = app.slice(app.indexOf('function renderPublicChannelView('), app.indexOf('async function refreshPublicDiscovery('));
+    expect(renderFn.length, 'the slice really spans the render function').toBeGreaterThan(2000);
     expect(renderFn).toMatch(/scrollAnchor = \{ id: node\.dataset\.itemId, offset: nodeTop \}/);
-    expect(renderFn).toMatch(/node\.dataset\.itemId = String\(item\.id\);/);
+    expect(renderFn).toMatch(/node\.dataset\.itemId = itemId; \/\/ scroll-anchor key/);
+    expect(renderFn, 'and the anchor key is the post id it was always').toMatch(/const itemId = String\(item\.id\);/);
     // ...(5) posts are NOT marked read while the post detail / discovery is stacked over the view, and (6) the
     // header Back routes through requestNavBack (Telegram BackButton + history sentinel stay consistent).
     expect(renderFn).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && markVisiblePublicFeedRead\(capped\)/);
@@ -5672,7 +6027,7 @@ describe('PWA runtime config guard', () => {
     // v780: a SELECTED word pre-fills the link-text field (sanitized), and focus jumps to the URL field when prefilled.
     expect(linkDlg).toMatch(/const selectedText = savedRange && !savedRange\.collapsed \? savedRange\.toString\(\)\.replace\(\/\[\[\\\]\\n\]\/g, ' '\)\.trim\(\)\.slice\(0, 200\) : '';/);
     expect(linkDlg).toMatch(/if \(selectedText\) \{ textInput\.value = selectedText; prefilledText = true; \}/);
-    expect(linkDlg).toMatch(/\(prefilledText \? urlInput : textInput\)\.focus\(\);/);
+    expect(linkDlg).toMatch(/focusComposerField\(prefilledText \? urlInput : textInput\);/);
     // v780: composerEditorInsertLinkBlock REPLACES a selection with the link (deleteContents), then ALWAYS lifts the
     // caret OUT of any enclosing fmt span (escape) + prunes the emptied span — else a link on a bold/italic word
     // serializes to a DEAD `**[label](url)**` (recipient renders literal bold text) or a stray `****`.
@@ -6167,7 +6522,7 @@ describe('PWA runtime config guard', () => {
     // DOWN -> nothing (no re-focus of a dismissed keyboard, no maximize-time blur which dropped the desktop caret).
     expect(app).toMatch(/const wasFocused = !!editorEl && document\.activeElement === editorEl;/);
     expect(app).toMatch(/const keyboardWasOpen = composerKeyboardLikelyOpen\(\);/);
-    expect(app).toMatch(/if \(wasFocused && keyboardWasOpen && editorEl && document\.activeElement !== editorEl\) editorEl\.focus\(\{ preventScroll: true \}\);/);
+    expect(app).toMatch(/if \(wasFocused && keyboardWasOpen && editorEl && document\.activeElement !== editorEl\) focusComposerField\(editorEl\);/);
     expect(app).not.toMatch(/composerKeyboardEverOpened/); // the sticky latch + maximize-time blur were removed (desktop caret regression)
     const maxFocusFn = app.slice(app.indexOf('function toggleComposerMaximize('), app.indexOf('function toggleComposerMaximize(') + 2200);
     expect(maxFocusFn).not.toMatch(/editorEl\.blur\(\)/); // no forced blur inside maximize/restore itself
@@ -6215,7 +6570,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toContain('return serChildren(el, \'\');');
     // FIX A — Enter collapses a NON-collapsed selection to its END first (keeps the word), so escapeTrailingFmt puts
     // the <br> OUTSIDE the fmt span instead of deleteContents stripping the word + trapping the <br> inside (**\n\n**).
-    const ins = app.slice(app.indexOf('function composerEditorInsertLineBreak('), app.indexOf('function composerEditorInsertLineBreak(') + 1400);
+    // Sliced to the NEXT function, not by a character count: a fixed window stops covering the tail of the
+    // function the moment anything above it grows, and the assertions then pass for lack of text to fail on.
+    const ins = app.slice(app.indexOf('function composerEditorInsertLineBreak('), app.indexOf('function composerEditorInsertChip('));
+    expect(ins.length, 'the slice really spans the function').toBeGreaterThan(600);
     expect(ins).toContain('if (sel && sel.rangeCount && !sel.isCollapsed && el.contains(sel.getRangeAt(0).commonAncestorContainer)) {');
     expect(ins).toContain('const r = sel.getRangeAt(0); r.collapse(false); sel.removeAllRanges(); sel.addRange(r);');
     expect(ins).toContain('composerEditorPruneEmptyFmt(el); // drop any span a prior edit emptied');
@@ -7662,7 +8020,14 @@ describe('PWA runtime config guard', () => {
     // along because it captures its text at render time; only the path that re-resolved was wrong.
     const app = readFileSync('web/app.js', 'utf8');
     expect(app, 'rows are bound to their message at render time').toMatch(/const messageRowRefs = new WeakMap\(\);/);
-    expect(app.match(/(?<!function )rememberMessageForRow\(row, (?:message|comment)\)/g)?.length, 'both row builders bind: private messages AND public comments')
+    expect(app.match(/(?<!function )rememberMessageForRow\(row, (?:message|comment)\)/g)?.length,
+      'both row builders bind, and both lanes RE-bind a reused row')
+      .toBe(4);
+    // FOUR, not two, since the rows are reconciled instead of rebuilt (KEYROW-*): a row that survives a render
+    // still holds the object it was built with, and the merges hand out fresh objects ({...old, ...new}) — so
+    // long-press copy and swipe-to-reply would act on a stale copy. Each lane re-binds through `adopt`.
+    expect(app.match(/adopt: \(row\) => rememberMessageForRow\(row, (?:message|comment)\),/g)?.length,
+      'the private strip and the comment thread both re-bind on reuse')
       .toBe(2);
     // Every consumer must ASK THE ROW first. The id lookup stays only as the fallback for a row rendered before
     // this binding existed — it must never be the first answer.

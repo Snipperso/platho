@@ -121,8 +121,34 @@ export function parseRecipientIdentity(input) {
   return { ok: false, error: 'Use alex, alex.ath, alex.ton, or a wallet address.' };
 }
 
+/**
+ * A .ath NAME'S TIER, from its length — the same three the mint price and the NFT art already use: four characters
+ * is EPIC, five is RARE, six and up is COMMON. Defined here, in the module that owns what an identity IS, so the
+ * price, the art and the colour on screen cannot end up disagreeing about where a tier begins.
+ */
+export const PLATHO_USERNAME_TIERS = Object.freeze({ EPIC: 'epic', RARE: 'rare', COMMON: 'common' });
+
+export function plathoUsernameTier(name) {
+  const bare = String(name ?? '').trim().toLowerCase().replace(/\.ath$/, '');
+  if (!PLATHO_BARE_NFT_RE.test(bare)) return null;
+  if (bare.length === 4) return PLATHO_USERNAME_TIERS.EPIC;
+  if (bare.length === 5) return PLATHO_USERNAME_TIERS.RARE;
+  return PLATHO_USERNAME_TIERS.COMMON;
+}
+
+/**
+ * The tone a name is painted in. A .ath name splits by tier [OWNER 2026-08-24: "we have ordinary usernames (6+
+ * letters), rare (5) and epic (4). On the NFT picture we mark that with colours — gold, silver. Maybe we should
+ * mark 4-5 letter usernames with gold and silver in the app too?"] — so the scarcity a holder paid for is visible
+ * where their name actually appears, not only on the token's art.
+ *
+ * COMMON keeps the existing tone unchanged: it is the default case, and colouring it too would say nothing.
+ */
 export function identityTone(identity) {
-  return RECIPIENT_IDENTITY_META[identity?.type]?.tone ?? 'wallet';
+  const base = RECIPIENT_IDENTITY_META[identity?.type]?.tone ?? 'wallet';
+  if (base !== 'platho') return base;
+  const tier = plathoUsernameTier(identity?.value);
+  return tier && tier !== PLATHO_USERNAME_TIERS.COMMON ? `platho-${tier}` : base;
 }
 
 export function identityTypeLabel(identity) {

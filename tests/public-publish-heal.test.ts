@@ -65,8 +65,12 @@ describe('public publish heal driver guard', () => {
     // No placeholder 'you' on own optimistic records — the same label the sync assigns (username / short wallet).
     expect(app).not.toMatch(/author: 'you'/);
     expect(app.match(/author: publicAuthorLabel\(plathoWallet\?\.address\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    // The comment renderer shows the SAME live private-style status badge as feed posts.
-    const commentRenderer = app.slice(app.indexOf('function appendPublicItemComments'), app.indexOf('function appendPublicItemComments') + 3_800);   // the 2026-08 surfacing rows sit above the badge
+    // The comment renderer shows the SAME live private-style status badge as feed posts. Sliced to the NEXT
+    // function rather than by a character count — a fixed window stops covering the code it is meant to police
+    // the moment anything above it grows. The row body moved into its own builder when the thread became a
+    // reconciled list (KEYROW-*); the badge is the same badge.
+    const commentRenderer = app.slice(app.indexOf('function buildPublicCommentRow'), app.indexOf('function appendPublicItemComments'));
+    expect(commentRenderer.length, 'the slice really spans the comment row builder').toBeGreaterThan(1500);
     expect(commentRenderer).toMatch(/isPendingPublicFeedItem\(comment\) && comment\.publishStatus/);
     expect(commentRenderer).toMatch(/\(comment\.publishState \? publishStateMeta\(comment\.publishState\) : null\) \|\| comment\.publishStatus/);
     // The open post-detail screen refreshes on every progress write-back.

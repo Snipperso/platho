@@ -168,9 +168,17 @@ describe('a reply can quote MY OWN message', () => {
     const body = app.slice(start, start + 900);
     expect(body).toMatch(/if \(!row\?\.dataset\?\.entryId\) return;/);
     expect(body, 'a direction test here would re-break exactly what this fixes').not.toMatch(/type === 'in'/);
-    // And the desktop button must appear when the anchor arrives after render, not only after a rebuild.
-    expect(app).toMatch(/const gained = node\.dataset\.entryId === undefined;/);
-    expect(app).toMatch(/if \(gained\) appendRowReplyButton\(node, beginPrivateReplyForRow\);/);
+    // And the desktop button must appear when the anchor arrives AFTER the row was first rendered — a message is
+    // sent, and its chain entry id lands seconds later. This used to need a hand-written patch that noticed the id
+    // appearing on an existing node; the strip is reconciled now (KEYROW-*), so the id is part of the row's
+    // SIGNATURE: gaining it rebuilds that one row, and the builder sets the anchor before it asks for the button.
+    // (appendRowReplyButton refuses a row with no anchor — that is the gate above.)
+    expect(app).toMatch(/function privateMessageRenderSignature\(message, showMeta = true, groupStart = false\) \{[\s\S]{0,400}?message\?\.chainEntryId \?\? '',/);
+    const builder = app.slice(app.indexOf('const buildMessageRow = (message, showMeta, groupStart) => {'), app.indexOf('// THE STRIP AS A KEYED LIST'));
+    expect(builder.length, 'the slice really spans the row builder').toBeGreaterThan(1000);
+    expect(builder).toMatch(/if \(message\.chainEntryId !== undefined && message\.chainEntryId !== null\) row\.dataset\.entryId = String\(message\.chainEntryId\);/);
+    expect(builder.indexOf('row.dataset.entryId = String(message.chainEntryId)'), 'the anchor is set BEFORE the button is asked for')
+      .toBeLessThan(builder.indexOf('appendRowReplyButton(row, beginPrivateReplyForRow)'));
     // Reply sits before Copy on every row, including the ones that gain it late.
     expect(body).toMatch(/cluster\.insertBefore\(button, copy\)/);
   });

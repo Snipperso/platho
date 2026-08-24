@@ -33,7 +33,7 @@ phrase it cannot be restored by us or by anyone else.
 **Private messages are encrypted on your device** before they are published, and
 only the intended recipient can read their contents.
 
-**Public posts are not encrypted.** They are written to the GRAM blockchain in
+**Public posts are not encrypted.** They are written to the TON blockchain in
 plain text, and they are permanent: neither we, nor an administrator, nor a
 government, nor you as their author can remove them. Do not publish anything
 publicly that you would need to withdraw later.

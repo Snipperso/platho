@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=57';
+} from './public-channel-subscriptions.mjs?v=59';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -85,12 +85,14 @@ import {
   normalizeIdentityVariants,
   normalizeRecipientIdentity,
   parseRecipientIdentity,
+  plathoUsernameTier,
+  PLATHO_USERNAME_TIERS,
   preferredInboundIdentity,
   primaryThreadIdentity,
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=6';
+} from './recipient-identities.mjs?v=7';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
@@ -188,6 +190,7 @@ import { createRecordShardLastSeqReader, createRecordShardViewReader, createReco
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=24';
 import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=26';
 import { orderThreadsForList } from './thread-list-order.mjs?v=2';
+import { reconcileKeyedRows } from './keyed-rows.mjs?v=1';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
 // clean-17 first-contact (INTRO) send.
 import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=21';
@@ -250,7 +253,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=81';
+} from './i18n.mjs?v=82';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -270,7 +273,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.0';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.1';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1122,7 +1125,6 @@ let publicChannelViewReturnTo = null; // 'discovery' when the view was opened fr
 let publicChannelViewShownCap = 150; // local newest-N render cap, reset on open; "show older" grows it
 let publicChannelViewSyncPending = false; // a preview fetch is in flight (drives the loading vs empty state)
 let publicChannelViewOpenToken = 0; // bumped on every open/close; a stale preview sync's finally must not clear the CURRENT view's pending flag
-let publicChannelViewRenderSig = ''; // cheap rebuild guard: skip the body rebuild when nothing visible changed
 // A channel open in the view but NOT followed rides along as a TRANSIENT feed source (feedSourcePublicChannels)
 // so the standard sync walk fetches its posts for the preview; the main feed filters it out until followed.
 let publicChannelPreviewChannelId = null;
@@ -1268,6 +1270,9 @@ function samePublicPost(left, right) {
 const publicPostCommentsCache = new Map();
 const publicPostCommentsCacheKey = publicPostIdentity;
 let publicPostDetailLoadState = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
+// Which post the comment list currently in the DOM belongs to — the gate on reusing it across a render (see
+// renderPublicPostDetail). Null after a close, so the next open always starts from an empty thread.
+let publicPostDetailRenderedKey = null;
 let publicPostDetailParentExists = null; // last clean read: true = post has a comment index, false = genuinely none
 // How far back the open post's comment read has got, per thread shard, and whether anything older remains. A post
 // past the contract's 96-row page cap reads its NEWEST comments only; these drive the "show earlier" affordance.
@@ -1649,6 +1654,11 @@ const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v2';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
 const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
+// HOW FAR THE READER GOT IN EACH COMMENT THREAD [OWNER 2026-08-23: "if I read down to some comment, coming back
+// into that thread I want to be at the last comment I read and carry on from there"]. The twin of the cursors
+// above — same shape, same scoping — but keyed by POST identity (channel + entry) instead of channel, holding the
+// newest comment entry id that has scrolled past the reader's eyes.
+const PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY = 'platho.publicCommentReadCursors.v1';
 const INSTALL_PROMPT_DISMISSED_STORAGE_KEY = 'platho.installPrompt.dismissed.v1';
 const WALLET_DISPLAY_IDENTITY_STORAGE_PREFIX = 'platho.wallet.displayIdentity.v1';
 // How THIS device chooses to SEE a given counterparty wallet (their Private dialog name AND their
@@ -2408,12 +2418,46 @@ function writeVisibleBottomGap() {
  */
 let pageDragRefusalArmed = false;
 
+/**
+ * Does the field that has focus hold a selection with TWO ENDS — i.e. is there something for the grips to move?
+ *
+ * document.getSelection() is the whole story for a contenteditable. An <input>/<textarea> keeps its selection to
+ * itself and answers through selectionStart/selectionEnd instead — and throws for the input types that have no
+ * selection at all (number, email), hence the guard. Read at touchstart only, so it costs one property read per
+ * gesture and nothing per frame.
+ */
+function focusedEditableHoldsLiveSelection() {
+  const active = document.activeElement;
+  if (!(active instanceof Element)) return false;
+  if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') {
+    try { return active.selectionEnd > active.selectionStart; } catch { return false; }
+  }
+  if (!active.isContentEditable) return false;
+  const selection = document.getSelection?.();
+  return Boolean(selection && selection.rangeCount > 0 && !selection.isCollapsed);
+}
+
 function armPageDragRefusal(event) {
   pageDragRefusalArmed = false;
   const viewport = window.visualViewport;
   if (!viewport) return;
   if (Math.round(window.innerHeight - viewport.height) < KEYBOARD_PRESENT_PX) return;   // no keyboard, no lock
   if (event.touches && event.touches.length > 1) return;                                // pinch is not ours
+  // THE GRIPS ARE A DRAG TOO, and the note below used to say otherwise. [OWNER 2026-08-24: "the text does get
+  // selected, but you cannot widen it using the grips"] — on the iPhone a long press still selects, but neither
+  // grip will widen the selection. "Selection on iOS starts from a long press, not a drag, so nothing is taken away" was
+  // half true: it covers MAKING a selection and stops there. EXTENDING one is a drag, and WebKit defers its
+  // handle gesture until the page has said whether it prevents the touchmove — we prevent it, so the gesture is
+  // failed and the grip never moves. That is also why making a selection still works: the long press is decided
+  // by a timer, and WebKit hands us a touchcancel the moment it wins, so no touchmove of ours is in the way.
+  //
+  // THIS IS NOT THE OLD BLANKET EXEMPTION FOR EDITABLES [OWNER 2026-08-15: "you can still pull the page out by
+  // the text field"], which waved a field through for BEING a field and left the one surface the keyboard is open
+  // for handing its gestures to the browser. The condition here is a LIVE selection — two ends, in the field that
+  // has focus — which exists only in the seconds after the user has selected something, and is what the grips
+  // need. The honest cost: for those seconds a drag inside that field can carry the page again. A selection that
+  // can never be widened is the worse of the two, and the next tap collapses this one.
+  if (focusedEditableHoldsLiveSelection()) return;
   // Walk up looking for something that can actually consume this gesture. A scroller that is ALREADY at its limit
   // still counts: letting the browser rubber-band a list is fine, it is the PAGE that must not move.
   for (let node = event.target instanceof Element ? event.target : null; node && node !== document.body; node = node.parentElement) {
@@ -2427,8 +2471,9 @@ function armPageDragRefusal(event) {
     // WebKit defect above: the escalation happens precisely when the element under the finger has nothing to
     // scroll, which is what an editable holding one line of text is.
     // Editables are covered by the same rule as everything else: a field with more text than fits scrolls (the
-    // check above sees it), and one that fits has nothing to scroll and must not move the page instead. Selection
-    // on iOS starts from a long press, not a drag, so nothing is taken away.
+    // check above sees it), and one that fits has nothing to scroll and must not move the page instead. This once
+    // ended "selection on iOS starts from a long press, not a drag, so nothing is taken away" — which was true of
+    // MAKING a selection and false of extending one. The exception that answers it is above, not here.
   }
   pageDragRefusalArmed = true;
 }
@@ -2439,6 +2484,38 @@ function refusePageDragWhileKeyboardIsUp(event) {
   event.preventDefault();
 }
 
+// A REFUSAL BELONGS TO THE GESTURE THAT ARMED IT. The flag was raised by a touchstart and nothing lowered it, so
+// it survived into whatever came next — and what comes next on iOS is not always a touchstart of its own: WebKit
+// sends touchcancel the moment a native gesture (the selection assistant, above all) claims the touch, and
+// anything delivered after that is no longer ours to refuse. Same defect as the grips, reached the other way.
+function releasePageDragRefusal() {
+  pageDragRefusalArmed = false;
+}
+
+/**
+ * IS THE PAGE CARRYING AN OFFSET THAT ONLY THE KEYBOARD COULD HAVE GIVEN IT?
+ *
+ * [OWNER 2026-08-24: an empty dark strip along the bottom, BELOW the tab bar, appearing "sometimes" when the
+ * message field is tapped.] The strip is bare <body> — the shell is position:fixed against the LAYOUT viewport
+ * (WebKit 191204: a fixed element does not stay fixed while the keyboard is up), so a page scrolled by N draws
+ * the whole shell N higher and leaves N pixels of nothing under the bar. It is the same defect as "the interface
+ * flies up", measured small: MAX scroll 386, off 386, shell up 386 were one event, and any part of it left
+ * behind is a proportional strip.
+ *
+ * Nothing here fights a scroll the user asked for, and there cannot be one: html/body are the visible height
+ * with overflow hidden and overscroll-behavior none, and a finger cannot move the page either (see
+ * armPageDragRefusal). While the keyboard is up, a non-zero offset is the system's own reveal-the-field scroll,
+ * which was correct when it was decided and stale one frame later. That is the whole difference from the 1.0.28
+ * hack this file threw out: that one hung off the scroll event and undid the owner's drag; this one is bounded
+ * by the CONDITION, and in that condition the page has no legitimate offset to defend.
+ */
+function iosPageIsCarryingTheKeyboardsScroll() {
+  if (!isIosDevice()) return false;                                                      // only WebKit does this
+  if ((window.scrollY || document.documentElement.scrollTop || 0) === 0) return false;
+  const viewport = window.visualViewport;
+  return Boolean(viewport) && Math.round(window.innerHeight - viewport.height) >= KEYBOARD_PRESENT_PX;
+}
+
 function keepViewportVarsLiveWhileComposerIsOpen() {
   if (!viewportVarsLoopWanted()) {
     if (viewportVarsFrame) { cancelAnimationFrame(viewportVarsFrame); viewportVarsFrame = 0; }
@@ -2447,6 +2524,12 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   if (viewportVarsFrame) return;
   const tick = () => {
     if (!viewportVarsLoopWanted()) { viewportVarsFrame = 0; return; }
+    // THE PAGE STAYS AT THE TOP FOR AS LONG AS THE KEYBOARD IS UP, and this is where that costs nothing: the loop
+    // already runs for exactly that period. holdPageAtTopWhileKeyboardArrives covers the ARRIVAL — it is armed by
+    // a focus and expires on a clock (900ms), which is a guess at how long iOS takes — and the guess is the hole:
+    // the reveal-the-field scroll can also land later (the caret moving while typing, a keyboard that changes
+    // size, a return to a still-focused field with no focusin). A deadline cannot cover those. The condition can.
+    if (iosPageIsCarryingTheKeyboardsScroll()) window.scrollTo(0, 0);
     // The SIZES are recomputed only when the latch moved — i.e. the keyboard appeared, left, or changed into a
     // different one. Every other frame does nothing but the comparison, which is the point: a keyboard that is
     // simply OPEN must produce no size writes at all, or they breathe with the noise and that IS the shudder.
@@ -2455,6 +2538,99 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
   };
   viewportVarsFrame = requestAnimationFrame(tick);
 }
+
+/**
+ * THE KEYBOARD MUST NOT SWALLOW THE END OF THE THREAD [OWNER 2026-08-23: "it really annoys me that when I tap the
+ * composer, the keyboard that slides up covers the last messages — they should scroll, so I can see what I am even
+ * replying to"], with a screenshot showing the two newest messages cut off above the composer.
+ *
+ * The shell already shrinks to the visible height when the keyboard opens, which is why the composer stays above
+ * it. What nothing did was move the SCROLLER: a reader sitting at the end of a conversation loses exactly a
+ * keyboard's worth of it, because the content keeps the scroll offset it had when the box was taller.
+ *
+ * Only for a reader who WAS at the end. Someone who scrolled up to read history and then tapped the composer to
+ * answer something specific must keep their place — being thrown to the newest message would be the same defect
+ * pointing the other way.
+ */
+function pinOpenThreadsToEndAfterViewportChange() {
+  requestAnimationFrame(() => {   // after the new height has been laid out, or scrollHeight is the old one
+    if (conversationStickToBottom && messageStrip && appShell?.dataset.view === 'chats') {
+      messageStrip.scrollTop = messageStrip.scrollHeight;
+    }
+    if (publicPostDetailStickToBottom && publicPostDetailOpen && publicPostDetailBody) {
+      publicPostDetailBody.scrollTop = publicPostDetailBody.scrollHeight;
+    }
+  });
+}
+
+/**
+ * FOCUS A COMPOSER FIELD WITHOUT LETTING THE PAGE MOVE.
+ *
+ * [OWNER 2026-08-24: "there is still an iPhone bug. We treated it and thought it was cured, but it still shows up
+ * sometimes — the interface flies up, it accounts for the keyboard the way Android does, and on iPhone that must not
+ * be done. We fixed it, but it looks like some branch was missed."] Their memory is exact, and so is the miss: the
+ * cure is focus({ preventScroll: true }), and it had been applied in ONE place — the maximize toggle — while the
+ * other sixteen composer focus calls used a plain focus().
+ *
+ * A plain focus() asks the browser to bring the field into view. iOS obliges by scrolling the PAGE, and it decides
+ * that at the moment of focus, when the shell is still full height and the composer is sitting exactly where the
+ * keyboard is about to be. One frame later the shell shrinks to the visible height and the composer is near the
+ * top — but the page scroll it was given stays, and that is the interface flying up. The app already places the
+ * composer above the keyboard itself, so the browser's help is not needed anywhere, ever.
+ *
+ * One function so there cannot be a seventeenth branch that forgets. Also carries the disabled check every caller
+ * was repeating.
+ */
+function focusComposerField(field) {
+  if (!field || field.disabled) return;
+  field.focus({ preventScroll: true });
+}
+
+/**
+ * AND THE OTHER HALF — THE TAP, which is the one the owner actually sees.
+ *
+ * [OWNER 2026-08-24, on being shown the above: "toggleComposerMaximize is the composer's maximize, isn't it? But
+ * our problem was that I TAP the composer and the interface flies up, and that is where we fixed it — you are
+ * talking about the maximize, not the place with the problem."] Exactly right, and preventScroll cannot help
+ * there: on a tap nothing of ours calls focus() at all. The browser focuses the field itself, and iOS then scrolls
+ * the PAGE to bring it into view — the app ends up shoved off the top with the composer at the screen's edge.
+ *
+ * There WAS a cure for it: the single scrollTo(0, 0) in syncViewportCssVars. It fires once, on the frame the
+ * measured height changes — and iOS animates its keyboard, so the scroll it decides on can land AFTER that frame,
+ * with nothing left to undo it. That is the "sometimes".
+ *
+ * So the correction is held for as long as the keyboard takes to arrive, instead of being spent on one frame.
+ * Bounded (a fixed window, then it stops by itself), iOS-only (Android shrinks the layout viewport properly and
+ * never scrolls the page), and no threat to a dragging finger — a page drag while the keyboard is up is already
+ * refused outright by armPageDragRefusal, which is the cure for the OTHER iOS defect and stays exactly as it was.
+ */
+const IOS_FOCUS_SCROLL_WATCH_MS = 900;
+let iosFocusScrollWatchUntil = 0;
+let iosFocusScrollFrame = 0;
+
+function holdPageAtTopWhileKeyboardArrives() {
+  if (!isIosDevice()) return;
+  iosFocusScrollWatchUntil = performance.now() + IOS_FOCUS_SCROLL_WATCH_MS;
+  if (iosFocusScrollFrame) return;   // a watch is already running; it just got a later deadline
+  const settle = () => {
+    if ((window.scrollY || document.documentElement.scrollTop || 0) !== 0) window.scrollTo(0, 0);
+    if (performance.now() < iosFocusScrollWatchUntil) {
+      iosFocusScrollFrame = requestAnimationFrame(settle);
+    } else {
+      iosFocusScrollFrame = 0;
+    }
+  };
+  iosFocusScrollFrame = requestAnimationFrame(settle);
+}
+
+// Every field that can raise the keyboard, however it got focused — a tap, a caret move, or one of our own
+// focusComposerField calls. Delegated once on the document, so a field added later is covered by construction.
+document.addEventListener('focusin', (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return;
+  if (!target.matches('input, textarea, [contenteditable="true"], [contenteditable=""]')) return;
+  holdPageAtTopWhileKeyboardArrives();
+}, { passive: true });
 
 function syncViewportCssVars() {
   // Inside Telegram the WebView height is governed by the client (viewportStableHeight),
@@ -2515,6 +2691,7 @@ function syncViewportCssVars() {
   if (rounded !== viewportHeightLastWritten) {
     viewportHeightLastWritten = rounded;
     if ((window.scrollY || document.documentElement.scrollTop || 0) !== 0) window.scrollTo(0, 0);
+    pinOpenThreadsToEndAfterViewportChange();
   }
   // Identical to the above now that the floor is gone. Kept as a separate name only because the stylesheet refers
   // to it in several places; both are simply "the visible height", with nothing added to either.
@@ -3116,10 +3293,10 @@ function openLinkComposerDialog(targetInput, editChip = null) {
 
   const doInsert = () => {
     let raw = String(urlInput.value ?? '').trim();
-    if (!raw) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; urlInput.focus(); return; }
+    if (!raw) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; focusComposerField(urlInput); return; }
     if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = `https://${raw}`; // a bare domain typed without a scheme -> assume https
     const safe = safeExternalUrl(raw);
-    if (!safe) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; urlInput.focus(); return; }
+    if (!safe) { errorLine.textContent = t('composer.linkUrlInvalid'); errorLine.hidden = false; focusComposerField(urlInput); return; }
     const label = String(textInput.value ?? '').replace(/[[\]\n]/g, ' ').trim();
     const encodedUrl = safe.replace(/\(/g, '%28').replace(/\)/g, '%29'); // keep parens out of the [text](url) parse
     const display = label || safe;
@@ -3140,11 +3317,11 @@ function openLinkComposerDialog(targetInput, editChip = null) {
   cancelBtn.addEventListener('click', closeLinkComposerModal);
   insertBtn.addEventListener('click', doInsert);
   urlInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); doInsert(); } });
-  textInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); urlInput.focus(); } });
+  textInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); focusComposerField(urlInput); } });
   // v794: X-only — no outside/backdrop tap and no Escape dismiss; the user must choose Cancel or Insert.
   activeLinkComposerModal = { backdrop, onKeydown: null, previousFocus };
   // If the link text is already filled (a selected word, or the chip being edited), jump straight to the URL field.
-  (prefilledText ? urlInput : textInput).focus();
+  focusComposerField(prefilledText ? urlInput : textInput);
 }
 
 // A bare window.open of a t.me/ link is a no-op inside the Telegram in-app WebView,
@@ -3869,8 +4046,24 @@ const SAVED_MESSAGES_AVATAR_SVG =
 // Thread avatars route through here so the Saved (My notes) thread gets its pencil icon instead of the
 // wallet-letter fallback. The nodes are REUSED across threads (activeAvatar in the conversation header), so both
 // branches fully undo the other's state.
+/**
+ * THE TIER, ON THE PICTURE AS WELL AS THE NAME [OWNER 2026-08-24: "let's colour the icon for silver and gold too.
+ * Make the background so it's immediately clear it's silver."]
+ *
+ * Same source of truth as the name's colour — the tone identityTone hands out — so a name and its avatar can never
+ * disagree about a tier. An attribute rather than a class because the avatar's content is rewritten by both
+ * branches below and a class list is easier to lose than a data attribute; CSS keys the metal off it.
+ */
+function applyAvatarTier(node, tone) {
+  if (!node) return;
+  const tier = tone === 'platho-epic' ? 'epic' : tone === 'platho-rare' ? 'rare' : null;
+  if (tier) node.dataset.tier = tier;
+  else delete node.dataset.tier;
+}
+
 function setThreadAvatarNode(node, thread) {
   if (!node) return;
+  applyAvatarTier(node, threadDisplayTone(thread));
   // THE PIN BADGE, on the avatar of a pinned contact (the corner pin in styles.css). Set here rather than in the
   // row builder because this is the ONE place every thread avatar routes through — the list, the conversation
   // header and the share sheet — so the badge cannot appear on one surface and not another. An attribute, not a
@@ -6129,7 +6322,7 @@ function openNewChatDialog() {
   recipientHint.textContent = t('chat.newChatRecipientHint');
   recipientHint.dataset.tone = 'muted';
   newChatDialog.classList.remove('is-closing'); newChatDialog.hidden = false;
-  requestAnimationFrame(() => recipientInput.focus());
+  requestAnimationFrame(() => focusComposerField(recipientInput));
 }
 
 function closeNewChatDialog() {
@@ -7254,20 +7447,29 @@ function setPublicChannelSubscribed(channelId, subscribed) {
   return true;
 }
 
-function readPublicReadCursors() {
+/**
+ * A per-account map in local storage: read it back, or write it. One pair for every "where did this reader get
+ * to" record, so a new one is a storage key and nothing else.
+ *
+ * Reads defend against a hand-edited or half-written value (a non-object, an array) by falling back to empty:
+ * these are positions, and losing one costs a scroll, while trusting a malformed one costs a crash on open.
+ * Writes swallow their failure on purpose — private browsing has no localStorage, and the position still works
+ * for the current tab from memory.
+ */
+function readScopedJsonMap(storageKey) {
   try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(scopedStorageKey(PUBLIC_READ_CURSORS_STORAGE_KEY)) ?? '{}');
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(scopedStorageKey(storageKey)) ?? '{}');
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
   }
 }
 
-function writePublicReadCursors() {
+function writeScopedJsonMap(storageKey, value) {
   try {
-    localStorageOrNull()?.setItem(scopedStorageKey(PUBLIC_READ_CURSORS_STORAGE_KEY), JSON.stringify(publicReadCursors));
+    localStorageOrNull()?.setItem(scopedStorageKey(storageKey), JSON.stringify(value));
   } catch {
-    // Non-persistent mode still keeps read state for the current tab.
+    // Non-persistent mode still keeps the state for the current tab.
   }
 }
 
@@ -7283,6 +7485,70 @@ function publicEntryIdBigInt(value) {
 
 function publicChannelCursor(channelId) {
   return publicEntryIdBigInt(publicReadCursors?.[channelId]) ?? -1n;
+}
+
+/**
+ * THE READING MARK OF ONE COMMENT THREAD, and the three things that touch it.
+ *
+ * Stored per post as the newest comment entry id the reader has actually had on screen — not the newest that
+ * EXISTS, which would mark a thread read the moment it loaded. A comment with no entry id (one still in flight)
+ * can never be the mark: it has no place in the ordering the mark is compared against.
+ */
+let publicCommentReadCursors = {};
+
+function publicCommentReadCursor(postKey) {
+  const stored = postKey ? publicCommentReadCursors?.[postKey] : null;
+  return typeof stored === 'string' && stored !== '' ? stored : null;
+}
+
+/**
+ * Advance the mark to the last comment whose top has passed the bottom of the viewport — the last one the reader
+ * has had a chance to read. Called from the thread's own debounced scroll handler and once after the open scroll
+ * settles, so a thread that fits on one screen is marked read without any scrolling at all.
+ *
+ * BY POSITION, NOT BY COMPARING IDS. A comment's chain entry id is `c-<hash of the body>` — measured on a live
+ * thread, not a number and not ordered by anything. "Newer" is therefore a question about the DISPLAYED ORDER,
+ * which is the merge's own chronological sort, so the mark is a row KEY and progress is an index in that order.
+ *
+ * Only ever moves FORWARD (scrolling back up un-reads nothing), and never moves at all while the marked comment
+ * is missing from the loaded window — a mark we cannot locate must not be overwritten by a guess.
+ */
+function rememberPublicPostReadPosition() {
+  const postKey = publicPostIdentity(publicPostDetailItem);
+  const list = publicPostDetailBody?.querySelector('.comment-list');
+  if (!postKey || !list) return;
+  const rows = [...list.children];
+  const mark = publicCommentReadCursor(postKey);
+  const markIndex = mark === null ? -1 : rows.findIndex((row) => row.dataset.rowKey === mark);
+  if (mark !== null && markIndex < 0) return;
+  const viewportBottom = publicPostDetailBody.getBoundingClientRect().bottom;
+  let seenIndex = -1;
+  for (let i = 0; i < rows.length; i += 1) {
+    if (rows[i].getBoundingClientRect().top > viewportBottom) break;   // oldest first: everything below is unseen
+    seenIndex = i;
+  }
+  if (seenIndex <= markIndex) return;
+  publicCommentReadCursors = { ...publicCommentReadCursors, [postKey]: rows[seenIndex].dataset.rowKey };
+  writeScopedJsonMap(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY, publicCommentReadCursors);
+}
+
+/**
+ * Open a comment thread where the reader stopped — the same rule as a private dialog, through the same function.
+ * A thread never opened has no mark, so its first comment is the first unread and the reader lands at the start
+ * of the loaded window: the conversation from its beginning, as far as it has been paged in.
+ */
+function applyPublicPostDetailOpenScroll() {
+  const body = publicPostDetailBody;
+  if (!body) return;
+  const rows = [...(body.querySelector('.comment-list')?.children ?? [])];
+  const mark = publicCommentReadCursor(publicPostIdentity(publicPostDetailItem));
+  const markIndex = mark === null ? -1 : rows.findIndex((row) => row.dataset.rowKey === mark);
+  // The first unread is simply the row AFTER the marked one. A mark that is not in the loaded window (index -1
+  // with a mark set) leaves `firstUnread` undefined, which lands the reader at the end — the honest answer when
+  // we cannot say where they stopped.
+  const firstUnread = mark !== null && markIndex < 0 ? null : rows[markIndex + 1] ?? null;
+  anchorScrollerToFirstUnread(body, firstUnread, (top) => { body.scrollTop = top; });
+  rememberPublicPostReadPosition();
 }
 
 function isUnreadPublicItem(item) {
@@ -7313,7 +7579,7 @@ function markVisiblePublicFeedRead(items = publicFeedItemsChronological()) {
       changed = true;
     }
   }
-  if (changed) writePublicReadCursors();
+  if (changed) writeScopedJsonMap(PUBLIC_READ_CURSORS_STORAGE_KEY, publicReadCursors);
   return changed;
 }
 
@@ -7415,7 +7681,14 @@ function publicFeedItemMatchesSearch(item, query) {
 // (aria-hidden); the status line next to them keeps saying what is happening (and how many buckets are left).
 function buildSkeletonNodes(kind, count) {
   const fragment = document.createDocumentFragment();
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < count; i += 1) fragment.append(buildSkeletonNode(kind));
+  return fragment;
+}
+
+// ONE skeleton card. Split out of buildSkeletonNodes because a reconciled list needs every child to be a node it
+// can key (see reconcileKeyedRows) — a fragment of three would arrive as three unkeyed children and be swept.
+function buildSkeletonNode(kind) {
+  {
     const card = document.createElement('div');
     card.className = `skeleton-card skeleton-${kind}`;
     card.setAttribute('aria-hidden', 'true');
@@ -7431,9 +7704,8 @@ function buildSkeletonNodes(kind, count) {
     const short = document.createElement('span');
     short.className = 'skeleton skeleton-line skeleton-line-short';
     card.append(head, line, short);
-    fragment.append(card);
+    return card;
   }
-  return fragment;
 }
 
 function renderPublicEmpty(titleText, bodyText) {
@@ -7519,18 +7791,68 @@ function appendPublicItemContent(container, item, embedDepth = 0) {
 // Comment keys already painted: a comment new to the screen surfaces (owner); cleared when a post detail opens so
 // its thread rises in again.
 const publicCommentSurfacedKeys = new Map();
-function appendPublicItemComments(article, item) {
-  const comments = Array.isArray(item?.comments) ? item.comments : [];
-  if (comments.length === 0) return;
-  const commentList = document.createElement('div');
-  commentList.className = 'comment-list';
-  let surfacing = 0;
-  for (const comment of comments) {
+
+/**
+ * WHAT A COMMENT ROW LOOKS LIKE, as a string — the reuse test for reconcileKeyedRows.
+ *
+ * The body itself is NOT in here beyond its size, and deliberately: the row's KEY is the chain entry id, or the
+ * hash OF THE BODY for a comment that has not landed yet, so under a stable key the text cannot change. What does
+ * change under a stable key is everything resolved later — the author's name and avatar arriving from the registry,
+ * a pending comment's publish status ticking over, an image data url that persist stripped and a later sync
+ * re-hydrated (the feed's signature carries the same term for the same reason) — plus the two display settings
+ * baked into every row: the locale (button labels, relative dates) and the timestamp mode.
+ */
+function publicItemContentSignature(item) {
+  const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
+  if (blocks.length > 0) {
+    return blocks.map((block) => {
+      const type = String(block?.type ?? '');
+      if (type === 'text') return `t${String(block.text ?? '').length}`;
+      if (type === 'image') return `i${block.url ? 1 : 0}`;
+      if (type === 'file') return `f${block.url ? 1 : 0}.${String(block.name ?? '').length}`;
+      if (type === 'share') return `s${block.entryId ?? ''}`;
+      if (type === 'reply') return `r${block.entryId ?? ''}.${String(block.text ?? '').length}`;
+      return type;
+    }).join(',');
+  }
+  return `x${String(item?.text ?? '').length}${item?.imageUrl ? 'i' : ''}`;
+}
+
+function publicCommentRenderSignature(comment, avatarUrlMemo) {
+  return [
+    currentLocale(),
+    feedTimestampMode(),
+    comment?.author ?? '',
+    comment?.createdAt ?? '',
+    comment?.entryId ?? '',
+    comment?.publishStatus ?? '',
+    comment?.publishState ? publishStateMeta(comment.publishState) : '',
+    (comment?.avatarImageUrl ?? publicAvatarUrlForWallet(comment?.authorWallet, avatarUrlMemo)) ?? '',
+    publicItemContentSignature(comment),
+  ].join('|');
+}
+
+/**
+ * THE ROW'S IDENTITY — the same one mergePublicComments uses, so the two agree on what "the same comment" means.
+ * A landed comment is its chain entry id; one still in flight is the hash of its body (which is what the merge
+ * matches on to drop the local copy once the chain copy appears, so the row is rebuilt exactly once at that
+ * moment, not on every render).
+ */
+function publicCommentRowKey(comment) {
+  const entryId = comment?.entryId;
+  if (entryId !== undefined && entryId !== null && String(entryId) !== '') return String(entryId);
+  const hash = String(comment?.bodyHash ?? '');
+  if (hash) return `hash:${hash}`;
+  return comment?.id ? `local:${comment.id}` : '';
+}
+
+function buildPublicCommentRow(comment, surfacing) {
+  {
     const row = document.createElement('article');
     row.className = 'comment-item';
     const surfaceKey = comment?.id ?? comment?.entryId ?? null;
     if (surfaceKey !== null && surfaceKey !== undefined
-      && surfaceRow(row, publicCommentSurfacedKeys, String(surfaceKey), surfacing)) surfacing += 1;
+      && surfaceRow(row, publicCommentSurfacedKeys, String(surfaceKey), surfacing.count)) surfacing.count += 1;
     // Chain anchor (parity with private .message rows): the swipe-to-reply gesture reads it as the reply ref and
     // reply quotes scroll to it. A local-pending comment has none — replying to it waits for the entry id.
     if (comment.entryId !== undefined && comment.entryId !== null && comment.entryId !== '') row.dataset.entryId = String(comment.entryId);
@@ -7559,8 +7881,33 @@ function appendPublicItemComments(article, item) {
     appendPublicItemContent(row, comment);
     appendRowReplyButton(row, beginPublicCommentReplyForRow);
     appendRowCopyButton(row, copyTextFromContent(comment));
-    commentList.append(row);
+    return row;
   }
+}
+
+/**
+ * The comment thread, reconciled rather than rebuilt.
+ *
+ * `keptList` is the .comment-list node from the PREVIOUS render, which renderPublicPostDetail holds on to across
+ * its body rebuild. Without it every render would hand reconcileKeyedRows an empty container and rebuild all the
+ * rows anyway — the wipe, not the loop, is what made this quadratic.
+ */
+function appendPublicItemComments(article, item, keptList = null) {
+  const comments = Array.isArray(item?.comments) ? item.comments : [];
+  if (comments.length === 0) return;
+  const commentList = keptList ?? document.createElement('div');
+  commentList.className = 'comment-list';
+  const avatarUrlMemo = new Map();
+  const surfacing = { count: 0 };
+  reconcileKeyedRows(commentList, comments.map((comment) => ({
+    key: publicCommentRowKey(comment),
+    sig: publicCommentRenderSignature(comment, avatarUrlMemo),
+    build: () => buildPublicCommentRow(comment, surfacing),
+    // A reused row must point at the CURRENT comment object: mergePublicComments returns a fresh object on every
+    // merge ({...old, ...new}), so the row's binding — which long-press copy and swipe-to-reply read — would
+    // otherwise still hold the object from the render that first built the row.
+    adopt: (row) => rememberMessageForRow(row, comment),
+  })));
   article.append(commentList);
 }
 
@@ -7917,7 +8264,7 @@ function chooseShareTargetThread(thread) {
   if (!openPrivateThreadForWallet(wallet)) return;
   setPrivateShareDraft(share);
   insertShareMarker(messageInput);
-  if (messageInput && !messageInput.disabled) messageInput.focus();
+  focusComposerField(messageInput);
 }
 
 function chooseShareTargetOwnChannel() {
@@ -7929,7 +8276,7 @@ function chooseShareTargetOwnChannel() {
   openPublicChannelView({ channelId: own.id, authorWallet: rawWalletAddress(plathoWallet?.address ?? storedPlathoWalletRecord()?.address) });
   setPublicShareDraft(share);
   insertShareMarker(publicMessageInput);
-  if (publicMessageInput && !publicMessageInput.disabled) publicMessageInput.focus();
+  focusComposerField(publicMessageInput);
 }
 
 /**
@@ -8002,62 +8349,42 @@ function renderPublicFeed(items, options = {}) {
       if (nodeTop + node.offsetHeight > 0) { scrollAnchor = { id: node.dataset.itemId, offset: nodeTop }; break; }
     }
   }
-  // F2 keyed reconciliation (mirrors renderThreads): reuse each <article> whose render signature is unchanged since
-  // the last render (the common case on a background sync — post content is immutable), building only new/changed
-  // ones and removing/reordering the delta. This also keeps the scroll position stable (no replaceChildren flicker)
-  // while the user is scrolled up reading, across the frequent background re-renders.
-  const existing = new Map();
-  for (const node of Array.from(publicFeed.children)) {
-    const id = node.dataset?.itemId;
-    // Keep the FIRST node per item id; drop non-item nodes (discovery CTA / show-older / empty-state, rebuilt below)
-    // AND any DUPLICATE id — so a DOM a prior render left with duplicates self-heals to one node per item here.
-    if (id && !existing.has(id)) existing.set(id, node);
-    else node.remove();
-  }
+  // F2 keyed reconciliation, through the shared primitive (reconcileKeyedRows): reuse each <article> whose render
+  // signature is unchanged since the last render — the common case on a background sync, post content being
+  // immutable — build only new or changed ones, and move the rest. That also keeps the scroll position stable (no
+  // replaceChildren flicker) while the user is scrolled up reading, across the frequent background re-renders.
   const avatarUrlMemo = new Map();
-  const seen = new Set();
-  let prev = null;
-  let surfacing = 0;
+  const entries = [];
   // The discovery CTA stays at the very top (a newcomer sees it first).
   if (shouldShowDiscoveryCta()) {
-    const cta = buildDiscoveryCtaCard();
-    if (cta !== publicFeed.firstChild) publicFeed.insertBefore(cta, publicFeed.firstChild);
-    prev = cta;
+    entries.push({ key: 'cta', sig: `${currentLocale()}`, build: () => buildDiscoveryCtaCard() });
   }
   // Newest-FIRST (v752, owner ask: newer posts on TOP): render the window REVERSED so newer posts sit at the top;
   // the "show older" button then goes at the BOTTOM (below the oldest rendered post). windowItems is oldest→newest.
+  let surfacing = 0;
   for (const item of windowItems.slice().reverse()) {
     const key = String(item.id);
-    seen.add(key);
-    const sig = publicFeedItemRenderSignature(item, avatarUrlMemo);
-    let article = existing.get(key);
-    if (article && article.dataset.sig !== sig) {
-      // Signature changed -> the cached article is stale. REMOVE it before rebuilding, else the old node lingers as a
-      // duplicate (the final cleanup only removes ids NOT in `seen`, and this id IS in seen for the rebuilt node).
-      article.remove();
-      existing.delete(key);
-      article = null;
-    }
-    if (!article) {
-      article = buildPublicFeedArticle(item, avatarUrlMemo);
-      article.dataset.itemId = key;
-      article.dataset.sig = sig;
-      existing.set(key, article);
-      // A post this feed has not shown yet SURFACES (owner) — the first paint, a newly landed post, a revealed older
-      // one; a rebuild for a changed signature (locale, timestamp mode) stays still. CSSOM delay: CSP, no style attr.
-      if (surfaceRow(article, publicFeedSurfacedIds, key, surfacing)) surfacing += 1;
-    }
-    const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
-    if (article !== anchor) publicFeed.insertBefore(article, anchor);
-    prev = article;
+    entries.push({
+      key,
+      sig: publicFeedItemRenderSignature(item, avatarUrlMemo),
+      build: () => {
+        const article = buildPublicFeedArticle(item, avatarUrlMemo);
+        article.dataset.itemId = key;   // the scroll anchor's key, read before the reconcile
+        // A post this feed has not shown yet SURFACES (owner) — the first paint, a newly landed post, a revealed
+        // older one; a rebuild for a changed signature (locale, timestamp mode) stays still.
+        if (surfaceRow(article, publicFeedSurfacedIds, key, surfacing)) surfacing += 1;
+        return article;
+      },
+    });
   }
   if (hiddenOlderCount > 0) {
-    const older = buildShowOlderButton(hiddenOlderCount);
-    const anchor = prev ? prev.nextSibling : publicFeed.firstChild;
-    if (older !== anchor) publicFeed.insertBefore(older, anchor);
-    prev = older;
+    entries.push({
+      key: 'older',
+      sig: `${currentLocale()}|${hiddenOlderCount}`,
+      build: () => buildShowOlderButton(hiddenOlderCount),
+    });
   }
-  for (const [id, node] of existing) if (!seen.has(id)) node.remove();
+  reconcileKeyedRows(publicFeed, entries);
   if (options.anchorUnread && publicFeed) {
     // Fresh view: land on the newest, now at the TOP (the old chat-style feed anchored to the oldest unread instead).
     requestAnimationFrame(() => { publicFeed.scrollTop = 0; updatePublicJumpDownVisibility(); });
@@ -8950,7 +9277,7 @@ function setPublicCommentTarget(item = null, { focus = true, showContext = true 
     setText(publicCommentContextText, t('public.commentTo', { target: item.title ?? item.id ?? t('public.postFallback') }));
     if (publicMessageInput) {
       publicMessageInput.placeholder = publicComposerPlaceholder();
-      if (focus) publicMessageInput.focus();
+      if (focus) focusComposerField(publicMessageInput);
     }
   } else {
     if (publicMessageInput) {
@@ -8991,7 +9318,7 @@ function setPrivateReplyDraft(reply) {
   if (privateReplyDraft && privateReplyContextText) {
     replyStripContent(privateReplyContextText, privateReplyDraft);
   }
-  if (privateReplyDraft && messageInput && !messageInput.disabled) messageInput.focus();
+  if (privateReplyDraft) focusComposerField(messageInput);
   refreshComposerCostStatus();
 }
 
@@ -9059,7 +9386,7 @@ function refreshPublicCommentReplyUi() {
 function setPublicCommentReplyTo(reply) {
   publicCommentReplyTo = reply ?? null;
   refreshPublicCommentReplyUi();
-  if (publicCommentReplyTo && publicMessageInput && !publicMessageInput.disabled) publicMessageInput.focus();
+  if (publicCommentReplyTo) focusComposerField(publicMessageInput);
   refreshComposerCostStatus();
 }
 
@@ -9301,6 +9628,8 @@ function renderPublicPostDetail() {
   setText(publicPostDetailSubtitle, '');
   if (publicPostDetailAvatar) {
     setAvatarNode(publicPostDetailAvatar, String(authorName).slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet));
+    // The same tier the title above is painted in — a name in gold beside a plain avatar would read as a mistake.
+    applyAvatarTier(publicPostDetailAvatar, authorTone);
   }
   // The "Display as" chevron — relabel another author (same as the feed's per-post chevron). Hidden for your own
   // post, the official channel, or an item with no author wallet (matches publicItemIdentityButton's gate).
@@ -9311,11 +9640,20 @@ function renderPublicPostDetail() {
       || item.channelId === DEFAULT_PUBLIC_CHANNEL_ID;
   }
   // READING-POSITION ANCHOR (stability): every rebuild snapshots the topmost visible comment row and its
-  // viewport offset, and restores it after the rebuild. Newest-first means background syncs PREPEND fresh
-  // comments above a scrolled-down reader — without this every sync tick shoved the visible rows down
-  // (iOS/WebKit has no overflow-anchor; same pattern as the feed's topmost-article snapshot).
+  // viewport offset, and restores it after the rebuild, because iOS/WebKit has no overflow-anchor.
+  //
+  // AT scrollTop 0 AS WELL [OWNER 2026-08-24: "I scrolled up, comments started loading, a page appeared, filled the
+  // screen and immediately loaded another one. I'd like the position not to jump like that — for older comments to
+  // load above, and to be able to scroll up calmly to the next load"]. The guard used to skip the snapshot at the
+  // very top, which is a leftover from the newest-first layout: there the top held the FRESHEST comments and a
+  // reader sitting at 0 wanted to be shown what had just arrived. Reading runs oldest-first now, so the top is the
+  // PAST — and 0 is exactly where a reader ends up after scrolling back through history.
+  //
+  // That is the whole cascade: no snapshot at 0 meant the prepended page did not push the reader down, so they
+  // stayed within the 320px trigger band and the next page fired at once, and the next. With the snapshot the
+  // reader travels up with their own rows and has the whole new page to read before reaching the top again.
   let detailScrollAnchor = null;
-  if (publicPostDetailBody.scrollTop > 0 || publicPostDetailNewerCursor) {
+  {
     const bodyRect = publicPostDetailBody.getBoundingClientRect();
     for (const row of publicPostDetailBody.querySelectorAll('.comment-item[data-entry-id]')) {
       const rect = row.getBoundingClientRect();
@@ -9325,6 +9663,20 @@ function renderPublicPostDetail() {
       }
     }
   }
+  // KEEP THE COMMENT LIST ACROSS THE WIPE. Everything around it — the post card, the heading, the sentinels, the
+  // status line — is a handful of nodes and is cheapest to rebuild; the thread is the part that grows without
+  // bound and is re-rendered while it grows, so it is carried over and reconciled (see reconcileKeyedRows).
+  // Detaching it here is safe: a detached node keeps its children, and appendPublicItemComments puts it back.
+  //
+  // ONLY WITHIN THE SAME POST. A comment row is keyed by its chain entry id, and an entry id is unique inside a
+  // channel, NOT across the chain — so carrying the previous post's list into a different post could hand a
+  // comment of B a row built for a comment of A that happens to share an id. The post's own identity
+  // (channel + entry) is the guard, and it is the same function the comment cache keys on.
+  const renderedPostKey = publicPostIdentity(item);
+  const keptCommentList = renderedPostKey && renderedPostKey === publicPostDetailRenderedKey
+    ? publicPostDetailBody.querySelector('.comment-list')
+    : null;
+  publicPostDetailRenderedKey = renderedPostKey;
   publicPostDetailBody.replaceChildren();
 
   // The post content, pinned at the top (no author row — the header already carries the author identity).
@@ -9362,16 +9714,21 @@ function renderPublicPostDetail() {
     publicPostDetailBody.append(section);
     return;
   }
-  // NEWEST FIRST (owner): comments read like the feed — the freshest sits right under the heading and
-  // scrolling DOWN walks back through history. The BOTTOM sentinel auto-pages further back the moment it
-  // scrolls into view (IntersectionObserver; still a tappable button without it). The TOP sentinel exists
-  // only after a date jump and pages FORWARD toward the present. get_page stays capped at 96 rows.
-  if (publicPostDetailNewerCursor && !publicPostDetailJumpBusy) section.append(buildCommentsLoadSentinel('newer'));
-  if (comments.length > 0) appendPublicItemComments(section, { comments: comments.slice().reverse() });
+  // OLDEST FIRST — a thread, not a feed [OWNER 2026-08-23: "the developer made our comments backwards … people
+  // could be replying to each other, reading it in reverse is perverse"]. The redesign had them newest-first like
+  // the feed, and a feed is a list of unrelated posts where the freshest matters most; a comment thread is a
+  // CONVERSATION, where a reply means nothing before the comment it answers. So the oldest sits at the top and
+  // reading runs downward, exactly like the private conversation.
+  //
+  // That inverts both sentinels with it: OLDER pages in at the TOP (where the reader is when they want more
+  // history), NEWER at the BOTTOM (toward the present, after a date jump). The scroll handler that arms them is
+  // inverted to match — see the publicPostDetailBody scroll listener. get_page stays capped at 96 rows.
   if (publicPostDetailHasMoreComments && !publicPostDetailJumpBusy) section.append(buildCommentsLoadSentinel('earlier'));
   else if (publicPostDetailOlderTruncated && comments.length > 0) {
     section.append(publicDetailStatusNode(t('public.olderUnavailable')));
   }
+  if (comments.length > 0) appendPublicItemComments(section, { comments }, keptCommentList);
+  if (publicPostDetailNewerCursor && !publicPostDetailJumpBusy) section.append(buildCommentsLoadSentinel('newer'));
   if (publicPostDetailLoadState === 'loading') {
     if (comments.length === 0) section.append(buildSkeletonNodes('comment', 3));
     section.append(publicDetailStatusNode(comments.length > 0 ? t('public.loadingMoreComments') : t('public.loadingComments')));
@@ -9388,13 +9745,24 @@ function renderPublicPostDetail() {
   }
   publicPostDetailBody.append(section);
   if (detailScrollAnchor) {
-    const row = publicPostDetailBody.querySelector(
-      `.comment-item[data-entry-id="${CSS.escape(detailScrollAnchor.id)}"]`,
-    );
-    if (row) {
+    const holdAnchor = () => {
+      const row = publicPostDetailBody.querySelector(
+        `.comment-item[data-entry-id="${CSS.escape(detailScrollAnchor.id)}"]`,
+      );
+      if (!row) return;
       const delta = (row.getBoundingClientRect().top - publicPostDetailBody.getBoundingClientRect().top)
         - detailScrollAnchor.offset;
       if (delta !== 0) publicPostDetailBody.scrollTop += delta;
+    };
+    holdAnchor();
+    // AND AGAIN AS THE PICTURES ARRIVE. A prepended page is measured before its images have decoded, so every one
+    // of them grows the content ABOVE the reader a second time, after the anchor was already restored — the same
+    // jump, arriving late. Each undecoded image re-applies the anchor once when it settles; a thread of text pays
+    // nothing for this, because a complete image is skipped.
+    for (const image of publicPostDetailBody.querySelectorAll('img')) {
+      if (image.complete) continue;
+      image.addEventListener('load', holdAnchor, { once: true });
+      image.addEventListener('error', holdAnchor, { once: true });
     }
   }
   // Consumed by whichever render actually paints the new comment — the optimistic row, or the chain-confirmed one
@@ -9402,6 +9770,11 @@ function renderPublicPostDetail() {
   if (publicPostDetailScrollToLatest) {
     publicPostDetailScrollToLatest = false;
     scrollPublicPostDetailToLatest();
+  } else if (publicPostDetailOpenScrollPending && publicPostDetailBody.querySelector('.comment-item')) {
+    // The first render with rows in it is the one that can place the reader; after that the anchor above keeps
+    // their position across background syncs.
+    publicPostDetailOpenScrollPending = false;
+    requestAnimationFrame(() => applyPublicPostDetailOpenScroll());
   }
 }
 
@@ -9409,17 +9782,19 @@ function renderPublicPostDetail() {
 // shows up below the composer." Exactly: comments append at the bottom and the scroll position stayed put, so the
 // one comment the author is certain to want to see — their own, just written — landed below the fold.
 let publicPostDetailScrollToLatest = false;
+// Armed on opening a thread this reader has been in before; consumed by the first render that has comment rows
+// to place them against (see applyPublicPostDetailOpenScroll).
+let publicPostDetailOpenScrollPending = false;
+// Whether the reader is sitting at the END of the comment thread. Kept live by the thread's scroll handler so
+// the keyboard handler can still tell after the viewport has shrunk (see pinOpenThreadsToEndAfterViewportChange).
+// Starts true: a thread that has not been scrolled at all is at its end by definition.
+let publicPostDetailStickToBottom = true;
 
 function scrollPublicPostDetailToLatest() {
   if (!publicPostDetailBody) return;
   const body = publicPostDetailBody;
-  // NEWEST FIRST: the freshest comment renders at the TOP of the thread, right under the heading — "latest"
-  // means the comments section's start now, not the scroller's bottom.
-  const toLatest = () => {
-    const section = body.querySelector('.public-detail-comments');
-    if (!section) { body.scrollTop = 0; return; }
-    body.scrollTop += section.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
-  };
+  // OLDEST FIRST: the freshest comment is the LAST row of the thread, so "latest" is the scroller's end again.
+  const toLatest = () => { body.scrollTop = body.scrollHeight; };
   // After layout: the row was appended THIS tick; a post-card image decoding later shifts the section down,
   // so re-anchor once per pending image.
   requestAnimationFrame(toLatest);
@@ -9530,6 +9905,10 @@ function openPublicPostDetail(item) {
   // Opening a post starts at the TOP — the post itself is what was tapped. A jump-to-latest armed by a comment on
   // the PREVIOUS post must not survive into this one.
   publicPostDetailScrollToLatest = false;
+  // ...UNLESS this reader has been here before: a thread with a reading mark reopens where they stopped [OWNER
+  // 2026-08-23]. Armed rather than applied, because the comments are not loaded yet — the render that first paints
+  // rows consumes it. A first visit has no mark and keeps the plain top, post first.
+  publicPostDetailOpenScrollPending = publicCommentReadCursor(publicPostIdentity(item)) !== null;
   renderPublicPostDetail();
   if (publicPostDetailBody) publicPostDetailBody.scrollTop = 0;
   // DURABLE seed: after a full reload the in-memory Map is empty — pull the last-loaded comments (with images)
@@ -9558,6 +9937,7 @@ function closePublicPostDetail() {
   publicPostDetailChainComments = [];
   publicPostDetailLoadState = 'idle';
   publicPostDetailLoadToken += 1; // invalidate any in-flight comment load so a stale result can't render
+  publicPostDetailRenderedKey = null; // the next open reconciles against nothing, never against the closed post
   if (publicPane) {
     publicPane.dataset.postOpen = 'false';
     publicPane.dataset.postComments = 'on';
@@ -9843,6 +10223,36 @@ function rebuildAuroraSuns() {
   }
   for (const stage of auroraStages) { stage.suns = makeAuroraSuns(auroraCount); stage.flares = []; }
 }
+/**
+ * DOES A CANVAS BLUR ACTUALLY BLUR? Asked by painting one dot through a blur and looking whether it spread.
+ *
+ * `'filter' in ctx` cannot answer it: Safari before 18 HAS the property and ignores it, which is the worst possible
+ * combination — the code believes it has a blur, sizes the canvas small on that belief, and the device gets a raw
+ * upscale of Skia's dither. Measured once, cached; the answer cannot change within a page.
+ */
+let auroraCanvasBlurAnswer = null;
+function auroraCanvasBlurWorks() {
+  if (auroraCanvasBlurAnswer !== null) return auroraCanvasBlurAnswer;
+  auroraCanvasBlurAnswer = false;
+  try {
+    const probe = document.createElement('canvas');
+    probe.width = 9;
+    probe.height = 9;
+    const ctx = probe.getContext('2d');
+    if (ctx && 'filter' in ctx) {
+      ctx.filter = 'blur(2px)';
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(4, 4, 1, 1);
+      const row = ctx.getImageData(0, 4, 9, 1).data;
+      // A working blur lights the dot's neighbours; an ignored one leaves them at zero.
+      auroraCanvasBlurAnswer = row[3 * 4 + 3] > 0 || row[5 * 4 + 3] > 0;
+    }
+  } catch {
+    auroraCanvasBlurAnswer = false;   // a tainted or unavailable context answers "no", which is the safe half
+  }
+  return auroraCanvasBlurAnswer;
+}
+
 const auroraSmooth = (x) => x * x * (3 - 2 * x);
 function auroraSunAt(sun, t) {
   const presence = auroraSmooth(0.5 + 0.5 * Math.sin(t * sun.fp + sun.pp));
@@ -9978,11 +10388,20 @@ function auroraTick(now) {
       scene.measuredAt = now;
       const lw = scene.layer.clientWidth || 1;
       const lh = scene.layer.clientHeight || 1;
-      // RIPPLE FIX (owner: "ripples"): at 96px the canvas was stretched 10–15×, so Skia's gradient dither and the 8-bit
-      // alpha steps of a very faint gradient became cm-sized crawling cells. Quarter resolution (160–360px) keeps
-      // the dither sub-visible, and the glow painter blurs the fills in canvas space on top of that.
-      const cw = Math.max(160, Math.min(360, Math.round(lw / 4)));
-      const ch = Math.max(64, Math.min(400, Math.round(cw * lh / lw)));
+      // RIPPLE, SECOND PASS [OWNER 2026-08-24: "the plasma has a ripple, small, but it is there" — and, pointing at
+      // the cause: "it ripples because of px"]. Right, and the first pass only halved it.
+      //
+      // The canvas is small and stretched, so what the eye catches is not OUR gradient but Skia's own dither inside
+      // it, magnified by the upscale. Two things were meant to hide that: the upscale's own interpolation, and a
+      // blur in canvas space. On Safari before 18 the blur DOES NOTHING — the property exists and is ignored — so
+      // exactly the devices the owner reports from were left with raw dither at 2-3x magnification.
+      //
+      // So the resolution follows what the device can actually do: with a working blur a quarter of the layer is
+      // plenty, without one the pixels have to do the whole job themselves. The height follows the layer's aspect
+      // either way, so the upscale stays uniform — an anisotropic stretch turns round dither into stripes.
+      const budget = auroraCanvasBlurWorks() ? 4 : 1.6;
+      const cw = Math.max(160, Math.min(auroraCanvasBlurWorks() ? 360 : 560, Math.round(lw / budget)));
+      const ch = Math.max(64, Math.min(1200, Math.round(cw * lh / lw)));
       if (scene.canvas.width !== cw || scene.canvas.height !== ch) { scene.canvas.width = cw; scene.canvas.height = ch; }
     }
     if (scene.stage) drawAuroraView(scene, t, rgb);
@@ -10369,7 +10788,9 @@ function openPublicChannelView(source = {}) {
     ?? null;
   publicChannelViewReturnTo = source.returnTo ?? null;
   publicChannelViewShownCap = PUBLIC_FEED_RENDER_CAP;
-  publicChannelViewRenderSig = '';
+  // A DIFFERENT CHANNEL starts from an empty body: none of the previous channel's posts can be reused, and
+  // clearing settles the question of whether a post id could ever mean two things (see reconcileKeyedRows).
+  if (publicChannelViewBody) publicChannelViewBody.replaceChildren();
   publicChannelViewSurfacedIds.clear();   // the channel's posts rise in as they land (owner)
   const own = publicChannelViewWallet ? isOwnPublicAuthor(publicChannelViewWallet) : false;
   const followed = own || isPublicChannelSubscribed(channelId);
@@ -10421,7 +10842,6 @@ function closePublicChannelView(options = {}) {
   publicChannelPreviewChannelId = null;
   publicChannelViewChannelId = null;
   publicChannelViewWallet = null;
-  publicChannelViewRenderSig = '';
   const returnTo = publicChannelViewReturnTo;
   publicChannelViewReturnTo = null;
   if (publicPane) {
@@ -10480,88 +10900,109 @@ function renderPublicChannelView() {
   // existing DOM (and the reader's scroll position). Signature mirrors the feed's per-item reconciliation.
   const avatarUrlMemo = new Map();
   const capped = items.length > publicChannelViewShownCap ? items.slice(items.length - publicChannelViewShownCap) : items;
-  const sig = [
-    publicChannelViewChannelId, label, followed ? 'f' : '', own ? 'o' : '',
-    publicChannelViewSyncPending ? 'p' : '', description, tags.join(','), String(items.length),
-    ...capped.map((item) => `${item.id}:${publicFeedItemRenderSignature(item, avatarUrlMemo)}`),
-  ].join('|');
-  if (sig !== publicChannelViewRenderSig) {
-    publicChannelViewRenderSig = sig;
-    // Reading-position anchor (the v752 feed lesson): a raw scrollTop restore shifts the reader when a NEW post
-    // prepends at the top of the rebuilt list — snapshot the topmost visible article + its viewport offset and
-    // re-align it after the rebuild. Skipped at the top (scrollTop 0 → new posts simply appear).
-    const previousScrollTop = publicChannelViewBody.scrollTop;
-    let scrollAnchor = null;
-    if (previousScrollTop > 0) {
-      const bodyTop = publicChannelViewBody.getBoundingClientRect().top;
-      for (const node of publicChannelViewBody.children) {
-        if (!node.dataset?.itemId) continue;
-        const nodeTop = node.getBoundingClientRect().top - bodyTop;
-        if (nodeTop + node.offsetHeight > 0) { scrollAnchor = { id: node.dataset.itemId, offset: nodeTop }; break; }
-      }
+  // Reading-position anchor (the v752 feed lesson): content arriving ABOVE the reader shoves them down, and
+  // WebKit has no overflow-anchor — so snapshot the topmost visible article with its viewport offset and
+  // re-align it afterwards. Skipped at the top (scrollTop 0 -> new posts simply appear).
+  const previousScrollTop = publicChannelViewBody.scrollTop;
+  let scrollAnchor = null;
+  if (previousScrollTop > 0) {
+    const bodyTop = publicChannelViewBody.getBoundingClientRect().top;
+    for (const node of publicChannelViewBody.children) {
+      if (!node.dataset?.itemId) continue;
+      const nodeTop = node.getBoundingClientRect().top - bodyTop;
+      if (nodeTop + node.offsetHeight > 0) { scrollAnchor = { id: node.dataset.itemId, offset: nodeTop }; break; }
     }
-    publicChannelViewBody.replaceChildren();
-    if (description || tags.length > 0) {
-      const about = document.createElement('article');
-      about.className = 'discovery-card channel-view-about';
-      if (description) {
-        const paragraph = document.createElement('p');
-        paragraph.className = 'channel-about-description';
-        paragraph.textContent = description;
-        about.append(paragraph);
-      }
-      if (tags.length > 0) {
-        const tagRow = document.createElement('div');
-        tagRow.className = 'channel-about-tags';
-        for (const tag of tags) {
-          const chip = document.createElement('span');
-          chip.className = 'channel-about-tag';
-          chip.textContent = `#${tag}`;
-          tagRow.append(chip);
+  }
+  // The whole list is reconciled, so an unchanged render costs a walk and nothing else — which is why the coarse
+  // "did anything visible change" fingerprint this function used to keep is gone. It answered the same question
+  // one list at a time; the per-row signatures answer it one ROW at a time, and only the rows that really changed
+  // are rebuilt (a sync that adds one post no longer rebuilds a hundred and fifty).
+  const entries = [];
+  if (description || tags.length > 0) {
+    entries.push({
+      key: 'about',
+      sig: `${currentLocale()}|${description}|${tags.join(',')}`,
+      build: () => {
+        const about = document.createElement('article');
+        about.className = 'discovery-card channel-view-about';
+        if (description) {
+          const paragraph = document.createElement('p');
+          paragraph.className = 'channel-about-description';
+          paragraph.textContent = description;
+          about.append(paragraph);
         }
-        about.append(tagRow);
-      }
-      publicChannelViewBody.append(about);
+        if (tags.length > 0) {
+          const tagRow = document.createElement('div');
+          tagRow.className = 'channel-about-tags';
+          for (const tag of tags) {
+            const chip = document.createElement('span');
+            chip.className = 'channel-about-tag';
+            chip.textContent = `#${tag}`;
+            tagRow.append(chip);
+          }
+          about.append(tagRow);
+        }
+        return about;
+      },
+    });
+  }
+  if (capped.length === 0) {
+    const statusText = publicChannelViewSyncPending ? t('public.channelLoading') : t('public.channelEmpty');
+    entries.push({
+      key: 'status',
+      sig: statusText,
+      build: () => {
+        const status = document.createElement('p');
+        status.className = 'discovery-status';
+        status.textContent = statusText;
+        return status;
+      },
+    });
+  } else {
+    // Newest-first (the v752 feed model) with a local cap + "show older" at the bottom.
+    let surfacing = 0;
+    for (const item of capped.slice().reverse()) {
+      const itemId = String(item.id);
+      entries.push({
+        key: `post:${itemId}`,
+        sig: publicFeedItemRenderSignature(item, avatarUrlMemo),
+        build: () => {
+          const node = buildPublicFeedArticle(item, avatarUrlMemo);
+          node.dataset.itemId = itemId; // scroll-anchor key, read by the anchor snapshot above
+          if (surfaceRow(node, publicChannelViewSurfacedIds, itemId, surfacing)) surfacing += 1;
+          return node;
+        },
+      });
     }
-    if (capped.length === 0) {
-      const status = document.createElement('p');
-      status.className = 'discovery-status';
-      status.textContent = publicChannelViewSyncPending ? t('public.channelLoading') : t('public.channelEmpty');
-      publicChannelViewBody.append(status);
-    } else {
-      // Newest-first (the v752 feed model) with a local cap + "show older" at the bottom.
-      let surfacing = 0;
-      for (const item of capped.slice().reverse()) {
-        const node = buildPublicFeedArticle(item, avatarUrlMemo);
-        node.dataset.itemId = String(item.id); // scroll-anchor key across rebuilds
-        if (surfaceRow(node, publicChannelViewSurfacedIds, String(item.id), surfacing)) surfacing += 1;
-        publicChannelViewBody.append(node);
-      }
-      const hiddenOlder = items.length - capped.length;
-      if (hiddenOlder > 0) {
-        const older = document.createElement('button');
-        older.type = 'button';
-        older.className = 'feed-show-older';
-        older.textContent = t('public.showOlder');
-        older.dataset.hiddenOlder = String(hiddenOlder);
-        older.addEventListener('click', () => {
-          publicChannelViewShownCap += PUBLIC_FEED_RENDER_PAGE;
-          renderPublicChannelView();
-        });
-        publicChannelViewBody.append(older);
-      }
+    const hiddenOlder = items.length - capped.length;
+    if (hiddenOlder > 0) {
+      entries.push({
+        key: 'older',
+        sig: `${currentLocale()}|${hiddenOlder}`,
+        build: () => {
+          const older = document.createElement('button');
+          older.type = 'button';
+          older.className = 'feed-show-older';
+          older.textContent = t('public.showOlder');
+          older.dataset.hiddenOlder = String(hiddenOlder);
+          older.addEventListener('click', () => {
+            publicChannelViewShownCap += PUBLIC_FEED_RENDER_PAGE;
+            renderPublicChannelView();
+          });
+          return older;
+        },
+      });
     }
-    publicChannelViewBody.scrollTop = previousScrollTop;
-    if (scrollAnchor) {
-      // Re-align the anchored article to its pre-rebuild viewport offset (content added ABOVE otherwise shoves
-      // the reader down; WebKit has no overflow-anchor). No-op when the anchor aged out of the window.
-      const bodyTop = publicChannelViewBody.getBoundingClientRect().top;
-      for (const node of publicChannelViewBody.children) {
-        if (node.dataset?.itemId !== scrollAnchor.id) continue;
-        const nodeTop = node.getBoundingClientRect().top - bodyTop;
-        publicChannelViewBody.scrollTop = Math.max(0, publicChannelViewBody.scrollTop + (nodeTop - scrollAnchor.offset));
-        break;
-      }
+  }
+  reconcileKeyedRows(publicChannelViewBody, entries);
+  if (scrollAnchor) {
+    // Re-align the anchored article to its pre-render viewport offset. No-op when the anchor aged out of the window.
+    const bodyTop = publicChannelViewBody.getBoundingClientRect().top;
+    for (const node of publicChannelViewBody.children) {
+      if (node.dataset?.itemId !== scrollAnchor.id) continue;
+      const nodeTop = node.getBoundingClientRect().top - bodyTop;
+      publicChannelViewBody.scrollTop = Math.max(0, publicChannelViewBody.scrollTop + (nodeTop - scrollAnchor.offset));
+      break;
     }
   }
   // Reading the channel marks its rendered posts read — the same rule the feed applies to its window. NOT while
@@ -10620,25 +11061,31 @@ function renderPublicDiscovery(options = {}) {
   const shown = results.filter((channel) =>
     (!publicDiscoveryTagFilter || channel.tags.includes(publicDiscoveryTagFilter))
     && discoveryChannelMatches(channel, needle));
-  const fragment = document.createDocumentFragment();
+  const entries = [];
   // Tag filter chips (tags present in the sampled set) — filtering narrows within the recent sample, not globally.
   const allTags = [...new Set(results.flatMap((channel) => channel.tags))].slice(0, 24);
   if (allTags.length > 0) {
-    const filterRow = document.createElement('div');
-    filterRow.className = 'discovery-tag-filter';
-    for (const tag of allTags) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'channel-about-tag';
-      chip.textContent = `#${tag}`;
-      chip.setAttribute('aria-pressed', publicDiscoveryTagFilter === tag ? 'true' : 'false');
-      chip.addEventListener('click', () => {
-        publicDiscoveryTagFilter = publicDiscoveryTagFilter === tag ? null : tag;
-        renderPublicDiscovery({ loading: false });
-      });
-      filterRow.append(chip);
-    }
-    fragment.append(filterRow);
+    entries.push({
+      key: 'tags',
+      sig: `${currentLocale()}|${publicDiscoveryTagFilter ?? ''}|${allTags.join(',')}`,
+      build: () => {
+        const filterRow = document.createElement('div');
+        filterRow.className = 'discovery-tag-filter';
+        for (const tag of allTags) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'channel-about-tag';
+          chip.textContent = `#${tag}`;
+          chip.setAttribute('aria-pressed', publicDiscoveryTagFilter === tag ? 'true' : 'false');
+          chip.addEventListener('click', () => {
+            publicDiscoveryTagFilter = publicDiscoveryTagFilter === tag ? null : tag;
+            renderPublicDiscovery({ loading: false });
+          });
+          filterRow.append(chip);
+        }
+        return filterRow;
+      },
+    });
   }
   // Diff against what is on screen: survivors / departures / ghosts still leaving, in their old order.
   const shownByKey = new Map();
@@ -10660,28 +11107,55 @@ function renderPublicDiscovery(options = {}) {
     pendingGhosts.push(node);
   }
   let surfacing = 0;
+  const avatarUrlMemo = new Map();
+  // A GHOST rides as an entry under its own wallet key with the signature it already carries, so the reconciler
+  // reuses the very node that is mid-animation. Left out of the list it would be swept away instantly and the
+  // leave animation — a card folding and fading as it stops matching the filter — would never be seen.
+  const ghostEntry = (node) => ({
+    key: node.dataset.rowKey ?? node.dataset.wallet ?? '',
+    sig: node.dataset.sig ?? 'ghost',
+    build: () => node,
+  });
   for (const channel of shown) {
     const key = rawWalletAddress(channel.authorWallet);
-    const ghosts = ghostsBefore.get(key);
-    if (ghosts) fragment.append(...ghosts);
-    const card = buildDiscoveryCard(channel);
-    card.dataset.wallet = key;
-    if (surfaceRow(card, publicDiscoverySurfaceRegistry, key, surfacing, !wasShown.has(key))) surfacing += 1;
-    fragment.append(card);
+    for (const ghost of ghostsBefore.get(key) ?? []) entries.push(ghostEntry(ghost));
+    entries.push({
+      key,
+      sig: discoveryCardRenderSignature(channel, avatarUrlMemo),
+      build: () => {
+        const card = buildDiscoveryCard(channel);
+        card.dataset.wallet = key;
+        if (surfaceRow(card, publicDiscoverySurfaceRegistry, key, surfacing, !wasShown.has(key))) surfacing += 1;
+        return card;
+      },
+    });
   }
-  if (pendingGhosts.length > 0) fragment.append(...pendingGhosts);
+  for (const ghost of pendingGhosts) entries.push(ghostEntry(ghost));
   // The status line: under the cards while the sweep runs (the list reads as growing, not finished-and-short), alone
   // when there is nothing to show — looking / looking for «q» / no match / empty / error.
   if (loading || partial || shown.length === 0) {
-    if (shown.length === 0 && (loading || progress !== null) && !publicDiscoveryQuery && options.error !== true) fragment.append(buildSkeletonNodes('discovery', 3));
-    const status = document.createElement('p');
-    status.className = 'discovery-status';
-    status.textContent = publicDiscoveryStatusText(progress, { shownCount: shown.length, loading, error: options.error === true });
-    if (loading || progress !== null) status.dataset.sweep = 'true';
-    fragment.append(status);
+    if (shown.length === 0 && (loading || progress !== null) && !publicDiscoveryQuery && options.error !== true) {
+      for (let i = 0; i < 3; i += 1) entries.push({ key: `skeleton:${i}`, sig: 'discovery', build: () => buildSkeletonNode('discovery') });
+    }
+    const sweeping = loading || progress !== null;
+    const statusText = publicDiscoveryStatusText(progress, { shownCount: shown.length, loading, error: options.error === true });
+    entries.push({
+      key: 'status',
+      sig: `${sweeping ? 'sweep' : 'done'}|${statusText}`,
+      build: () => {
+        const status = document.createElement('p');
+        status.className = 'discovery-status';
+        status.textContent = statusText;
+        if (sweeping) status.dataset.sweep = 'true';
+        return status;
+      },
+    });
   }
-  publicDiscoveryBody.replaceChildren(fragment);
-  // Every card is a new node: the latest-post observer must be pointed at the ones that still have no line.
+  reconcileKeyedRows(publicDiscoveryBody, entries);
+  // Cards that survived the render keep the observation they already had; this points the observer at the ones
+  // that are NEW and still have no latest-post line. (Before the list was reconciled every card was a new node on
+  // every sweep frame, so this had to re-observe all of them — and a single card's latest post landing rebuilt the
+  // whole screen.)
   observeDiscoveryLatestCards();
 }
 
@@ -10708,6 +11182,27 @@ function discoveryCardIdentityButton(authorWallet) {
     }
   });
   return identityButton;
+}
+
+/**
+ * What a discovery card LOOKS like. The reuse test for reconcileKeyedRows — and the reason a sweep no longer
+ * repaints the whole screen for each bucket it finds.
+ *
+ * The latest-post line is in here, and it is the term that matters most: it arrives per channel, asynchronously,
+ * and each arrival re-renders this screen. Rebuilding every card for one card's answer is how a list of a hundred
+ * channels used to cost a hundred full repaints.
+ */
+function discoveryCardRenderSignature(channel, avatarUrlMemo) {
+  const wallet = rawWalletAddress(channel.authorWallet);
+  const latest = discoveryLatestState(wallet);
+  return [
+    currentLocale(),
+    resolveWalletChannelDisplay(channel.authorWallet)?.name || publicAuthorLabel(channel.authorWallet) || channel.name || '',
+    publicAvatarUrlForWallet(channel.authorWallet, avatarUrlMemo) ?? '',
+    channel.description ?? '',
+    (channel.tags ?? []).join(','),
+    latest ? `${latest.status ?? ''}.${latest.createdAtMs ?? ''}.${String(latest.text ?? '').length}` : 'none',
+  ].join('|');
 }
 
 function buildDiscoveryCard(channel) {
@@ -11120,12 +11615,19 @@ publicPostDetailBody?.addEventListener('scroll', () => {
     const body = publicPostDetailBody;
     if (!body || !publicPostDetailOpen) return;
     if (publicPostDetailJumpBusy) return;
-    if (body.scrollHeight - body.scrollTop - body.clientHeight < 320 && publicPostDetailHasMoreComments) {
+    // OLDEST FIRST (see renderPublicPostDetail): the top of the scroller is the PAST, so nearing it pages older
+    // comments in; nearing the bottom pages toward the present. These two were the other way round while the
+    // thread rendered newest-first.
+    if (body.scrollTop < 320 && publicPostDetailHasMoreComments) {
       loadEarlierPublicPostComments();
     }
-    if (body.scrollTop < 320 && publicPostDetailNewerCursor) {
+    if (body.scrollHeight - body.scrollTop - body.clientHeight < 320 && publicPostDetailNewerCursor) {
       loadNewerPublicPostComments();
     }
+    // "Was the reader at the end?" — kept live here so the keyboard handler can answer it AFTER the viewport has
+    // already shrunk, when the distance to the bottom no longer tells it anything.
+    publicPostDetailStickToBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 64;
+    rememberPublicPostReadPosition();
   }, 120);
 }, { passive: true });
 
@@ -18697,7 +19199,7 @@ function composerEditorAfterEdit(el) {
 
 function composerEditorInsertText(el, text) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   const range = composerEditorRange(el);
   range.deleteContents();
   const node = document.createTextNode(String(text ?? ''));
@@ -18876,7 +19378,7 @@ function composerEditorSplitFmtForNewlineIfMidWord(el) {
 
 function composerEditorInsertLineBreak(el) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   // A NON-COLLAPSED selection must be collapsed to its END first (mirrors composerEditorInsertChip). The common
   // case is the whole word staying selected right after a Bold/Italic toggle: without this the split/escape guards
   // both bail on !collapsed, then range.deleteContents() below STRIPS the word and drops the <br> INSIDE the now-
@@ -18908,7 +19410,7 @@ function composerEditorInsertLineBreak(el) {
 // text flow and Backspace right after it deletes it as one unit (handled in composerEditorBeforeInput).
 function composerEditorInsertChip(el, marker) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   // Attach at the caret WITHOUT deleting a live selection — a selection sitting inside a .fmt-* span (toggleFormat
   // leaves the formatted word selected) would otherwise be replaced by the marker INSIDE the span (lost text +
   // unbalanced ** on send). Collapse to the selection end first, then escape any trailing fmt span.
@@ -18930,7 +19432,7 @@ function composerEditorInsertChip(el, marker) {
 // **…** first — rendering the marker as literal bold/italic text, a DEAD non-clickable link on the wire.
 function composerEditorInsertLinkBlock(el, markup, label, savedRange) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); }
   const sel = window.getSelection();
   const hadSelection = sel && sel.rangeCount && !sel.isCollapsed;
@@ -19275,7 +19777,7 @@ function composerEditorLineNodes(el, range) {
  */
 function composerEditorToggleHeading(el) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
@@ -19319,7 +19821,7 @@ function composerEditorToggleHeading(el) {
 
 function composerEditorToggleFormat(el, className) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
@@ -19523,7 +20025,7 @@ function composerEditorBeforeInput(el, event) {
 // clipboard HTML; only text crosses into the editor). \r\n normalized; the serializer turns \n into <br>.
 function composerEditorInsertPlainMultiline(el, text) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   // [18] Neutralize marker-like tokens in the pasted TEXT so serialize->composerBlocksFromDraft can't re-parse a
   // pasted `[image 1]` as a real chip's marker (which would bind it to the editor's OWN attachment or drop the text
   // on send). A zero-width space after `[` breaks the marker regex while staying invisible; the `(?!\()` mirrors
@@ -20041,7 +20543,7 @@ function applyComposerFormat(editor, format) {
 // word under the caret. From a bare caret it selects the whole word directly.
 function composerEditorSelectWordAtCaret(el) {
   if (!el || el.disabled) return;
-  el.focus();
+  focusComposerField(el);
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
@@ -20653,35 +21155,34 @@ function renderThreads() {
   });
   // F3 (scale): keyed reconciliation instead of innerHTML='' + a full O(chats) teardown/rebuild. renderThreads runs
   // on every sync tick AND every search keystroke, so a user with hundreds of chats otherwise rebuilt every row
-  // (avatar + identity label + a fresh click listener each) on each. Now existing rows are REUSED (matched by
+  // (avatar + identity label + a fresh click listener each) on each. Existing rows are REUSED (matched by
   // thread.id), only their mutable content is patched (applyThreadRow), and only added/removed/reordered rows touch
-  // the DOM. One-time migration: rows left by the pre-F3 build carry no _refs — drop them so they are rebuilt once.
-  // (Checked on the first ROW, not the first child — the contact-CTA plate legitimately carries no _refs.)
-  const firstRow = threadList.querySelector(':scope > [data-thread]');
-  if (firstRow && !firstRow._refs) threadList.replaceChildren();
-  const existingRows = new Map();
-  for (const node of Array.from(threadList.children)) {
-    const id = node.dataset?.thread;
-    if (id && node._refs) existingRows.set(id, node);
-    else if (node !== privateContactCtaCard) node.remove();
-  }
-  const seen = new Set();
-  // The add-a-contact plate stays pinned as the FIRST list entry; hidden while a search is filtering the list
-  // (results must not be pushed down — mirrors the public discovery plate's search behavior).
-  const contactCta = ensureContactCtaCard();
-  contactCta.hidden = q.length > 0;
-  if (threadList.firstElementChild !== contactCta) threadList.insertBefore(contactCta, threadList.firstElementChild);
-  let prev = contactCta;
+  // the DOM. The one-time migration that dropped rows left by the pre-F3 build is gone with the hand-written loop:
+  // the shared primitive sweeps any child it did not key itself, which covers that case and every other kind of
+  // debris besides.
+  // PATCH, NOT REBUILD (the second of the two policies reconcileKeyedRows documents): a thread row's preview,
+  // time, unread count, name and avatar can all move on any sync tick, so its signature is a constant and the
+  // refresh happens unconditionally in `adopt`. A signature here would be a second description of the row, free
+  // to disagree with applyThreadRow — and it would only save re-filling a few text nodes, while costing an avatar
+  // re-decode whenever it did fire. The primitive is the same one every other list uses.
+  const entries = [{
+    // The add-a-contact plate stays pinned as the FIRST list entry; hidden while a search is filtering the list
+    // (results must not be pushed down — mirrors the public discovery plate's search behavior).
+    key: 'cta',
+    sig: 'cta',
+    build: () => ensureContactCtaCard(),
+    adopt: () => {},
+  }];
   for (const thread of ordered) {
-    seen.add(thread.id);
-    let item = existingRows.get(thread.id);
-    if (!item) item = buildThreadRow(thread.id);
-    applyThreadRow(item, thread);
-    const anchor = prev ? prev.nextElementSibling : threadList.firstElementChild;
-    if (item !== anchor) threadList.insertBefore(item, anchor);
-    prev = item;
+    entries.push({
+      key: `thread:${thread.id}`,
+      sig: 'row',
+      build: () => { const item = buildThreadRow(thread.id); applyThreadRow(item, thread); return item; },
+      adopt: (item) => applyThreadRow(item, thread),
+    });
   }
-  for (const [id, node] of existingRows) if (!seen.has(id)) node.remove();
+  reconcileKeyedRows(threadList, entries);
+  ensureContactCtaCard().hidden = q.length > 0;
 }
 
 // Build a reusable thread-list row: the STRUCTURE + a single click listener. The listener resolves its thread by id
@@ -20783,8 +21284,10 @@ function applyThreadRow(item, thread) {
 // reload, once its messages render) lands on the latest, and the user's own new message smooth-scrolls into view.
 // Once the reader scrolls up to read history it stops sticking, and a background re-render (sync / status / a
 // received message) keeps them where they are instead of yanking the view down. The "at bottom" flag + saved
-// position are read from a DEBOUNCED scroll handler, so the transient scroll-to-0 a re-render causes when it
-// rebuilds the strip cannot corrupt them — that race is what made the earlier attempts land back at the top.
+// position were originally read from a DEBOUNCED scroll handler so the transient scroll-to-0 of a strip rebuild
+// could not corrupt them — the race that made the earlier attempts land back at the top. The strip is reconciled
+// now (reconcileKeyedRows), so there is no transient 0 to defend against: a background re-render leaves the rows,
+// and the scroller, exactly where they were.
 let lastConversationThreadId = null;
 let lastConversationMsgCount = 0;
 let conversationStickToBottom = true;
@@ -20803,9 +21306,6 @@ let conversationProgrammaticScrollAt = 0;
 // send action, NOT on "the tail is an 'out' message" (a late out-of-order INCOMING can leave an 'out' tail and would
 // otherwise wrongly clear a first-unread anchor and yank the reader — the v740 review finding).
 let ownSendPendingRender = false;
-// Per-row structure fingerprint of the last full conversation render — drives the status-only fast path
-// (a status tick patches rows in place instead of rebuilding the strip, so the scroller never moves).
-let lastConversationRenderSnapshot = null;
 
 // Track the bottom-pin state and position IMMEDIATELY (no debounce): the image-load re-anchor and the
 // hidden-strip fallback read these, and a debounced value lags an active gesture — a stale "still pinned"
@@ -20847,74 +21347,36 @@ function setConversationScrollTop(top) {
 // Apply the open-scroll anchor: land on the latest when the unread fit the last screen (few/no new), else put the
 // FIRST unread at the top of the viewport (many new -> read down from there). Idempotent; re-run on every render of
 // the open burst so the transient scroll-to-0 a rebuild causes can never leave a long history stuck at the top.
-function applyConversationOpenScroll() {
-  if (!messageStrip) return;
-  const maxScrollTop = Math.max(0, messageStrip.scrollHeight - messageStrip.clientHeight);
-  const firstUnreadRow = conversationOpenFirstUnreadRef ? messageStrip.querySelector('[data-first-unread="true"]') : null;
-  let anchoredToUnread = false;
+/**
+ * WHERE A THREAD OPENS — the one rule, used by the private conversation and by a post's comments.
+ *
+ * Land at the end (the newest), UNLESS the first unread row sits above the last screen — landing at the bottom
+ * would scroll it off the top — in which case put THAT row at the top, so reading runs downward from exactly
+ * where it stopped. Returns whether it anchored to the unread row, which is also the answer to "is the reader
+ * now at the end".
+ *
+ * `setScrollTop` is injected because the private strip routes its own writes through a setter that marks them
+ * programmatic (a scroll it caused itself must not read as the reader scrolling away).
+ */
+function anchorScrollerToFirstUnread(scroller, firstUnreadRow, setScrollTop) {
+  const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
   if (firstUnreadRow) {
-    const rowTopWithinStrip = messageStrip.scrollTop
-      + (firstUnreadRow.getBoundingClientRect().top - messageStrip.getBoundingClientRect().top);
-    // The first unread sits ABOVE the last screen (it would be scrolled off the top at the bottom) -> anchor it to top.
-    if (rowTopWithinStrip < maxScrollTop - 4) {
-      setConversationScrollTop(rowTopWithinStrip);
-      anchoredToUnread = true;
+    const rowTopWithinScroller = scroller.scrollTop
+      + (firstUnreadRow.getBoundingClientRect().top - scroller.getBoundingClientRect().top);
+    if (rowTopWithinScroller < maxScrollTop - 4) {
+      setScrollTop(rowTopWithinScroller);
+      return true;
     }
   }
-  if (!anchoredToUnread) setConversationScrollTop(messageStrip.scrollHeight);
-  conversationStickToBottom = !anchoredToUnread;
+  setScrollTop(scroller.scrollHeight);
+  return false;
 }
 
-// STATUS-ONLY FAST PATH: when the message list is structurally identical to the last full render (same
-// message objects, same rows — only meta text / status changed), patch the existing rows in place. The
-// owner's rule: only the act of sending may move the dialog; a status change must never budge it — and a
-// full rebuild would kill an active scroll gesture even with a perfect position restore. Anything that can
-// change row STRUCTURE (meta node appearing/disappearing, the manual Retry
-// affordance — all derived from the status text) falls through to the full rebuild.
-function applyConversationStatusOnlyPatch(thread) {
-  const snapshot = lastConversationRenderSnapshot;
-  if (!snapshot || snapshot.threadId !== thread.id) return false;
-  const messages = Array.isArray(thread.messages) ? thread.messages : [];
-  if (snapshot.rows.length !== messages.length) return false;
-  if (!messageStrip) return false;
-  // Only MESSAGE rows count — the day/unread separators and the "show earlier" control share the strip. The control's
-  // own state (present / loading) must match too, because it is only ever repainted by the full rebuild. [review]
-  const rowNodes = Array.from(messageStrip.children).filter((node) => node.classList.contains('message'));
-  if (rowNodes.length !== messages.length) return false;
-  const earlier = messageStrip.firstElementChild?.classList.contains('conversation-earlier-button') ? messageStrip.firstElementChild : null;
-  if (Boolean(earlier) !== threadHistoryHasMore(thread.id)) return false;
-  if (earlier && earlier.disabled !== (privateHistoryLoadingThreadId === thread.id)) return false;
-  for (let i = 0; i < messages.length; i += 1) {
-    const row = snapshot.rows[i];
-    const message = messages[i];
-    if (row.ref !== message) return false;
-    const metaText = messageMetaLine(message);
-    if ((metaText !== '') !== row.hasMeta) return false;
-    if (Boolean(privateMessageShouldShowManualActions(message)) !== row.showManual) return false;
-  }
-  for (let i = 0; i < messages.length; i += 1) {
-    const row = snapshot.rows[i];
-    const message = messages[i];
-    const node = rowNodes[i];
-    const metaText = messageMetaLine(message);
-    if (metaText !== row.metaText) {
-      row.metaText = metaText;
-      node.dataset.status = messageStatusKey(message);
-      const metaNode = node.querySelector('.message-meta');
-      if (metaNode) metaNode.textContent = metaText;
-    }
-    // A confirming send gains its chain entry id (the swipe-reply anchor) — keep it current without a rebuild.
-    if (message.chainEntryId !== undefined && message.chainEntryId !== null) {
-      const gained = node.dataset.entryId === undefined;
-      node.dataset.entryId = String(message.chainEntryId);
-      // The gesture paths (swipe, double-click) read the dataset live, so they start working the moment it is set.
-      // The DESKTOP button does not: it is built once at render, and appendRowReplyButton refuses a row with no
-      // anchor. Without this line a message sent seconds ago had no hover Reply until something else forced a
-      // structural rebuild — the affordance would appear, eventually, for reasons the user cannot see.
-      if (gained) appendRowReplyButton(node, beginPrivateReplyForRow);
-    }
-  }
-  return true;
+function applyConversationOpenScroll() {
+  if (!messageStrip) return;
+  const firstUnreadRow = conversationOpenFirstUnreadRef ? messageStrip.querySelector('[data-first-unread="true"]') : null;
+  const anchoredToUnread = anchorScrollerToFirstUnread(messageStrip, firstUnreadRow, setConversationScrollTop);
+  conversationStickToBottom = !anchoredToUnread;
 }
 
 // Rows that were already painted (identity-keyed: message objects are stable across repaints) and the thread they
@@ -20922,6 +21384,52 @@ function applyConversationStatusOnlyPatch(thread) {
 // surfaces (owner).
 const conversationSurfacedMessages = new WeakMap();
 let conversationSurfacedThreadId = null;
+
+/**
+ * A MESSAGE ROW'S KEY, handed out per message OBJECT.
+ *
+ * Not derived from any field, and deliberately. A key collision in reconcileKeyedRows does not draw something odd —
+ * it DROPS a row, which here would be a message disappearing from a conversation, and no field on a message is
+ * guaranteed unique at the moment it is rendered: a just-sent message has no chain entry id yet, an own echo has
+ * no capsule id at all, and two messages can share a timestamp. Object identity is exactly as stable as this needs
+ * to be, because the sync merges INTO the existing object (upsertOpenedPrivateMessage, absorbOwnChainCopy) rather
+ * than replacing it — the same property conversationSurfacedMessages already relies on. A genuinely new object is a
+ * genuinely new row.
+ */
+const privateMessageRowKeys = new WeakMap();
+let privateMessageRowKeySeq = 0;
+function privateMessageRowKey(message) {
+  let key = privateMessageRowKeys.get(message);
+  if (!key) {
+    privateMessageRowKeySeq += 1;
+    key = `m${privateMessageRowKeySeq}`;
+    privateMessageRowKeys.set(message, key);
+  }
+  return key;
+}
+
+/**
+ * What a message row LOOKS like. Everything that can change while the message object stays the same: the status
+ * line and its key (a send ticking over), the chain entry id it gains on confirmation (the swipe-reply anchor and
+ * the hover Reply button both hang off it), whether it carries manual retry/cancel actions, whether it is the
+ * first-unread row, the locale baked into its labels, and its content — which a multipart assembly can still be
+ * filling in. The body is measured, not compared: under a stable object the text is the same text.
+ */
+function privateMessageRenderSignature(message, showMeta = true, groupStart = false) {
+  return [
+    currentLocale(),
+    message?.type ?? '',
+    messageMetaLine(message),
+    messageStatusKey(message),
+    message?.chainEntryId ?? '',
+    message === conversationOpenFirstUnreadRef ? 'fu' : '',
+    showMeta ? 'meta' : 'nometa',
+    groupStart ? 'open' : 'cont',
+    privateMessageShouldShowManualActions(message) ? 'ma' : '',
+    publicItemContentSignature(message),
+    message?.attachment?.type === 'image' && message.attachment.url ? 'att' : '',
+  ].join('|');
+}
 
 // DATE SEPARATORS (owner): a rule split in the middle by the day — "Today" / "Yesterday" / "21 August" (+ year when it
 // differs) — before the first row of each day, and an accent "New messages" rule before the first unread row when a
@@ -20989,7 +21497,7 @@ function buildEmptyConversationNode(thread) {
       if (!input) return;
       input.value = text;
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      try { input.focus(); } catch { /* hidden composer */ }
+      try { focusComposerField(input); } catch { /* hidden composer */ }
     });
     chips.append(chip);
   }
@@ -21067,7 +21575,6 @@ function renderConversation() {
     conversationStickToBottom = true;
     conversationOpenScrollUnsettled = false;
     conversationOpenFirstUnreadRef = null;
-    lastConversationRenderSnapshot = null;
     return;
   }
   // Compute the open + capture the unread count BEFORE markThreadRead clears it, so the open-scroll can anchor to the
@@ -21141,43 +21648,20 @@ function renderConversation() {
   if (ownSendScrollToEnd) conversationOpenScrollUnsettled = false;
   lastConversationThreadId = thread.id;
   lastConversationMsgCount = conversationMsgCount;
-  // Status tick with identical structure -> patch in place, scroller COMPLETELY untouched (no rebuild, no
-  // scroll writes, no rAF). Only a structural change (new message, manual-action flip) rebuilds.
-  if (!conversationThreadChanged && !conversationNewOutbound && applyConversationStatusOnlyPatch(thread)) return;
-  const conversationRenderSnapshotRows = [];
-  if (conversationEarlierObserver) conversationEarlierObserver.disconnect();
-  messageStrip.innerHTML = '';
-  // Older messages live on disk outside the loaded window. The control goes ABOVE the first row, where the reader
-  // is already looking when they scroll up, and appears only when the store really has more — a button that
-  // finds nothing teaches people to stop pressing it.
-  if (threadHistoryHasMore(thread.id)) {
-    const earlier = document.createElement('button');
-    earlier.type = 'button';
-    earlier.className = 'conversation-earlier-button';
-    earlier.textContent = privateHistoryLoadingThreadId === thread.id
-      ? t('chat.loadingEarlier')
-      : t('chat.showEarlierMessages');
-    earlier.disabled = privateHistoryLoadingThreadId === thread.id;
-    earlier.addEventListener('click', () => { loadEarlierThreadHistory(thread).catch((error) => console.error(error)); });
-    messageStrip.append(earlier);
-    // Auto-page: scrolling up to the control loads the page without a tap (the observer just clicks it; the
-    // disabled state while loading makes a repeat fire a no-op). Without IntersectionObserver it stays a button.
-    if (conversationEarlierObserver) conversationEarlierObserver.observe(earlier);
+  // A THREAD SWITCH starts from an empty strip: not one row of the previous conversation can be reused (every key
+  // belongs to a different message), so clearing outright is both correct and cheaper than reconciling it all away.
+  // Every OTHER render reconciles into what is already there — see reconcileKeyedRows for why.
+  if (conversationThreadChanged) {
+    if (conversationEarlierObserver) conversationEarlierObserver.disconnect();
+    messageStrip.innerHTML = '';
   }
   const surfaceNewRows = conversationSurfacedThreadId === thread.id;
   conversationSurfacedThreadId = thread.id;
   let surfacingRows = 0;
-  let lastDayKey = null;
-  thread.messages.forEach((message) => {
-    const rowMs = messageCreatedAtMs(message);
-    const dayKey = messageDayKey(rowMs);
-    if (dayKey && dayKey !== lastDayKey) {
-      messageStrip.append(buildStripSeparator(formatDaySeparatorLabel(rowMs)));
-      lastDayKey = dayKey;
-    }
-    if (message === conversationOpenFirstUnreadRef) messageStrip.append(buildStripSeparator(t('chat.newMessages'), { unread: true }));
+  const buildMessageRow = (message, showMeta, groupStart) => {
     const row = document.createElement('div');
     row.className = `message ${message.type}`;
+    if (groupStart) row.dataset.groupStart = 'true';
     if (surfaceNewRows) {
       if (surfaceRow(row, conversationSurfacedMessages, message, surfacingRows)) surfacingRows += 1;
     } else if (!conversationSurfacedMessages.has(message)) {
@@ -21255,9 +21739,17 @@ function renderConversation() {
       bubble.append(image);
     }
     const manualActions = privateMessageManualActionsElement(thread, message);
+    // A bubble carrying a picture lets it reach the frame (owner). Marked here, where what went into the bubble is
+    // known, rather than with a CSS :has() — the older WebViews this app runs in ignore that, and an ignored
+    // selector would leave the picture inset while every other one is flush.
+    if (bubble.querySelector('.message-image')) bubble.classList.add('has-media');
     const metaText = messageMetaLine(message);
-    if (metaText) {
-      row.dataset.status = messageStatusKey(message);
+    if (metaText) row.dataset.status = messageStatusKey(message);
+    // ONE STATUS LINE PER BURST [OWNER 2026-08-24: "for messages that have the same received/published and time,
+    // sent in one batch by a user, write it only on the LAST message"]. Six lines reading "received · 00:03" under
+    // six bubbles say one thing six times; the burst is one arrival, so it is stamped once, at its end. `showMeta`
+    // is decided by the caller, which can see the message that follows this one.
+    if (metaText && showMeta) {
       const meta = document.createElement('div');
       meta.className = 'message-meta';
       meta.textContent = metaText;
@@ -21271,16 +21763,94 @@ function renderConversation() {
     else if (manualActions) row.append(manualActions);
     appendRowReplyButton(row, beginPrivateReplyForRow);
     appendRowCopyButton(row, copyTextFromContent(message));
-    messageStrip.append(row);
-    conversationRenderSnapshotRows.push({
-      ref: message,
-      metaText,
-      hasMeta: Boolean(metaText),
-      showManual: Boolean(manualActions),
+    return row;
+  };
+
+  // THE STRIP AS A KEYED LIST: the "show earlier" control, the day separators, the unread mark and the messages,
+  // all of them keyed, because reconcileKeyedRows owns every child of the container it is given.
+  const stripEntries = [];
+  // Older messages live on disk outside the loaded window. The control goes ABOVE the first row, where the reader
+  // is already looking when they scroll up, and appears only when the store really has more — a button that
+  // finds nothing teaches people to stop pressing it.
+  if (threadHistoryHasMore(thread.id)) {
+    const loadingEarlier = privateHistoryLoadingThreadId === thread.id;
+    stripEntries.push({
+      key: 'ctl:earlier',
+      sig: `${currentLocale()}|${loadingEarlier ? 'loading' : 'idle'}`,
+      build: () => {
+        const earlier = document.createElement('button');
+        earlier.type = 'button';
+        earlier.className = 'conversation-earlier-button';
+        earlier.textContent = loadingEarlier ? t('chat.loadingEarlier') : t('chat.showEarlierMessages');
+        earlier.disabled = loadingEarlier;
+        earlier.addEventListener('click', () => { loadEarlierThreadHistory(thread).catch((error) => console.error(error)); });
+        // Auto-page: scrolling up to the control loads the page without a tap (the observer just clicks it; the
+        // disabled state while loading makes a repeat fire a no-op). Without IntersectionObserver it stays a button.
+        // Observed HERE, on the node that is actually built: a reused control keeps the observation it already has,
+        // and a rebuilt one loses it with the node it replaces.
+        if (conversationEarlierObserver) conversationEarlierObserver.observe(earlier);
+        return earlier;
+      },
     });
+  }
+  let lastDayKey = null;
+  // A BURST IS STAMPED ONCE, AT ITS END (owner). A message carries its status line only when the one after it is
+  // not the same person saying the same thing at the same minute — i.e. it is the last of its run. The unread mark
+  // and a day change both break a run, because a line hidden behind a divider reads as a missing line.
+  const messages = thread.messages;
+  const showMetaFor = messages.map((message, index) => {
+    const next = messages[index + 1];
+    if (!next) return true;
+    if (next === conversationOpenFirstUnreadRef) return true;
+    if (messageDayKey(messageCreatedAtMs(next)) !== messageDayKey(messageCreatedAtMs(message))) return true;
+    if (next.type !== message.type) return true;
+    return messageMetaLine(next) !== messageMetaLine(message);
   });
-  lastConversationRenderSnapshot = { threadId: thread.id, rows: conversationRenderSnapshotRows };
-  if (thread.messages.length === 0 && !threadHistoryHasMore(thread.id)) messageStrip.append(buildEmptyConversationNode(thread));
+  for (const [messageIndex, message] of messages.entries()) {
+    const showMeta = showMetaFor[messageIndex];
+    const rowMs = messageCreatedAtMs(message);
+    const dayKey = messageDayKey(rowMs);
+    if (dayKey && dayKey !== lastDayKey) {
+      lastDayKey = dayKey;
+      const dayLabel = formatDaySeparatorLabel(rowMs);
+      stripEntries.push({
+        key: `day:${dayKey}`,
+        sig: `${currentLocale()}|${dayLabel}`,
+        build: () => buildStripSeparator(dayLabel),
+      });
+    }
+    if (message === conversationOpenFirstUnreadRef) {
+      stripEntries.push({
+        key: 'sep:unread',
+        sig: currentLocale(),
+        build: () => buildStripSeparator(t('chat.newMessages'), { unread: true }),
+      });
+    }
+    // A row OPENS a group when the one before it ended its own — i.e. it carried the status line. The tight gap is
+    // the strip's default, so this is what buys the space back between one sending and the next.
+    const groupStart = messageIndex === 0 || showMetaFor[messageIndex - 1] === true;
+    stripEntries.push({
+      key: privateMessageRowKey(message),
+      sig: privateMessageRenderSignature(message, showMeta, groupStart),
+      build: () => buildMessageRow(message, showMeta, groupStart),
+      adopt: (row) => rememberMessageForRow(row, message),
+    });
+  }
+  if (thread.messages.length === 0 && !threadHistoryHasMore(thread.id)) {
+    stripEntries.push({
+      key: 'empty',
+      sig: `${currentLocale()}|${thread.id}`,
+      build: () => buildEmptyConversationNode(thread),
+    });
+  }
+  const stripDelta = reconcileKeyedRows(messageStrip, stripEntries);
+  // DID THE STRIP CHANGE SHAPE? A status tick rebuilds one row in place and must leave the scroller alone — a
+  // reader scrolled up in history is not to be moved because a send went from sending to sent. Rows arriving,
+  // leaving or changing places is the opposite case, and so is an open still settling. This replaces the
+  // hand-written status-only patch that used to answer the same question by comparing a positional snapshot.
+  const stripShapeChanged = stripDelta.added + stripDelta.dropped + stripDelta.moved + stripDelta.swept > 0;
+  if (!conversationThreadChanged && !conversationNewOutbound && !ownSendScrollToEnd
+    && !conversationOpenScrollUnsettled && !stripShapeChanged) return;
 
   // Open burst: apply the anchor SYNCHRONOUSLY now (reading scrollHeight/getBoundingClientRect forces the layout), so
   // the NEXT render in the burst reads the correct scrollTop at its entry instead of a transient 0 — the fix for a
@@ -21292,9 +21862,11 @@ function renderConversation() {
       // Still opening — (re)apply the open anchor (latest, or first-unread at the top when the unread overflow).
       applyConversationOpenScroll();
     } else if (ownSendScrollToEnd) {
-      // The user just sent — scroll their message into view as a gentle scroll, not a sudden jump. Restore the
-      // pre-rebuild position first (instant) so the smooth scroll travels only from there to the new bottom, instead
-      // of animating up from the cleared scrollTop=0 (the "flies to the beginning and back" jerk). Gated on the PRECISE
+      // The user just sent — scroll their message into view as a gentle scroll, not a sudden jump. The position is
+      // re-asserted first so the smooth scroll travels only from there to the new bottom. It used to be a genuine
+      // restore, because the strip was rebuilt from empty and scrollTop fell to 0 (the "flies to the beginning and
+      // back" jerk); reconciled rows never move, so this now only guards against anything else having moved the
+      // scroller between the render and this frame. Gated on the PRECISE
       // own-send flag (not conversationNewOutbound): a late out-of-order INCOMING can leave an 'out' tail with a grown
       // count and must NOT smooth-scroll a reader who has scrolled up to read history to the bottom.
       conversationStickToBottom = true;
@@ -22508,7 +23080,7 @@ function toggleComposerMaximize(form, button) {
   // moment the soft keyboard is dismissed (so this maximize/restore never faces a focused-but-keyboard-hidden field that
   // the geometry change would re-pop the keyboard for). Desktop has no soft keyboard, so keyboardWasOpen is false and the
   // caret is simply left untouched.
-  if (wasFocused && keyboardWasOpen && editorEl && document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
+  if (wasFocused && keyboardWasOpen && editorEl && document.activeElement !== editorEl) focusComposerField(editorEl);
 }
 // Collapse any maximized composer INSTANTLY (after a send clears the draft, or on navigation away — the overlay must
 // get out of the way at once, no shrink animation). Cancels any in-flight FLIP first. Returns true if it collapsed one.
@@ -22933,7 +23505,7 @@ composer?.addEventListener('submit', async (event) => {
     && normalizePrivateFileAttachments(privateFileAttachments).length === 0) {
     // Empty submit (e.g. an accidental Send click with nothing typed) — return focus to the input so the user can
     // just start typing, the same as after a real send. A share-only draft (v766) IS content — falls through.
-    messageInput?.focus();
+    focusComposerField(messageInput);
     return;
   }
   // NEVER fall back to threads[0] for a SEND: threads[0] is ALWAYS the Saved self-thread (ensureSavedMessagesThread
@@ -23062,7 +23634,7 @@ composer?.addEventListener('submit', async (event) => {
   // send button moved focus to the button (and on mobile would drop the keyboard); refocus synchronously
   // within the submit gesture so the keyboard stays up. messageInput is the static shell element (not
   // rebuilt by the renders below), so the focus survives renderThreads()/renderConversation().
-  messageInput?.focus();
+  focusComposerField(messageInput);
   refreshComposerCostStatus();
   if (sendButton) sendButton.disabled = true;
   renderThreads();
@@ -23551,11 +24123,13 @@ function normalizeUsernameInput(input) {
   return username;
 }
 
+// The price follows the TIER, from the one place that decides where a tier begins (plathoUsernameTier). Two
+// copies of "four characters means epic" is how the price and the colour on screen end up disagreeing.
 function localUsernameMintPriceAtomic(username) {
-  const length = String(username ?? '').length;
-  if (length === 4) return USERNAME_PRICE_4_CHARS_ATOMIC;
-  if (length === 5) return USERNAME_PRICE_5_CHARS_ATOMIC;
-  if (length >= 6 && length <= 16) return USERNAME_PRICE_6_PLUS_CHARS_ATOMIC;
+  const tier = plathoUsernameTier(username);
+  if (tier === PLATHO_USERNAME_TIERS.EPIC) return USERNAME_PRICE_4_CHARS_ATOMIC;
+  if (tier === PLATHO_USERNAME_TIERS.RARE) return USERNAME_PRICE_5_CHARS_ATOMIC;
+  if (tier === PLATHO_USERNAME_TIERS.COMMON) return USERNAME_PRICE_6_PLUS_CHARS_ATOMIC;
   return null;
 }
 
@@ -23647,7 +24221,9 @@ async function showReceiveWalletTonDialog() {
       render: () => createWalletReceiveQrNode(address),
     }],
     summary: [
-      { label: t('common.network'), value: appConfig.network?.label ?? appConfig.network?.chain ?? 'GRAM' },
+      // THE NETWORK IS TON, THE COIN IS GRAM. This row is labelled "Network", so its fallback is the chain's name;
+      // the blanket rebrand had turned it into the coin's.
+      { label: t('common.network'), value: appConfig.network?.label ?? appConfig.network?.chain ?? 'TON' },
       { label: t('wallet.destination'), value: t('wallet.localPlathoWallet') },
     ],
   });
@@ -27870,8 +28446,8 @@ async function attemptConvMessagePublishDirect(context) {
   // OWNER, 2026-08-08: "I can only reply to the other person's messages." Correct, and the reason was that nothing
   // ever gave an outgoing message a chainEntryId: privateChainMessageOrderFields runs only on RECEIVED entries, and
   // every reply affordance (swipe, double-click, the hover button) is gated on the row carrying one. The mechanism
-  // for the other half was fully built and documented — applyConversationStatusOnlyPatch has a branch titled "a
-  // confirming send gains its chain entry id" — and had no writer, so it never ran once.
+  // for the other half was fully built and documented — the conversation render has always given a row its entry
+  // id the moment the send gains one — and had no writer, so it never ran once.
   //
   // The id is the publish seq, and it is known HERE rather than read back later: nextOutgoingSeq is the local
   // monotonic counter that IS the record's identity on the shard (the chain last_seq only seeds a cold epoch), so
@@ -29490,6 +30066,9 @@ window.visualViewport?.addEventListener?.('scroll', syncViewportCssVars, { passi
 // is the entire point). See refusePageDragWhileKeyboardIsUp for why this exists at all — WebKit 191204.
 document.addEventListener('touchstart', armPageDragRefusal, { passive: true });
 document.addEventListener('touchmove', refusePageDragWhileKeyboardIsUp, { passive: false });
+// ...and the flag falls with the gesture that raised it, so it can never be inherited by the next one.
+document.addEventListener('touchend', releasePageDragRefusal, { passive: true });
+document.addEventListener('touchcancel', releasePageDragRefusal, { passive: true });
 
 // Composer textareas auto-size on input, but a window/pane resize re-wraps EXISTING text (a one-liner
 // becomes two lines when the window narrows) with no input event — so refit both fields on resize too.
@@ -29544,7 +30123,8 @@ setTimeout(() => { void migrateLegacyAvatarMediaCacheToIndexedDb(); }, 0);
 // re-serialize of the old store does not block boot; it runs before the user can navigate to the Vault tab.
 // The in-memory cache keeps its media for rendering; only the persisted copy is lightened.
 setTimeout(() => { try { writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache); } catch {} }, 0);
-publicReadCursors = readPublicReadCursors();
+publicReadCursors = readScopedJsonMap(PUBLIC_READ_CURSORS_STORAGE_KEY);
+publicCommentReadCursors = readScopedJsonMap(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY);
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
 renderDocsNav();
