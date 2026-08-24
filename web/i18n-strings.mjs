@@ -966,6 +966,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Image saved",
     "common.imageSaveFailed": "Could not save the image",
     "wallet.keyFileKeepsExportPassword": "A saved wallet key file opens with the password it was exported under — save it again after this change.",
+    "username.noNameOption": "No name — show the wallet address",
+    "username.nameUnlinked": "Name unlinked — the wallet address is shown now",
   },
   ru: {
     "public.olderUnavailable": "Более старые комментарии уже недоступны для чтения.",
@@ -1935,6 +1937,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Изображение сохранено",
     "common.imageSaveFailed": "Не удалось сохранить изображение",
     "wallet.keyFileKeepsExportPassword": "Сохранённый файл ключа открывается тем паролем, с которым его выгрузили, — сохраните его заново после смены.",
+    "username.noNameOption": "Без имени — показывать адрес кошелька",
+    "username.nameUnlinked": "Имя отвязано — теперь показывается адрес кошелька",
   },
   zh: {
     "public.olderUnavailable": "更早的评论已无法读取。",
@@ -2874,6 +2878,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "图片已保存",
     "common.imageSaveFailed": "无法保存图片",
     "wallet.keyFileKeepsExportPassword": "已保存的钱包密钥文件只能用导出时的密码打开——更改密码后请重新保存。",
+    "username.noNameOption": "不使用名称 — 显示钱包地址",
+    "username.nameUnlinked": "名称已解绑 — 现在显示钱包地址",
   },
   es: {
     "public.olderUnavailable": "Los comentarios más antiguos ya no se pueden recuperar.",
@@ -3823,6 +3829,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Imagen guardada",
     "common.imageSaveFailed": "No se pudo guardar la imagen",
     "wallet.keyFileKeepsExportPassword": "Un archivo de clave guardado se abre con la contraseña con la que se exportó: vuelve a guardarlo tras el cambio.",
+    "username.noNameOption": "Sin nombre: mostrar la dirección de la cartera",
+    "username.nameUnlinked": "Nombre desvinculado: ahora se muestra la dirección de la cartera",
   },
   pt: {
     "public.olderUnavailable": "Comentários mais antigos não podem mais ser recuperados.",
@@ -4772,6 +4780,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Imagem guardada",
     "common.imageSaveFailed": "Não foi possível guardar a imagem",
     "wallet.keyFileKeepsExportPassword": "Um ficheiro de chave guardado abre com a palavra-passe com que foi exportado — guarde-o de novo após a alteração.",
+    "username.noNameOption": "Sem nome — mostrar o endereço da carteira",
+    "username.nameUnlinked": "Nome desvinculado — agora mostra-se o endereço da carteira",
   },
   fr: {
     "public.olderUnavailable": "Les commentaires plus anciens ne peuvent plus être récupérés.",
@@ -5721,6 +5731,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Image enregistrée",
     "common.imageSaveFailed": "Impossible d'enregistrer l'image",
     "wallet.keyFileKeepsExportPassword": "Un fichier de clé enregistré s'ouvre avec le mot de passe utilisé lors de l'export — enregistrez-le à nouveau après ce changement.",
+    "username.noNameOption": "Sans nom — afficher l'adresse du portefeuille",
+    "username.nameUnlinked": "Nom dissocié — l'adresse du portefeuille est affichée",
   },
   de: {
     "public.olderUnavailable": "Ältere Kommentare können nicht mehr geladen werden.",
@@ -6670,6 +6682,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Bild gespeichert",
     "common.imageSaveFailed": "Bild konnte nicht gespeichert werden",
     "wallet.keyFileKeepsExportPassword": "Eine gespeicherte Wallet-Schlüsseldatei öffnet sich mit dem Passwort, mit dem sie exportiert wurde — speichern Sie sie nach der Änderung erneut.",
+    "username.noNameOption": "Ohne Namen — die Wallet-Adresse zeigen",
+    "username.nameUnlinked": "Name entkoppelt — jetzt wird die Wallet-Adresse gezeigt",
   },
   hi: {
     "public.olderUnavailable": "पुरानी टिप्पणियाँ अब उपलब्ध नहीं हैं।",
@@ -7619,6 +7633,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "छवि सहेजी गई",
     "common.imageSaveFailed": "छवि सहेजी नहीं जा सकी",
     "wallet.keyFileKeepsExportPassword": "सहेजी गई वॉलेट कुंजी फ़ाइल उसी पासवर्ड से खुलती है जिससे उसे निर्यात किया गया था — बदलाव के बाद उसे फिर से सहेजें।",
+    "username.noNameOption": "कोई नाम नहीं — वॉलेट पता दिखाएँ",
+    "username.nameUnlinked": "नाम अनलिंक किया गया — अब वॉलेट पता दिखाया जाता है",
   },
   id: {
     "public.olderUnavailable": "Komentar yang lebih lama tidak dapat diambil lagi.",
@@ -8558,6 +8574,8 @@ export const I18N_STRINGS = {
     "common.imageSaved": "Gambar disimpan",
     "common.imageSaveFailed": "Gambar tidak dapat disimpan",
     "wallet.keyFileKeepsExportPassword": "Berkas kunci dompet yang tersimpan dibuka dengan kata sandi saat diekspor — simpan lagi setelah perubahan ini.",
+    "username.noNameOption": "Tanpa nama — tampilkan alamat dompet",
+    "username.nameUnlinked": "Nama dilepas — sekarang alamat dompet yang ditampilkan",
   },
   ja: {
     "public.olderUnavailable": "これより古いコメントは取得できません。",
@@ -9497,5 +9515,7 @@ export const I18N_STRINGS = {
     "common.imageSaved": "画像を保存しました",
     "common.imageSaveFailed": "画像を保存できませんでした",
     "wallet.keyFileKeepsExportPassword": "保存済みのウォレットキーファイルは、書き出した時のパスワードで開きます。変更後にもう一度保存してください。",
+    "username.noNameOption": "名前なし — ウォレットアドレスを表示",
+    "username.nameUnlinked": "名前の紐付けを解除しました。ウォレットアドレスを表示します",
   },
 };

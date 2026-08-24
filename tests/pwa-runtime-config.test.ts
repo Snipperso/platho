@@ -438,8 +438,24 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function baseContactDisplayContextForWallet\(counterpartyWallet\)/);
     expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)/);
     expect(app).toMatch(/const ownUsername = readLinkedPlathoUsername\(plathoWallet\.address\)/);
-    expect(app).toMatch(/if \(ownIdentity\) extraIdentities\.push\(ownIdentity\)/);
-    expect(app).toMatch(/normalizeIdentityVariants\(\[\.\.\.extraIdentities, \.\.\.threadIdentityVariants\(base\)\]\)/);
+    expect(app).toMatch(/if \(ownIdentity\) found\.push\(ownIdentity\)/);
+    // BOTH SURFACES ASK THE SAME QUESTION [OWNER 2026-08-24: "the counterparty's username gets lost in the app —
+    // this contact has one and I don't see it"]. A private dialog learns a peer's .ath only from the senderUsername
+    // stamped on a message; the public side proves the channel's .ath against the chain and remembers it, and when
+    // it builds a name it already reads the private threads first. The reverse direction did not exist, so the same
+    // person was a name on one surface and a bare address on the other, with the name in the app all along.
+    expect(app).toMatch(/function walletKnownIdentityVariants\(counterpartyWallet\)/);
+    expect(app).toMatch(/function withWalletKnownIdentities\(context, counterpartyWallet\)/);
+    expect(app).toMatch(/normalizeIdentityVariants\(\[\.\.\.extra, \.\.\.threadIdentityVariants\(context\)\]\)/);
+    // Public asks it...
+    expect(app).toMatch(/function contactDisplayContextForWallet\(counterpartyWallet\) \{\s*\n\s*return withWalletKnownIdentities\(baseContactDisplayContextForWallet\(counterpartyWallet\), counterpartyWallet\);/);
+    // ...and Private asks it, for the header title AND the menu — a menu listing fewer names than the twin menu for
+    // the same person is exactly how this went missing.
+    expect(app).toMatch(/function threadDisplayView\(thread\)/);
+    expect(app).toMatch(/const view = threadDisplayView\(thread\);\s*\n\s*const label = threadDisplayLabel\(view\);\s*\n\s*const identity = threadSelectedIdentity\(view\);/);
+    expect(app).toMatch(/options: identityDisplayOptions\(view\),\s*\n\s*selectedKey: selectedIdentityDisplayOptionKey\(view\),/);
+    // Read-only: a name derived from another surface must not be grafted onto the live thread by a repaint.
+    expect(app).toMatch(/return \{ \.\.\.context, identityVariants: normalizeIdentityVariants/);
 
     // Registry name overlay + per-wallet avatar resolution so feed, channels list and detail all show it.
     expect(app).toMatch(/\.map\(applyContactDisplayToRegistryChannel\)/);
@@ -2294,6 +2310,23 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function reconcileOwnLinkedUsername\(\)/);
     // Cardinal rule: never strip/clear a username off an unverifiable (structurally-degraded / hostile-RPC) read.
     expect(app).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) \{ backoffOwnLinkedUsernameReconcile/);
+
+    // A CLAIMED NAME IS REMEMBERED AND RE-ASKED [OWNER 2026-08-24: "the counterparty's username gets lost in the
+    // app — this contact has one and I don't see it"]. Verifying the peer's claim takes a chain read; when that read
+    // failed, the only retry rode on the NEXT message from that peer, so a contact who went quiet stayed a bare
+    // address for ever. The claim is remembered even when nothing is done with it, and it is persisted, because in
+    // memory alone it died on every reload — the same hole convPeerKeyId had.
+    expect(app).toMatch(/if \(claimedUsername\) thread\.claimedSenderUsername = claimedUsername;/);
+    expect(app).toMatch(/claimedSenderUsername: thread\.claimedSenderUsername \?\? null,/);
+    expect(app).toMatch(/if \(!thread\.claimedSenderUsername && snapshot\.claimedSenderUsername\) thread\.claimedSenderUsername = snapshot\.claimedSenderUsername;/);
+    // Asked for on OPEN — the one moment left when nothing is arriving — and not only for anonymous dialogs.
+    const restored = app.slice(app.indexOf('function queueRestoredConvIdentityResolution('), app.indexOf('function messageStripScrollMetrics'));
+    expect(restored.length, 'the slice really spans the function').toBeGreaterThan(400);
+    expect(restored).toMatch(/if \(!isAnonymousPeerThread\(thread\) && !\(claim && !threadWearsUsername\(thread, claim\)\)\) return;/);
+    expect(restored).toMatch(/queueInboundPeerIdentityResolution\(thread, claim\);/);
+    expect(app).toMatch(/queueUsernameHygiene\(\(\) => reconcileOwnLinkedUsername\(\)\);\s*\n(\s*\/\/.*\n)*\s*queueRestoredConvIdentityResolution\(thread\);/);
+    // A FAILED attempt must not spend the one attempt: the marker is released so the next open asks again.
+    expect(app).toMatch(/if \(!named\) convThreadIdentityAttempted\.delete\(thread\.id\);/);
   });
 
   it('PWA-LINK-NAME-PICKER-01: Link Platho name validates input and offers already-known profile usernames', () => {
@@ -2314,6 +2347,24 @@ describe('PWA runtime config guard', () => {
     // Verification now runs in-place via validateSubmit (close only on success — no flicker), see PWA-LINK-NAME-NO-FLICKER-01.
     expect(linkSource).toMatch(/await verifyWalletDisplayIdentity\(normalizedMode, chosen, plathoWallet\)/);
     expect(linkSource).toMatch(/addKnownPlathoUsername\(result\.label, plathoWallet\?\.address\)/);
+
+    // OWNING A NAME AND PRESENTING ONE ARE DIFFERENT THINGS [OWNER 2026-08-24: "a person may not want to link a name
+    // and still own the username. Let's put a no-username option in this menu, for when someone just wants to unlink
+    // theirs"]. The row appears only when there IS a linked name to take off, and the picker opens for it even when
+    // the chain read returned no owned names — otherwise the one person who needs the row cannot reach it.
+    expect(app).toMatch(/const WALLET_DISPLAY_UNLINK_OPTION = '__no_name__';/);
+    expect(linkSource).toMatch(/if \(knownNames\.length > 0 \|\| linkedNow\)/);
+    expect(linkSource).toMatch(/\.\.\.\(linkedNow \? \[\{ value: WALLET_DISPLAY_UNLINK_OPTION, label: t\('username\.noNameOption'\) \}\] : \[\]\)/);
+    // Read ONLY from the picked row, and only with the free-text box empty: an empty box is "nothing chosen yet",
+    // and a typed string must never stand in for a choice the user did not make.
+    expect(linkSource).toMatch(/if \(!typed && values\.pick === WALLET_DISPLAY_UNLINK_OPTION\) \{\s*\n\s*return \{ ok: true, result: \{ mode: WALLET_DISPLAY_MODES\.ADDRESS \} \};/);
+    // It asks the chain for NOTHING — there is nothing to verify about not having a name.
+    const unlinkBranch = linkSource.slice(linkSource.indexOf('validateSubmit'), linkSource.indexOf('const chosen ='));
+    expect(unlinkBranch.length, 'the slice really spans the branch').toBeGreaterThan(200);
+    expect(unlinkBranch).not.toMatch(/verifyWalletDisplayIdentity|resolvePlathoUsernameOwner/);
+    // And the caller takes the name off instead of writing an empty one as if it were a name.
+    expect(app).toMatch(/if \(identity\.mode === WALLET_DISPLAY_MODES\.ADDRESS\) \{\s*\n\s*clearLinkedPlathoUsername\(plathoWallet\.address\);/);
+    expect(app).toMatch(/flashWalletIdentityStatus\(t\('username\.nameUnlinked'\)\);/);
   });
 
   it('PWA-MINT-ATH-PREFLIGHT-01: Mint Platho name validates length and ATH affordability up front', () => {
@@ -3922,10 +3973,13 @@ describe('PWA runtime config guard', () => {
 
     // A wallet's VERIFIED channel .ath (never the raw claim) is offered as a "Display as" option for ANY wallet, so
     // the Discovery chevron surfaces e.g. "glasnost" for a channel with no Private dialog. Tolerant parse (no throw).
-    const ctx = app.slice(app.indexOf('function contactDisplayContextForWallet('), app.indexOf('function baseContactDisplayContextForWallet('));
+    // Lives in walletKnownIdentityVariants — the ONE answer both surfaces ask (see PWA-CONFIG-01H); the discovery
+    // chevron reaches it through contactDisplayContextForWallet.
+    const ctx = app.slice(app.indexOf('function walletKnownIdentityVariants('), app.indexOf('function withWalletKnownIdentities('));
+    expect(ctx.length, 'the slice really spans the lookup').toBeGreaterThan(400);
     expect(ctx).toMatch(/const verifiedUsername = publicChannelProfileCache\[channelProfileCacheKey\(counterpartyWallet\)\]\?\.verifiedUsername/);
     expect(ctx).toMatch(/try \{ channelIdentity = plathoUsernameIdentity\(verifiedUsername\); \} catch \{ channelIdentity = null; \}/);
-    expect(ctx).toMatch(/if \(channelIdentity\) extraIdentities\.push\(channelIdentity\)/);
+    expect(ctx).toMatch(/if \(channelIdentity\) found\.push\(channelIdentity\)/);
 
     // Copy affordance on the raw-address row of the SHARED "Display as" popover (used by Private header + public
     // post chevron + discovery chevron). Separate from selecting: click is stopped, popover stays open.

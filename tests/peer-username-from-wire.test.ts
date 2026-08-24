@@ -210,10 +210,21 @@ describe('PEERNAME — the peer .ath travels on the wire and is verified before 
     // the stricter one went unnoticed.
     expect((APP.match(/identityMenuButton\.hidden = identityMenuHidden\(thread\);/g) ?? []).length).toBe(2);
     // Saved messages keeps no chevron: re-labelling your own notes as your own address is not a choice.
-    const fn = APP.slice(APP.indexOf('function identityMenuHidden(thread) {'));
-    expect(fn.slice(0, 200)).toContain('isSavedMessagesThread(thread)');
-    // …and the popover really does always offer the action the button now exposes.
-    const popover = APP.slice(APP.indexOf('function showIdentityPopover(thread, anchor) {'));
-    expect(popover.slice(0, 1_400), 'the pin row (2026-08-21) sits before it, so the window is wider').toContain('onSetLocalName:');
+    // Bounded by the function's own end, for the same reason as the window below: a character count is a window
+    // that rots the moment a comment is added above the line it watches.
+    const rest = APP.slice(APP.indexOf('function identityMenuHidden(thread) {'));
+    const fn = rest.slice(0, rest.indexOf('\n}') + 2);
+    expect(fn.length, 'the slice really spans the function').toBeGreaterThan(80);
+    expect(fn).toContain('isSavedMessagesThread(thread)');
+    // …and the popover really does always offer the action the button now exposes. Cut to the NEXT function, not to
+    // a character count: this window was 1,400 wide and every row added since (the pin, the mute, the shared
+    // identity view) pushed the line it was looking for further down until it fell out and the gate failed on an
+    // unrelated change.
+    const popover = APP.slice(
+      APP.indexOf('function showIdentityPopover(thread, anchor) {'),
+      APP.indexOf('function showPublicChannelDisplayPopover('),
+    );
+    expect(popover.length, 'the slice really spans the popover').toBeGreaterThan(600);
+    expect(popover).toContain('onSetLocalName:');
   });
 });

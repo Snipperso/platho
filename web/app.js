@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=64';
+} from './public-channel-subscriptions.mjs?v=65';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -254,7 +254,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=87';
+} from './i18n.mjs?v=88';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.2';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.3';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -5416,8 +5416,11 @@ function routeIdentitySubtitle(thread) {
 
 function applyThreadDisplayFields(thread) {
   if (!thread) return thread;
-  const label = threadDisplayLabel(thread);
-  const identity = threadSelectedIdentity(thread);
+  // Read through the view (the thread's own variants PLUS anything else known for that wallet), write onto the
+  // thread. An explicit choice still wins: threadSelectedIdentity looks at displayIdentity before any variant.
+  const view = threadDisplayView(thread);
+  const label = threadDisplayLabel(view);
+  const identity = threadSelectedIdentity(view);
   if (label) {
     thread.name = label;
     thread.avatar = String(label || 'P').slice(0, 1).toUpperCase() || thread.avatar || 'P';
@@ -5476,35 +5479,61 @@ function applyContactDisplaySelection(counterpartyWallet, { displayIdentity = nu
 // menu can reuse the exact same option-builder (identityDisplayOptions) the Private menu uses. When a
 // real Private thread exists, callers pass that instead and full parity (incl. a known .ath username)
 // is automatic.
-function contactDisplayContextForWallet(counterpartyWallet) {
-  const base = baseContactDisplayContextForWallet(counterpartyWallet);
-  const extraIdentities = [];
-  // The user's OWN wallet channel must offer their OWN linked username (.ath) as a "Display as" option, the
-  // same way a counterparty's channel offers theirs. A counterparty's username arrives via their received
-  // posts (senderUsername); your own never does (you don't receive your own posts), so without this the own
-  // channel only ever shows the wallet address while everyone else sees your username. Add it explicitly.
+/**
+ * EVERY NAME THIS APP KNOWS FOR A WALLET, wherever it learned it.
+ *
+ * A private dialog learns the peer's .ath from ONE source only: the senderUsername the sender stamps on a message,
+ * verified against the chain. The public side learns it independently — it proves a channel's .ath against the
+ * chain and remembers it — and when it builds a name it already looks INTO the private threads first. Nothing ever
+ * looked the other way [OWNER 2026-08-24: "the counterparty's username gets lost in the app — this contact has one
+ * and I don't see it"], so one person could be a name on the Public surface and a bare address on the Private one,
+ * with the name sitting in the app the whole time.
+ *
+ * This is the one answer both surfaces ask, so they cannot disagree again.
+ */
+function walletKnownIdentityVariants(counterpartyWallet) {
+  if (!counterpartyWallet) return [];
+  const found = [];
+  // The user's OWN wallet must offer their OWN linked username (.ath): a counterparty's name arrives on their
+  // messages and posts, your own never does — you receive neither from yourself — so without this your own channel
+  // and your Saved thread show the bare address while everyone else sees your name.
   if (plathoWallet?.address && sameWalletAddress(counterpartyWallet, plathoWallet.address)) {
     const ownUsername = readLinkedPlathoUsername(plathoWallet.address);
     const ownIdentity = ownUsername?.label ? plathoUsernameIdentity(ownUsername.label) : null;
-    if (ownIdentity) extraIdentities.push(ownIdentity);
+    if (ownIdentity) found.push(ownIdentity);
   }
-  // A public channel's VERIFIED .ath username (chain-proven owner of the LINKED NFT — never the raw ownerUsername
-  // claim) is offered as a "Display as" option too. This is what surfaces e.g. "glasnost" in the Discovery card's
-  // chevron for a wallet you have no Private dialog with: contactDisplayContextForWallet only ever knew the raw
-  // address there, so the menu would otherwise list address + local name only.
+  // The channel's VERIFIED .ath — chain-proven owner of the linked NFT, never the raw ownerUsername claim.
   const verifiedUsername = publicChannelProfileCache[channelProfileCacheKey(counterpartyWallet)]?.verifiedUsername;
   if (verifiedUsername) {
     let channelIdentity = null;
     try { channelIdentity = plathoUsernameIdentity(verifiedUsername); } catch { channelIdentity = null; }
-    if (channelIdentity) extraIdentities.push(channelIdentity);
+    if (channelIdentity) found.push(channelIdentity);
   }
-  if (extraIdentities.length) {
-    // Non-mutating: return a shallow context whose variants include the extra identities (base may be a live
-    // thread object; don't graft the variant onto it as a side effect of opening a popover). uniqueDisplayIdentityVariants
-    // de-dupes downstream, so an own username that also matches the channel's verified name collapses to one row.
-    return { ...base, identityVariants: normalizeIdentityVariants([...extraIdentities, ...threadIdentityVariants(base)]) };
-  }
-  return base;
+  return found;
+}
+
+/**
+ * A read-only VIEW of a thread/context carrying those names as identity variants.
+ *
+ * Non-mutating on purpose: the input is often a live thread object, and grafting a derived name onto it as a side
+ * effect of a repaint would outlive the thing it was derived from. Recomputed instead — it is an object lookup and
+ * a parse, and uniqueDisplayIdentityVariants de-dupes downstream, so a name known from two sources is one row.
+ */
+function withWalletKnownIdentities(context, counterpartyWallet) {
+  const extra = walletKnownIdentityVariants(counterpartyWallet);
+  if (extra.length === 0) return context;
+  return { ...context, identityVariants: normalizeIdentityVariants([...extra, ...threadIdentityVariants(context)]) };
+}
+
+function contactDisplayContextForWallet(counterpartyWallet) {
+  return withWalletKnownIdentities(baseContactDisplayContextForWallet(counterpartyWallet), counterpartyWallet);
+}
+
+// The PRIVATE surface's half of the same answer: the header title, the thread row and the "Display as" menu all
+// read the thread through this, so a name the public side proved shows up in the dialog too.
+function threadDisplayView(thread) {
+  const wallet = thread ? ownerWalletFromThread(thread) : null;
+  return wallet ? withWalletKnownIdentities(thread, wallet) : thread;
 }
 
 function baseContactDisplayContextForWallet(counterpartyWallet) {
@@ -6181,9 +6210,12 @@ function showIdentityPopover(thread, anchor) {
   // The pin lives in the shared per-counterparty store (keyed by the peer's wallet); a dialog whose peer wallet is
   // not resolved yet, or the Saved thread, gets no pin row.
   const pinWallet = isSavedMessagesThread(thread) ? null : ownerWalletFromThread(thread);
+  // Through the view, so the menu offers every name known for this wallet — the Public chevron already did, and a
+  // menu that lists fewer names than the other menu for the same person is how the name went missing here.
+  const view = threadDisplayView(thread);
   renderDisplayAsPopover({
-    options: identityDisplayOptions(thread),
-    selectedKey: selectedIdentityDisplayOptionKey(thread),
+    options: identityDisplayOptions(view),
+    selectedKey: selectedIdentityDisplayOptionKey(view),
     localLabelExists: Boolean(thread.localLabel),
     pinned: pinWallet ? isContactPinned(pinWallet) : null,
     onTogglePin: pinWallet ? (next) => setContactPinned(pinWallet, next) : null,
@@ -13636,8 +13668,22 @@ function advanceConvBucketSeqHighWater(bucketAddress, seq) {
 /** Idempotent: safe to call on every incoming message. Returns immediately once the dialog is named and wears it. */
 function queueInboundPeerIdentityResolution(thread, claimedUsername = null) {
   if (!thread || inboundPeerIdentityInFlight.has(thread.id)) return;
+  // REMEMBER THE CLAIM BEFORE ACTING ON IT — including when nothing is done with it right now. Verifying it needs a
+  // chain read, and that read can fail; the only retry there ever was rode on the NEXT message from this peer, so a
+  // contact who then went quiet stayed a bare address for good [OWNER 2026-08-24]. Remembered here (and carried in
+  // the thread snapshot), the dialog can ask again on its own — see queueRestoredConvIdentityResolution.
+  if (claimedUsername) thread.claimedSenderUsername = claimedUsername;
   if (!isAnonymousPeerThread(thread) && (!claimedUsername || threadWearsUsername(thread, claimedUsername))) return;
-  resolveInboundPeerWalletIdentity(thread, claimedUsername).catch((error) => console.warn('[intro] identity resolve failed', error));
+  resolveInboundPeerWalletIdentity(thread, claimedUsername)
+    .then((named) => {
+      // A failed attempt must not count as the one attempt this session — releasing the marker lets the next
+      // thread open try again, which is the difference between "asks again on its own" and "asked once, gave up".
+      if (!named) convThreadIdentityAttempted.delete(thread.id);
+    })
+    .catch((error) => {
+      convThreadIdentityAttempted.delete(thread.id);
+      console.warn('[intro] identity resolve failed', error);
+    });
 }
 
 // Dialogs this session has already asked the chain to name. See below for why the attempt is bounded.
@@ -13658,10 +13704,18 @@ const convThreadIdentityAttempted = new Set();
  * with no wallet on record costs nothing at all: resolveInboundPeerWalletIdentity returns before any read.
  */
 function queueRestoredConvIdentityResolution(thread) {
-  if (!thread?.id || !thread.convPeerKeyId || !isAnonymousPeerThread(thread)) return;
+  if (!thread?.id || !thread.convPeerKeyId) return;
+  // TWO dialogs need asking again, and NEITHER of them will be asked by an arriving message — which is the whole
+  // point, because both are dialogs where nothing is arriving:
+  //  · ANONYMOUS — no peer wallet at all yet (a snapshot written before the identity resolved).
+  //  · KNOWN PEER WHO CLAIMED A NAME WE NEVER PROVED — the verifying read failed once, and the retry was pinned to
+  //    the next message. A quiet contact stayed a bare wallet address for ever [OWNER 2026-08-24: "the counterparty's
+  //    username gets lost — this contact has one and I don't see it"].
+  const claim = thread.claimedSenderUsername ?? null;
+  if (!isAnonymousPeerThread(thread) && !(claim && !threadWearsUsername(thread, claim))) return;
   if (convThreadIdentityAttempted.has(thread.id)) return;
   convThreadIdentityAttempted.add(thread.id);
-  queueInboundPeerIdentityResolution(thread);
+  queueInboundPeerIdentityResolution(thread, claim);
 }
 
 /**
@@ -16558,6 +16612,10 @@ function serializeThreadForHistory(thread) {
     // real thread and created an "Anonymous <keyId>" one beside it. The user saw an empty duplicate appear after
     // sending, and the conversation they had just established looked like two.
     convPeerKeyId: thread.convPeerKeyId ?? null,
+    // The peer's LAST SELF-DECLARED .ath — a claim, never a proof (it is verified against the chain before it is
+    // ever worn). Persisted for the same reason convPeerKeyId above is: kept in memory alone it died on every
+    // reload, and with it the only thing that could make the dialog ask for the name again without a new message.
+    claimedSenderUsername: thread.claimedSenderUsername ?? null,
   });
 }
 
@@ -16593,6 +16651,8 @@ function applyHistoryThreadSnapshot(thread, snapshot) {
   // Restore the CONV bridge before anything else can route around its absence. Never OVERWRITE a live value: the
   // in-memory one was stamped by a send or an adoption this session and is authoritative over a persisted copy.
   if (!thread.convPeerKeyId && snapshot.convPeerKeyId) thread.convPeerKeyId = snapshot.convPeerKeyId;
+  // Same rule for the remembered claim: a live value was stamped by a message THIS session and outranks a copy.
+  if (!thread.claimedSenderUsername && snapshot.claimedSenderUsername) thread.claimedSenderUsername = snapshot.claimedSenderUsername;
   if (!thread.localLabel && snapshot.name && snapshot.name !== 'Imported') thread.name = snapshot.name;
   if (snapshot.subtitle && snapshot.subtitle !== 'local encrypted history') thread.subtitle = snapshot.subtitle;
   if (snapshot.avatar) thread.avatar = snapshot.avatar;
@@ -21543,6 +21603,10 @@ function buildThreadRow(threadId) {
     // freeze). Each is throttled internally; repaints happen only on an actual change.
     queueUsernameHygiene(() => revalidateThreadUsernameVariants(thread));
     queueUsernameHygiene(() => reconcileOwnLinkedUsername());
+    // And ask for a name this dialog has been CLAIMED to have but never proved. Opening the dialog is the only
+    // moment left for a peer who has stopped writing — the receive path fires this too, but nothing is being
+    // received here. Guarded and once-per-attempt inside, so an open costs nothing when there is nothing to ask.
+    queueRestoredConvIdentityResolution(thread);
   });
   return item;
 }
@@ -22818,6 +22882,15 @@ linkUsernameButton?.addEventListener('click', async () => {
     linkUsernameButton.disabled = true;
     const identity = await requestWalletDisplayIdentity(WALLET_DISPLAY_MODES.PLATHO_NFT);
     if (!identity) return;
+    // "No name" picked: take the name off this device's presentation. NOT a failure and NOT an empty name — the
+    // wallet still owns whatever it owns on chain, it just stops stamping a name on what it sends. clearLinked...
+    // switches the display to the address itself, so there is no second write to keep in step.
+    if (identity.mode === WALLET_DISPLAY_MODES.ADDRESS) {
+      clearLinkedPlathoUsername(plathoWallet.address);
+      if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.ADDRESS;
+      flashWalletIdentityStatus(t('username.nameUnlinked'));
+      return;
+    }
     writeLinkedPlathoUsername(identity, plathoWallet.address);
     writeWalletDisplayIdentity(identity, plathoWallet.address);
     flashWalletIdentityStatus(t('username.linkedName', { name: canonicalUsernameDisplay(identity.label) }));
@@ -24805,6 +24878,13 @@ function usernameLinkErrorText(error, chosen) {
   return t('username.linkCouldNotVerify', { name });
 }
 
+// The "no name" row in the linked-names picker. OWNING a name and PRESENTING one are different things [OWNER
+// 2026-08-24: "a person may not want to link a name and still own the username. Let's put a no-username option in
+// this menu, for when someone just wants to unlink theirs"] — the wallet keeps whatever .ath it owns on chain; it
+// simply stops putting one on messages and posts. A sentinel no name can be: labels are lower-case letters and
+// digits, so nothing typeable collides with it.
+const WALLET_DISPLAY_UNLINK_OPTION = '__no_name__';
+
 async function requestWalletDisplayIdentity(mode) {
   const normalizedMode = normalizeWalletDisplayMode(mode);
   if (normalizedMode === WALLET_DISPLAY_MODES.ADDRESS) return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
@@ -24832,13 +24912,24 @@ async function requestWalletDisplayIdentity(mode) {
     ? (ownedNames ?? readKnownPlathoUsernames(plathoWallet?.address))
     : [];
   const fields = [];
-  if (knownNames.length > 0) {
+  // The picker also opens for a wallet whose only pickable thing is "no name" — someone who linked a name and now
+  // wants it off must not be blocked by a chain read that came back empty.
+  const linkedNow = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
+    ? (readLinkedPlathoUsername(plathoWallet?.address)?.label ?? null)
+    : null;
+  if (knownNames.length > 0 || linkedNow) {
     fields.push({
       id: 'pick',
       type: 'select',
       label: t('username.yourLinkedNames'),
       required: false,
-      options: [{ value: '', label: t('username.enterNameBelow') }, ...knownNames.map((label) => ({ value: label, label }))],
+      options: [
+        { value: '', label: t('username.enterNameBelow') },
+        ...knownNames.map((label) => ({ value: label, label })),
+        // Offered only when there IS something to take off — on a wallet presenting no name it would be a row that
+        // does nothing.
+        ...(linkedNow ? [{ value: WALLET_DISPLAY_UNLINK_OPTION, label: t('username.noNameOption') }] : []),
+      ],
       value: knownNames.includes(value) ? value : '',
     });
     fields.push({
@@ -24880,7 +24971,14 @@ async function requestWalletDisplayIdentity(mode) {
     // Russian dialog read "Check:". A line that repeats the button in a language the reader did not choose is
     // worse than no line.
     validateSubmit: async (values) => {
-      const chosen = (values.displayName?.trim() || values.pick || '').trim();
+      const typed = values.displayName?.trim() ?? '';
+      // The deliberate "no name". Read ONLY from the picked row and only with the free-text box empty: an empty box
+      // on its own means "nothing chosen yet", not "take my name off", and a typed string must never stand in for a
+      // choice the user did not make. Nothing to verify — this asks the chain for nothing.
+      if (!typed && values.pick === WALLET_DISPLAY_UNLINK_OPTION) {
+        return { ok: true, result: { mode: WALLET_DISPLAY_MODES.ADDRESS } };
+      }
+      const chosen = (typed || values.pick || '').trim();
       try {
         const result = await verifyWalletDisplayIdentity(normalizedMode, chosen, plathoWallet);
         if (result?.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && result.label) {
