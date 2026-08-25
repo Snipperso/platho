@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=66';
+} from './public-channel-subscriptions.mjs?v=68';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -254,7 +254,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=89';
+} from './i18n.mjs?v=91';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.4';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.5';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1677,9 +1677,6 @@ const USERNAME_MINT_CONFIRM_DELAY_MS = 1500;
 const USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS = 240;
 const USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS = 15_000;
 const USERNAME_MINT_LOCAL_PENDING_MS = USERNAME_MINT_BACKGROUND_CONFIRM_ATTEMPTS * USERNAME_MINT_BACKGROUND_CONFIRM_DELAY_MS;
-const ATH_FULL_DISCOUNT_AMOUNT_ATOMIC = 10_000_000_000_000n;
-const VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC = 15_000_000_000_000_000n;
-const VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC = 0n;
 const USERNAME_PRICE_4_CHARS_ATOMIC = 10_000_000_000_000n;
 const USERNAME_PRICE_5_CHARS_ATOMIC = 1_000_000_000_000n;
 const USERNAME_PRICE_6_PLUS_CHARS_ATOMIC = 100_000_000_000n;
@@ -1747,16 +1744,6 @@ let navVaultBalanceState = {
   status: 'idle',
   retryAttempt: 0,
   reason: null,
-};
-let vaultProtocolState = {
-  // null = not yet read from chain (renders "-"), NOT "full allocation remaining" — so the airdrop
-  // stat never shows a misleading 0 before a fresh read populates it.
-  airdrop_remaining_ath: null,
-  airdrop_total_allocation_ath: VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-  profile_registry_bound: false,
-  profile_registry_address: null,
-  username_registry_bound: false,
-  username_registry_address: null,
 };
 let athProtocolState = {
   total_supply: null,
@@ -2355,11 +2342,11 @@ function viewportVarsLoopWanted() {
  * re-latch only for a change far too large to be noise (switching to the emoji keyboard, a language with a
  * suggestion strip) — a jump there is correct, because the keyboard really did change size.
  */
-const KEYBOARD_PRESENT_PX = 120;
+const KEYBOARD_PRESENT_PX = 120;   // below this the visible area is merely inset (browser chrome), not covered
 // HOW LONG A FINGER MUST SIT STILL BEFORE THE TOUCH BELONGS TO TEXT, NOT TO THE PAGE. Every iOS selection gesture —
 // the loupe, the word grab, both grips — begins with a deliberate hold; a drag meant to move the page begins
 // moving at once. So the hold, not the presence of a selection, is what tells them apart.
-const EDITABLE_SELECTION_HOLD_MS = 350;   // below this the visible area is merely inset (browser chrome), not covered
+const EDITABLE_SELECTION_HOLD_MS = 350;
 const KEYBOARD_RESIZE_PX = 60;     // a real change of keyboard, not the reading wobbling about one
 let keyboardGapLatched = 0;
 
@@ -14859,9 +14846,12 @@ async function revalidateThreadUsernameVariants(thread) {
     let ownerWallet = null;
     try {
       ownerWallet = (await resolvePlathoUsernameOwner(variant.value)).ownerWallet;
-    } catch (error) {
-      if (error instanceof UsernameNotRegisteredError) ownerWallet = '';
-      else continue; // transient RPC — do not strip
+    } catch {
+      // SAME RULE AS THE OWN-NAME RECONCILE, and for the same contract reason: UsernameNFTItem sets initialized=true
+      // at mint and nothing ever sets it back, so a registered name cannot report itself unregistered. Whatever the
+      // failure was — transient RPC or an item answering "not initialised" — it proves nothing, and a peer keeps the
+      // name they were verified under until an AUTHORITATIVE answer names a different owner.
+      continue;
     }
     // Verification degraded mid-loop (was healthy at the pre-loop gate): the answer just now may be a single
     // unverified / hostile-RPC report — do NOT strip a peer's .ath on it. Abort and retry once verification recovers.
@@ -14917,8 +14907,21 @@ async function reconcileOwnLinkedUsername() {
     try {
       ownerWallet = (await resolvePlathoUsernameOwner(linked.label)).ownerWallet;
     } catch (error) {
-      if (error instanceof UsernameNotRegisteredError) ownerWallet = '';
-      else { backoffOwnLinkedUsernameReconcile(linked, owner); return; } // transient RPC — leave cache intact, back off
+      // A REGISTERED NAME CANNOT BECOME UNREGISTERED, so "not registered" is never proof of loss here.
+      // UsernameNFTItem sets initialized=true at mint (line ~260) and NO receiver ever sets it back: there is no
+      // burn and no destroy in that contract. A name this wallet has already linked was therefore minted, and an
+      // item that answers "not initialised" about it is a bad read — a degraded provider, an empty stack, a
+      // derivation that landed elsewhere — not a name that ceased to exist.
+      //
+      // This branch used to launder that answer into an empty owner and fall through to the delete below. [OWNER
+      // 2026-08-25: "the usernames fall off by themselves again ... the app asks to link a username again, though
+      // we wrote in the changelog post that this would no longer be needed."] Measured the same hour: the chain
+      // still listed all four names on that wallet, so the link was destroyed over an answer that cannot be true.
+      //
+      // Both failures now do the same safe thing. What still clears a name is what always should have: an
+      // AUTHORITATIVE proof naming a DIFFERENT owner, which is what a real transfer leaves behind.
+      backoffOwnLinkedUsernameReconcile(linked, owner);
+      return;
     }
     // A read that COMPLETED but under degraded verification is not authoritative enough to destroy the local name.
     if (tonRpcVerificationStructurallyDegraded()) { backoffOwnLinkedUsernameReconcile(linked, owner); return; }
@@ -18246,7 +18249,7 @@ function nonNegativeBigInt(value, fallback = 0n) {
 // currentAthBalanceAtomic() stood here and is DELETED. It read the ATH balance off currentVaultUserSource() — the
 // clean-17 Vault user, which is synthesized from a KeyShard read and has no such field — so it returned 0n for
 // every user, always. Both of its callers were found wrong on 2026-08-13 (the mint dialog, where the whole
-// affordability block had been switched off to hide it; the message discount, which was merely dormant), and a
+// affordability block had been switched off to hide it), and a
 // function that silently answers "zero" to everyone is a trap for whoever reaches for it next.
 
 /**
@@ -18422,48 +18425,18 @@ function privateSendRetryMaxAttempts(error = null, message = null) {
   return PRIVATE_SEND_RETRY_MAX_ATTEMPTS;
 }
 
-function messageDiscountUnlocked() {
-  const remaining = vaultProtocolState?.airdrop_remaining_ath;
-  if (remaining === null || remaining === undefined) return false;
-  return nonNegativeBigInt(remaining) <= VAULT_ACTIVITY_AIRDROP_DISCOUNT_UNLOCK_REMAINING_ATH_ATOMIC;
-}
-
-// The discount scales with how much ATH the sender HOLDS — so it has to read the balance that actually exists.
-//
-// [FOUND 2026-08-13, while fixing the username dialog] This read the balance off the SYNTHESIZED clean-17 Vault
-// user, which is built from a KeyShard read and carries no ath_balance at all. It therefore returned 0n for every
-// user, always. Nothing was visibly wrong only because messageDiscountUnlocked() keeps this
-// whole branch asleep until the activity airdrop is fully distributed — the day it empties, the discount switches
-// on and computes 0% for everyone, including wallets holding the full amount, and nothing breaks loudly enough to
-// notice. Same defect, same day, as the mint dialog: a reader left pointing at a removed data source.
-function athDiscountBps() {
-  if (!messageDiscountUnlocked()) return 0n;
-  // An unread balance is NOT zero — but this function owes its callers a number, so the honest "we do not know
-  // yet" is expressed one level up, in formatAthDiscountLabel, which is the only thing a user ever sees.
-  const athBalance = connectedWalletAthBalanceAtomic() ?? 0n;
-  if (athBalance >= ATH_FULL_DISCOUNT_AMOUNT_ATOMIC) return 10_000n;
-  return (athBalance * 10_000n) / ATH_FULL_DISCOUNT_AMOUNT_ATOMIC;
-}
-
-function formatDiscountPercent(bps = athDiscountBps()) {
-  const basis = nonNegativeBigInt(bps);
-  return basis >= 10_000n ? '100%' : formatBasisPointsPercent(basis);
-}
-
-function formatAthDiscountLabel() {
-  if (!messageDiscountUnlocked()) {
-    return t('composer.athDiscountLocked');
-  }
-  // Balance not read yet. Saying "0%" here would be a claim about the user's holdings made without looking, and
-  // it is the exact shape of the bug above — a figure that is really "unknown" rendered as a real number.
-  if (connectedWalletAthBalanceAtomic() === null) {
-    return t('composer.athDiscountChecking');
-  }
-  const bps = athDiscountBps();
-  if (bps >= 10_000n) {
-    return t('composer.athDiscountFull');
-  }
-  return t('composer.athDiscountPartial', { percent: formatDiscountPercent(bps) });
+/**
+ * HOW MUCH OF THE ACTIVITY AIRDROP IS STILL TO BE EARNED — atomic ATH, or null for "not read".
+ *
+ * The one number the post-airdrop epoch turns on: the buy dialog stops promising that writing earns ATH, and the
+ * claim row goes away once this wallet has taken its last credits. It comes from AirdropPool itself, because the
+ * alternative is prose about a phase of the project, and prose about a phase goes stale in silence.
+ *
+ * Each caller picks its OWN default for null, and they differ on purpose — see the two call sites.
+ */
+function activityAirdropRemainingAtomic() {
+  const remaining = athPoolState.remainingBudget;
+  return remaining === null || remaining === undefined ? null : nonNegativeBigInt(remaining);
 }
 
 function normalizePrivateSizeClass(sizeClass = 1) {
@@ -19199,8 +19172,8 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
     // 0.1626 GRAM reserved anyway, computed by the batch-hold model of a contract clean-17 deleted. A number the
     // surrounding code documents as non-existent is worse than no number.
     text: privateLaneDirectPayEnabled()
-      ? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText, discount: formatAthDiscountLabel() })
-      : t('composer.costHoldStatus', { cost: formatTonNanotons(price), hold: formatTonNanotons(hold), surcharge: surchargeText, discount: formatAthDiscountLabel() }),
+      ? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText })
+      : t('composer.costHoldStatus', { cost: formatTonNanotons(price), hold: formatTonNanotons(hold), surcharge: surchargeText }),
     state: 'ready',
     parts,
   };
@@ -24490,8 +24463,23 @@ function athClaimReady() {
   return nonNegativeBigInt(athTicketState.inFlight) === 0n && credits >= need;
 }
 
+function athAirdropClosedForThisWallet() {
+  const remaining = activityAirdropRemainingAtomic();
+  if (remaining === null || remaining > 0n) return false;
+  if (athClaimState.busy || athClaimState.pendingSince) return false;
+  if (athTicketState.credits === null) return false;              // not read: say nothing
+  if (nonNegativeBigInt(athTicketState.credits) > 0n) return false;
+  return nonNegativeBigInt(athTicketState.inFlight) === 0n;
+}
+
 function renderAthClaimStatus() {
-  if (claimAirdropButton) claimAirdropButton.disabled = athClaimState.busy || !athClaimReady();
+  // The whole row, not just its label: an epoch that is over leaves no control behind.
+  const closed = athAirdropClosedForThisWallet();
+  if (claimAirdropButton) {
+    claimAirdropButton.hidden = closed;
+    claimAirdropButton.disabled = closed || athClaimState.busy || !athClaimReady();
+  }
+  if (closed) return;
   if (!claimAirdropStatus) return;
   if (athClaimState.busy) { setText(claimAirdropStatus, t('profile.claiming')); return; }
   if (athClaimState.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') { setText(claimAirdropStatus, t('common.needsWalletGram')); return; }
@@ -24519,31 +24507,18 @@ function renderAthClaimStatus() {
 
 function renderAthProfileStats() {
   setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
-  const total = nonNegativeBigInt(
-    vaultProtocolState?.airdrop_total_allocation_ath,
-    VAULT_ACTIVITY_AIRDROP_TOTAL_ATH_ATOMIC,
-  );
   renderAthClaimStatus();
-  // [BUILT 2026-08-03] The GLOBAL figure, from AirdropPool. It used to come from the Vault global; clean-17 deleted
-  // the Vault and moved the undistributed remainder here, and until the genesis ceremony sealed there was no address
-  // to configure — so this rendered a dash and said so. `distributed_total` is read directly rather than derived as
+  // The GLOBAL figure, from AirdropPool. distributed_total is read directly rather than derived as
   // total-minus-remaining: the pool CAPS remaining_budget at seal, so the subtraction has an edge the field does not.
+  // A pool not yet read shows a dash — never 0%, which would read as "nothing has gone out yet".
   const poolTotal = athPoolState.totalPool ?? null;
   const distributed = athPoolState.distributedTotal ?? null;
-  if (distributed !== null && poolTotal !== null && poolTotal > 0n) {
-    const percent = (distributed * 10_000n) / poolTotal;
-    setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(distributed)}`);
-    return;
-  }
-  const remainingRaw = vaultProtocolState?.airdrop_remaining_ath;
-  if (remainingRaw === null || remainingRaw === undefined || total <= 0n) {
+  if (distributed === null || poolTotal === null || poolTotal <= 0n) {
     setText(athDropIssuedStatus, '-');
     return;
   }
-  const remaining = nonNegativeBigInt(remainingRaw);
-  const issued = remaining >= total ? 0n : total - remaining;
-  const percent = (issued * 10_000n) / total;
-  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(issued)}`);
+  const percent = (distributed * 10_000n) / poolTotal;
+  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(distributed)}`);
 }
 
 function normalizeUsernameInput(input) {
@@ -26125,8 +26100,8 @@ function renderBuyAthStatus() {
 // An UNREADABLE pool shows the shorter text, not the longer one. That is the whole discipline in one line: the
 // shorter version asserts strictly less, so it cannot be the wrong thing to say when we do not know.
 function buyAthFootnotes(state) {
-  const remaining = athPoolState.remainingBudget;
-  const airdropStillRunning = remaining !== null && remaining !== undefined && nonNegativeBigInt(remaining) > 0n;
+  // UNKNOWN SAYS LESS: an unread pool drops the earning line rather than promising a payout that may be over.
+  const airdropStillRunning = (activityAirdropRemainingAtomic() ?? 0n) > 0n;
   const lines = [t('profile.buyAthFootStep', {
     price: marketStabilityUnitPriceLabel(state) ?? '-',
     amount: formatAthAtomicGrouped(maxBuyableAtomic(state)),

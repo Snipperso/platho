@@ -1142,13 +1142,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/Private chat/);
     expect(app).toMatch(/openPrivateThreadForWallet/);
     expect(enCopy).toMatch(/Add public channel/);
-    expect(enCopy).toMatch(/ATH protocol-fee discount/);
-    expect(enCopy).toMatch(/locked until activity airdrop is fully distributed/);
-    expect(enCopy).toMatch(/Platho fee 0 GRAM/);
-    expect(enCopy).toMatch(/max reduction 0.010 GRAM/);
+    // NO DISCOUNT IN THE COMPOSER [OWNER 2026-08-25: "remove the discount line from the composer"]. It priced a
+    // reduction the protocol does not give: the shards charge a FLAT protocol fee (IntroShard:91, PublicShard:121,
+    // RecordShard:80), no contract reads an ATH balance, and a client attaching less is refused by the shard.
+    // The mechanism belonged to the Vault, which clean-17 deleted.
+    expect(enCopy, "the composer must not price a reduction that does not exist").not.toMatch(/discount|Rabatt|descuento|desconto|remise|diskon/i);
+    expect(app).not.toMatch(/formatAthDiscountLabel|athDiscountBps|messageDiscountUnlocked/);
     expect(app).not.toMatch(/ATH discount \$\{percent\}/);
     expect(app).not.toMatch(/locked until 15%/);
-    expect(app).toMatch(/messageDiscountUnlocked/);
     expect(app).toMatch(/Cost/);
     expect(app).toMatch(/Hold/);
     expect(app).toMatch(/composerEstimatedNetCostNanotons/);
@@ -2310,6 +2311,28 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function reconcileOwnLinkedUsername\(\)/);
     // Cardinal rule: never strip/clear a username off an unverifiable (structurally-degraded / hostile-RPC) read.
     expect(app).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) \{ backoffOwnLinkedUsernameReconcile/);
+
+    // "NOT REGISTERED" IS NEVER PROOF OF LOSS [OWNER 2026-08-25: "the usernames fall off by themselves again ... the
+    // app asks to link a username again, though we wrote in the changelog that this would no longer be needed"].
+    // UsernameNFTItem sets initialized=true at mint and no receiver ever sets it back — there is no burn and no
+    // destroy in that contract — so a name this wallet already linked cannot become unregistered. An item answering
+    // "not initialised" about it is a bad read, and this branch used to turn that answer into an empty owner and
+    // fall through to the delete. Measured the same hour: the chain still listed all four names on that wallet.
+    const reconcile = app.slice(app.indexOf('async function reconcileOwnLinkedUsername()'), app.indexOf('function backoffOwnLinkedUsernameReconcile('));
+    expect(reconcile.length, 'the slice really spans the reconcile').toBeGreaterThan(800);
+    expect(reconcile, 'a bad read must not be laundered into an empty owner').not.toMatch(/ownerWallet = ''/);
+    expect(reconcile, 'both failures back off — neither proves anything').toMatch(/\} catch \(error\) \{[\s\S]*?backoffOwnLinkedUsernameReconcile\(linked, owner\);\s*\n\s*return;\s*\n\s*\}/);
+    // What DOES still clear a name is unchanged: an authoritative answer naming a different owner — a real transfer.
+    expect(reconcile).toMatch(/if \(ownerWallet && sameWalletAddress\(ownerWallet, owner\)\) \{/);
+    expect(reconcile).toMatch(/clearLinkedPlathoUsername\(owner\);/);
+    // And the item contract is the reason this holds — pinned so a future edit there cannot quietly invalidate it.
+    const item = readFileSync('contracts/UsernameNFTItem.tact', 'utf8');
+    expect((item.match(/self\.initialized = false;/g) ?? []).length, 'only init() may leave an item uninitialised').toBe(1);
+    // AND THE TWIN, on the peer side [👯]: the same bad read used to strip a CONTACT's name off a dialog.
+    const peerRevalidate = app.slice(app.indexOf('async function revalidateThreadUsernameVariants(thread)'), app.indexOf('// Sender-side mirror of revalidateThreadUsernameVariants'));
+    expect(peerRevalidate.length, 'the slice really spans the peer reconcile').toBeGreaterThan(600);
+    expect(peerRevalidate, 'a failed read proves nothing about a peer either').not.toMatch(/UsernameNotRegisteredError/);
+    expect(peerRevalidate).toMatch(/\} catch \{[\s\S]*?continue;\s*\n\s*\}/);
 
     // A CLAIMED NAME IS REMEMBERED AND RE-ASKED [OWNER 2026-08-24: "the counterparty's username gets lost in the
     // app — this contact has one and I don't see it"]. Verifying the peer's claim takes a chain read; when that read

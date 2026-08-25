@@ -2,7 +2,7 @@
 
 ## The Platho Protocol Token
 
-ATH is the utility token of Platho. It is used for activity rewards, post-airdrop protocol-fee discounts, `.ath` usernames, profile avatar updates, market-stability sales, buyback, and burn.
+ATH is the utility token of Platho. It is used for activity rewards, `.ath` usernames, profile avatar updates, market-stability sales, buyback, and burn.
 
 ATH is not an administrative token. It grants no power to rewrite balances, pause operations, issue new supply, or change what users own. Its role is to power the app's economy and tie the use of Platho to on-chain accounting.
 
@@ -115,7 +115,7 @@ Messages start from the current base price:
 0.0191 GRAM
 ```
 
-Current exact figures before the ATH discount:
+Current exact figures:
 
 ```text
 private message:  0.0191 GRAM
@@ -164,36 +164,7 @@ The price to the user covers the protocol fee, the gas, and the endowment for st
 | Avatar update | 0.0395 GRAM |
 | Account activation | 0.0600 GRAM |
 
-The client always attaches the larger of the two figures — the one needed to create the shard. The surplus is not lost: the shard keeps exactly what it needs and returns the remainder to the sender. If the network estimate comes back higher than expected, the client adds a margin on top; that is a margin rather than a payment, and it too is returned. ATH discounts apply to the protocol fee, not to network costs or storage reserves.
-
-## ATH Discounts
-
-ATH reduces message protocol fees once the activity airdrop has been fully distributed.
-
-Discounts unlock only when the remaining activity airdrop is:
-
-```text
-airdrop_remaining_ath == 0 ATH
-```
-
-Until that point the protocol fee is paid in full.
-
-Full discount threshold:
-
-```text
-10,000 ATH
-```
-
-If the ATH balance in the user's own ATH wallet is at least `10,000 ATH`, the user reaches the full protocol-fee discount tier for the Platho fee component. Network costs and storage reserves are still paid.
-
-Below `10,000 ATH` the fee decreases linearly:
-
-```text
-raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 ATH)) / 10,000 ATH)
-discounted_fee = raw_discounted_fee
-```
-
-The calculation rounds up. With current constants the full protocol fee is `0.010 GRAM` (`10,000,000 nanotons`) for both public and private capsules, and the maximum reduction is `0.010 GRAM` per capsule.
+The client always attaches the larger of the two figures — the one needed to create the shard. The surplus is not lost: the shard keeps exactly what it needs and returns the remainder to the sender. If the network estimate comes back higher than expected, the client adds a margin on top; that is a margin rather than a payment, and it too is returned.
 
 ## Pool Launch
 
@@ -203,10 +174,9 @@ Launch sequence:
 
 1. Users receive ATH through real use of Platho.
 2. The full activity airdrop is distributed.
-3. ATH discounts unlock.
-4. The ATH/GRAM pool launches.
-5. Post-pool route evidence and pricing evidence are frozen.
-6. The buyback split is enabled.
+3. The ATH/GRAM pool launches.
+4. Post-pool route evidence and pricing evidence are frozen.
+5. The buyback split is enabled.
 
 The pool starts from the reference price:
 
@@ -380,9 +350,9 @@ The on-chain utility of ATH is concrete:
 - accepted name and avatar fees create treasury due and burn due;
 - BuybackBurn buys ATH with GRAM protocol fees and burns the received ATH through ATHMaster.
 
-Publications are paid in GRAM straight from the wallet. ATH does not pay for the whole publish transaction. It reduces the protocol-fee component once the discount gate opens.
+Publications are paid in GRAM straight from the wallet.
 
-This ties ATH demand to specific protocol actions: `.ath` names, avatar updates, post-airdrop protocol-fee discounts, and buyback/burn pressure. MarketStabilitySeller expands available supply only as buyers take the next tranche, so early access is public and deterministic rather than dominated by a thin pool.
+This ties ATH demand to specific protocol actions: `.ath` names, avatar updates, and buyback/burn pressure. MarketStabilitySeller expands available supply only as buyers take the next tranche, so early access is public and deterministic rather than dominated by a thin pool.
 
 The reserve is sold only after the post-pool pricing freeze.
 
@@ -436,7 +406,7 @@ A single purchase cannot cross a tranche boundary. This prevents buying ATH from
 
 GRAM revenue is recognised only after the ATH has been delivered to the buyer. If the ATH transfer fails or bounces, the reserve is restored, the buyer gets back the GRAM principal they paid, and treasury due does not increase.
 
-After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the price of ATH. From that point the price is set entirely by the market: liquidity, available supply, demand for `.ath` names, avatar updates, post-airdrop protocol-fee discounts, and buyback/burn pressure.
+After the final x21 tranche is sold, MarketStabilitySeller no longer regulates the price of ATH. From that point the price is set entirely by the market: liquidity, available supply, demand for `.ath` names, avatar updates, and buyback/burn pressure.
 
 Even at the x21 step the reference valuation stays moderate relative to the utility model:
 
@@ -490,24 +460,22 @@ Outgoing internal transfers in ATHWallet are protected by source-side pending ac
 3. The supply is allocated across activity, liquidity, long-term vesting, and market stability.
 4. Users publish messages by paying directly from their own wallet.
 5. A successful publish credits a `10 ATH` activity reward.
-6. Once the full `15,000,000 ATH` activity airdrop is distributed and `airdrop_remaining_ath == 0`, ATH protocol-fee discounts unlock.
-7. The ATH/GRAM pool launches at the reference price `1 ATH = 0.001 GRAM`.
-8. Post-pool route evidence and pricing evidence are frozen.
-9. MarketStabilitySeller sells the reserve through tranches x2..x21.
-10. Once the split is enabled, FeeAccumulator divides GRAM protocol fees between treasury and buyback.
-11. BuybackBurn buys ATH with GRAM protocol fees and burns ATH through ATHMaster.
-12. Name and profile fees create ATH treasury due and ATH burn due.
-13. Total supply gradually decreases through authenticated burns.
+6. The ATH/GRAM pool launches at the reference price `1 ATH = 0.001 GRAM`.
+7. Post-pool route evidence and pricing evidence are frozen.
+8. MarketStabilitySeller sells the reserve through tranches x2..x21.
+9. Once the split is enabled, FeeAccumulator divides GRAM protocol fees between treasury and buyback.
+10. BuybackBurn buys ATH with GRAM protocol fees and burns ATH through ATHMaster.
+11. Name and profile fees create ATH treasury due and ATH burn due.
+12. Total supply gradually decreases through authenticated burns.
 
 ## Final Model
 
-ATH ties four layers of Platho together:
+ATH ties three layers of Platho together:
 
 1. **App usage** — messages create activity rewards.
 2. **Paid features** — names and avatars require ATH.
-3. **Discounts** — an ATH balance reduces the protocol fee after the distribution gate.
-4. **Supply reduction** — part of the ATH fees and of the buyback result is burned through ATHMaster.
+3. **Supply reduction** — part of the ATH fees and of the buyback result is burned through ATHMaster.
 
-The model starts from a fixed supply and a reference valuation of `100,000 GRAM`. The primary distribution to users is tied to real paid usage: messages start from `0.0191 GRAM` — currently `0.0191 GRAM` for a private message and `0.0203 GRAM` for a public post — plus a `10 ATH` activity bonus per finalised capsule. Larger public or private size classes cost more. This bonus is not a refund, a reimbursement, or a promise of profit. After the first 15% of the supply is distributed, the pool launches, protocol-fee discounts unlock, and the buyback path opens.
+The model starts from a fixed supply and a reference valuation of `100,000 GRAM`. The primary distribution to users is tied to real paid usage: messages start from `0.0191 GRAM` — currently `0.0191 GRAM` for a private message and `0.0203 GRAM` for a public post — plus a `10 ATH` activity bonus per finalised capsule. Larger public or private size classes cost more. This bonus is not a refund, a reimbursement, or a promise of profit. After the first 15% of the supply is distributed, the pool launches and the buyback path opens.
 
 ATH exists as a working token inside Platho: it is distributed through activity, used in paid actions, reduces the protocol fee, is sold from the reserve along a defined ladder, and is burned through on-chain burning. After the market-stability ladder, the future price of ATH is set by the market and by protocol usage.

@@ -2,7 +2,7 @@
 
 ## Der Token des Platho-Protokolls
 
-ATH ist der Utility-Token von Platho. Er dient Aktivitätsbelohnungen, Rabatten auf die Protokollgebühr nach dem Airdrop, `.ath`-Namen, Avatar-Aktualisierungen, Verkäufen zur Marktstabilisierung, Rückkauf und Verbrennung.
+ATH ist der Utility-Token von Platho. Er dient Aktivitätsbelohnungen, `.ath`-Namen, Avatar-Aktualisierungen, Verkäufen zur Marktstabilisierung, Rückkauf und Verbrennung.
 
 ATH ist kein Verwaltungstoken. Er verleiht keine Macht, Guthaben umzuschreiben, Vorgänge anzuhalten, neue Menge auszugeben oder zu verändern, was den Nutzenden gehört. Seine Aufgabe ist es, die Wirtschaft der App anzutreiben und die Nutzung von Platho an die On-Chain-Buchführung zu binden.
 
@@ -112,7 +112,7 @@ Nachrichten beginnen beim aktuellen Grundpreis:
 0.0191 GRAM
 ```
 
-Aktuelle genaue Werte vor dem ATH-Rabatt:
+Aktuelle genaue Werte:
 
 ```text
 private Nachricht:  0.0191 GRAM
@@ -161,36 +161,7 @@ Der Endpreis deckt die Protokollgebühr, das Gas und die Ausstattung für die Sp
 | Avatar-Aktualisierung | 0.0395 GRAM |
 | Kontoaktivierung | 0.0600 GRAM |
 
-Die Client-Anwendung fügt stets den größeren der beiden Beträge bei — jenen, der zur Erstellung des Shards nötig ist. Der Überschuss geht nicht verloren: Der Shard behält genau das Nötige und gibt den Rest an die absendende Seite zurück. Fällt die Netzschätzung höher aus als erwartet, legt die Client-Anwendung eine Reserve obendrauf; das ist eine Reserve und keine Zahlung, und auch sie kommt zurück. ATH-Rabatte gelten für die Protokollgebühr, nicht für Netzkosten oder Speicherrücklagen.
-
-## ATH-Rabatte
-
-ATH senkt die Protokollgebühren für Nachrichten, sobald der Aktivitäts-Airdrop vollständig verteilt ist.
-
-Rabatte werden erst freigeschaltet, wenn der verbleibende Airdrop beträgt:
-
-```text
-airdrop_remaining_ath == 0 ATH
-```
-
-Bis dahin wird die Protokollgebühr voll bezahlt.
-
-Schwelle für den vollen Rabatt:
-
-```text
-10,000 ATH
-```
-
-Liegt das ATH-Guthaben in der eigenen ATH-Wallet bei mindestens `10,000 ATH`, erreicht man die volle Rabattstufe auf den Platho-Gebührenanteil. Netzkosten und Speicherrücklagen bleiben zu zahlen.
-
-Unterhalb von `10,000 ATH` sinkt die Gebühr linear:
-
-```text
-raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 ATH)) / 10,000 ATH)
-discounted_fee = raw_discounted_fee
-```
-
-Die Berechnung rundet auf. Mit den aktuellen Konstanten beträgt die volle Protokollgebühr `0.010 GRAM` (`10,000,000 nanotons`) für öffentliche wie private Kapseln, und die maximale Ermäßigung liegt bei `0.010 GRAM` je Kapsel.
+Die Client-Anwendung fügt stets den größeren der beiden Beträge bei — jenen, der zur Erstellung des Shards nötig ist. Der Überschuss geht nicht verloren: Der Shard behält genau das Nötige und gibt den Rest an die absendende Seite zurück. Fällt die Netzschätzung höher aus als erwartet, legt die Client-Anwendung eine Reserve obendrauf; das ist eine Reserve und keine Zahlung, und auch sie kommt zurück.
 
 ## Pool-Start
 
@@ -200,10 +171,9 @@ Startreihenfolge:
 
 1. Die Nutzenden erhalten ATH durch echte Nutzung von Platho.
 2. Der vollständige Aktivitäts-Airdrop wird verteilt.
-3. Die ATH-Rabatte werden freigeschaltet.
-4. Der ATH/GRAM-Pool startet.
-5. Routen- und Preisnachweise nach dem Pool werden eingefroren.
-6. Die Rückkauf-Aufteilung wird aktiviert.
+3. Der ATH/GRAM-Pool startet.
+4. Routen- und Preisnachweise nach dem Pool werden eingefroren.
+5. Die Rückkauf-Aufteilung wird aktiviert.
 
 Der Pool beginnt beim Referenzpreis:
 
@@ -377,9 +347,9 @@ Der On-Chain-Nutzen von ATH ist konkret:
 - angenommene Namens- und Avatar-Gebühren erzeugen Treasury-Schuld und Verbrennungsschuld;
 - BuybackBurn kauft ATH mit GRAM-Protokollgebühren und verbrennt das erhaltene ATH über ATHMaster.
 
-Veröffentlichungen werden in GRAM direkt aus der Wallet bezahlt. ATH bezahlt nicht die gesamte Veröffentlichungstransaktion. Es senkt den Protokollgebührenanteil, sobald das Rabatt-Tor offen ist.
+Veröffentlichungen werden in GRAM direkt aus der Wallet bezahlt.
 
-Damit hängt die Nachfrage nach ATH an konkreten Protokollhandlungen: `.ath`-Namen, Avatar-Aktualisierungen, Gebührenrabatte nach dem Airdrop sowie Rückkauf- und Verbrennungsdruck. MarketStabilitySeller weitet das verfügbare Angebot nur aus, wenn die nächste Tranche genommen wird; früher Zugang ist damit öffentlich und deterministisch statt von einem dünnen Pool bestimmt.
+Damit hängt die Nachfrage nach ATH an konkreten Protokollhandlungen: `.ath`-Namen, Avatar-Aktualisierungen sowie Rückkauf- und Verbrennungsdruck. MarketStabilitySeller weitet das verfügbare Angebot nur aus, wenn die nächste Tranche genommen wird; früher Zugang ist damit öffentlich und deterministisch statt von einem dünnen Pool bestimmt.
 
 Verkauft wird die Reserve erst nach dem Preis-Freeze im Anschluss an den Pool.
 
@@ -433,7 +403,7 @@ Ein einzelner Kauf darf keine Tranchengrenze überschreiten. Das verhindert, ATH
 
 GRAM-Erträge werden erst anerkannt, nachdem das ATH an die kaufende Seite geliefert wurde. Schlägt der ATH-Transfer fehl oder prallt ab, wird die Reserve wiederhergestellt, die kaufende Seite erhält den gezahlten GRAM-Betrag zurück, und die Treasury-Schuld steigt nicht.
 
-Ist die letzte Tranche x21 verkauft, reguliert MarketStabilitySeller den ATH-Preis nicht mehr. Ab da bestimmt ihn allein der Markt: Liquidität, verfügbares Angebot, Nachfrage nach `.ath`-Namen, Avatar-Aktualisierungen, Gebührenrabatte nach dem Airdrop sowie Rückkauf- und Verbrennungsdruck.
+Ist die letzte Tranche x21 verkauft, reguliert MarketStabilitySeller den ATH-Preis nicht mehr. Ab da bestimmt ihn allein der Markt: Liquidität, verfügbares Angebot, Nachfrage nach `.ath`-Namen, Avatar-Aktualisierungen sowie Rückkauf- und Verbrennungsdruck.
 
 Selbst auf der Stufe x21 bleibt die Referenzbewertung gemessen am Nutzenmodell moderat:
 
@@ -487,24 +457,22 @@ Ausgehende interne Transfers in ATHWallet sind durch quellseitige Buchführung o
 3. Die Menge wird auf Aktivität, Liquidität, Langfrist-Vesting und Marktstabilität verteilt.
 4. Die Nutzenden veröffentlichen Nachrichten und zahlen direkt aus der eigenen Wallet.
 5. Eine erfolgreiche Veröffentlichung schreibt `10 ATH` Aktivitätsbelohnung gut.
-6. Ist der Aktivitäts-Airdrop von `15,000,000 ATH` vollständig verteilt und `airdrop_remaining_ath == 0`, werden die Gebührenrabatte freigeschaltet.
-7. Der ATH/GRAM-Pool startet zum Referenzpreis `1 ATH = 0.001 GRAM`.
-8. Routen- und Preisnachweise nach dem Pool werden eingefroren.
-9. MarketStabilitySeller verkauft die Reserve über die Tranchen x2..x21.
-10. Nach Aktivierung der Aufteilung verteilt FeeAccumulator die GRAM-Gebühren zwischen Treasury und Rückkauf.
-11. BuybackBurn kauft ATH mit GRAM-Gebühren und verbrennt es über ATHMaster.
-12. Namens- und Profilgebühren erzeugen ATH-Treasury-Schuld und ATH-Verbrennungsschuld.
-13. Die Gesamtmenge sinkt schrittweise durch authentifizierte Verbrennungen.
+6. Der ATH/GRAM-Pool startet zum Referenzpreis `1 ATH = 0.001 GRAM`.
+7. Routen- und Preisnachweise nach dem Pool werden eingefroren.
+8. MarketStabilitySeller verkauft die Reserve über die Tranchen x2..x21.
+9. Nach Aktivierung der Aufteilung verteilt FeeAccumulator die GRAM-Gebühren zwischen Treasury und Rückkauf.
+10. BuybackBurn kauft ATH mit GRAM-Gebühren und verbrennt es über ATHMaster.
+11. Namens- und Profilgebühren erzeugen ATH-Treasury-Schuld und ATH-Verbrennungsschuld.
+12. Die Gesamtmenge sinkt schrittweise durch authentifizierte Verbrennungen.
 
 ## Endmodell
 
-ATH verbindet vier Schichten von Platho:
+ATH verbindet drei Schichten von Platho:
 
 1. **Nutzung der App** — Nachrichten erzeugen Aktivitätsbelohnungen.
 2. **Bezahlte Funktionen** — Namen und Avatare verlangen ATH.
-3. **Rabatte** — ein ATH-Guthaben senkt die Protokollgebühr nach dem Verteilungstor.
-4. **Mengenreduktion** — ein Teil der ATH-Gebühren und des Rückkaufergebnisses wird über ATHMaster verbrannt.
+3. **Mengenreduktion** — ein Teil der ATH-Gebühren und des Rückkaufergebnisses wird über ATHMaster verbrannt.
 
-Das Modell beginnt mit einer festen Menge und einer Referenzbewertung von `100,000 GRAM`. Die Erstverteilung ist an echte, bezahlte Nutzung gebunden: Nachrichten beginnen bei `0.0191 GRAM` — derzeit `0.0191 GRAM` für eine private Nachricht und `0.0203 GRAM` für einen öffentlichen Beitrag — plus `10 ATH` Aktivitätsbonus je abgeschlossener Kapsel. Größere öffentliche oder private Größenklassen kosten mehr. Dieser Bonus ist keine Rückerstattung, keine Entschädigung und kein Gewinnversprechen. Sind die ersten 15% der Menge verteilt, startet der Pool, die Gebührenrabatte werden freigeschaltet und der Rückkaufweg öffnet sich.
+Das Modell beginnt mit einer festen Menge und einer Referenzbewertung von `100,000 GRAM`. Die Erstverteilung ist an echte, bezahlte Nutzung gebunden: Nachrichten beginnen bei `0.0191 GRAM` — derzeit `0.0191 GRAM` für eine private Nachricht und `0.0203 GRAM` für einen öffentlichen Beitrag — plus `10 ATH` Aktivitätsbonus je abgeschlossener Kapsel. Größere öffentliche oder private Größenklassen kosten mehr. Dieser Bonus ist keine Rückerstattung, keine Entschädigung und kein Gewinnversprechen. Sind die ersten 15% der Menge verteilt, startet der Pool und der Rückkaufweg öffnet sich.
 
 ATH existiert als Arbeitstoken innerhalb von Platho: verteilt über Aktivität, eingesetzt in bezahlten Handlungen, senkend auf die Protokollgebühr, verkauft aus der Reserve entlang einer festgelegten Treppe und verbrannt on-chain. Nach der Marktstabilitätstreppe wird der künftige ATH-Preis vom Markt und von der Nutzung des Protokolls bestimmt.

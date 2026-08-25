@@ -80,8 +80,10 @@ describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => 
     for (const line of cost) {
       expect(line, `${line} still names a hold`).not.toContain('{hold}');
       expect(line).toContain('{cost}');
-      expect(line).toContain('{discount}');
+      // NO DISCOUNT SLOT. The protocol fee is a flat constant in all three shards and no contract reads ATH,
+      // so a percentage here would be a figure the wallet is never charged.
+      expect(line, `${line} still names a discount`).not.toContain('{discount}');
     }
-    expect(APP).toContain("? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText, discount: formatAthDiscountLabel() })");
+    expect(APP).toContain("? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText })");
   });
 });

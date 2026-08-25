@@ -2,7 +2,7 @@
 
 ## El token del protocolo Platho
 
-ATH es el token de utilidad de Platho. Se usa para las recompensas por actividad, los descuentos en la comisión de protocolo tras el airdrop, los nombres `.ath`, las actualizaciones de avatar, las ventas de estabilidad de mercado, la recompra y la quema.
+ATH es el token de utilidad de Platho. Se usa para las recompensas por actividad, los nombres `.ath`, las actualizaciones de avatar, las ventas de estabilidad de mercado, la recompra y la quema.
 
 ATH no es un token administrativo. No otorga poder para reescribir saldos, pausar operaciones, emitir nueva oferta ni cambiar lo que poseen las personas usuarias. Su papel es alimentar la economía de la aplicación y ligar el uso de Platho a la contabilidad on-chain.
 
@@ -112,7 +112,7 @@ Los mensajes parten del precio base actual:
 0.0191 GRAM
 ```
 
-Cifras exactas actuales antes del descuento por ATH:
+Cifras exactas actuales:
 
 ```text
 mensaje privado:  0.0191 GRAM
@@ -161,36 +161,7 @@ El precio final cubre la comisión de protocolo, el gas y la dotación para alma
 | Actualización de avatar | 0.0395 GRAM |
 | Activación de la cuenta | 0.0600 GRAM |
 
-El cliente adjunta siempre la mayor de las dos cifras: la que hace falta para crear el fragmento. El excedente no se pierde: el fragmento se queda exactamente con lo que necesita y devuelve el resto a quien envía. Si la estimación de red llega más alta de lo previsto, el cliente añade un margen encima; ese margen es margen y no pago, y también se devuelve. Los descuentos por ATH se aplican a la comisión de protocolo, no a los costes de red ni a las reservas de almacenamiento.
-
-## Descuentos por ATH
-
-ATH reduce las comisiones de protocolo de los mensajes una vez que el airdrop por actividad se ha distribuido por completo.
-
-Los descuentos se desbloquean solo cuando el airdrop restante es:
-
-```text
-airdrop_remaining_ath == 0 ATH
-```
-
-Hasta ese punto la comisión de protocolo se paga íntegra.
-
-Umbral de descuento completo:
-
-```text
-10,000 ATH
-```
-
-Si el saldo de ATH en la wallet propia es de al menos `10,000 ATH`, se alcanza el tramo de descuento completo sobre el componente de comisión de Platho. Los costes de red y las reservas de almacenamiento se siguen pagando.
-
-Por debajo de `10,000 ATH` la comisión decrece linealmente:
-
-```text
-raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 ATH)) / 10,000 ATH)
-discounted_fee = raw_discounted_fee
-```
-
-El cálculo redondea hacia arriba. Con las constantes actuales, la comisión de protocolo completa es de `0.010 GRAM` (`10,000,000 nanotons`) tanto para cápsulas públicas como privadas, y la reducción máxima es de `0.010 GRAM` por cápsula.
+El cliente adjunta siempre la mayor de las dos cifras: la que hace falta para crear el fragmento. El excedente no se pierde: el fragmento se queda exactamente con lo que necesita y devuelve el resto a quien envía. Si la estimación de red llega más alta de lo previsto, el cliente añade un margen encima; ese margen es margen y no pago, y también se devuelve.
 
 ## Lanzamiento del pool
 
@@ -200,10 +171,9 @@ Secuencia de lanzamiento:
 
 1. Las personas usuarias reciben ATH por el uso real de Platho.
 2. Se distribuye el airdrop por actividad completo.
-3. Se desbloquean los descuentos por ATH.
-4. Se lanza el pool ATH/GRAM.
-5. Se congelan las evidencias de ruta y de precio posteriores al pool.
-6. Se habilita la división de recompra.
+3. Se lanza el pool ATH/GRAM.
+4. Se congelan las evidencias de ruta y de precio posteriores al pool.
+5. Se habilita la división de recompra.
 
 El pool arranca desde el precio de referencia:
 
@@ -377,9 +347,9 @@ La utilidad on-chain de ATH es concreta:
 - las comisiones aceptadas por nombres y avatares crean deuda de tesorería y deuda de quema;
 - BuybackBurn compra ATH con comisiones de protocolo en GRAM y quema el ATH recibido a través de ATHMaster.
 
-Las publicaciones se pagan en GRAM directamente desde la wallet. ATH no paga la transacción de publicación entera. Reduce el componente de comisión de protocolo una vez abierta la puerta de descuentos.
+Las publicaciones se pagan en GRAM directamente desde la wallet.
 
-Esto liga la demanda de ATH a acciones concretas del protocolo: nombres `.ath`, actualizaciones de avatar, descuentos de comisión tras el airdrop y la presión de recompra y quema. MarketStabilitySeller amplía la oferta disponible solo a medida que se toma el siguiente tramo, de modo que el acceso temprano es público y determinista en lugar de estar dominado por un pool fino.
+Esto liga la demanda de ATH a acciones concretas del protocolo: nombres `.ath`, actualizaciones de avatar y la presión de recompra y quema. MarketStabilitySeller amplía la oferta disponible solo a medida que se toma el siguiente tramo, de modo que el acceso temprano es público y determinista en lugar de estar dominado por un pool fino.
 
 La reserva se vende solo tras la congelación de precios posterior al pool.
 
@@ -433,7 +403,7 @@ Una compra no puede cruzar el límite de un tramo. Esto impide comprar ATH del t
 
 Los ingresos en GRAM se reconocen solo después de entregar el ATH a quien compra. Si la transferencia de ATH falla o rebota, la reserva se restaura, quien compra recupera el principal en GRAM pagado y la deuda de tesorería no aumenta.
 
-Vendido el tramo final x21, MarketStabilitySeller deja de regular el precio de ATH. Desde ese punto el precio lo fija enteramente el mercado: liquidez, oferta disponible, demanda de nombres `.ath`, actualizaciones de avatar, descuentos de comisión tras el airdrop y la presión de recompra y quema.
+Vendido el tramo final x21, MarketStabilitySeller deja de regular el precio de ATH. Desde ese punto el precio lo fija enteramente el mercado: liquidez, oferta disponible, demanda de nombres `.ath`, actualizaciones de avatar y la presión de recompra y quema.
 
 Incluso en el escalón x21 la valoración de referencia sigue siendo moderada frente al modelo de utilidad:
 
@@ -487,24 +457,22 @@ Las transferencias internas salientes en ATHWallet están protegidas por contabi
 3. La oferta se reparte entre actividad, liquidez, vesting a largo plazo y estabilidad de mercado.
 4. Las personas usuarias publican mensajes pagando directamente desde su propia wallet.
 5. Una publicación exitosa abona `10 ATH` de recompensa por actividad.
-6. Cuando el airdrop por actividad de `15,000,000 ATH` se ha distribuido por completo y `airdrop_remaining_ath == 0`, se desbloquean los descuentos de comisión.
-7. El pool ATH/GRAM se lanza al precio de referencia `1 ATH = 0.001 GRAM`.
-8. Se congelan las evidencias de ruta y de precio posteriores al pool.
-9. MarketStabilitySeller vende la reserva por los tramos x2..x21.
-10. Habilitada la división, FeeAccumulator reparte las comisiones en GRAM entre tesorería y recompra.
-11. BuybackBurn compra ATH con comisiones en GRAM y lo quema a través de ATHMaster.
-12. Las comisiones por nombre y perfil crean deuda de tesorería en ATH y deuda de quema en ATH.
-13. La oferta total disminuye gradualmente mediante quemas autenticadas.
+6. El pool ATH/GRAM se lanza al precio de referencia `1 ATH = 0.001 GRAM`.
+7. Se congelan las evidencias de ruta y de precio posteriores al pool.
+8. MarketStabilitySeller vende la reserva por los tramos x2..x21.
+9. Habilitada la división, FeeAccumulator reparte las comisiones en GRAM entre tesorería y recompra.
+10. BuybackBurn compra ATH con comisiones en GRAM y lo quema a través de ATHMaster.
+11. Las comisiones por nombre y perfil crean deuda de tesorería en ATH y deuda de quema en ATH.
+12. La oferta total disminuye gradualmente mediante quemas autenticadas.
 
 ## Modelo final
 
-ATH une cuatro capas de Platho:
+ATH une tres capas de Platho:
 
 1. **Uso de la aplicación**: los mensajes generan recompensas por actividad.
 2. **Funciones de pago**: los nombres y los avatares requieren ATH.
-3. **Descuentos**: un saldo de ATH reduce la comisión de protocolo tras la puerta de distribución.
-4. **Reducción de oferta**: parte de las comisiones en ATH y del resultado de la recompra se quema a través de ATHMaster.
+3. **Reducción de oferta**: parte de las comisiones en ATH y del resultado de la recompra se quema a través de ATHMaster.
 
-El modelo parte de una oferta fija y una valoración de referencia de `100,000 GRAM`. La distribución primaria está ligada al uso real y pagado: los mensajes parten de `0.0191 GRAM` —hoy `0.0191 GRAM` un mensaje privado y `0.0203 GRAM` una publicación pública— más un bono de actividad de `10 ATH` por cápsula finalizada. Las clases de tamaño públicas o privadas mayores cuestan más. Ese bono no es un reembolso, una compensación ni una promesa de beneficio. Distribuido el primer 15% de la oferta, se lanza el pool, se desbloquean los descuentos y se abre la vía de recompra.
+El modelo parte de una oferta fija y una valoración de referencia de `100,000 GRAM`. La distribución primaria está ligada al uso real y pagado: los mensajes parten de `0.0191 GRAM` —hoy `0.0191 GRAM` un mensaje privado y `0.0203 GRAM` una publicación pública— más un bono de actividad de `10 ATH` por cápsula finalizada. Las clases de tamaño públicas o privadas mayores cuestan más. Ese bono no es un reembolso, una compensación ni una promesa de beneficio. Distribuido el primer 15% de la oferta, se lanza el pool y se abre la vía de recompra.
 
 ATH existe como token de trabajo dentro de Platho: se distribuye por actividad, se usa en acciones de pago, reduce la comisión de protocolo, se vende desde la reserva por una escalera definida y se quema on-chain. Superada la escalera de estabilidad de mercado, el precio futuro de ATH lo determinan el mercado y el uso del protocolo.

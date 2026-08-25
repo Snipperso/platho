@@ -2,7 +2,7 @@
 
 ## Token protokol Platho
 
-ATH adalah token utilitas Platho. Ia dipakai untuk imbalan aktivitas, potongan biaya protokol setelah airdrop, nama `.ath`, pembaruan avatar, penjualan stabilitas pasar, pembelian kembali, dan pembakaran.
+ATH adalah token utilitas Platho. Ia dipakai untuk imbalan aktivitas, nama `.ath`, pembaruan avatar, penjualan stabilitas pasar, pembelian kembali, dan pembakaran.
 
 ATH bukan token administratif. Ia tidak memberi kuasa untuk menulis ulang saldo, menghentikan operasi, menerbitkan pasokan baru, atau mengubah apa yang dimiliki penggunanya. Perannya adalah menggerakkan ekonomi aplikasi dan mengikat penggunaan Platho pada pembukuan on-chain.
 
@@ -112,7 +112,7 @@ Pesan dimulai dari harga dasar saat ini:
 0.0191 GRAM
 ```
 
-Angka pasti saat ini, sebelum potongan ATH:
+Angka pasti saat ini:
 
 ```text
 pesan privat:     0.0191 GRAM
@@ -161,36 +161,7 @@ Harga akhir mencakup biaya protokol, gas, dan dana penyimpanan catatan di shard-
 | Pembaruan avatar | 0.0395 GRAM |
 | Aktivasi akun | 0.0600 GRAM |
 
-Klien selalu melampirkan yang lebih besar di antara dua angka — angka yang dibutuhkan untuk membuat shard. Kelebihannya tidak hilang: shard menyimpan tepat yang diperlukan dan mengembalikan sisanya kepada pengirim. Bila perkiraan jaringan datang lebih tinggi dari dugaan, klien menambahkan margin di atasnya; itu margin, bukan pembayaran, dan ikut dikembalikan. Potongan ATH berlaku untuk biaya protokol, bukan untuk biaya jaringan atau cadangan penyimpanan.
-
-## Potongan ATH
-
-ATH menurunkan biaya protokol pesan setelah airdrop aktivitas terdistribusi sepenuhnya.
-
-Potongan hanya terbuka ketika sisa airdrop aktivitas bernilai:
-
-```text
-airdrop_remaining_ath == 0 ATH
-```
-
-Sebelum titik itu, biaya protokol dibayar penuh.
-
-Ambang potongan penuh:
-
-```text
-10,000 ATH
-```
-
-Jika saldo ATH di dompet ATH milik sendiri paling sedikit `10,000 ATH`, pengguna mencapai tingkat potongan penuh untuk komponen biaya Platho. Biaya jaringan dan cadangan penyimpanan tetap dibayar.
-
-Di bawah `10,000 ATH`, biaya turun secara linier:
-
-```text
-raw_discounted_fee = ceil(full_fee * (10,000 ATH - min(user_ath_balance, 10,000 ATH)) / 10,000 ATH)
-discounted_fee = raw_discounted_fee
-```
-
-Perhitungan dibulatkan ke atas. Dengan konstanta saat ini, biaya protokol penuh adalah `0.010 GRAM` (`10,000,000 nanotons`) baik untuk kapsul publik maupun privat, dan pengurangan maksimum `0.010 GRAM` per kapsul.
+Klien selalu melampirkan yang lebih besar di antara dua angka — angka yang dibutuhkan untuk membuat shard. Kelebihannya tidak hilang: shard menyimpan tepat yang diperlukan dan mengembalikan sisanya kepada pengirim. Bila perkiraan jaringan datang lebih tinggi dari dugaan, klien menambahkan margin di atasnya; itu margin, bukan pembayaran, dan ikut dikembalikan.
 
 ## Peluncuran pool
 
@@ -200,10 +171,9 @@ Urutan peluncuran:
 
 1. Pengguna menerima ATH lewat penggunaan nyata Platho.
 2. Seluruh airdrop aktivitas terdistribusi.
-3. Potongan ATH terbuka.
-4. Pool ATH/GRAM diluncurkan.
-5. Bukti rute dan bukti harga pascapool dibekukan.
-6. Pembagian pembelian kembali diaktifkan.
+3. Pool ATH/GRAM diluncurkan.
+4. Bukti rute dan bukti harga pascapool dibekukan.
+5. Pembagian pembelian kembali diaktifkan.
 
 Pool bermula dari harga acuan:
 
@@ -377,9 +347,9 @@ Kegunaan ATH di on-chain bersifat konkret:
 - biaya nama dan avatar yang diterima menciptakan utang perbendaharaan dan utang pembakaran;
 - BuybackBurn membeli ATH dengan biaya protokol dalam GRAM dan membakar ATH yang diterima lewat ATHMaster.
 
-Penerbitan dibayar dalam GRAM langsung dari dompet. ATH tidak membayar seluruh transaksi penerbitan. Ia menurunkan komponen biaya protokol setelah gerbang potongan terbuka.
+Penerbitan dibayar dalam GRAM langsung dari dompet.
 
-Dengan begitu permintaan ATH terikat pada tindakan protokol yang spesifik: nama `.ath`, pembaruan avatar, potongan biaya setelah airdrop, serta tekanan pembelian kembali dan pembakaran. MarketStabilitySeller memperluas pasokan yang tersedia hanya seiring tahap berikutnya diambil, sehingga akses awal bersifat publik dan deterministik, bukan didominasi pool yang tipis.
+Dengan begitu permintaan ATH terikat pada tindakan protokol yang spesifik: nama `.ath`, pembaruan avatar, serta tekanan pembelian kembali dan pembakaran. MarketStabilitySeller memperluas pasokan yang tersedia hanya seiring tahap berikutnya diambil, sehingga akses awal bersifat publik dan deterministik, bukan didominasi pool yang tipis.
 
 Cadangan baru dijual setelah pembekuan harga pascapool.
 
@@ -433,7 +403,7 @@ Satu pembelian tidak boleh melewati batas tahap. Ini mencegah membeli ATH tahap 
 
 Pendapatan dalam GRAM baru diakui setelah ATH sampai ke pembeli. Jika transfer ATH gagal atau memantul, cadangan dipulihkan, pembeli menerima kembali pokok GRAM yang dibayarkan, dan utang perbendaharaan tidak bertambah.
 
-Setelah tahap terakhir x21 terjual, MarketStabilitySeller tidak lagi mengatur harga ATH. Sejak itu harga sepenuhnya ditentukan pasar: likuiditas, pasokan yang tersedia, permintaan nama `.ath`, pembaruan avatar, potongan biaya setelah airdrop, serta tekanan pembelian kembali dan pembakaran.
+Setelah tahap terakhir x21 terjual, MarketStabilitySeller tidak lagi mengatur harga ATH. Sejak itu harga sepenuhnya ditentukan pasar: likuiditas, pasokan yang tersedia, permintaan nama `.ath`, pembaruan avatar, serta tekanan pembelian kembali dan pembakaran.
 
 Bahkan pada anak tangga x21, valuasi acuan tetap moderat dibandingkan model kegunaannya:
 
@@ -487,24 +457,22 @@ Transfer internal keluar di ATHWallet dilindungi pembukuan operasi tertunda di s
 3. Pasokan dibagi ke aktivitas, likuiditas, vesting jangka panjang, dan stabilitas pasar.
 4. Pengguna menerbitkan pesan dengan membayar langsung dari dompetnya sendiri.
 5. Penerbitan yang berhasil mengkredit imbalan aktivitas `10 ATH`.
-6. Begitu airdrop aktivitas `15,000,000 ATH` terdistribusi penuh dan `airdrop_remaining_ath == 0`, potongan biaya protokol terbuka.
-7. Pool ATH/GRAM diluncurkan pada harga acuan `1 ATH = 0.001 GRAM`.
-8. Bukti rute dan bukti harga pascapool dibekukan.
-9. MarketStabilitySeller menjual cadangan lewat tahap x2..x21.
-10. Setelah pembagian aktif, FeeAccumulator membagi biaya GRAM antara perbendaharaan dan pembelian kembali.
-11. BuybackBurn membeli ATH dengan biaya GRAM dan membakarnya lewat ATHMaster.
-12. Biaya nama dan profil menciptakan utang perbendaharaan ATH dan utang pembakaran ATH.
-13. Pasokan total berkurang berangsur lewat pembakaran terautentikasi.
+6. Pool ATH/GRAM diluncurkan pada harga acuan `1 ATH = 0.001 GRAM`.
+7. Bukti rute dan bukti harga pascapool dibekukan.
+8. MarketStabilitySeller menjual cadangan lewat tahap x2..x21.
+9. Setelah pembagian aktif, FeeAccumulator membagi biaya GRAM antara perbendaharaan dan pembelian kembali.
+10. BuybackBurn membeli ATH dengan biaya GRAM dan membakarnya lewat ATHMaster.
+11. Biaya nama dan profil menciptakan utang perbendaharaan ATH dan utang pembakaran ATH.
+12. Pasokan total berkurang berangsur lewat pembakaran terautentikasi.
 
 ## Model akhir
 
-ATH menyatukan empat lapis Platho:
+ATH menyatukan tiga lapis Platho:
 
 1. **Pemakaian aplikasi** — pesan menghasilkan imbalan aktivitas.
 2. **Fitur berbayar** — nama dan avatar menuntut ATH.
-3. **Potongan** — saldo ATH menurunkan biaya protokol setelah gerbang distribusi.
-4. **Penyusutan pasokan** — sebagian biaya ATH dan hasil pembelian kembali dibakar lewat ATHMaster.
+3. **Penyusutan pasokan** — sebagian biaya ATH dan hasil pembelian kembali dibakar lewat ATHMaster.
 
-Model ini berangkat dari pasokan tetap dan valuasi acuan `100,000 GRAM`. Distribusi perdana terikat pada pemakaian nyata yang berbayar: pesan mulai dari `0.0191 GRAM` — saat ini `0.0191 GRAM` untuk pesan privat dan `0.0203 GRAM` untuk kiriman publik — ditambah bonus aktivitas `10 ATH` per kapsul yang difinalisasi. Kelas ukuran publik atau privat yang lebih besar lebih mahal. Bonus itu bukan pengembalian dana, bukan ganti rugi, dan bukan janji keuntungan. Setelah 15% pasokan pertama terdistribusi, pool diluncurkan, potongan biaya terbuka, dan jalur pembelian kembali membuka.
+Model ini berangkat dari pasokan tetap dan valuasi acuan `100,000 GRAM`. Distribusi perdana terikat pada pemakaian nyata yang berbayar: pesan mulai dari `0.0191 GRAM` — saat ini `0.0191 GRAM` untuk pesan privat dan `0.0203 GRAM` untuk kiriman publik — ditambah bonus aktivitas `10 ATH` per kapsul yang difinalisasi. Kelas ukuran publik atau privat yang lebih besar lebih mahal. Bonus itu bukan pengembalian dana, bukan ganti rugi, dan bukan janji keuntungan. Setelah 15% pasokan pertama terdistribusi, pool diluncurkan dan jalur pembelian kembali membuka.
 
 ATH ada sebagai token kerja di dalam Platho: dibagikan lewat aktivitas, dipakai pada tindakan berbayar, menurunkan biaya protokol, dijual dari cadangan menuruti tangga yang telah ditetapkan, dan dibakar on-chain. Setelah tangga stabilitas pasar berakhir, harga ATH di masa depan ditentukan pasar dan oleh pemakaian protokol.

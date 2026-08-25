@@ -25,7 +25,9 @@ describe('buy ATH from the reserve', () => {
   it('BUYATH-02: the copy is assembled from the airdrop pool state, not hardcoded', () => {
     expect(app).toMatch(/function buyAthFootnotes\(state\)/);
     expect(app).toMatch(/const remaining = athPoolState\.remainingBudget;/);
-    expect(app).toMatch(/const airdropStillRunning = remaining !== null && remaining !== undefined && nonNegativeBigInt\(remaining\) > 0n;/);
+    // The number comes from ONE source now — two callers ask it and want opposite defaults for "not read".
+        expect(app).toMatch(/function activityAirdropRemainingAtomic\(\)/);
+        expect(app).toMatch(/const airdropStillRunning = \(activityAirdropRemainingAtomic\(\) \?\? 0n\) > 0n;/);
     // The two PHASE-BOUND footnotes — a pool that does not exist yet and an airdrop still paying out — ride the same
     // condition, because they stop being true on the same event. The step price and "you can already spend it" are
     // unconditional: both stay true forever.
@@ -58,7 +60,10 @@ describe('buy ATH from the reserve', () => {
     // Getting this backwards would print "ATH is earned by writing" at a user for whom it may already be false.
     expect(app).toMatch(/remainingBudget: pool\.remainingBudget,/);
     expect(app).toMatch(/remainingBudget: null \}/);
-    expect(app, 'null must fail the running test, not pass it').toMatch(/remaining !== null && remaining !== undefined && nonNegativeBigInt\(remaining\) > 0n/);
+    expect(app, 'an unread pool must fail the running test, not pass it')
+          .toMatch(/const airdropStillRunning = \(activityAirdropRemainingAtomic\(\) \?\? 0n\) > 0n;/);
+        // ...and the source itself keeps null as null, so each caller can decide what to do with it.
+        expect(app).toMatch(/return remaining === null \|\| remaining === undefined \? null : nonNegativeBigInt\(remaining\);/);
   });
 
   it('BUYATH-04: the amount is clamped by BOTH contract bounds before it can be composed', () => {

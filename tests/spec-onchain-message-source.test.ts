@@ -243,14 +243,15 @@ describe('v1 on-chain message source of truth', () => {
       }
     }
 
-    // The discount composer copy moved from inline literals in web/app.js into the en dictionary
-    // (composer.athDiscountLocked / athDiscountFull / athDiscountPartial). Pin the shipped copy in
-    // app.js source + en copy; the negative also spans both so a bad phrase can't hide in either.
-    const app = `${read('web/app.js')}\n${EN_COPY}`;
-    expect(app).toMatch(/ATH protocol-fee discount locked until activity airdrop is fully distributed/);
-    expect(app).toMatch(/ATH protocol-fee discount 100% - Platho fee 0 GRAM/);
-    expect(app).toMatch(/max reduction 0.010 GRAM/);
-    expect(app).not.toMatch(/ATH discount \$\{percent\}|locked until 15%/);
+    // THE COMPOSER PROMISES NO DISCOUNT [OWNER 2026-08-25]. The protocol fee is a flat constant in all three
+    // shards and nothing on chain reads ATH, so a percentage on the cost line would be a figure the wallet never
+    // sees. The whitepaper still describes the tier — that is a separate decision, and it is why this pins the
+    // COMPOSER copy specifically rather than the word everywhere.
+    const app = `${read('web/app.js')}
+${EN_COPY}`;
+    expect(app).not.toMatch(/protocol-fee discount|discount locked|discount \{percent\}/);
+    expect(app).not.toMatch(/max reduction 0.010 GRAM|Platho fee 0 GRAM/);
+    expect(app).not.toMatch(/ATH discount ${percent}|locked until 15%/);
   });
 
   it('SPEC-MSG-SOURCE-03C: public docs do not overpromise message permanence or user-selectable RPC', () => {
