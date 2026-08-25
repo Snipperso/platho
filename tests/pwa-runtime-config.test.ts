@@ -1949,6 +1949,25 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/try \{ quickStartShown = maybeShowQuickStartOnFirstRun\(\); \} catch \(error\) \{ console\.error\(error\); \}/);
   });
 
+
+  it('PWA-TMA-VIEWPORT-01: a Telegram viewport change is re-asked, not read once mid-animation', () => {
+    // [OWNER 2026-08-25: "the interface flew almost off the screen ... it happened when I minimised the mini-app
+    // window and then restored it. I cannot reach it with a finger, the whole interface seems to have collapsed
+    // into a narrow strip."] Telegram sends viewportChanged WHILE the window is still moving — minimise and restore
+    // both do — and viewportStableHeight can still be catching up when the "stable" one arrives. Reading once and
+    // stopping latches a height measured half-way through the move, and nothing asks again: the shell stays built
+    // to that number for as long as the app is open.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/const TELEGRAM_VIEWPORT_RESYNC_MS = \[60, 180, 420, 900\];/);
+    expect(app).toMatch(/function handleTelegramViewportChanged\(\) \{[\s\S]{0,340}?scheduleTelegramViewportResync\(\);/);
+    // The subscription goes through it — a bare syncViewportCssVars is the single read this fixes.
+    expect(app).toMatch(/tg\.onEvent\('viewportChanged', handleTelegramViewportChanged\);/);
+    expect(app, 'the one-shot subscription must not come back').not.toMatch(/onEvent\('viewportChanged', syncViewportCssVars\)/);
+    // Re-armed, not stacked: a burst of events during one animation must not leave a pile of timers behind.
+    const ladder = app.slice(app.indexOf('function scheduleTelegramViewportResync()'), app.indexOf('function handleTelegramViewportChanged'));
+    expect(ladder.length, 'the slice really spans the ladder').toBeGreaterThan(150);
+    expect(ladder).toMatch(/for \(const timer of telegramViewportResyncTimers\) clearTimeout\(timer\);/);
+  });
   it('PWA-QUICKSTART-TMA-01: quick-start works inside the Telegram Mini App (modal stacking, awaitable export, TG link, cloud dismissal)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');

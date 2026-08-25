@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.6';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.7';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2783,6 +2783,32 @@ function isTelegramSuspendingPlatform() {
   return telegramPlatform() === 'ios';
 }
 
+// RE-ASK, BECAUSE THE FIRST ANSWER IS TAKEN MID-MOVE.
+//
+// Telegram reports viewportChanged while the window is still animating — minimise and restore both send it with
+// isStateStable false — and viewportStableHeight can still be catching up when the "stable" one arrives. Reading
+// once and stopping latches a height measured half-way through the move, and nothing ever asks again: the shell
+// stays built to that number [OWNER 2026-08-25: "the interface flew almost off the screen ... it happened when I
+// minimised the mini-app window and then restored it. I cannot reach it with a finger, the whole interface seems
+// to have collapsed into a narrow strip."]
+//
+// So the event starts a short ladder instead of a single read. Each rung is the same idempotent sync — it writes
+// the number it measures and nothing else — so a rung that lands on the settled value simply writes it again.
+const TELEGRAM_VIEWPORT_RESYNC_MS = [60, 180, 420, 900];
+let telegramViewportResyncTimers = [];
+
+function scheduleTelegramViewportResync() {
+  for (const timer of telegramViewportResyncTimers) clearTimeout(timer);
+  telegramViewportResyncTimers = TELEGRAM_VIEWPORT_RESYNC_MS.map((delay) => setTimeout(syncViewportCssVars, delay));
+}
+
+function handleTelegramViewportChanged() {
+  syncViewportCssVars();
+  // Always, not only when the client admits the state is unstable: a client that reports stable BEFORE
+  // viewportStableHeight has settled is the case a flag cannot describe, and re-running a pure write costs nothing.
+  scheduleTelegramViewportResync();
+}
+
 function telegramViewportHeight() {
   if (!isTelegramEnv()) return 0;
   const tg = telegramWebApp();
@@ -3426,7 +3452,7 @@ function initTelegramMiniApp() {
   } catch {}
   syncViewportCssVars();
   try {
-    tg.onEvent('viewportChanged', syncViewportCssVars);
+    tg.onEvent('viewportChanged', handleTelegramViewportChanged);
   } catch {}
   try {
     if (tg.BackButton && typeof tg.BackButton.onClick === 'function') {
