@@ -4759,6 +4759,22 @@ describe('PWA runtime config guard', () => {
     expect(armer).toContain('KEYBOARD_PRESENT_PX');
     expect(armer).toMatch(/node\.scrollHeight > node\.clientHeight\) return;/);
 
+    // MAKING A SELECTION IS A DRAG TOO [OWNER 2026-08-24: "on the iPhone I cannot select text in the composer by
+    // the standard means — something intercepts it and resets it"]. The live-selection exception above covers
+    // EXTENDING a selection and stops there: on iOS the gesture that PLACES the two ends starts with the loupe,
+    // and the loupe carries a COLLAPSED caret, so the field holds no live selection and the very move that would
+    // make one was refused. What tells the two gestures apart is the HOLD — every selection gesture begins with
+    // one, a page drag begins moving at once — so the release is time-based, and an immediate drag from the field
+    // stays refused [OWNER 2026-08-15: "you can still pull the page out by the text field"].
+    expect(app).toMatch(/const EDITABLE_SELECTION_HOLD_MS = 350;/);
+    expect(app).toMatch(/function touchBeganInEditable\(event\)/);
+    expect(armer).toMatch(/pageDragRefusalStartedAt = Date\.now\(\);\s*\n\s*pageDragRefusalInText = touchBeganInEditable\(event\);/);
+    const refuser = app.slice(app.indexOf('function refusePageDragWhileKeyboardIsUp('), app.indexOf('// A REFUSAL BELONGS TO THE GESTURE'));
+    expect(refuser.length, 'the slice really spans the refuser').toBeGreaterThan(400);
+    // BOTH conditions, never the flag alone — "it is a text field" is exactly the blanket exemption that was removed.
+    expect(refuser).toMatch(/if \(pageDragRefusalInText && Date\.now\(\) - pageDragRefusalStartedAt >= EDITABLE_SELECTION_HOLD_MS\) \{/);
+    expect(refuser, 'a refusal that releases must also disarm, or the next move re-refuses').toMatch(/pageDragRefusalArmed = false;\s*\n\s*return;\s*\n\s*\}\s*\n\s*event\.preventDefault\(\);/);
+
     // AND THE FLAG FALLS WITH ITS GESTURE. It was raised at touchstart and nothing lowered it, so it outlived the
     // gesture that armed it — and iOS does not always open a sequence with a touchstart the page can see: WebKit
     // sends touchcancel the moment the selection assistant claims the touch, and whatever arrives after that is
@@ -8614,6 +8630,20 @@ describe('PWA runtime config guard', () => {
     // read until the dialog was opened.
     const app = readFileSync('web/app.js', 'utf8');
     const load = app.slice(app.indexOf('function renderMyUsernamesStatus()'), app.indexOf('function usernameNftCardNode('));
+    // 0. THE ROW COUNTS NAMES, NOT SPELLINGS [OWNER 2026-08-24: "the app periodically lies about how many usernames
+    // I have — I have one and always had one, and it periodically decides there are two"]. One .ath has two written
+    // forms, "platho" and "platho.ath", and this list is built from sources that disagree on which: the linked name
+    // is normalised to the suffixed form, the chain reconcile writes the suffixed form, but an entry stored by an
+    // older build — or restored from a prefs snapshot one of them published — can still be bare. A plain Set kept
+    // both and the row counted two. Every operation on the list compares through ONE key function, so the read also
+    // heals a device already holding the pair, with no migration.
+    const list = app.slice(app.indexOf('function readKnownPlathoUsernames('), app.indexOf('function writeWalletDisplayIdentity('));
+    expect(list.length, 'the slice really spans the list operations').toBeGreaterThan(800);
+    expect(list).toMatch(/function knownUsernameKey\(label\) \{\s*\n\s*return canonicalUsernameDisplay\(String\(label \?\? ''\)\.trim\(\)\)\.toLowerCase\(\);/);
+    expect(list, 'the reader de-dupes by name').toMatch(/const canonical = knownUsernameKey\(text\);\s*\n\s*if \(!text \|\| !canonical \|\| seen\.has\(canonical\)\) return;/);
+    expect(list, 'and so does the writer').toMatch(/filter\(\(entry\) => knownUsernameKey\(entry\) !== added\)/);
+    expect(list, 'and the remover').toMatch(/filter\(\(entry\) => knownUsernameKey\(entry\) !== dropped\)/);
+    expect(list, 'no raw-string comparison of two labels survives').not.toMatch(/entry !== normalized/);
     // 1. A complete read forgets what is gone and remembers what was found; an incomplete read may only add.
     expect(load).toContain('reconcileKnownPlathoUsernames(result, wallet);');
     expect(load).toMatch(/function reconcileKnownPlathoUsernames\(result, owner = plathoWallet\?\.address\) \{/);

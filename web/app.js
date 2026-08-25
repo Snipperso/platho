@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=65';
+} from './public-channel-subscriptions.mjs?v=66';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -254,7 +254,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=88';
+} from './i18n.mjs?v=89';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.3';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.4';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2355,7 +2355,11 @@ function viewportVarsLoopWanted() {
  * re-latch only for a change far too large to be noise (switching to the emoji keyboard, a language with a
  * suggestion strip) — a jump there is correct, because the keyboard really did change size.
  */
-const KEYBOARD_PRESENT_PX = 120;   // below this the visible area is merely inset (browser chrome), not covered
+const KEYBOARD_PRESENT_PX = 120;
+// HOW LONG A FINGER MUST SIT STILL BEFORE THE TOUCH BELONGS TO TEXT, NOT TO THE PAGE. Every iOS selection gesture —
+// the loupe, the word grab, both grips — begins with a deliberate hold; a drag meant to move the page begins
+// moving at once. So the hold, not the presence of a selection, is what tells them apart.
+const EDITABLE_SELECTION_HOLD_MS = 350;   // below this the visible area is merely inset (browser chrome), not covered
 const KEYBOARD_RESIZE_PX = 60;     // a real change of keyboard, not the reading wobbling about one
 let keyboardGapLatched = 0;
 
@@ -2427,6 +2431,22 @@ let pageDragRefusalArmed = false;
  * selection at all (number, email), hence the guard. Read at touchstart only, so it costs one property read per
  * gesture and nothing per frame.
  */
+let pageDragRefusalStartedAt = 0;
+let pageDragRefusalInText = false;
+
+/**
+ * DID THIS TOUCH LAND IN SOMETHING THE USER CAN SELECT TEXT IN?
+ *
+ * Read from the TARGET, not from document.activeElement: the loupe and the grips are worked with the field already
+ * focused, but a tap that lands on a text node inside a contenteditable reports that node's element, and focus can
+ * still be moving. isContentEditable is inherited, so this answers for the composer's inner blocks too.
+ */
+function touchBeganInEditable(event) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return false;
+  return Boolean(target.closest('input, textarea, [contenteditable]')) || target.isContentEditable;
+}
+
 function focusedEditableHoldsLiveSelection() {
   const active = document.activeElement;
   if (!(active instanceof Element)) return false;
@@ -2440,6 +2460,8 @@ function focusedEditableHoldsLiveSelection() {
 
 function armPageDragRefusal(event) {
   pageDragRefusalArmed = false;
+  pageDragRefusalStartedAt = Date.now();
+  pageDragRefusalInText = touchBeganInEditable(event);
   const viewport = window.visualViewport;
   if (!viewport) return;
   if (Math.round(window.innerHeight - viewport.height) < KEYBOARD_PRESENT_PX) return;   // no keyboard, no lock
@@ -2482,6 +2504,17 @@ function armPageDragRefusal(event) {
 function refusePageDragWhileKeyboardIsUp(event) {
   if (!pageDragRefusalArmed) return;
   if (event.touches && event.touches.length > 1) { pageDragRefusalArmed = false; return; }   // became a pinch
+  // A HELD FINGER IN A TEXT FIELD IS SELECTING [OWNER 2026-08-24: "on the iPhone I cannot select text in the
+  // composer by the standard means — something intercepts it and resets it"]. The exemption used to require a LIVE
+  // selection, i.e. two ends already placed. But on iOS the gesture that PLACES them starts with the loupe, and the
+  // loupe carries a COLLAPSED caret — no second end, no exemption, and the very move that would make a selection
+  // was the one refused. The hold answers for all of it: loupe, word grab and both grips begin with one, a page
+  // drag never does, and an immediate drag from the field stays refused [OWNER 2026-08-15: "you can still pull the
+  // page out by the text field"].
+  if (pageDragRefusalInText && Date.now() - pageDragRefusalStartedAt >= EDITABLE_SELECTION_HOLD_MS) {
+    pageDragRefusalArmed = false;
+    return;
+  }
   event.preventDefault();
 }
 
@@ -4779,31 +4812,52 @@ function knownPlathoUsernamesStorageKey(owner = plathoWallet?.address) {
 // Always unions the currently-linked name. A picked name is still re-verified on submit (it could have been
 // transferred away since it was last seen).
 function readKnownPlathoUsernames(owner = plathoWallet?.address) {
-  const names = new Set();
-  const linked = readLinkedPlathoUsername(owner)?.label;
-  if (linked) names.add(linked);
+  // DE-DUPED BY NAME, NOT BY SPELLING [OWNER 2026-08-24: "the app periodically lies about how many usernames I have.
+  // I have one and always had one, and it periodically decides there are two"]. One name has two written forms here —
+  // "platho" and "platho.ath" — and this list is built from sources that do not agree on which: the linked name is
+  // always normalised to the suffixed form, the chain reconcile writes the suffixed form, but a quick-pick entry
+  // stored by an older build, or restored from a prefs snapshot one of them published, can still be bare. A plain
+  // Set kept both, and the profile row counts what this returns. Compared canonically, the first spelling seen wins
+  // — which also HEALS a device already holding the pair, on the next read, with no migration.
+  const seen = new Set();
+  const names = [];
+  const remember = (label) => {
+    const text = String(label ?? '').trim();
+    const canonical = knownUsernameKey(text);
+    if (!text || !canonical || seen.has(canonical)) return;
+    seen.add(canonical);
+    names.push(text);
+  };
+  remember(readLinkedPlathoUsername(owner)?.label);
   const key = knownPlathoUsernamesStorageKey(owner);
   if (key) {
     try {
       const stored = JSON.parse(localStorageOrNull()?.getItem(key) ?? '[]');
-      if (Array.isArray(stored)) {
-        for (const label of stored) if (typeof label === 'string' && label.trim()) names.add(label.trim());
-      }
+      if (Array.isArray(stored)) for (const label of stored) remember(label);
     } catch {
       // A malformed local quick-pick list must not break the link dialog.
     }
   }
-  return [...names];
+  return names;
+}
+
+// WHAT MAKES TWO ENTRIES THE SAME NAME. "platho" and "platho.ath" are one .ath, so every list operation here
+// compares through this and never by raw string — comparing spellings is what let one name be stored, counted and
+// listed twice.
+function knownUsernameKey(label) {
+  return canonicalUsernameDisplay(String(label ?? '').trim()).toLowerCase();
 }
 
 // Drop a name from the quick-pick list. Its counterpart existed from the day names could be ACQUIRED; this one is
 // new because until now there was no place in the app where a name could be given AWAY.
 function removeKnownPlathoUsername(label, owner = plathoWallet?.address) {
-  const normalized = typeof label === 'string' ? label.trim() : '';
+  const dropped = knownUsernameKey(label);
   const key = knownPlathoUsernamesStorageKey(owner);
-  if (!normalized || !key) return;
+  if (!dropped || !key) return;
   try {
-    localStorageOrNull()?.setItem(key, JSON.stringify(readKnownPlathoUsernames(owner).filter((entry) => entry !== normalized)));
+    localStorageOrNull()?.setItem(key, JSON.stringify(
+      readKnownPlathoUsernames(owner).filter((entry) => knownUsernameKey(entry) !== dropped),
+    ));
   } catch {
     // Cosmetic quick-pick list; safe to drop on a storage failure.
   }
@@ -4811,9 +4865,10 @@ function removeKnownPlathoUsername(label, owner = plathoWallet?.address) {
 
 function addKnownPlathoUsername(label, owner = plathoWallet?.address) {
   const normalized = typeof label === 'string' ? label.trim() : '';
+  const added = knownUsernameKey(normalized);
   const key = knownPlathoUsernamesStorageKey(owner);
-  if (!normalized || !key) return;
-  const next = [normalized, ...readKnownPlathoUsernames(owner).filter((entry) => entry !== normalized)].slice(0, 24);
+  if (!normalized || !added || !key) return;
+  const next = [normalized, ...readKnownPlathoUsernames(owner).filter((entry) => knownUsernameKey(entry) !== added)].slice(0, 24);
   try {
     localStorageOrNull()?.setItem(key, JSON.stringify(next));
   } catch {

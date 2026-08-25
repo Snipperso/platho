@@ -1599,6 +1599,8 @@ export const I18N_STRINGS = {
     "username.myNames": "Мои имена .ath",
     "username.openList": "открыть",
     "username.knownNames#one": "{count} имя",
+    "username.knownNames#few": "{count} имени",
+    "username.knownNames#many": "{count} имён",
     "username.knownNames#other": "{count} имён",
     "username.transferName": "Передать",
     "username.transferNameTitle": "Передать {name}",

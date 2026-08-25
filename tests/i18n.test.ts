@@ -160,6 +160,37 @@ describe('i18n app integration', () => {
     expect(app).toMatch(/\/g, '\\u202F'\)/);
   });
 
+  it('PWA-I18N-11: every plural key carries every category its locale actually uses', () => {
+    // [OWNER 2026-08-24: screenshot reading "2 имён"] Russian has FOUR plural categories and Intl picks `few` for 2;
+    // username.knownNames shipped with only `one` and `other`, so 2 fell back to the `other` form — the one that
+    // belongs to 5 and up. Ten of the eleven plural keys already had all four, which is exactly why nobody looked.
+    // Checked by ASKING Intl which categories a locale uses, so the same hole cannot open in another key or locale.
+    const codes = I18N_LOCALES.map((l: { code: string }) => l.code);
+    const pluralKeys = new Map<string, Set<string>>();
+    for (const locale of codes) {
+      for (const key of Object.keys(I18N_STRINGS[locale as keyof typeof I18N_STRINGS])) {
+        const at = key.indexOf('#');
+        if (at < 0) continue;
+        const base = key.slice(0, at);
+        if (!pluralKeys.has(base)) pluralKeys.set(base, new Set());
+        pluralKeys.get(base)!.add(`${locale}#${key.slice(at + 1)}`);
+      }
+    }
+    expect(pluralKeys.size, 'the dictionary really has plural keys').toBeGreaterThan(5);
+    const missing: string[] = [];
+    for (const [base, present] of pluralKeys) {
+      for (const locale of codes) {
+        // The categories this language can actually produce for a COUNT (0-200 covers every rule boundary in use).
+        const rules = new Intl.PluralRules(locale);
+        const used = new Set(Array.from({ length: 201 }, (_, n) => rules.select(n)));
+        for (const category of used) {
+          if (!present.has(`${locale}#${category}`)) missing.push(`${locale} ${base}#${category}`);
+        }
+      }
+    }
+    expect(missing, 'a missing category silently falls back to the form of another number').toEqual([]);
+  });
+
   it('PWA-I18N-10: sync state is never read back out of translated display text', () => {
     // REBASELINED 2026-08-07. This used to pin one mechanism — setMessageSyncStatus / messageSyncStatusState /
     // messageSyncStatus.dataset.syncState — which existed because the profile "Sync messages" row doubled as a
