@@ -2046,6 +2046,26 @@ describe('PWA runtime config guard', () => {
     // is about the WALLET key during a direct send — is the part that still has a subject.
   });
 
+  it('PWA-WALLET-LOCK-CONTENT-01: locking takes the decrypted conversations with the keys', () => {
+    // [OWNER 2026-08-25: "on the desktop, if you do not unlock and just close the window, everything is clean,
+    // there are no conversations. On mobile I can close the window and read conversations."] The teardown dropped
+    // the KEYS and left what they had already decrypted — the dialog list, the loaded messages, the open
+    // conversation — in memory and on screen. Closing a desktop window destroys the page, so the leak was
+    // invisible there; a phone freezes the page and hands it back intact, and the unlock prompt is dismissable
+    // by design (declining reveals the app "in its locked state").
+    const app = readFileSync('web/app.js', 'utf8');
+    const lock = app.slice(app.indexOf('function lockPlathoWallet(status = '), app.indexOf('const TELEGRAM_BACKGROUND_LOCK_GRACE_MS'));
+    expect(lock.length, 'the slice really spans the lock').toBeGreaterThan(1200);
+    // PRIVATE ONLY: public channel rows share this list and are not secrets — the public surface works while locked.
+    expect(lock).toMatch(/threads = threads\.filter\(\(thread\) => Boolean\(thread\.publicChannelId\)\);/);
+    expect(lock).toMatch(/activeThreadId = null;/);
+    // And the screen is repainted from the emptied state — dropping the array while the DOM keeps the rows
+    // would leave the messages readable, which is the whole defect.
+    expect(lock).toMatch(/renderThreads\(\);\s*\n\s*renderConversation\(\);/);
+    // Not the wallet-CHANGE teardown: that drops caches this same wallet wants back a moment later.
+    expect(lock, 'a lock is not a wallet change').not.toMatch(/clearWalletScopedRuntimeState\(/);
+  });
+
   it('PWA-WALLET-LOCK-TIMING-01: wallet auto-lock timers relaxed per owner (idle 30min, TG background 5min, send grace 10min)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // Owner-chosen values (2026-06-22): the wallet was auto-locking too eagerly and interrupting slow sends.
@@ -5622,6 +5642,20 @@ describe('PWA runtime config guard', () => {
     // timer resets on every scroll event), so restoring it mid-scroll jumped to a pre-gesture position.
     expect(renderSource).toMatch(/const stripMeasurable = messageStrip\.clientHeight > 0 && messageStrip\.scrollHeight > 0;/);
     expect(renderSource).toMatch(/messageStrip\.scrollTop = prevConversationScrollTop;/);
+    // ...but a SEND never teleports first [OWNER 2026-08-25: "if I write one more message, the page jumps back to
+    // where I came in and scrolls down to my new message from there"]. The re-assert was a genuine restore when
+    // the strip was rebuilt from empty and scrollTop fell to 0; reconciled rows never move, so it had nothing
+    // left to restore and could only put a stale number on screen. The report is those two lines in order: the
+    // teleport, then the scroll away from it. Invisible on the first send, where the remembered position is
+    // where the reader already stands.
+    const ownSendBranch = renderSource.slice(
+      renderSource.indexOf('} else if (ownSendScrollToEnd) {'),
+      renderSource.indexOf('} else if (conversationStickToBottom) {'),
+    );
+    expect(ownSendBranch.length, 'the slice really spans the branch').toBeGreaterThan(400);
+    expect(ownSendBranch, 'the own-send branch must not teleport before it scrolls')
+      .not.toMatch(/scrollTop = prevConversationScrollTop/);
+    expect(ownSendBranch).toMatch(/messageStrip\.scrollTo\(\{ top: messageStrip\.scrollHeight, behavior: 'smooth' \}\);/);
     // A status-only re-render never touches the scroller. This used to be a hand-written fast path that compared a
     // positional snapshot of the last render; the strip is now reconciled (KEYROW-*), so the same question is
     // answered by what the reconciliation actually DID — a row rebuilt in place is not a change of shape, a row

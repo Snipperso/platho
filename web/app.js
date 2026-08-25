@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.5';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.6';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -5152,6 +5152,28 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   // (a stale slot from a switched-away wallet self-clears: the new wallet's partition for it is empty, so it is skipped).
   delete globalThis.plathoVaultBinding;
   resetVaultPocketState();
+  // THE LOCK TAKES THE CONVERSATIONS WITH IT. Everything above tears down the KEYS; what those keys already
+  // decrypted stayed behind — the dialog list, every loaded message, the open conversation — in memory and on
+  // screen. [OWNER 2026-08-25: "on the desktop, if you do not unlock and just close the window, everything is
+  // clean, there are no conversations. On mobile I can close the window and read conversations."]
+  //
+  // The difference was never the app, it was the platform: closing a desktop window destroys the page, so the
+  // leak could not be seen there, while a phone freezes the page and hands it back intact. And the unlock prompt
+  // is dismissable by design — declining reveals the app "in its locked state", which was every private message
+  // still sitting on it.
+  //
+  // PRIVATE ONLY. Public channel rows live in this same list (rebuildThreadsFromPublicSubscriptions keys them by
+  // publicChannelId) and are not secrets: the public surface is meant to work while locked, and emptying it would
+  // turn a leak fix into a feature loss.
+  //
+  // Not clearWalletScopedRuntimeState: that one is for a wallet CHANGE and drops caches this wallet will want back
+  // in a moment. Re-unlocking restores these dialogs from the local encrypted history, the same path a cold boot
+  // takes — which is exactly what the desktop has been doing all along.
+  threads = threads.filter((thread) => Boolean(thread.publicChannelId));
+  activeThreadId = null;
+  if (appShell) appShell.dataset.chatOpen = 'false';
+  renderThreads();
+  renderConversation();
   renderWalletIdentity();
   flashWalletIdentityStatus(status);
   setText(encryptionStatus, t('wallet.unlockRequired'));
@@ -22258,15 +22280,19 @@ function renderConversation() {
       // Still opening — (re)apply the open anchor (latest, or first-unread at the top when the unread overflow).
       applyConversationOpenScroll();
     } else if (ownSendScrollToEnd) {
-      // The user just sent — scroll their message into view as a gentle scroll, not a sudden jump. The position is
-      // re-asserted first so the smooth scroll travels only from there to the new bottom. It used to be a genuine
-      // restore, because the strip was rebuilt from empty and scrollTop fell to 0 (the "flies to the beginning and
-      // back" jerk); reconciled rows never move, so this now only guards against anything else having moved the
-      // scroller between the render and this frame. Gated on the PRECISE
-      // own-send flag (not conversationNewOutbound): a late out-of-order INCOMING can leave an 'out' tail with a grown
-      // count and must NOT smooth-scroll a reader who has scrolled up to read history to the bottom.
+      // The user just sent — scroll their message into view as a gentle scroll, from WHEREVER THE SCROLLER IS.
+      //
+      // It used to re-assert a remembered position first. That line was a genuine restore once: the strip was
+      // rebuilt from empty and scrollTop fell to 0 (the "flies to the beginning and back" jerk). Reconciled rows
+      // never move, so the restore had nothing left to restore — and a teleport to a remembered number is exactly
+      // the jump it was there to prevent [OWNER 2026-08-25: "if I write one more message, the page jumps back to
+      // where I came in and scrolls down to my new message from there"]. The report is a narration of those two
+      // lines in order: the teleport, then the scroll. On the FIRST send it is invisible because the remembered
+      // position IS where the reader is standing; on the second it is not, and the difference is on screen.
+      //
+      // Gated on the PRECISE own-send flag (not conversationNewOutbound): a late out-of-order INCOMING can leave an
+      // 'out' tail with a grown count and must NOT smooth-scroll a reader who has scrolled up to read history.
       conversationStickToBottom = true;
-      messageStrip.scrollTop = prevConversationScrollTop;
       messageStrip.scrollTo({ top: messageStrip.scrollHeight, behavior: 'smooth' });
     } else if (conversationStickToBottom) {
       // Already reading the latest — stay pinned to the end (instant).

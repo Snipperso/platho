@@ -123,6 +123,14 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
     const cancelPublicPublishVisibilityChecks = () => {};
     const resetVaultPocketState = () => {};
     const renderWalletIdentity = () => {};
+    // The lock now drops the decrypted private dialogs as well as the keys (PWA-WALLET-LOCK-CONTENT-01), so the
+    // harness owns a list for it to empty: one private dialog, which must go, and one public channel row, which
+    // must survive — the public surface is meant to work while locked.
+    let threads = [{ id: 'peer:a', name: 'private' }, { id: 'chan:1', publicChannelId: 'c1', name: 'channel' }];
+    let activeThreadId = threads[0].id;
+    const appShell = { dataset: {} };
+    const renderThreads = () => {};
+    const renderConversation = () => {};
     const flashWalletIdentityStatus = () => {};
     const refreshMessagingControls = () => {};
     const refreshComposerPublishPolicy = () => {};
@@ -199,6 +207,9 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
       finishSend: () => { sendHoldsKey = false; },
       state: () => ({
         unlocked: Boolean(plathoWallet),
+        privateThreads: threads.filter((thread) => !thread.publicChannelId).length,
+        publicThreads: threads.filter((thread) => Boolean(thread.publicChannelId)).length,
+        activeThreadId,
         dialogOpen: Boolean(activeActionDialog),
         overlayRaised,
         hardLocks,
@@ -321,6 +332,23 @@ describe('background wallet lock deferral', () => {
     h.comeBack();
     expect(h.state().hardLocks, 'a focus event with no deferral behind it locks nothing').toBe(0);
     expect(h.state().dialogOpen).toBe(true);
+  });
+
+  it('BGLOCK-09: the lock takes the decrypted conversations with it, and leaves the public ones', () => {
+    // [OWNER 2026-08-25: "on the desktop, if you do not unlock and just close the window, everything is clean,
+    // there are no conversations. On mobile I can close the window and read conversations."] Tearing down the keys
+    // left everything they had already decrypted on screen. A desktop window CLOSE destroys the page, which is why
+    // the leak could only be seen on a phone: it freezes the page and hands it back intact — and the unlock prompt
+    // is dismissable by design, so declining revealed the app with every private message still on it.
+    const h = harness();
+    expect(h.state().privateThreads, 'the fixture starts with a private dialog loaded').toBe(1);
+    h.goAway();
+    h.advance(WALLET_BLIP + 1);
+    expect(h.state().unlocked, 'precondition: it really locked').toBe(false);
+    expect(h.state().privateThreads, 'the decrypted dialogs go with the keys').toBe(0);
+    expect(h.state().activeThreadId, 'and no conversation stays open behind the mask').toBe(null);
+    // The public surface is meant to work while locked, and its rows share the same list.
+    expect(h.state().publicThreads, 'public channels are not secrets').toBe(1);
   });
 
   it('BGLOCK-08: every deferral arms the grace, and the seed gate cannot re-open over the lock', () => {
