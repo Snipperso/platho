@@ -176,7 +176,11 @@ describe('a reply can quote MY OWN message', () => {
     expect(app).toMatch(/function privateMessageRenderSignature\(message, showMeta = true, groupStart = false\) \{[\s\S]{0,400}?message\?\.chainEntryId \?\? '',/);
     const builder = app.slice(app.indexOf('const buildMessageRow = (message, showMeta, groupStart) => {'), app.indexOf('// THE STRIP AS A KEYED LIST'));
     expect(builder.length, 'the slice really spans the row builder').toBeGreaterThan(1000);
-    expect(builder).toMatch(/if \(message\.chainEntryId !== undefined && message\.chainEntryId !== null\) row\.dataset\.entryId = String\(message\.chainEntryId\);/);
+    // Direction still plays no part. The one exclusion is STATUS: a FAILED send's anchor points at records the
+    // chain never accepted (or at a sibling device's record under the same seq), so it offers no reply — see
+    // PWA-REPLYDEAD-01. A failed row that later proves delivered changes meta, and meta is in the row signature,
+    // so the rebuild re-evaluates this gate.
+    expect(builder).toMatch(/if \(message\.chainEntryId !== undefined && message\.chainEntryId !== null && messageStatusKey\(message\) !== 'failed'\) row\.dataset\.entryId = String\(message\.chainEntryId\);/);
     expect(builder.indexOf('row.dataset.entryId = String(message.chainEntryId)'), 'the anchor is set BEFORE the button is asked for')
       .toBeLessThan(builder.indexOf('appendRowReplyButton(row, beginPrivateReplyForRow)'));
     // Reply sits before Copy on every row, including the ones that gain it late.

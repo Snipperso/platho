@@ -166,15 +166,20 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
     },
 
     /**
-     * The next OUTGOING seq for (conversation, epoch). The local counter is authoritative and monotonic; coldFloor
-     * (the shard's last_seq, read once at cold start) only seeds a fresh epoch so two fast messages can't collide.
+     * The next OUTGOING seq for (conversation, epoch). The local counter is monotonic and never rolls back; the
+     * floor argument (the highest seq the caller knows the SHARD to hold — the cold-start chain read, and warm the
+     * caller's read-lane high-water) can only push it FORWARD. That forward push is what lets two devices of ONE
+     * wallet share an outgoing shard: each keeps an independent counter, so a device that fell behind would
+     * otherwise re-claim seqs its sibling already committed — its sends bounce off the shard's anti-rollback gate,
+     * and its stamped echoes alias the sibling's records. A stale (low) floor is harmless: max() ignores it.
      */
     async nextOutgoingSeq(selfKeyId, peerKeyId, epoch, coldFloor = 0) {
       const id = conversationId(selfKeyId, peerKeyId);
       const record = byConv.get(id);
       if (!record) throw new Error('nextOutgoingSeq: no K_root for this conversation — receive/adopt the INTRO first');
       const e = Number(epoch);
-      const base = record.outgoingSeq[e] !== undefined ? record.outgoingSeq[e] : Number(coldFloor ?? 0);
+      const floor = Number(coldFloor ?? 0);
+      const base = record.outgoingSeq[e] !== undefined ? Math.max(record.outgoingSeq[e], floor) : floor;
       const next = base + 1;
       record.outgoingSeq[e] = next;
       if (persist) await persist(byConv);

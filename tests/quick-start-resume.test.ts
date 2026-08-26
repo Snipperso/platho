@@ -385,13 +385,22 @@ describe('quick-start resume + activation gate guard', () => {
     // Comments stripped: the note explaining WHY it must not names the very identifiers it must not read.
     const refreshCode = refresh.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
     expect(refreshCode, 'the top-level refresher must not touch quick-start state').not.toMatch(/quickStart/);
-    for (const handler of ["window.addEventListener('beforeinstallprompt'", "window.addEventListener('appinstalled'"]) {
-      // Terminator at LINE START: an inner call like closeInstallDialog({ dismissed: false }); ends in "});" too,
-      // and slicing there cut the handler in half — a gate that reads half a function passes on half the truth.
+    // Terminator at LINE START: an inner call like closeInstallDialog({ dismissed: false }); ends in "});" too,
+    // and slicing there cut the handler in half — a gate that reads half a function passes on half the truth.
+    const handlerSlice = (handler: string) => {
       const fn = app.slice(app.indexOf(handler), app.indexOf('\n});', app.indexOf(handler)));
       expect(fn.length, `${handler} slice must not collapse`).toBeGreaterThan(80);
-      expect(fn, `${handler} must repaint the step`).toContain('refreshQuickStartInstallStep();');
-    }
+      return fn;
+    };
+    // beforeinstallprompt repaints the step through the LATCHED UI half (applyDeferredInstallPromptUi): the raw
+    // call sat in the handler until 2026-08-26, when Edge fired the event inside a top-level-await gap and the
+    // refresh read wizard state still in its temporal dead zone (PWA-QSTDZ-01 pins the latch mechanics).
+    expect(handlerSlice("window.addEventListener('beforeinstallprompt'"))
+      .toContain('if (installPromptUiReady) applyDeferredInstallPromptUi();');
+    const apply = app.slice(app.indexOf('function applyDeferredInstallPromptUi()'), app.indexOf("window.addEventListener('beforeinstallprompt'"));
+    expect(apply, 'the deferred UI half must repaint the step').toContain('refreshQuickStartInstallStep();');
+    // appinstalled repaints it too (behind the same latch), so an install completed mid-wizard updates the copy.
+    expect(handlerSlice("window.addEventListener('appinstalled'"), 'appinstalled must repaint the step').toContain('refreshQuickStartInstallStep();');
     // And the refresher itself must never re-render a step that is mid-tap: refreshInstallButtons fires while the
     // browser sheet is opening (the deferred event is spent the moment it is used), and rebuilding the body would
     // pull the button out from under the click that is still running.

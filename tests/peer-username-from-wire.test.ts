@@ -16,6 +16,14 @@ import {
   PLATHO_COMPACT_SENDER_USERNAME_METADATA_PREFIX_BYTES,
 } from '../web/crypto/platho-crypto.mjs';
 import { splitBytesToCapsuleParts, MAX_CAPSULE_USEFUL_BYTES } from '../web/capsule-part-policy.mjs';
+import {
+  parseRecipientIdentity,
+  preferredInboundIdentity,
+  primaryThreadIdentity,
+  threadIdentityVariants,
+  identityKey,
+  RECIPIENT_IDENTITY_TYPES,
+} from '../web/recipient-identities.mjs';
 
 // A dialog must show the peer's .ath, not their raw address — when the peer has one and it is REALLY theirs.
 //
@@ -228,3 +236,102 @@ describe('PEERNAME — the peer .ath travels on the wire and is verified before 
     expect(popover).toContain('onSetLocalName:');
   });
 });
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// PEERNAME-SEL — a name once PROVEN for the wallet stays on the dialog; only a proven transfer takes it off.
+//
+// [OWNER 2026-08-26] "even if he sent anonymously, the name must not fall off — I still see his wallet; he
+// wrote to me non-anonymously before." The reported screen: the header and the thread row wore the raw address
+// while the "Display as" menu listed TWO proven names for that very wallet. Mechanics: thread.identity latches
+// onto the FIRST history snapshot applied at rebirth (an address-era one), and only a LIVE verified claim could
+// re-dress it — which a peer who unlinked, toggled anonymity, or linked a name held by their other wallet never
+// sends again. The claim is how a name is LEARNED, never how it is kept.
+//
+// Real code, real identity module: threadSelectedIdentity + claimedThreadIdentityFromVariants +
+// plathoUsernameIdentity are lifted from app.js and run against the reported state.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+function loadNameSelection() {
+  const cutAt = (start: string, end: string, min: number) => {
+    const a = APP.indexOf(start);
+    const b = APP.indexOf(end);
+    expect(a, start + ' must exist').toBeGreaterThan(-1);
+    expect(b, end + ' must exist').toBeGreaterThan(a);
+    const src = APP.slice(a, b);
+    expect(src.length, 'slice ' + start + ' looks truncated').toBeGreaterThan(min);
+    return src;
+  };
+  const source = [
+    cutAt('function threadSelectedIdentity', 'function threadDisplayLabel', 900),
+    cutAt('function plathoUsernameIdentity', 'async function verifiedPlathoUsernameIdentityForWallet', 100),
+  ].join('\n');
+  // eslint-disable-next-line no-new-func
+  return new Function(
+    'parseRecipientIdentity', 'preferredInboundIdentity', 'primaryThreadIdentity',
+    'threadIdentityVariants', 'identityKey', 'RECIPIENT_IDENTITY_TYPES',
+    source + '\nreturn threadSelectedIdentity;',
+  )(parseRecipientIdentity, preferredInboundIdentity, primaryThreadIdentity,
+    threadIdentityVariants, identityKey, RECIPIENT_IDENTITY_TYPES);
+}
+
+const nameIdentity = (label: string) => {
+  const parsed = parseRecipientIdentity(label);
+  if (!parsed.ok || parsed.identity.type !== RECIPIENT_IDENTITY_TYPES.PLATHO_NFT) throw new Error('not a name: ' + label);
+  return parsed.identity;
+};
+const walletIdentityOf = (value: string) => {
+  const parsed = parseRecipientIdentity(value);
+  if (!parsed.ok || parsed.identity.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) throw new Error('not a wallet: ' + value);
+  return parsed.identity;
+};
+
+describe('PEERNAME-SEL — the automatic pick reads everything known for the wallet', () => {
+  const WALLET = 'UQ' + 'a'.repeat(46);
+
+  it('PEERNAME-SEL-01: the reported screen — sticky address identity, two proven names, last claim wins', () => {
+    const select = loadNameSelection();
+    const thread = {
+      identity: walletIdentityOf(WALLET),                                   // the address-era snapshot latch
+      identityVariants: [nameIdentity('other.ath'), nameIdentity('scaming.ath')],
+      claimedSenderUsername: 'scaming.ath',                                 // what the peer last called themselves
+    };
+    const selected = select(thread);
+    expect(selected?.type).toBe(RECIPIENT_IDENTITY_TYPES.PLATHO_NFT);
+    expect(selected?.value).toBe(nameIdentity('scaming.ath').value);
+  });
+
+  it('PEERNAME-SEL-02: no remembered claim — any proven name still beats the raw address', () => {
+    const select = loadNameSelection();
+    const thread = { identity: walletIdentityOf(WALLET), identityVariants: [nameIdentity('other.ath')] };
+    expect(select(thread)?.type).toBe(RECIPIENT_IDENTITY_TYPES.PLATHO_NFT);
+  });
+
+  it('PEERNAME-SEL-03: an UNPROVEN claim never surfaces — it only picks among proven variants', () => {
+    const select = loadNameSelection();
+    const thread = {
+      identity: walletIdentityOf(WALLET),
+      identityVariants: [nameIdentity('other.ath')],
+      claimedSenderUsername: 'ghost.ath',                                   // typed by the sender, never verified
+    };
+    const selected = select(thread);
+    expect(selected?.type).toBe(RECIPIENT_IDENTITY_TYPES.PLATHO_NFT);
+    expect(selected?.value).not.toBe(nameIdentity('ghost.ath').value);
+  });
+
+  it('PEERNAME-SEL-04: an EXPLICIT address pick is the user speaking — it is respected over every name', () => {
+    const select = loadNameSelection();
+    const thread = {
+      displayIdentity: walletIdentityOf(WALLET),
+      identity: walletIdentityOf(WALLET),
+      identityVariants: [nameIdentity('scaming.ath')],
+      claimedSenderUsername: 'scaming.ath',
+    };
+    expect(select(thread)?.type).toBe(RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS);
+  });
+
+  it('PEERNAME-SEL-05: a local label still silences the identity pick, and a nameless wallet stays an address', () => {
+    const select = loadNameSelection();
+    expect(select({ localLabel: 'my buddy', identity: walletIdentityOf(WALLET), identityVariants: [nameIdentity('scaming.ath')] })).toBe(null);
+    expect(select({ identity: walletIdentityOf(WALLET) })?.type).toBe(RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS);
+  });
+});
+

@@ -2926,6 +2926,128 @@ describe('PWA runtime config guard', () => {
     expect(refreshNow).toMatch(/vaultRefreshInFlightFlags = null;/);
   });
 
+  it('PWA-QSTDZ-01: an install prompt fired mid-evaluation stores itself; only the module tail paints it', () => {
+    // Uncaught ReferenceError on the owner's stage session (2026-08-26, Edge): beforeinstallprompt fired inside
+    // a top-level-await gap, and the handler's quick-start refresh read wizard state still in its temporal dead
+    // zone. The handler now does only the always-safe capture; the LAST top-level statement of the module flips
+    // the latch and replays a captured prompt — past that line no declaration can be dead, by construction.
+    const app = readFileSync('web/app.js', 'utf8');
+    const latchAt = app.indexOf('let installPromptUiReady = false;');
+    const handlerAt = app.indexOf("window.addEventListener('beforeinstallprompt'");
+    const installedAt = app.indexOf("window.addEventListener('appinstalled'");
+    expect(latchAt).toBeGreaterThan(-1);
+    expect(handlerAt, 'the latch must be declared before the listener registers').toBeGreaterThan(latchAt);
+    expect(installedAt).toBeGreaterThan(handlerAt);
+    const handler = app.slice(handlerAt, installedAt);
+    expect(handler).toContain('if (installPromptUiReady) applyDeferredInstallPromptUi();');
+    // The regression: a naked UI call back inside the handler reintroduces the dead-zone read.
+    expect(handler, 'no unguarded quick-start refresh in the handler').not.toContain('refreshQuickStartInstallStep();');
+    // The tail really is the tail: latch flip + replay are the last top-level statements of the module.
+    const tail = app.slice(-600);
+    expect(tail).toContain('installPromptUiReady = true;');
+    expect(tail).toContain('if (deferredInstallPrompt) applyDeferredInstallPromptUi();');
+  });
+
+  it('PWA-REPLYDEAD-01: a failed message offers no reply anchor, and the unlanded verdict sheds the dead claim', () => {
+    // [OWNER 2026-08-26, relaying a user] "you can reply to a message that did not send." The reply the user
+    // then sent quoted a message the peer can never have — and on a wallet with two devices the dead anchor can
+    // even point at the SIBLING device record committed under the same seq. All three reply affordances (swipe
+    // arming, the hover button, beginPrivateReplyForRow) share one gate: row.dataset.entryId.
+    const app = readFileSync('web/app.js', 'utf8');
+    // The stamp itself is withheld from failed rows...
+    expect(app).toContain(
+      "if (message.chainEntryId !== undefined && message.chainEntryId !== null && messageStatusKey(message) !== 'failed') row.dataset.entryId = String(message.chainEntryId);",
+    );
+    // ...and the three affordances really do hang off that dataset, so withholding it is sufficient.
+    expect(app).toMatch(/function appendRowReplyButton\(row, onReply\) \{\n\s*if \(!row\?\.dataset\?\.entryId\) return;/);
+    expect(app).toMatch(/if \(!row \|\| !row\.dataset\.entryId\) return;\n\s*swipe = \{/);
+    // The unlanded verdict (the shard is provably past this seq with no record) sheds the pre-broadcast claim,
+    // exactly like the pre-broadcast failure catch does — same three fields, same reasons (PWA-CONVSEQ-01).
+    const start = app.indexOf('function markConvDeliveryUnlanded');
+    const end = app.indexOf('function rearmConvDeliveryConfirms');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const unlanded = app.slice(start, end);
+    expect(unlanded.length, 'the unlanded slice looks truncated').toBeGreaterThan(400);
+    expect(unlanded).toMatch(/delete message\.chainEntryId;\n\s*delete message\.chainLastEntryId;\n\s*delete message\.convShardAddress;/);
+  });
+
+  it('PWA-CMPDRAFT-05: the wallet teardown takes the drafts with it — they are decrypted content', () => {
+    // The behavioural half lives in tests/composer-thread-drafts.test.ts; THIS pins the two wiring points that
+    // cannot be lifted: the renderConversation choke-point call, and the wallet-scoped teardown clearing the
+    // draft map BEFORE the sync could stash the previous wallet's plaintext back into it.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/const thread = activeThread\(\);\n(\s*\/\/[^\n]*\n)*\s*syncComposerDraftToActiveThread\(\);/);
+    expect(app).toMatch(/privateComposerDraftsByThread\.clear\(\);[^\n]*\n\s*composerDraftThreadId = null;\n\s*if \(messageInput\) messageInput\.value = '';\n\s*privateImageAttachments = \[\];/);
+    // The thread-row click handler used to null the reply quote on every switch — the crude leak guard this
+    // feature replaces. Left in place it destroyed the quote BEFORE the stash could keep it, so merely peeking
+    // at another chat lost a reply being typed. The stash owns cross-chat hygiene now.
+    const clickAt = app.indexOf("const thread = threads.find((t) => t.id === item.dataset.thread);");
+    expect(clickAt).toBeGreaterThan(-1);
+    const clickEnd = app.indexOf('renderConversation();', clickAt);
+    expect(clickEnd, 'the click handler must reach renderConversation — the draft-sync choke point').toBeGreaterThan(clickAt);
+    const click = app.slice(clickAt, clickEnd);
+    expect(click, 'no reply pre-clear between the row lookup and the render').not.toContain('setPrivateReplyDraft(null)');
+  });
+
+  it('PWA-CONVSEQ-01: a send that never left the device sheds its (shard, seq) claim, and allocation floors on what was SEEN', () => {
+    // [OWNER 2026-08-26, relaying a user] "my phone ran out of GRAM paying for a message and it did not send;
+    // I topped up and wrote from the PC — all fine; but the phone still shows the unsent message and does not
+    // show the messages I sent from the PC, even though everything is synced." The behavioural halves (the seq
+    // mark seeding and the echo matcher) run in tests/conv-own-echo-alias.test.ts; THIS gate pins the send
+    // path, which cannot be lifted whole.
+    const app = readFileSync('web/app.js', 'utf8');
+    const start = app.indexOf('async function attemptConvMessagePublishDirect');
+    const end = app.indexOf('async function attemptPrivateComposerMessagePublish');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const send = app.slice(start, end);
+    expect(send.length, 'the slice no longer covers the whole function').toBeGreaterThan(8000);
+    // The affordability gate lives INSIDE the try: an underfunded send must exit through the same catch as any
+    // other pre-broadcast failure and shed its claim there. The absence pin is the revert-detector.
+    expect(send).toMatch(/try \{\n(\s*\/\/[^\n]*\n)*\s*await assertWalletGramAtLeast\(/);
+    expect(
+      send.slice(0, send.indexOf('let result;')).includes('assertWalletGramAtLeast'),
+      'the affordability gate moved back OUTSIDE the try — its failure would keep the dead chain claim',
+    ).toBe(false);
+    // The shed itself: no signed external captured -> the pre-broadcast stamp comes off, so the red echo can
+    // neither alias the sibling device record (findOwnEchoForChainCopy) nor seed the shard seq mark.
+    expect(send).toMatch(/if \(!error\?\.builtBoc\) \{\n\s*delete message\.chainEntryId;\n\s*delete message\.chainLastEntryId;\n\s*delete message\.convShardAddress;\n\s*\}/);
+    // And the allocation floors on BOTH: the cold-start chain read and the warm read-lane high-water — a device
+    // behind its sibling must not re-claim committed seqs (behavioural half: CKS-09).
+    expect(send).toContain('nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, Math.max(coldFloor, convBucketSeqHighWater(route.address)))');
+  });
+
+  it('PWA-CONVRESTORE-03: a device that is BEHIND merges from the recovery slots — not only an empty one', () => {
+    // [OWNER 2026-08-26: "I talked to a NEW user on one client; the other showed none of it until the user wrote
+    // again" — and the framing that matters: "if I talk on the phone and then open the desktop, losing messages
+    // IS a problem".] A conversation BORN on device A is structurally invisible to device B: the conversation
+    // scan walks only the local store, and the old restore latched shut on ANY non-empty store ("already holds
+    // conversations -> authoritative"), leaving the INTRO scan — with its ~13-minute null-body backoff under a
+    // boot storm — as the only door. The slots already carried everything; only the latch kept B out.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/async function restoreConvKeysFromRecoveryIfBehind\(\)/);
+    expect(app, 'the empty-only latch is gone by name too').not.toMatch(/restoreConvKeysFromRecoveryIfEmpty/);
+    // ...and not merely by name: NOTHING may return between computing storeEmpty and the throttle line — an early
+    // non-empty latch reinserted there is exactly the regression this gate exists to catch.
+    expect(app).toMatch(/const storeEmpty = convKeyStore\.snapshot\(\)\.size === 0;\s*\n(\s*\/\/[^\n]*\n)*\s*if \(!storeEmpty && convRecoveryRestoreAttempted && Date\.now\(\) - convRecoveryMergeCheckedAt < 60_000\) return;/);
+    // The cheap gate: ONE batched accountStates over the slot addresses; bodies only when a marker MOVED past
+    // what this device last saw. Markers are wallet- AND deployment-scoped.
+    expect(app).toMatch(/const CONV_RECOVERY_SLOT_MARKERS_KEY = 'platho\.convRecovery\.slotMarkers\.v1';/);
+    expect(app).toContain("${CONV_RECOVERY_SLOT_MARKERS_KEY}:${deploymentStorageSuffix()}:${owner}");
+    expect(app).toMatch(/const marker = changeMarkerOf\(state\);/);
+    expect(app).toMatch(/if \(marker !== null && stored\[publicAddrKey\(slot\.address\)\] !== marker\) \{ moved = true; break; \}/);
+    // Unmoved slots exit after the one batch, and only then is the local store called authoritative.
+    expect(app).toMatch(/if \(!moved\) \{[^}]*convRecoveryBackupAllowed = true;/);
+    // A MOVED slot means another writer published: our own backup must wait for the clean merge, or a shared
+    // slot could be rewritten from a map that lacks the other device\u0027s conversation.
+    expect(app).toMatch(/convRecoveryBackupAllowed = false;\s*\n\s*\}\s*\n\s*const readView/);
+    // An import kicks the sync NOW — the point of the merge is not waiting for a door to open on its own.
+    expect(app).toMatch(/if \(imported > 0\) \{\s*\n\s*renderThreads\(\);\s*\n[^}]*scheduleMessageAutoSync\(2_000\);/);
+    // Markers are written ONLY on a clean scan — an unclean one must keep looking behind.
+    expect(app).toMatch(/writeConvRecoverySlotMarkers\(markers\);/);
+  });
+
   it('PWA-CONVRESTORE-01: a never-scanned conversation scans from its birth, and the sync reads BOTH sides of it', () => {
     // [OWNER 2026-08-22, on the stand with a key restored from the recovery slots] "only the peer's replies synced,
     // mine did not; in some conversations only the peer's latest replies came." Two causes, one function:
@@ -2968,7 +3090,7 @@ describe('PWA runtime config guard', () => {
     // And a cold pass says what it did, per conversation, so a restore that came back short is diagnosable.
     expect(sync).toMatch(/console\.info\('\[conv\] cold conversation', \{/);
     expect(sync).toMatch(/console\.info\('\[conv\] cold scan', \{ conversations: coldConversations, of: conversations, shards: coldShards, manual: forceFull \}\);/);
-    expect(app).toMatch(/import \{ outgoingRecordShard, incomingRecordShards, outgoingRecordShards \} from '\.\/conv-discovery\.mjs\?v=\d+';/);
+    expect(app).toMatch(/import \{ outgoingRecordShard, incomingRecordShards, outgoingRecordShards, selfRecoveryShardSpace \} from '\.\/conv-discovery\.mjs\?v=\d+';/);
     // The opened capsule decides the side: the sender's own copy renders 'out' (this is what makes the restore
     // agree with the local echo instead of duplicating it).
     const fromOpened = app.slice(app.indexOf('function messageFromOpenedCapsule(opened, meta, entry)'), app.indexOf('function messageFromOpenedPrivateParts('));
@@ -2980,7 +3102,7 @@ describe('PWA runtime config guard', () => {
     // lived in memory. The app seeds shard-reader from localStorage inside installConfiguredTonRuntime — BEFORE the
     // transports are built and before any lane reads — and writes every change back; armed once per module.
     const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toMatch(/import \{ readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling \} from '\.\/shard-reader\.mjs\?v=\d+';/);
+    expect(app).toMatch(/import \{ readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, changeMarkerOf \} from '\.\/shard-reader\.mjs\?v=\d+';/);
     const runtime = app.slice(app.indexOf('function installConfiguredTonRuntime('), app.indexOf('if (!globalThis.plathoTonRpcTransport && typeof globalThis.fetch'));
     expect(runtime.length, 'the runtime slice must not collapse').toBeGreaterThan(600);
     // Armed ONCE, however many times the runtime is (re)installed — the handle doubles as the guard.
@@ -3022,7 +3144,12 @@ describe('PWA runtime config guard', () => {
     // (shard, seq) is the exact identity — a multipart copy matches anywhere in the echo's [first..last] seq range,
     // and the same seq in ANOTHER shard is another send, never this one.
     expect(echo).toMatch(/if \(copySeq < first \|\| copySeq > last\) continue;/);
-    expect(echo).toMatch(/if \(sameConvShardAddress\(echoShard, copyShard\)\) return message;/);
+    // ...but (shard, seq) alone only says "one of MY writers": with two devices on one wallet, a send that died
+    // before broadcast leaves an echo claiming a seq the sibling device then commits with a DIFFERENT message.
+    // The seal second settles authorship, so the sibling's copy stands as its own row instead of being swallowed
+    // [OWNER 2026-08-26; behavioural half in tests/conv-own-echo-alias.test.ts].
+    expect(echo).toMatch(/if \(!sameConvShardAddress\(echoShard, copyShard\)\) continue;/);
+    expect(echo).toMatch(/Math\.abs\(copyAt - sealedAt\) > CONV_OWN_ECHO_TIME_SLACK_MS\) continue;/);
     // ...and where a side carries no address (an echo from before the send stamped one), the signed time within a
     // few seconds is the fallback.
     expect(echo).toMatch(/Math\.abs\(copyAt - echoAt\) <= CONV_OWN_ECHO_TIME_SLACK_MS\) return message;/);
@@ -5210,9 +5337,10 @@ describe('PWA runtime config guard', () => {
     // detail screen); the private strip has its own cancel.
     expect(app).toMatch(/if \(publicCommentReplyTo\) \{\s*setPublicCommentReplyTo\(null\);\s*return;\s*\}/);
     expect(app).toMatch(/privateReplyCancelButton\?\.addEventListener\('click'/);
-    // Drafts clear on send, thread switch, and account switch.
+    // Drafts clear on send and account switch. A THREAD SWITCH no longer clears — the per-thread draft stash
+    // (CMPDRAFT, 2026-08-26) moves the quote WITH its dialog; the old pre-clear destroyed a reply being typed
+    // on a mere peek at another chat. PWA-CMPDRAFT-05 pins the absence on the switch path.
     expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPrivateShareDraft\(null\);\s*privateFileAttachments = \[\];\s*updatePrivateFileAttachmentUi\(\);\s*updateImageAttachmentUi\('private'\);/);
-    expect(app).toMatch(/if \(activeThreadId !== thread\.id\) setPrivateReplyDraft\(null\);/);
     expect(app).toMatch(/setPrivateReplyDraft\(null\);\s*setPublicCommentReplyTo\(null\);/);
     // UI shells + gesture CSS (touch-action pan-y keeps vertical scroll native; position:relative anchors the
     // desktop hover Reply button).
@@ -5534,8 +5662,9 @@ describe('PWA runtime config guard', () => {
     expect(nav).toMatch(/const forWalletRaw = rawWalletAddress\(plathoWallet\.address\);/);
     expect(nav).toMatch(/if \(!plathoWallet\?\.address \|\| rawWalletAddress\(plathoWallet\.address\) !== forWalletRaw\) return null;/);
     // Wallet change also wipes the cached balances so the NEW wallet never inherits wallet A's funds (this is what
-    // makes the failed-read carry-forward safe across an in-app A->B switch).
-    expect(app).toMatch(/vaultPocketState = \{ wallet: \{ ton_balance: null, ath_balance: null \} \};\s*\n\s*privateImageAttachments = \[\];/);
+    // makes the failed-read carry-forward safe across an in-app A->B switch). The per-thread composer drafts sit
+    // between the two resets now — decrypted content leaves with the wallet too (PWA-CMPDRAFT-05).
+    expect(app).toMatch(/vaultPocketState = \{ wallet: \{ ton_balance: null, ath_balance: null \} \};\s*\n[\s\S]{0,400}?privateImageAttachments = \[\];/);
   });
 
   it('PWA-WALLET-BALANCE-CARRY-RETRY-01: a failed external-balance read keeps last-known and retries, never a dash-and-give-up', () => {
@@ -5798,7 +5927,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function setConversationScrollTop\(top\) \{[\s\S]*?conversationProgrammaticScrollAt = Date\.now\(\);[\s\S]*?messageStrip\.scrollTop = top;/);
     // Review fix A: the thread-list tap must NOT markThreadRead before renderConversation (that zeroed the count so the
     // first-unread anchor never armed on the primary open path). renderConversation captures the count, THEN marks read.
-    const clickHandler = app.slice(app.indexOf("item.addEventListener('click', () => {"), app.indexOf("item.addEventListener('click', () => {") + 1100);
+    const clickStart = app.indexOf("item.addEventListener('click', () => {");
+    const clickRenderAt = app.indexOf('renderConversation();', clickStart);
+    expect(clickRenderAt, 'the row click must reach renderConversation').toBeGreaterThan(clickStart);
+    const clickHandler = app.slice(clickStart, clickRenderAt + 'renderConversation();'.length);
     expect(clickHandler).not.toMatch(/markThreadRead\(/);
     expect(clickHandler).toMatch(/renderThreads\(\);\s*\n\s*renderConversation\(\);/);
     // Review fix B: a fresh own-send abandons the open-anchor (else the rAF's unsettled branch re-pins first-unread-top

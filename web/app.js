@@ -179,16 +179,16 @@ import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wall
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=21';
 import { createIntroLane } from './intro-lane.mjs?v=37';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=7';
-import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=4';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=6';
+import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=5';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=7';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards } from './conv-discovery.mjs?v=22';
+import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards, selfRecoveryShardSpace } from './conv-discovery.mjs?v=22';
 import { publishConvLaneParts } from './conv-lane-send.mjs?v=21';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
 import { createConvReadLane } from './conv-lane.mjs?v=32';
 import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=28';
 import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=24';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling } from './shard-reader.mjs?v=26';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, changeMarkerOf } from './shard-reader.mjs?v=26';
 import { sha256 as nobleSha256 } from './vendor/@noble/hashes/sha2.js';
 import { orderThreadsForList } from './thread-list-order.mjs?v=2';
 import { reconcileKeyedRows } from './keyed-rows.mjs?v=1';
@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.9';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.10';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1323,6 +1323,53 @@ let publicShareDraft = null;
 // File attachments (v652): [{name, mime, bytes: Uint8Array}] for the NEXT private send — same default-param
 // pattern as images/reply so plan, echo and wire agree; captured-at-submit for retries.
 let privateFileAttachments = [];
+// PER-THREAD COMPOSER DRAFTS (in-memory). The composer's text, attachments, reply and share drafts were ALL
+// process-globals, so anything typed-but-not-sent in one dialog rode along into whichever chat was opened next —
+// and could then be SENT to the wrong contact [OWNER 2026-08-26, relaying a user: "write something without
+// sending, open another chat — the same message is sitting there; that should not happen"]. Keyed by thread id
+// and synced at the renderConversation choke point (the one place every thread switch passes through), so none
+// of the dozen activeThreadId writers needs to know drafts exist. In-memory on purpose: a draft is DECRYPTED
+// content, and the wallet-scoped teardown (lock, account switch) clears the map along with everything else.
+const privateComposerDraftsByThread = new Map();
+let composerDraftThreadId = null;   // which thread the composer's CURRENT content belongs to
+
+function currentComposerDraftSnapshot() {
+  return {
+    text: messageInput?.value ?? '',
+    images: privateImageAttachments,
+    files: privateFileAttachments,
+    reply: privateReplyDraft,
+    share: privateShareDraft,
+  };
+}
+
+function composerDraftIsEmpty(draft) {
+  return !String(draft?.text ?? '').trim()
+    && !(draft?.images?.length > 0) && !(draft?.files?.length > 0)
+    && !draft?.reply && !draft?.share;
+}
+
+function syncComposerDraftToActiveThread() {
+  if (!messageInput) return;
+  const target = activeThreadId ?? null;
+  if (composerDraftThreadId === target) return;
+  if (composerDraftThreadId !== null) {
+    // Stash the PREVIOUS dialog's unsent work under its own id; an empty composer clears its stash instead — a
+    // message that was just sent must not resurrect as a draft.
+    const stash = currentComposerDraftSnapshot();
+    if (composerDraftIsEmpty(stash)) privateComposerDraftsByThread.delete(composerDraftThreadId);
+    else privateComposerDraftsByThread.set(composerDraftThreadId, stash);
+  }
+  composerDraftThreadId = target;
+  const draft = target !== null ? privateComposerDraftsByThread.get(target) : null;
+  // Arrays and strips FIRST, text LAST: image/file markers inside the serialized text index into these arrays,
+  // and the value setter rebuilds the editor DOM from the text.
+  privateImageAttachments = draft?.images ?? [];
+  privateFileAttachments = draft?.files ?? [];
+  setPrivateReplyDraft(draft?.reply ?? null);
+  setPrivateShareDraft(draft?.share ?? null);
+  messageInput.value = draft?.text ?? '';
+}
 let publicImageAttachments = [];
 let publicFileAttachments = [];
 let pendingProfileAvatarModeId = 'good';
@@ -1423,6 +1470,12 @@ function enqueueOutgoingPublish(task) {
 }
 let deferredInstallPrompt = null;
 let installedRelatedPwaDetected = false;
+// Flipped by the LAST top-level statement of this module. The install-prompt listeners register early, and the
+// browser can fire beforeinstallprompt inside a top-level-await gap MID-EVALUATION — the UI half of the handler
+// then reads quick-start wizard state that is still in its temporal dead zone (uncaught ReferenceError on
+// quickStartInstallPromptRunning, observed 2026-08-26 on the owner's stage session, Edge). Until this flips the
+// handlers only STORE what happened; the module tail replays the UI half exactly once.
+let installPromptUiReady = false;
 let walletIdentityFlashTimer = null;
 let profileAvatarPickerSuppressedUntil = 0;
 let imageLightboxPreviousFocus = null;
@@ -4634,6 +4687,9 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // known balance across a failed read must not surface wallet A's funds under wallet B. The new wallet's own reads
   // repopulate this; until then the UI shows unknown ("-"/pending), which is correct.
   vaultPocketState = { wallet: { ton_balance: null, ath_balance: null } };
+  privateComposerDraftsByThread.clear();   // drafts are decrypted content — they leave with the wallet
+  composerDraftThreadId = null;
+  if (messageInput) messageInput.value = '';
   privateImageAttachments = [];
   privateFileAttachments = [];
   setPrivateReplyDraft(null);
@@ -5527,7 +5583,30 @@ function threadSelectedIdentity(thread) {
   const displayIdentity = primaryThreadIdentity({ displayIdentity: thread?.displayIdentity });
   if (displayIdentity) return displayIdentity;
   if (thread?.localLabel) return null;
-  return primaryThreadIdentity(thread);
+  // The AUTOMATIC pick reads EVERYTHING known for the counterparty, not the sticky thread.identity. That identity
+  // latches onto whatever the FIRST applied history snapshot carried, so a dialog reborn from an address-era
+  // snapshot wore the address forever while its proven names sat right in its own menu — and a live claim was the
+  // only thing that could re-dress it, which a peer who unlinked or toggled anonymity never sends [OWNER
+  // 2026-08-26: "even if he sent anonymously the name must not fall off — I still see his wallet; he wrote to me
+  // non-anonymously before"]. The wallet is the identity and name ownership is public chain fact, so a claim is
+  // how a name is LEARNED, never how it is kept: absence is not renunciation (the public lane's rule, now both
+  // lanes'). The one honest forgetter stays the PROVEN transfer — dropThreadIdentityVariant strips the variant
+  // (and the remembered claim), and this preference falls back on its own. Among several proven names the peer's
+  // LAST self-declared one wins; preferredInboundIdentity ranks any name above the raw address.
+  const variants = threadIdentityVariants(thread);
+  return claimedThreadIdentityFromVariants(thread, variants)
+    ?? preferredInboundIdentity(variants)
+    ?? primaryThreadIdentity(thread);
+}
+
+// The identity the peer LAST called themselves — but only if it is among the KNOWN (verified) variants. The claim
+// string is typed by the sender and proves nothing, so an unverified claim never surfaces here; this only picks
+// WHICH proven name to wear when the wallet owns several.
+function claimedThreadIdentityFromVariants(thread, variants) {
+  const claimedIdentity = plathoUsernameIdentity(String(thread?.claimedSenderUsername ?? '').trim());
+  if (!claimedIdentity) return null;
+  const key = identityKey(claimedIdentity);
+  return variants.find((variant) => identityKey(variant) === key) ?? null;
 }
 
 function threadDisplayLabel(thread) {
@@ -13925,6 +14004,17 @@ function seedConvSeqMarksFromHistory(messages) {
   for (const message of messages ?? []) {
     const address = message?.convShardAddress;
     if (typeof address !== 'string' || !address) continue;
+    // AN ECHO'S CLAIM IS NOT A CHAIN FACT. An outgoing message may contribute only once the chain is KNOWN to hold
+    // its records: a capsule (the copy was read back off the shard) or a green delivery confirm (meta 'published' —
+    // the confirm read the record; statusKey 'sent'). The stamp itself is written BEFORE the broadcast, and a send
+    // that then failed keeps claiming a (shard, seq) the chain never accepted from us — while ANOTHER DEVICE of
+    // this wallet may commit that very seq with a different message [OWNER 2026-08-26: the phone ran dry mid-send,
+    // the PC then wrote fine, and the phone never showed the PC's messages "even though everything is synced" —
+    // this seeded mark made the scan skip the PC's record as already-seen, rebuilt from the red echo on every
+    // reload]. Skipping an in-flight echo here only re-reads its seq once: the safe direction.
+    if (message.type === 'out'
+      && !message.capsule?.id && !(Array.isArray(message.capsules) && message.capsules.length > 0)
+      && messageStatusKey(message) !== 'sent') continue;
     // A multipart message spans several entries in one shard; chainLastEntryId is its highest.
     const seq = Number(message.chainLastEntryId ?? message.chainEntryId);
     if (!Number.isFinite(seq)) continue;
@@ -14869,8 +14959,16 @@ function findOwnEchoForChainCopy(thread, copy) {
     const last = privateEntryIdValue({ entry_id: lastRaw }) ?? first;
     if (copySeq < first || copySeq > last) continue;
     if (echoShard !== null && copyShard !== null) {
-      if (sameConvShardAddress(echoShard, copyShard)) return message;
-      continue;   // the same seq in ANOTHER shard (another day, another root) is a different send
+      if (!sameConvShardAddress(echoShard, copyShard)) continue;   // the same seq in ANOTHER shard (another day, another root) is a different send
+      // (shard, seq) says "one of MY writers" — not "this echo". Two devices of one wallet keep independent seq
+      // counters, so a send that died before broadcast leaves this echo claiming a seq the OTHER device then
+      // commits with a different message; merging that copy in here would swallow it silently [OWNER 2026-08-26].
+      // The seal second settles authorship: the copy's signed createdAt IS the sealing device's convSealedAtMs
+      // (attemptConvMessagePublishDirect stamps both from one clock read), so agreement within the echo slack
+      // means my own bytes came back, and disagreement means another writer — let the copy stand as its own row.
+      const sealedAt = Number(message.convSealedAtMs);
+      if (Number.isFinite(sealedAt) && copyAt !== null && Math.abs(copyAt - sealedAt) > CONV_OWN_ECHO_TIME_SLACK_MS) continue;
+      return message;
     }
     const echoAt = messageCreatedAtMs(message);
     if (copyAt !== null && echoAt !== null && Math.abs(copyAt - echoAt) <= CONV_OWN_ECHO_TIME_SLACK_MS) return message;
@@ -15040,6 +15138,11 @@ function dropThreadIdentityVariant(thread, targetKey) {
   if (thread.displayIdentity && identityKey(thread.displayIdentity) === targetKey && !thread.localLabel) {
     thread.displayIdentity = null;
   }
+  // The remembered last claim must not outlive the proof: the selection prefers the last-claimed name, and the
+  // wallet-known graft (withWalletKnownIdentities) can keep offering the dropped one until the public cache
+  // reconciles — the pair would dress the dialog in a name this wallet provably no longer owns.
+  const droppedClaim = plathoUsernameIdentity(String(thread.claimedSenderUsername ?? '').trim());
+  if (droppedClaim && identityKey(droppedClaim) === targetKey) thread.claimedSenderUsername = null;
   if (kept.length > 0) refreshThreadIdentityFromVariants(thread, kept);
   applyThreadDisplayFields(thread);
   return true;
@@ -17415,7 +17518,7 @@ async function bootConvKeyStore() {
     console.warn('[conv] persistent key store unavailable, using memory (K_roots will not survive reload)', error);
     if (!convKeyStore) convKeyStore = createMemoryConvKeyStore();
   }
-  await restoreConvKeysFromRecoveryIfEmpty();
+  await restoreConvKeysFromRecoveryIfBehind();
   await restorePrefsFromRecoveryIfFresh();
   await restoreSelfNotesFromRecovery();
 }
@@ -17452,30 +17555,104 @@ function createSelfSlotStatesReader() {
     return null;
   }
 }
-async function restoreConvKeysFromRecoveryIfEmpty() {
-  if (convRecoveryRestoreAttempted || !convKeyStore || !plathoWallet?.seed) return;
-  if (convKeyStore.snapshot().size > 0) {
-    // Already holds conversations (original device, or a prior clean restore) → authoritative; backups are safe.
-    convRecoveryRestoreAttempted = true;
-    convRecoveryBackupAllowed = true;
-    return;
-  }
+// The last recovery-slot change markers this device has SEEN (restored from, or found unchanged) — wallet- and
+// deployment-scoped, because two wallets on one device must never share them. The marker is the same currency the
+// quiet-conversation valve trades in: accountStates' last_transaction_lt, monotonic per account, moved by ANY
+// inbound transaction — so it can only ever err toward a needless re-read, never toward a silent skip.
+const CONV_RECOVERY_SLOT_MARKERS_KEY = 'platho.convRecovery.slotMarkers.v1';
+function convRecoverySlotMarkersKey(owner = plathoWallet?.address) {
+  return owner ? `${CONV_RECOVERY_SLOT_MARKERS_KEY}:${deploymentStorageSuffix()}:${owner}` : null;
+}
+function readConvRecoverySlotMarkers() {
+  const key = convRecoverySlotMarkersKey();
+  if (!key) return {};
+  try { const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? '{}'); return parsed && typeof parsed === 'object' ? parsed : {}; } catch { return {}; }
+}
+function writeConvRecoverySlotMarkers(markers) {
+  const key = convRecoverySlotMarkersKey();
+  if (!key) return;
+  try { localStorageOrNull()?.setItem(key, JSON.stringify(markers)); } catch { /* cosmetic accelerator; safe to lose */ }
+}
+let convRecoveryMergeCheckedAt = 0;   // session throttle for the visible-path checks
+
+/**
+ * RESTORE FROM THE RECOVERY SLOTS WHEN THIS DEVICE IS BEHIND — not only when it is empty.
+ *
+ * The "IfEmpty" latch this replaces treated any non-empty store as authoritative and never read the slots again.
+ * That is exactly wrong for one wallet on TWO devices [OWNER 2026-08-26: "I talked to a NEW user on one client;
+ * the other client showed none of it until the user wrote again" — and his sharper framing: "if I talk on the
+ * phone and then open the desktop, losing messages IS a problem"]. A conversation BORN on device A lives in A's
+ * store and in the on-chain backup A publishes; device B's conversation scan walks only B's own store, so the
+ * dialog is structurally invisible to it — B's one remaining door is the INTRO scan, whose null-body backoff
+ * under a boot storm stretches to ~13 minutes. The slots already carry everything; only this latch kept B out.
+ *
+ * COST DISCIPLINE: a quiet device pays ONE batched accountStates over its slot addresses (the same currency the
+ * conversation valve pays every 12s for every shard). Bodies are read only when a slot's change marker moved
+ * past what this device last saw — i.e. exactly when ANOTHER writer published. importConversations is already
+ * merge-safe: it imports what is missing, upgrades only a strictly newer root, resets no local cursor otherwise.
+ */
+async function restoreConvKeysFromRecoveryIfBehind() {
+  if (!convKeyStore || !plathoWallet?.seed) return;
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return;   // no transport yet — do NOT latch; retry on the next unlock/visible
+  const storeEmpty = convKeyStore.snapshot().size === 0;
+  // Throttle the repeat checks (the visible handler fires on every tab switch); a fresh session or wallet always
+  // gets its first look.
+  if (!storeEmpty && convRecoveryRestoreAttempted && Date.now() - convRecoveryMergeCheckedAt < 60_000) return;
   try {
+    // THE CHEAP GATE, for a device that already holds conversations: have the slots changed since we last looked?
+    // The empty store skips it — it has nothing, so the full read is the point.
+    let states = null;
+    if (!storeEmpty) {
+      const readStates = createSelfSlotStatesReader();
+      if (!readStates) return;
+      const { slots } = await selfRecoveryShardSpace(plathoWallet.seed);
+      states = await readStates(slots.map((slot) => slot.address));
+      convRecoveryMergeCheckedAt = Date.now();
+      const stored = readConvRecoverySlotMarkers();
+      let moved = false;
+      for (const slot of slots) {
+        const state = states.get(publicAddrKey(slot.address));
+        if (!state) continue;                                   // never written: nothing to restore from it
+        const marker = changeMarkerOf(state);
+        if (marker !== null && stored[publicAddrKey(slot.address)] !== marker) { moved = true; break; }
+      }
+      if (!moved) {
+        // Nothing new on chain since this device last looked — local is superset-or-equal, backups are safe.
+        convRecoveryRestoreAttempted = true;
+        convRecoveryBackupAllowed = true;
+        return;
+      }
+      // A slot moved: ANOTHER writer published. Until the merge lands cleanly, our own backup could rewrite a
+      // shared slot from a map that lacks the other device's conversation — so backups wait for the clean merge.
+      convRecoveryBackupAllowed = false;
+    }
     const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
     const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
     const { map, found, clean } = await restoreConvKeysFromRecovery({
       seed: plathoWallet.seed, readView, readBody, readStates: createSelfSlotStatesReader(),
     });
     const imported = map.size > 0 ? await convKeyStore.importConversations(map) : 0;
-    globalThis.plathoLastConvRecoveryRestore = { imported, slots: found.length, clean, at: new Date().toISOString() };
+    globalThis.plathoLastConvRecoveryRestore = { imported, slots: found.length, clean, merged: !storeEmpty, at: new Date().toISOString() };
     if (clean) {
       // A clean scan is authoritative — the store now holds the whole on-chain backup, so a later backup can only grow it.
       convRecoveryRestoreAttempted = true;
       convRecoveryBackupAllowed = true;
+      if (states) {
+        const markers = {};
+        for (const [key, state] of states) {
+          const marker = changeMarkerOf(state);
+          if (marker !== null) markers[key] = marker;
+        }
+        writeConvRecoverySlotMarkers(markers);
+      }
     }  // unclean → leave both false: retry next unlock/visible, and BLOCK any backup from clobbering the fuller on-chain blob.
-    if (imported > 0) renderThreads();
+    if (imported > 0) {
+      renderThreads();
+      // The imported conversation arrives COLD (no cursor): the next sync walks it from its birth. Ask for that
+      // sync NOW — the whole point of the merge is not waiting for a door to open on its own.
+      scheduleMessageAutoSync(2_000);
+    }
   } catch (error) {
     if (!noteTonRpcRateLimit(error)) console.warn('[recovery] restore failed', error);   // no latch — retry later
   }
@@ -21856,8 +22033,11 @@ function buildThreadRow(threadId) {
   item.addEventListener('click', () => {
     const thread = threads.find((t) => t.id === item.dataset.thread);
     if (!thread) return;
-    // A reply quote references a message of the PREVIOUS dialog — drop it on any switch.
-    if (activeThreadId !== thread.id) setPrivateReplyDraft(null);
+    // The reply quote is NOT pre-cleared here any more. It used to be ("references a message of the PREVIOUS
+    // dialog — drop it on any switch"), which was the crude guard against the cross-chat leak; the per-thread
+    // draft sync in renderConversation now STASHES the whole composer draft — text, attachments, reply, share —
+    // under the dialog it belongs to and restores it on the way back. Nulling the quote here destroyed it
+    // before the stash could keep it, so a reply being typed was lost by merely peeking at another chat.
     activeThreadId = thread.id;
     appShell.dataset.chatOpen = 'true';
     // Re-selecting the CURRENT dialog lands at the end (conversationThreadChanged is false, so renderConversation's
@@ -22187,6 +22367,9 @@ function renderConversation() {
   // that re-rendering on tab open made redundant.)
   if (appShell?.dataset.view !== 'chats') return;
   const thread = activeThread();
+  // Move the composer's unsent work with the dialog it belongs to (stash the previous thread's, restore this
+  // one's) BEFORE anything below repaints composer-adjacent state.
+  syncComposerDraftToActiveThread();
   if (!thread) {
     setAvatarNode(activeAvatar, 'P', null);
     activeTitle.textContent = t('chat.noPrivateChat');
@@ -22306,7 +22489,11 @@ function renderConversation() {
     }
     // Chain anchor: the swipe-to-reply gesture reads it as the reply ref, and reply quotes scroll to it. A
     // not-yet-confirmed optimistic message has none — replying to it is gated until the entry id lands.
-    if (message.chainEntryId !== undefined && message.chainEntryId !== null) row.dataset.entryId = String(message.chainEntryId);
+    // A FAILED own message carries no chain identity worth replying to: the peer can never see it, so a reply
+    // anchor would point at nothing — or at a sibling device's record committed under the same seq [OWNER
+    // 2026-08-26, relaying a user: "you can reply to a message that did not send"]. No dataset.entryId means no
+    // swipe arming, no hover button and no beginPrivateReplyForRow target — all three affordances share it.
+    if (message.chainEntryId !== undefined && message.chainEntryId !== null && messageStatusKey(message) !== 'failed') row.dataset.entryId = String(message.chainEntryId);
     rememberMessageForRow(row, message);   // WHICH message this row is — never re-derived from the entry id (see below)
     if (message === conversationOpenFirstUnreadRef) row.dataset.firstUnread = 'true';
     const bubble = document.createElement('div');
@@ -28986,6 +29173,13 @@ function markConvDeliveryUnlanded(thread, message) {
   message.meta = 'not delivered: the shard did not store it — resend';
   message.privateManualRetryAvailable = false;
   message.privateCancelAvailable = false;
+  // The unlanded verdict is PROOF the records never existed — shed the pre-broadcast (shard, seq) claim exactly
+  // as a failure before broadcast does (attemptConvMessagePublishDirect's catch). The dead anchor otherwise keeps
+  // offering Reply on a message the peer can never see, keeps seeding the shard's seq mark at the next boot, and
+  // can alias a sibling device's record committed under the very same seq.
+  delete message.chainEntryId;
+  delete message.chainLastEntryId;
+  delete message.convShardAddress;
   thread.state = 'blocked';
   refreshThreadAfterMessageChange(thread);
   renderThreads();
@@ -29096,8 +29290,8 @@ async function attemptConvMessagePublishDirect(context) {
     coldFloor = await createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(route.address);
   }
 
-  // Seal each part as a CONV capsule and assign a strictly-increasing outgoing seq (local monotonic counter — the
-  // chain last_seq is only a cold-start floor, so two fast messages cannot collide on the same seq).
+  // Seal each part as a CONV capsule and assign a strictly-increasing outgoing seq (local monotonic counter,
+  // floored by everything this device has seen on the shard — see the allocation below).
   const streamId = randomBytes(16);
   const parts = [];
   for (let index = 0; index < documentParts.length; index += 1) {
@@ -29128,7 +29322,11 @@ async function attemptConvMessagePublishDirect(context) {
       payloadBytes, sizeClass: part.sizeClass, senderRecovery: true, now: createdAtSec * 1000,
       ...currentProfilePointerFields(),
     });
-    const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, coldFloor);
+    // BOTH floors: the cold-start chain read (above) and the WARM one — the highest seq this device has SEEN on
+    // this shard (read lane + confirmed sends, convBucketSeqMarks). The local counter alone is blind to records
+    // committed by this wallet's OTHER devices; a device that fell behind would re-claim committed seqs and bounce
+    // off the shard's anti-rollback gate on every send until its own counter caught up.
+    const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, Math.max(coldFloor, convBucketSeqHighWater(route.address)));
     parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
   }
 
@@ -29141,7 +29339,7 @@ async function attemptConvMessagePublishDirect(context) {
   // id the moment the send gains one — and had no writer, so it never ran once.
   //
   // The id is the publish seq, and it is known HERE rather than read back later: nextOutgoingSeq is the local
-  // monotonic counter that IS the record's identity on the shard (the chain last_seq only seeds a cold epoch), so
+  // monotonic counter that IS the record's identity on the shard (floored by what this device has seen there), so
   // the peer stores this exact number for this exact message. MIN, not max, because a multipart message is anchored
   // by its FIRST record on both sides — the receiver takes orderedByChain[0] — and the parts are published with
   // strictly increasing seq in part order.
@@ -29160,20 +29358,21 @@ async function attemptConvMessagePublishDirect(context) {
   message.convShardAddress = route.address;
   if (parts.length > 1) message.chainLastEntryId = String(Math.max(...parts.map((part) => part.seq)));
 
-  // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
-  // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a
-  // conversation part carries a CONSUMED seq (nextOutgoingSeq already advanced), so the dropped tail cannot be
-  // re-sent under the same seq. Fail-open on an unreadable balance; the send stays the authority.
-  await assertWalletGramAtLeast(
-    CONV_PUBLISH_VALUE * BigInt(parts.length)
-      + walletSendFeeReserveNanotons(parts.map((part) => part.capsule?.header0?.sizeClass)), 'send');
-
   let result;
   // Diagnostics for the send path, which had none. `sendInFlight` is what tells "the call never returned" apart from
   // "it threw and is retrying" — the dump could not distinguish those, and both render as the word "sending".
   globalThis.plathoConvSendInFlight = (globalThis.plathoConvSendInFlight ?? 0) + 1;
   const sendStartedAt = Date.now();
   try {
+    // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
+    // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a
+    // conversation part carries a CONSUMED seq (nextOutgoingSeq already advanced), so the dropped tail cannot be
+    // re-sent under the same seq. Fail-open on an unreadable balance; the send stays the authority. INSIDE the
+    // try, deliberately: an underfunded send must exit through the same catch as every other pre-broadcast
+    // failure and shed its chain claim there.
+    await assertWalletGramAtLeast(
+      CONV_PUBLISH_VALUE * BigInt(parts.length)
+        + walletSendFeeReserveNanotons(parts.map((part) => part.capsule?.header0?.sizeClass)), 'send');
     result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
     // seqno lives at result.result.seqno: publishConvLaneParts returns { parts, result } and `result` is what
     // sendPlathoWalletTransaction returned, which spreads the FIRST built external ({ boc, seqno, wallet }).
@@ -29211,6 +29410,17 @@ async function attemptConvMessagePublishDirect(context) {
     // Keeping the old record let the next Retry rebuild AGAIN while the new external might still land: double publish.
     if (error?.builtBoc) message.convDirectSend = { boc: error.builtBoc, seqno: error.builtSeqno ?? null, at: Date.now() };
     if (Array.isArray(error?.preparedParts)) captureConvDeliveryConfirmTarget(message, { address: route.address, epoch: route.epoch, commits: error.preparedParts.map((p) => p.commit), maxSeq: Math.max(...parts.map((p) => p.seq)) });
+    // NOTHING LEFT THE DEVICE (no signed external captured — the affordability gate, a build or a signing
+    // failure): the pre-broadcast (shard, seq) stamp is now a claim about records that will never exist under our
+    // bytes, while another device of this wallet may commit those very seqs with different messages [OWNER
+    // 2026-08-26]. Shed the claim: without it the red echo can neither alias the foreign record
+    // (findOwnEchoForChainCopy) nor seed the shard's seq mark (seedConvSeqMarksFromHistory). The consumed seqs
+    // stay consumed — a gap on the shard is the safe direction, and a Retry re-runs the pipeline and stamps fresh.
+    if (!error?.builtBoc) {
+      delete message.chainEntryId;
+      delete message.chainLastEntryId;
+      delete message.convShardAddress;
+    }
     // `broadcast` distinguishes the two outcomes that matter and that nothing recorded before: a throw with a signed
     // external attached means the request DID go out and the answer was lost (an ambiguous broadcast — the external
     // may well have landed), whereas no external means we failed before anything left the device.
@@ -30662,23 +30872,30 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
     .catch(() => {});
 }
 
-// The install state changes in exactly two places, and BOTH are event handlers — they can only fire after this
-// module has finished evaluating, which is why the quick-start step refresh is safe here and not inside
-// refreshInstallButtons (see the note there: that one also runs at top level, where the wizard's state is still in
-// its temporal dead zone). The step is what the user is looking at when a sheet becomes available mid-onboarding.
+// The install state changes in exactly two places, and both are event handlers. This block used to claim they
+// "can only fire after this module has finished evaluating" and called the quick-start refresh directly on that
+// strength — FALSE: a top-level await suspends evaluation and turns the event loop, and Edge fired
+// beforeinstallprompt inside such a gap while the wizard's state further down was still in its temporal dead
+// zone (uncaught ReferenceError, 2026-08-26). So each handler does the always-safe half immediately — capture
+// the event into state declared at the top of the module — and the UI half runs only once the module tail has
+// flipped installPromptUiReady; a prompt captured before that is replayed by the tail exactly once.
+function applyDeferredInstallPromptUi() {
+  refreshInstallButtons();
+  refreshQuickStartInstallStep();
+  openInstallDialogIfUseful();
+}
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
   installedRelatedPwaDetected = false;
-  refreshInstallButtons();
-  refreshQuickStartInstallStep();
-  openInstallDialogIfUseful();
+  if (installPromptUiReady) applyDeferredInstallPromptUi();
 });
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
   installedRelatedPwaDetected = true;
   markInstallPromptDismissed();
   closeInstallDialog({ dismissed: false });
+  if (!installPromptUiReady) return;   // mid-evaluation install: the tail repaints from current state anyway
   refreshInstallButtons();
   refreshQuickStartInstallStep();
 });
@@ -30702,7 +30919,7 @@ document.addEventListener('visibilitychange', () => {
     armIntroReceiveLane().catch((error) => console.warn('[intro] arm on visible failed', error));
     // Retry a recovery restore that a transient RPC error left incomplete (it did not latch), and re-fire a backup a
     // background-lock cancelled — a foreground-only session never re-boots, so this is the only place these recover.
-    restoreConvKeysFromRecoveryIfEmpty().then(rearmRecoveryBackupIfDirty).then(runRecoveryFreezeSweep).catch((error) => console.warn('[recovery] visible retry failed', error));
+    restoreConvKeysFromRecoveryIfBehind().then(rearmRecoveryBackupIfDirty).then(runRecoveryFreezeSweep).catch((error) => console.warn('[recovery] visible retry failed', error));
     // Return-from-wallet-app: refresh a quick-start balance step so topped-up funds show right away.
     quickStartRefreshCurrentBalanceStep();
     if (isVaultViewActive()) {
@@ -31928,3 +32145,9 @@ bootCrypto()
     return undefined;
   })
   .catch((error) => { setBootDebug(`boot-chain-err ${error?.message ?? error}`); console.error(error); });
+
+// LAST TOP-LEVEL STATEMENT, deliberately: nothing after this line can be in a temporal dead zone, whatever
+// top-level awaits suspended above. If the browser offered the install prompt while evaluation was suspended,
+// run the UI half the handler had to skip.
+installPromptUiReady = true;
+if (deferredInstallPrompt) applyDeferredInstallPromptUi();

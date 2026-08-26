@@ -60,6 +60,22 @@ describe('CONV-KEY-STORE', () => {
     expect(await store.nextOutgoingSeq(A, B, 19001, 0)).toBe(1);
   });
 
+  it('CKS-09: the floor pushes a WARM counter forward — a device behind its sibling cannot re-claim committed seqs', async () => {
+    // Two devices of ONE wallet keep independent outgoing counters for the same conversation. The counter used
+    // to consult the chain only on a COLD epoch, so a device that fell behind (its sibling had published seqs
+    // past its local counter) kept allocating already-committed seqs: those sends bounce off the shard's
+    // anti-rollback gate, and their pre-broadcast echo stamps alias the sibling's records [OWNER 2026-08-26:
+    // the phone's dead send hid the PC's messages]. The floor is whatever the caller has SEEN on the shard;
+    // max() keeps a stale floor harmless, so the CKS-05 guarantee holds unchanged.
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    expect(await store.nextOutgoingSeq(A, B, 19100, 0)).toBe(1);   // the epoch is warm from here on
+    // The read lane then sees the sibling's records up to seq 6 on this shard...
+    expect(await store.nextOutgoingSeq(A, B, 19100, 6), 'the floor lifts a lagging warm counter past the sibling').toBe(7);
+    // ...while a floor BELOW the local counter changes nothing (CKS-05, restated for a warm epoch).
+    expect(await store.nextOutgoingSeq(A, B, 19100, 2), 'a stale floor never rolls the counter back').toBe(8);
+  });
+
   it('CKS-06: peerWallet (the INTRO tx src) is stored on create and preserved across a re-INTRO', async () => {
     const store = createMemoryConvKeyStore();
     const walletA = '0:' + 'ab'.repeat(32);

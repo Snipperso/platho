@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-08-26T12:11:29.861Z",
+  "generatedAt": "2026-08-26T15:11:05.789Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -9,8 +9,8 @@
   "noBackendRuntime": true,
   "runtime": {
     "fileCount": 258,
-    "totalBytes": 6383170,
-    "bundleSha256": "f5a70e4777afc0d089f94ce230e53455289dbec0b7c7923f4aeb57a8df3a9fdf",
+    "totalBytes": 6399911,
+    "bundleSha256": "d2f75b8b539d7fb238d32a5b7c0549755cca687525764ad01a8af1e71ce8adca",
     "files": [
       {
         "path": "airdrop-pool-read.mjs",
@@ -24,8 +24,8 @@
       },
       {
         "path": "app.js",
-        "bytes": 1731251,
-        "sha256": "ae97c721660f66dc3fb7db27277a2601189af6b23c53d5323b3ef9ce41139d60"
+        "bytes": 1747496,
+        "sha256": "1283a01cd27f097582ff6032b387d4f132aded12842d3cf40322eeb015b29e0d"
       },
       {
         "path": "assets/icons/about.svg",
@@ -310,12 +310,12 @@
       {
         "path": "conv-key-persist.mjs",
         "bytes": 9097,
-        "sha256": "4201c3068466502207a48b8763f5273ea0014d3190077d8a33e0a5bf64e7ab4b"
+        "sha256": "6b33fc45f07f6130e42ff0bbf875ff910fdc97ac9e2baeb958d57347796e7f66"
       },
       {
         "path": "conv-key-store.mjs",
-        "bytes": 13273,
-        "sha256": "e708f0e6006c647286b75249474e318cf2cc9fd4dab2535c8a9123e5b7e77de8"
+        "bytes": 13767,
+        "sha256": "ab46b80c76c7b87ad9cbaa7efe03086f77ed6d73b3b68a7b49af51f0fefc8dad"
       },
       {
         "path": "conv-lane-read.mjs",
@@ -629,8 +629,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 73871,
-        "sha256": "95d0a121af16c9777ed3a728d2067925ae8b188da7b7776dda9d1a8a22677f2b"
+        "bytes": 73873,
+        "sha256": "fb1495c867c2dff248c1a3c2aef8a584d3ba20c8cd43c7651701640d8b3ea7f9"
       },
       {
         "path": "intro-bucket.mjs",
@@ -885,7 +885,7 @@
       {
         "path": "sw.js",
         "bytes": 15539,
-        "sha256": "aee2129a962ecb66c5203d72a75db25565d720e9964375f08545d1257f31df11"
+        "sha256": "27528a9782670f1884aa93ad90174f638ae4e9d223e726ed440b7b4527c467ca"
       },
       {
         "path": "terms.html",
