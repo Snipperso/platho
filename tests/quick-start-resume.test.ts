@@ -489,11 +489,17 @@ describe('quick-start resume + activation gate guard', () => {
       expect(I18N_STRINGS.en[key], `${key} must ship`).toBeTruthy();
       expect(I18N_STRINGS.ru[key], `${key} must ship in ru`).toBeTruthy();
     }
-    // [OWNER 2026-08-10] No password re-prompt in the wizard: an unlocked wallet can only exist because the
-    // password was entered this session (plathoWallet is memory-only, never cached, and the three functions that
-    // set it all demand the password), and here that was seconds ago on the step above.
-    expect(body, 'the wizard must not re-ask for a password it just took')
-      .not.toMatch(/confirmWalletPasswordForExport/);
+    // [OWNER 2026-08-10] the wizard does not re-ask for the password it just took — but ONLY while the foreground
+    // stretch still belongs to whoever typed it. The 5-minute background grace [OWNER 2026-08-25] made "unlocked"
+    // inheritable by whoever picks the device up inside the window, and this wizard resurfaces on its own for any
+    // backup-pending wallet — so without the boundary it was a password-free road to the SEED. The boundary is a
+    // background transition: the creating user never crosses one between create and save-seed, a thief always does.
+    expect(body).toMatch(/if \(walletLeftForegroundSinceUnlock && !\(await confirmWalletPasswordForExport\(wallet\)\)\) return;/);
+    const appAll = app;
+    expect(appAll, 'the flag rises on BOTH exit doors (they share this function)')
+      .toMatch(/function noteWalletUnlockInterruptedByBackground\(\) \{\s*\n\s*walletLeftForegroundSinceUnlock = true;/);
+    expect(appAll, 'and falls only when a password is actually typed')
+      .toMatch(/lastWalletUnlockAt = Date\.now\(\);\s*\n\s*walletLeftForegroundSinceUnlock = false;/);
     // The Wallet tab keeps its prompt — there the gap can be hours of an unlocked phone.
     expect(app).toMatch(/exportWalletSeedButton\?\.addEventListener[\s\S]{0,200}?confirmWalletPasswordForExport\(wallet\)/);
     // Continue now passes through, so the SAFETY NET is the pending-backup nudge, not the stepper. If this ever

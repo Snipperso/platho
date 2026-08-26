@@ -2073,7 +2073,7 @@ describe('PWA runtime config guard', () => {
     // invisible there; a phone freezes the page and hands it back intact, and the unlock prompt is dismissable
     // by design (declining reveals the app "in its locked state").
     const app = readFileSync('web/app.js', 'utf8');
-    const lock = app.slice(app.indexOf('function lockPlathoWallet(status = '), app.indexOf('const TELEGRAM_BACKGROUND_LOCK_GRACE_MS'));
+    const lock = app.slice(app.indexOf('function lockPlathoWallet(status = '), app.indexOf('const BACKGROUND_LOCK_GRACE_MS'));
     expect(lock.length, 'the slice really spans the lock').toBeGreaterThan(1200);
     // PRIVATE ONLY: public channel rows share this list and are not secrets — the public surface works while locked.
     expect(lock).toMatch(/threads = threads\.filter\(\(thread\) => Boolean\(thread\.publicChannelId\)\);/);
@@ -2085,11 +2085,11 @@ describe('PWA runtime config guard', () => {
     expect(lock, 'a lock is not a wallet change').not.toMatch(/clearWalletScopedRuntimeState\(/);
   });
 
-  it('PWA-WALLET-LOCK-TIMING-01: wallet auto-lock timers relaxed per owner (idle 30min, TG background 5min, send grace 10min)', () => {
+  it('PWA-WALLET-LOCK-TIMING-01: wallet auto-lock timers relaxed per owner (idle 30min, background 5min everywhere, send grace 10min)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // Owner-chosen values (2026-06-22): the wallet was auto-locking too eagerly and interrupting slow sends.
     expect(app).toMatch(/const WALLET_AUTO_LOCK_MS = 30 \* 60 \* 1000/);
-    expect(app).toMatch(/const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 300_000/);
+    expect(app).toMatch(/const BACKGROUND_LOCK_GRACE_MS = 300_000/);
     expect(app).toMatch(/const SEND_LOCK_MAX_GRACE_MS = 600 \* 1000/);
     // The hard idle lock still exists (this is a relaxation, not a removal).
     expect(app).toMatch(/walletAutoLockTimer = setTimeout\(\(\) => \{\s*lockPlathoWallet\(t\('wallet\.locked'\)\);\s*\}, WALLET_AUTO_LOCK_MS\)/);

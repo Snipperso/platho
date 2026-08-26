@@ -68,7 +68,7 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
   const source = `
     ${constant('WALLET_AUTO_LOCK_MS')}
     ${constant('WALLET_TRANSIENT_LOCK_GRACE_MS')}
-    ${constant('TELEGRAM_BACKGROUND_LOCK_GRACE_MS')}
+    ${constant('BACKGROUND_LOCK_GRACE_MS')}
     ${constant('SEND_LOCK_MAX_GRACE_MS')}
 
     // ── a clock and a timer wheel the test owns ────────────────────────────────────────────────────────────
@@ -144,7 +144,6 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
     const hasStoredPlathoWalletRecord = () => true;
     const privateOutboundWorkActive = () => sendHoldsKey;
     const isTelegramEnv = () => ${telegram ? 'true' : 'false'};
-    const isTelegramSuspendingPlatform = () => false;
     // The mask. Raised synchronously by scheduleWalletUnlockPrompt before the dialog timer, which is the whole
     // point of it — see PWA-BOOT-RELOCK in tests/pwa-runtime-config.
     // Idempotent, exactly like the shipped one (\`if (!bootScreen || bootScreenActive) return;\`) — the mask is
@@ -309,14 +308,14 @@ describe('background wallet lock deferral', () => {
     const tg = harness({ telegram: true });
     tg.advance(WALLET_BLIP + 1_000);
     tg.goAway();
-    tg.advance(TELEGRAM_GRACE - 1_000);
+    tg.advance(BACKGROUND_GRACE - 1_000);
     tg.comeBack();
     expect(tg.state().unlocked, 'Telegram backgrounds on the smallest interaction; that is not a departure').toBe(true);
 
     const away = harness({ telegram: true });
     away.advance(WALLET_BLIP + 1_000);
     away.goAway();
-    away.suspend(TELEGRAM_GRACE + 1_000);   // frozen timer — only the return door can settle this
+    away.suspend(BACKGROUND_GRACE + 1_000);   // frozen timer — only the return door can settle this
     away.comeBack();
     expect(away.state().unlocked, 'past the grace it locks, timer or no timer').toBe(false);
     expect(away.state().overlayRaised).toBe(1);
@@ -332,6 +331,34 @@ describe('background wallet lock deferral', () => {
     h.comeBack();
     expect(h.state().hardLocks, 'a focus event with no deferral behind it locks nothing').toBe(0);
     expect(h.state().dialogOpen).toBe(true);
+  });
+
+  it('BGLOCK-10: the background grace is no longer Telegram-only — a plain departure defers everywhere', () => {
+    // [OWNER 2026-08-25: "5 minutes is more adequate. We have things like getting an RPC key, which can take a
+    // while ... it makes the app much easier to work with."] The grace used to be granted only inside Telegram,
+    // because Telegram backgrounds its WebView on every small interaction. Leaving any app to fetch something and
+    // coming straight back is the same moment. Safe to generalise because the deadline is enforced on the RETURN
+    // door by the wall clock, not by the timer that armed it.
+    const back = harness();
+    back.advance(WALLET_BLIP + 1_000);   // past the just-unlocked blip window, which routes elsewhere
+    back.goAway();
+    back.suspend(BACKGROUND_GRACE - 1_000);   // frozen, not ticking: the timer never fires
+    back.comeBack();
+    expect(back.state().unlocked, 'back inside the window: nothing happened').toBe(true);
+
+    const late = harness();
+    late.advance(WALLET_BLIP + 1_000);
+    late.goAway();
+    late.suspend(BACKGROUND_GRACE + 1_000);
+    late.comeBack();
+    expect(late.state().unlocked, 'past the deadline, the return door locks even though no timer ran').toBe(false);
+
+    // And a page that keeps running does not wait to be looked at.
+    const awake = harness();
+    awake.advance(WALLET_BLIP + 1_000);
+    awake.goAway();
+    awake.advance(BACKGROUND_GRACE + 1);
+    expect(awake.state().unlocked, 'the armed timer fires against a still-hidden page').toBe(false);
   });
 
   it('BGLOCK-09: the lock takes the decrypted conversations with it, and leaves the public ones', () => {
@@ -366,7 +393,13 @@ describe('background wallet lock deferral', () => {
     expect(deferBranch.length, 'the slice must not collapse or run away').toBeGreaterThan(100);
     expect(deferBranch, 'a deferral must leave a deadline behind').toContain('scheduleBackgroundGraceLock(WALLET_TRANSIENT_LOCK_GRACE_MS);');
     expect((app.match(/shouldIgnoreTransientWalletLock\(\)/g) ?? []).length, 'definition + the three readers above').toBe(4);
-    expect(app).toMatch(/function lockPlathoWalletForBackground\(\)[\s\S]{0,900}?scheduleBackgroundGraceLock\(TELEGRAM_BACKGROUND_LOCK_GRACE_MS\);/);
+    // THE GRACE IS NO LONGER TELEGRAM'S ALONE [OWNER 2026-08-25: "5 minutes is more adequate ... it makes the app
+        // much easier to work with"]. What made it safe to generalise is that the deadline is enforced on the RETURN
+        // door by the wall clock, not by the timer that armed it — so a platform that freezes timers while hidden is
+        // caught all the same, which is what retired the iOS carve-out.
+        expect(app).toMatch(/function lockPlathoWalletForBackground\(\)[\s\S]{0,1400}?scheduleBackgroundGraceLock\(BACKGROUND_LOCK_GRACE_MS\);/);
+        expect(app, 'the carve-out is gone, not merely bypassed').not.toMatch(/isTelegramSuspendingPlatform/);
+        expect(app, 'and the grace is not gated on being inside Telegram').not.toMatch(/if \(isTelegramEnv\(\) &&[^)]*\) \{\s*\n\s*scheduleBackgroundGraceLock/);
     expect(app).toMatch(/function shouldDeferServiceWorkerReload\(\)[\s\S]{0,200}?shouldIgnoreTransientWalletLock\(\)/);
     expect(app, 'and the dialog clause is what the reloader is reading through it')
       .toMatch(/function shouldIgnoreTransientWalletLock\(\) \{\s*return Boolean\(activeActionDialog\)/);
@@ -385,7 +418,7 @@ describe('background wallet lock deferral', () => {
     // closes the image lightbox in turn, but a lightbox opened straight from a message has no action dialog above
     // it, so a decrypted photo stayed on screen over a locked app. The sweep is now a named list
     // (closeSessionOverlays), which is what stops the next window being forgotten — see PWA-LIGHTBOX-LOCK-01.
-    const lockBody = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('const TELEGRAM_BACKGROUND_LOCK_GRACE_MS'));
+    const lockBody = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('const BACKGROUND_LOCK_GRACE_MS'));
     expect(lockBody, 'the overlays go with the session that owned them').toContain('closeSessionOverlays();');
     expect(app).toMatch(/function closeSessionOverlays\(\) \{[\s\S]{0,400}?closeActionDialog\(null\);[\s\S]{0,400}?closeImageLightbox\(\);/);
     const seedGate = app.slice(app.indexOf('async function enforceTelegramSeedBackupGate('), app.indexOf('function showTelegramManualExportDialog('));
@@ -401,5 +434,5 @@ function shippedNumber(name: string) {
   return new Function(`${line}; return ${name};`)() as number;
 }
 const WALLET_BLIP = shippedNumber('WALLET_TRANSIENT_LOCK_GRACE_MS');
-const TELEGRAM_GRACE = shippedNumber('TELEGRAM_BACKGROUND_LOCK_GRACE_MS');
+const BACKGROUND_GRACE = shippedNumber('BACKGROUND_LOCK_GRACE_MS');
 const SEND_GRACE = shippedNumber('SEND_LOCK_MAX_GRACE_MS');

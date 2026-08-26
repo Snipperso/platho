@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.7';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.8';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -2777,12 +2777,6 @@ function telegramPlatform() {
   return tg && typeof tg.platform === 'string' ? tg.platform : '';
 }
 
-function isTelegramSuspendingPlatform() {
-  // iOS WKWebView freezes a backgrounded Mini App (timers stop), so a deferred
-  // background-lock timer would never fire there — keep lock-on-suspend on iOS.
-  return telegramPlatform() === 'ios';
-}
-
 // RE-ASK, BECAUSE THE FIRST ANSWER IS TAKEN MID-MOVE.
 //
 // Telegram reports viewportChanged while the window is still animating — minimise and restore both send it with
@@ -5020,6 +5014,7 @@ function noteWalletActivity() {
 
 function markWalletUnlocked() {
   lastWalletUnlockAt = Date.now();
+  walletLeftForegroundSinceUnlock = false;   // the password was just typed: this foreground stretch is theirs
   walletUnlockPromptPending = false;
   walletUnlockPromptInterrupted = false;
   // A wallet in hand settles the question the flag was holding open.
@@ -5213,7 +5208,21 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   reloadForPendingServiceWorkerAppShellUpdate();
 }
 
-const TELEGRAM_BACKGROUND_LOCK_GRACE_MS = 300_000;
+// FIVE MINUTES OF GRACE, EVERYWHERE [OWNER 2026-08-25: "5 minutes is more adequate. We have things like
+// getting an RPC key, which can take a while. 5 minutes is not critical in my view, and it makes the app much
+// easier to work with."] It used to be Telegram's alone, because Telegram backgrounds its WebView on the smallest
+// interaction and locking on each one made the wallet unusable. The same is true of any app you leave to fetch
+// something and come straight back to.
+//
+// WHAT MADE THIS SAFE TO GENERALISE: the deadline is enforced on the RETURN door by the wall clock
+// (enforceBackgroundGraceLockOnReturn), not by the timer that armed it. That is why the old iOS carve-out is gone
+// too: it existed because a suspended WebView freezes timers, so a deferred lock would never fire — a timer
+// problem, and the timer is no longer what decides.
+//
+// THE COST, STATED: for these five minutes the keys stay in memory and the conversations stay on screen, so a
+// phone handed to someone within that window shows them. The owner weighed that against the friction and chose
+// the grace. The 30-minute idle backstop and the on-return deadline both still govern.
+const BACKGROUND_LOCK_GRACE_MS = 300_000;
 let backgroundGraceLockTimer = null;
 let backgroundGraceLockDeadline = 0;
 
@@ -5280,14 +5289,17 @@ function enforceBackgroundGraceLockOnReturn() {
 }
 
 function lockPlathoWalletForBackground() {
-  // Telegram (Desktop/Android) backgrounds the WebView on the smallest interaction
-  // (opening its own UI, the attachment sheet, switching chats). Hard-locking on every
-  // such transition makes the wallet unusable, so defer to a short background-grace
-  // timer there — the page keeps running, so the timer fires and locks if still hidden.
-  // iOS suspends the WebView (timers freeze), so it keeps the immediate lock-on-suspend
-  // below; resume after suspend is keyless by design. closing-confirmation guards true close.
-  if (isTelegramEnv() && !isTelegramSuspendingPlatform() && plathoWallet && !shouldIgnoreTransientWalletLock()) {
-    scheduleBackgroundGraceLock(TELEGRAM_BACKGROUND_LOCK_GRACE_MS);
+  // GOING AWAY STARTS A DEADLINE, IT DOES NOT LOCK. Telegram backgrounds its WebView on the smallest interaction
+  // — opening its own menu, the attachment sheet, switching chats — and locking on each one made the wallet
+  // unusable; leaving any app to fetch something and coming straight back is the same shape of moment, which is
+  // why the grace is no longer Telegram's alone (see BACKGROUND_LOCK_GRACE_MS for the owner's decision and its
+  // cost). The deadline is enforced on the RETURN door by the wall clock, so a platform that freezes timers while
+  // hidden is caught all the same — which is what retired the old iOS carve-out.
+  //
+  // The lock below still runs for the one case the grace cannot cover: no wallet to defer, or a transient lock
+  // that something on screen is holding open (shouldIgnoreTransientWalletLock, which arms its own deadline).
+  if (plathoWallet && !shouldIgnoreTransientWalletLock()) {
+    scheduleBackgroundGraceLock(BACKGROUND_LOCK_GRACE_MS);
     return;
   }
   lockPlathoWallet(t('wallet.locked'), { transient: true });
@@ -5300,7 +5312,14 @@ function lockPlathoWalletForBackground() {
  * and pagehide, come through here), which is why the declined flag is dropped here: "not now" was an answer about
  * the session the user was in, and going away ends it. Coming back is a new arrival.
  */
+// Has the app been to the BACKGROUND since the password was last typed? The seed plate's no-prompt rule hangs on
+// "the password was entered in this session", and the 5-minute background grace changed what a session is: an
+// unlocked wallet can now be inherited by whoever picks the device up inside the window. A background transition
+// is exactly the boundary the thief must cross and the creating user never does, so it is the test.
+let walletLeftForegroundSinceUnlock = false;
+
 function noteWalletUnlockInterruptedByBackground() {
+  walletLeftForegroundSinceUnlock = true;
   if (walletUnlockPromise) walletUnlockPromptInterrupted = true;
   walletUnlockPromptDeclined = false;
 }
@@ -30977,11 +30996,15 @@ function buildQuickStartBackupBody() {
   };
   plate(t('quickstart.seedPlateNote'), t('quickstart.saveSeedAction'), async () => {
     const wallet = requirePlathoWallet();
-    // No password re-prompt HERE. An unlocked wallet can only exist because the password was entered in this
-    // session — plathoWallet lives in memory alone, is never cached, and the only three functions that set it
-    // (create / unlock / import key) all demand the password first. In the wizard that moment was seconds ago,
-    // on the step above. The Wallet tab keeps its prompt: there the gap between unlocking and pressing can be
-    // hours of the phone lying around unlocked, and the phrase is the one secret that never expires.
+    // NO PROMPT ONLY WHILE THE FOREGROUND STRETCH BELONGS TO WHOEVER TYPED THE PASSWORD. The old rule was "an
+    // unlocked wallet can only exist because the password was entered in this session" — true until the 5-minute
+    // background grace, under which an unlocked session is inherited by whoever picks the device up inside the
+    // window [OWNER 2026-08-25]. The seed is the one secret that never expires, and this wizard resurfaces ON ITS
+    // OWN for any wallet whose backup is pending, so it was the one password-free road to it. The boundary that
+    // separates the two readers is a BACKGROUND TRANSITION: the creating user goes create -> save seed without
+    // leaving, the thief by definition arrives after one. So that transition, not a timer, is the gate — and the
+    // creation flow keeps exactly the frictionless step the no-prompt rule existed for.
+    if (walletLeftForegroundSinceUnlock && !(await confirmWalletPasswordForExport(wallet))) return;
     await showWalletSeed(t('wallet.recoveryPhrase'), exportPlathoWalletRecoveryPhrase(wallet));
   });
   plate(t('quickstart.keyFilePlateNote'), t('quickstart.saveWalletKeyAction'), async () => {
