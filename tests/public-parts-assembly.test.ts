@@ -31,16 +31,20 @@ function loadAssemble() {
     const decodeMessageDocumentBlocks = (bytes) => {
       const count = bytes[0];
       if (bytes.length !== 1 + count) throw new Error('Document message has trailing bytes');
-      return Array.from(bytes.slice(1)).map((b) => ({ type: 'text', text: String.fromCharCode(b) }));
+      // Byte 255 stands in for the SENDER tag (the author-username claim riding a post since 2026-08-26).
+      return Array.from(bytes.slice(1)).map((b) => (b === 255 ? { type: 'sender', username: 'alice' } : { type: 'text', text: String.fromCharCode(b) }));
     };
     const displayBlocksFromDocumentBlocks = (blocks) => blocks;
     const messagePreviewFromBlocks = (blocks) => blocks.map((b) => b.text).join('');
     const publicEntryIdBigInt = (id) => { try { return BigInt(String(id).replace(/[^0-9]/g, '') || '0'); } catch { return null; } };
     const bytesToImageDataUrl = () => 'data:image/webp;base64,stub';
     const console = { warn() {} };
+    // The adopter is outside the extracted slice; the harness records its calls for the PARTS-05 assertions.
+    const adopted = [];
+    const adoptPostSenderUsernameClaim = (wallet, claim) => { adopted.push([wallet, claim]); };
   `;
   // eslint-disable-next-line no-new-func
-  return new Function(`${prelude}\n${source}\nreturn assemblePublicParts;`)();
+  return new Function(`${prelude}\n${source}\nassemblePublicParts.adopted = adopted;\nreturn assemblePublicParts;`)();
 }
 
 const docPart = (over: Record<string, unknown>) => ({
@@ -89,6 +93,25 @@ describe('PARTS — multipart assembly survives the real world', () => {
     ];
     const out = assemble([...broken, ...good]);
     expect(out.map((entry: any) => entry.text), 'the good comment went down with the bad one').toContain('OK');
+  });
+
+  it('PARTS-05: a sender tag is adopted and stripped; its absence adopts nothing', () => {
+    // [OWNER 2026-08-26: a feed author who owns a .ath showed as a bare address — the only public carrier of the
+    // claim was the channel-profile block, which this author never published.] The tag now rides ordinary posts;
+    // the assembly hands the claim to the adopter and keeps the tag out of the rendered blocks. The second half
+    // is the no-strip rule: a legacy post carries no tag, and that absence must adopt NOTHING — an empty claim
+    // fed to the verifier would clear a name already proven from a profile.
+    const assemble = loadAssemble();
+    const tagged = docPart({ partIndex: 0, partCount: 1, documentBytes: new Uint8Array([2, 72, 255]) });
+    const out = assemble([tagged]);
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toBe('H');
+    expect(out[0].blocks.some((block: any) => block?.type === 'sender'), 'the tag must not reach rendering').toBe(false);
+    expect((assemble as any).adopted).toEqual([['0:aa', 'alice']]);
+
+    const legacy = loadAssemble();
+    legacy([docPart({ partIndex: 0, partCount: 1, documentBytes: new Uint8Array([1, 72]) })]);
+    expect((legacy as any).adopted, 'no tag, no adoption — absence is not a renunciation').toEqual([]);
   });
 
   it('PARTS-04: an incomplete multipart group is still dropped', () => {

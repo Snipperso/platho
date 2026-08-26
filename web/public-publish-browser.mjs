@@ -17,7 +17,7 @@
 
 import { beginCell } from './pwa-contract-transactions.mjs?v=37';
 import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=7';
-import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=5';
+import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=6';
 
 // "PSP1" — message(0x50535031) PublicPublish. MUST equal the opcode PublicShard.tact declares; mirrored here (not
 // imported from the reader) because a builder that derives its own opcode is the independent check, and drift shows

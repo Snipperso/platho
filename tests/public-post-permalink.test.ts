@@ -23,7 +23,7 @@ const html = readFileSync('web/index.html', 'utf8');
 const caddy = readFileSync('deploy/Caddyfile', 'utf8');
 
 /** Lift the pure link functions out of app.js and RUN them, with the app-level helpers they touch stubbed. */
-function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: string }> = {}) {
+function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: string }> = {}, own: { wallet?: string, label?: string } = {}) {
   const start = app.indexOf('const PERMALINK_RESERVED_SEGMENTS');
   const end = app.indexOf('function parsePublicPostPermalink(');
   expect(start).toBeGreaterThan(-1);
@@ -33,6 +33,12 @@ function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: st
   const source = `${app.slice(start, end)}\n${app.slice(parseStart, parseEnd)}`;
   const prelude = `
     const location = { origin: 'https://platho.app' };
+    // The own-wallet branch [OWNER 2026-08-26]: null wallet = "someone else's device" (every pre-existing case);
+    // the post harness sets ownWallet/ownLabel to model the author's own device.
+    const plathoWallet = typeof ownWallet === 'undefined' ? null : { address: ownWallet };
+    const storedPlathoWalletRecord = () => null;
+    const sameWalletAddress = (a, b) => String(a ?? '') !== '' && String(a ?? '') === String(b ?? '');
+    const readLinkedPlathoUsername = () => (typeof ownLabel === 'undefined' || !ownLabel ? null : { label: ownLabel });
     const publicChannelProfileCache = ${JSON.stringify(profiles)};
     const channelProfileCacheKey = (w) => String(w ?? '');
     const rawWalletAddress = (w) => (typeof w === 'string' && w.startsWith('0:') ? w : null);
@@ -43,12 +49,21 @@ function loadPermalinkFunctions(profiles: Record<string, { verifiedUsername?: st
   // eslint-disable-next-line no-new-func
   // The REAL sha256 is handed in, not stubbed: a fingerprint computed here has to be the one the app builds, or
   // this file would be checking a shape rather than the value a shared link actually carries.
-  return new Function('nobleSha256', `${prelude}\n${source}\nreturn { publicPostPermalink, publicPostPermalinkAuthorSegment, parsePublicPostPermalink, permalinkWalletFingerprint };`)(nobleSha256);
+  return new Function('nobleSha256', 'ownWallet', 'ownLabel', `${prelude}\n${source}\nreturn { publicPostPermalink, publicPostPermalinkAuthorSegment, parsePublicPostPermalink, permalinkWalletFingerprint };`)(nobleSha256, own.wallet, own.label);
 }
 
 const WALLET = `0:${'ab'.repeat(32)}`;
 
 describe('public post permalinks', () => {
+  it('PERMA-15: the authors OWN device builds the NAMED link — the claim cache cannot cover yourself', () => {
+    // [OWNER 2026-08-26] The verified-claim cache fills only when posts are RECEIVED, and you never receive
+    // your own — so a link to your own post shared from your own device carried the address segment while
+    // every other device produced the named one.
+    const fns = loadPermalinkFunctions({}, { wallet: '0:aa', label: 'autodeff.ath' });
+    expect(fns.publicPostPermalinkAuthorSegment('0:aa')).toBe('autodeff');
+    const stranger = loadPermalinkFunctions({}, { wallet: '0:aa', label: 'autodeff.ath' });
+    expect(stranger.publicPostPermalinkAuthorSegment('0:bb'), 'someone else stays on the cache path').not.toBe('autodeff');
+  });
   it('PERMA-01: the link is /<name>/<entryId> when the name is registry-verified, /<address>/<entryId> otherwise', () => {
     const named = loadPermalinkFunctions({ [WALLET]: { verifiedUsername: 'alice.ath' } });
     // The name is followed by the author's fingerprint, so a later transfer of "alice" cannot repoint this link

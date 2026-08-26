@@ -1275,6 +1275,18 @@ html[data-platho-telegram="true"] .install-header-button {
 .message-strip {
   display: flex;
   flex-direction: column;
+  /* CONTENT THAT DOES NOT FILL THE STRIP SITS AT THE BOTTOM, against the composer — where the conversation
+     happens. Without this it sat at the TOP, and the owner met that as a keyboard bug [OWNER 2026-08-26: "a
+     message was written, the keyboard was dismissed, and the message stayed in place instead of moving down to
+     the composer"]: with the keyboard up the strip is short, so top and bottom are the same place; the keyboard
+     leaves, the strip grows, and the message stays glued under the header with a void below. No scroll fix can
+     touch it — a strip that does not overflow has nothing to scroll. The auto margin on the FIRST child is that
+     fix: it absorbs the free height above the content, and collapses to zero the moment the strip overflows, so
+     scroll behaviour is untouched. The empty-state node keeps its own vertical centring: its `margin: auto 0`
+     leaves margin-bottom auto, and auto top + auto bottom still centres.
+     THE COMMENTS LIST IS NOT A TWIN HERE, deliberately: a thread reads downward from the post, so one comment
+     belongs at the TOP, under what it answers — anchoring it to the bottom would be applying this fix to a
+     surface whose reading direction it contradicts. */
   /* The TIGHT gap is the default, because most rows in a busy strip continue a burst; a row that STARTS a group
      buys the space back below. Doing it this way round means a group of six looks like one sending rather than six. */
   gap: var(--message-gap-tight);
@@ -1285,6 +1297,10 @@ html[data-platho-telegram="true"] .install-header-button {
   /* Swipe-to-reply: the container yields horizontal touch gestures to JS (contract). */
   touch-action: pan-y;
   padding: 20px var(--gutter);
+}
+
+.message-strip > :first-child {
+  margin-top: auto;
 }
 
 /* A group opener and the day/unread separators restore the full breathing room the tight default gave up. */

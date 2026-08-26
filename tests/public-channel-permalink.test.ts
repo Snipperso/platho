@@ -28,6 +28,12 @@ function loadChannelLinkFunctions(profiles: Record<string, { verifiedUsername?: 
   const source = `${app.slice(sharedStart, sharedEnd)}\n${app.slice(channelStart, channelEnd)}`;
   const prelude = `
     const location = { origin: 'https://platho.app' };
+    // The own-wallet branch [OWNER 2026-08-26]: null wallet = "someone else's device" (every pre-existing case);
+    // the post harness sets ownWallet/ownLabel to model the author's own device.
+    const plathoWallet = typeof ownWallet === 'undefined' ? null : { address: ownWallet };
+    const storedPlathoWalletRecord = () => null;
+    const sameWalletAddress = (a, b) => String(a ?? '') !== '' && String(a ?? '') === String(b ?? '');
+    const readLinkedPlathoUsername = () => (typeof ownLabel === 'undefined' || !ownLabel ? null : { label: ownLabel });
     const publicChannelProfileCache = ${JSON.stringify(profiles)};
     const channelProfileCacheKey = (w) => String(w ?? '');
     const rawWalletAddress = (w) => {

@@ -171,9 +171,9 @@ import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './
 import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=62';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=43';
-import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=5';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=22';
+import { createPublicLane } from './public-lane.mjs?v=45';
+import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=6';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=23';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
 import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=9';
 import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=21';
@@ -274,7 +274,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.8';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.9';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -1287,6 +1287,9 @@ let publicPostDetailLoadingEarlier = false;
 let publicPostDetailNewerCursor = null;
 let publicPostDetailLoadingNewer = false;
 let publicPostDetailJumpBusy = false;
+// First-visit head seeding happens at most once per OPEN — the forward pager's own completion (a clean tail read)
+// must not be re-seeded into another trip to the start.
+let publicPostDetailHeadSeeded = false;
 // The /messages body-retention wall was hit going back: older commits exist on chain but their bodies are
 // no longer served, so back-pagination stops and the thread says so instead of grinding empty windows.
 let publicPostDetailOlderTruncated = false;
@@ -2723,6 +2726,11 @@ function syncViewportCssVars() {
     viewportHeightLastWritten = rounded;
     if ((window.scrollY || document.documentElement.scrollTop || 0) !== 0) window.scrollTo(0, 0);
     pinOpenThreadsToEndAfterViewportChange();
+    // ...and then KEEP asking for a moment. On iOS the keyboard is drawn OVER the window, the geometry settles
+    // lazily after this event, and the one-shot pin above lands on numbers still in motion — the ladder re-runs
+    // the same idempotent enforcement until the world stops moving. A rung that finds a further height change
+    // re-arms the ladder through this very branch, so a long animation extends its own watch.
+    armViewportSettleLadder();
   }
   // Identical to the above now that the floor is gone. Kept as a separate name only because the stylesheet refers
   // to it in several places; both are simply "the visible height", with nothing added to either.
@@ -2788,19 +2796,39 @@ function telegramPlatform() {
 //
 // So the event starts a short ladder instead of a single read. Each rung is the same idempotent sync — it writes
 // the number it measures and nothing else — so a rung that lands on the settled value simply writes it again.
-const TELEGRAM_VIEWPORT_RESYNC_MS = [60, 180, 420, 900];
-let telegramViewportResyncTimers = [];
+const VIEWPORT_SETTLE_RESYNC_MS = [60, 180, 420, 900];
+let viewportSettleResyncTimers = [];
 
-function scheduleTelegramViewportResync() {
-  for (const timer of telegramViewportResyncTimers) clearTimeout(timer);
-  telegramViewportResyncTimers = TELEGRAM_VIEWPORT_RESYNC_MS.map((delay) => setTimeout(syncViewportCssVars, delay));
+/**
+ * ONE SETTLE LADDER FOR EVERY "THE WINDOW JUST MOVED" SOURCE.
+ *
+ * Built for the Telegram container (viewportChanged arrives mid-animation) and then found to be the same disease
+ * on the plain iPhone [OWNER 2026-08-26: "Android resizes the app window when the keyboard appears; the iPhone
+ * just draws the keyboard OVER the window — and the message repositioning does not account for that"]. The
+ * owner's model is exact: on iOS the window never resizes, so this app rebuilds the shell from the VISUAL
+ * viewport by hand — and iOS settles the real geometry LAZILY, after the one resize event, with no further
+ * events. A one-shot pin therefore runs against numbers that are still moving [OWNER: "there are many messages
+ * in the dialog, they are just above the screen"], and nothing ever asks again.
+ *
+ * Every rung is idempotent, which is what makes re-running free: the sync writes the number it measures, the
+ * zero undoes only a scroll the SYSTEM made (the user cannot scroll the page — html/body are overflow:hidden and
+ * the drag refusal holds the rest), and the pin fires only while the reader is at the end
+ * (conversationStickToBottom / publicPostDetailStickToBottom — a reader who scrolled up clears both).
+ */
+function armViewportSettleLadder() {
+  for (const timer of viewportSettleResyncTimers) clearTimeout(timer);
+  viewportSettleResyncTimers = VIEWPORT_SETTLE_RESYNC_MS.map((delay) => setTimeout(() => {
+    syncViewportCssVars();
+    if ((window.scrollY || document.documentElement.scrollTop || 0) !== 0) window.scrollTo(0, 0);
+    pinOpenThreadsToEndAfterViewportChange();
+  }, delay));
 }
 
 function handleTelegramViewportChanged() {
   syncViewportCssVars();
   // Always, not only when the client admits the state is unstable: a client that reports stable BEFORE
   // viewportStableHeight has settled is the case a flag cannot describe, and re-running a pure write costs nothing.
-  scheduleTelegramViewportResync();
+  armViewportSettleLadder();
 }
 
 function telegramViewportHeight() {
@@ -7857,7 +7885,19 @@ let publicCommentReadCursors = {};
 
 function publicCommentReadCursor(postKey) {
   const stored = postKey ? publicCommentReadCursors?.[postKey] : null;
-  return typeof stored === 'string' && stored !== '' ? stored : null;
+  if (typeof stored === 'string') return stored !== '' ? stored : null;
+  const mark = typeof stored?.mark === 'string' ? stored.mark : '';
+  return mark !== '' ? mark : null;
+}
+
+// WHERE the marked comment lives — era shard + 0-based row — or null for a mark saved before places existed (a
+// bare string) or one whose row was never known (a cached comment from an unstamped snapshot).
+function publicCommentReadPlace(postKey) {
+  const stored = postKey ? publicCommentReadCursors?.[postKey] : null;
+  if (!stored || typeof stored === 'string') return null;
+  const shardKey = typeof stored.shardKey === 'string' && stored.shardKey !== '' ? stored.shardKey : null;
+  const row = Number.isFinite(Number(stored.row)) ? Number(stored.row) : null;
+  return shardKey !== null && row !== null ? { shardKey, row } : null;
 }
 
 /**
@@ -7887,7 +7927,15 @@ function rememberPublicPostReadPosition() {
     seenIndex = i;
   }
   if (seenIndex <= markIndex) return;
-  publicCommentReadCursors = { ...publicCommentReadCursors, [postKey]: rows[seenIndex].dataset.rowKey };
+  const markKey = rows[seenIndex].dataset.rowKey;
+  // The PLACE rides with the mark, so a later open can jump straight to it however deep it is. Looked up in the
+  // data (the DOM row carries only its key); a comment that cannot name its place — a local pending one, or one
+  // restored from a snapshot older than the stamp — stores the bare mark, which is exactly the old behaviour.
+  const marked = publicPostDetailMergedComments().find((comment) => publicCommentRowKey(comment) === markKey);
+  const place = marked && typeof marked.shardKey === 'string' && marked.shardKey !== '' && Number.isFinite(Number(marked.shardRow))
+    ? { shardKey: marked.shardKey, row: Number(marked.shardRow) }
+    : null;
+  publicCommentReadCursors = { ...publicCommentReadCursors, [postKey]: place ? { mark: markKey, ...place } : markKey };
   writeScopedJsonMap(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY, publicCommentReadCursors);
 }
 
@@ -9148,7 +9196,12 @@ function permalinkWalletFingerprint(authorWallet) {
 function publicPostPermalinkAuthorSegment(authorWallet) {
   const wallet = rawWalletAddress(authorWallet);
   if (!wallet) return null;
-  const verified = publicChannelProfileCache[channelProfileCacheKey(wallet)]?.verifiedUsername;
+  // Same own-wallet blind spot as publicAuthorLabel (the verified-claim cache is only ever filled by RECEIVING
+  // posts): a link to your own post shared from your own device carried the address segment while everyone else's
+  // device produced the named one. The linked name was chain-verified when it was linked.
+  const ownAddress = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  const ownLabel = ownAddress && sameWalletAddress(wallet, ownAddress) ? readLinkedPlathoUsername(ownAddress)?.label : null;
+  const verified = ownLabel ?? publicChannelProfileCache[channelProfileCacheKey(wallet)]?.verifiedUsername;
   const name = verified ? canonicalUsernameDisplay(verified).toLowerCase() : '';
   if (name && /^[a-z0-9_-]{4,16}$/.test(name) && !PERMALINK_RESERVED_SEGMENTS.has(name)) return name;
   return displayWalletAddress(wallet) || null;
@@ -10314,6 +10367,7 @@ function openPublicPostDetail(item) {
   publicPostDetailNewerCursor = null;
   publicPostDetailLoadingNewer = false;
   publicPostDetailJumpBusy = false;
+  publicPostDetailHeadSeeded = false;
   publicPostDetailOlderTruncated = false;
   publicCommentsEmptyStreaks.earlier = { key: null, calmEmpties: 0 };
   publicCommentsEmptyStreaks.newer = { key: null, calmEmpties: 0 };
@@ -11959,6 +12013,11 @@ async function publicThreadPostsToComments(item, threadPosts, hashMemo = null) {
       authorWallet,
       bodyHash: bodyHashHex,
       entryUid: bodyHashHex.slice(2),
+      // WHERE THIS COMMENT LIVES: its era shard and 0-based row in it — what a saved reading position points at.
+      // Strings/numbers only (comments persist to the IndexedDB snapshot); a multipart comment keeps its FIRST
+      // part's row via the assembler's ...first spread, which is the group's first row by construction.
+      shardKey: tp.shard_key ?? null,
+      shardRow: tp.entry_id === undefined || tp.entry_id === null ? null : Number(tp.entry_id),
       streamId: payload.stream_id,
       partIndex: payload.partIndex ?? 0,
       partCount: payload.partCount ?? 1,
@@ -12131,6 +12190,56 @@ async function readPublicCommentWindow(item, cursors, shardKey, endRow, probeCac
   }
   if (probeCache && result && !result.degraded) probeCache.set(cacheKey, result);
   return result;
+}
+
+/**
+ * JUMP THE OPEN THREAD TO A PLACE — a shard row — and hand the reader to the window machinery in BOTH directions.
+ *
+ * Two callers, one mechanism:
+ *   · FIRST VISIT [OWNER 2026-08-26: "I opened comments from a new profile and landed in the last batch"] — no
+ *     place given: row 0 of the OLDEST era shard, older sentinel off (nothing precedes the first comment).
+ *   · CONTINUATION [OWNER 2026-08-26: "finish it properly"] — the saved mark's place, however deep:
+ *     the window is read around it, older pages continue above, newer pages continue below.
+ *
+ * The synthesized cursors cover EVERY live shard, or the older sentinel would pull wrong-direction content: eras
+ * before the target are set un-read (their next older page is their own tail), eras after it are set exhausted
+ * (their rows belong to the NEWER pager). Forward, the date-jump pager takes over unchanged, and its completion
+ * (a clean tail refresh) restores tail mode and live updates. The shards walk OLDEST-first — the lane returns
+ * cursors in newest-era-first insertion order, so the reversed entries are that walk.
+ */
+async function jumpPublicPostDetailToPlace(item, cursors, place = null) {
+  if (publicPostDetailHeadSeeded) return false;
+  publicPostDetailHeadSeeded = true;
+  const entries = Object.entries(cursors ?? {}).reverse()
+    .map(([key, cursor]) => ({ key, entryCount: Number(cursor?.entryCount ?? 0) }))
+    .filter((shard) => shard.entryCount > 0);
+  if (entries.length === 0) return false;
+  const shardIdx = place === null ? 0 : entries.findIndex((shard) => shard.key === place.shardKey);
+  if (shardIdx < 0) return false;                       // the marked shard is no longer live: the tail stays, honestly
+  const target = entries[shardIdx];
+  const wantRow = place === null ? 0 : Math.max(0, Math.min(Number(place.row) || 0, target.entryCount - 1));
+  // The window reads [endRow - PAGE, endRow); the marked row sits a few rows below the window start, so the
+  // reader gets a line of context above and the unread run below.
+  const CONTEXT_ROWS = 8;
+  const endRow = Math.min(target.entryCount, Math.max(wantRow - CONTEXT_ROWS, 0) + PUBLIC_COMMENT_PAGE);
+  const result = await readPublicCommentWindow(item, cursors, target.key, endRow, null);
+  if (!publicPostDetailStillOn(item)) return false;
+  if (!result || result.degraded) return false;         // could not reach the place: the tail window stays, honestly
+  publicCommentsPagingGeneration += 1;                  // invalidate in-flight page reads of the tail frame
+  publicPostDetailChainComments = result.comments;
+  const windowStart = Math.max(0, endRow - PUBLIC_COMMENT_PAGE);
+  const atTail = endRow >= target.entryCount && shardIdx >= entries.length - 1;
+  publicPostDetailNewerCursor = atTail ? null : { shards: entries, shardIdx, from: endRow };
+  publicPostDetailCommentCursors = Object.fromEntries(entries.map((shard, index) => [shard.key, {
+    from: index < shardIdx ? shard.entryCount : (index === shardIdx ? windowStart : 0),
+    entryCount: shard.entryCount,
+    oldestLt: null,
+  }]));
+  publicPostDetailHasMoreComments = Object.values(publicPostDetailCommentCursors).some((cursor) => Number(cursor.from) > 0);
+  publicPostDetailOlderTruncated = false;
+  renderPublicPostDetail();
+  requestAnimationFrame(() => applyPublicPostDetailOpenScroll());   // the open anchor lands on the mark (or row 0)
+  return true;
 }
 
 // Page FORWARD (toward the present) after a date jump. Prepends render ABOVE the viewport, so the scroll
@@ -12385,6 +12494,21 @@ async function refreshPublicPostDetailComments() {
       // "confirming" in the cache forever and eventually goes red.
       retireConfirmedLocalPublicComments(item, result.comments);
       renderPublicPostDetail();
+      // FIRST VISIT: no read mark and more thread behind the window — re-point the view at the first comment.
+      // After the clean branch above so the snapshot cache, the pending-comment retirement and the cursors are
+      // exactly what a tail open produces; the seeder then replaces only what is on screen. A thread that FITS
+      // its window needs nothing: its first row is already the first comment, and the no-mark anchor lands there.
+      const openMark = publicCommentReadCursor(publicPostIdentity(item));
+      if (openMark === null && publicPostDetailHasMoreComments) {
+        // First visit of a thread deeper than its window: read it from the first comment.
+        await jumpPublicPostDetailToPlace(item, publicPostDetailCommentCursors ?? {}, null);
+      } else if (openMark !== null
+        && !publicPostDetailChainComments.some((comment) => publicCommentRowKey(comment) === openMark)) {
+        // The mark is DEEPER than the tail window — jump to its saved place instead of falling to the end. A mark
+        // without a place (saved before places existed) keeps the old honest fallback.
+        const openPlace = publicCommentReadPlace(publicPostIdentity(item));
+        if (openPlace) await jumpPublicPostDetailToPlace(item, publicPostDetailCommentCursors ?? {}, openPlace);
+      }
       return;
     }
     // Degraded: keep the previous authoritative list on screen (don't overwrite with a partial), show "loading",
@@ -13046,6 +13170,17 @@ function drainRestoredPrefsSnapshots() {
 
 function publicAuthorLabel(authorWallet) {
   const wallet = rawWalletAddress(authorWallet) ?? String(authorWallet ?? '').trim();
+  // YOUR OWN posts and comments wear YOUR OWN linked .ath. The claim pipeline cannot cover the author themselves:
+  // a claim is verified when a post is RECEIVED, and you do not receive your own posts — so on the author's own
+  // device the verified-claim cache below stays empty forever and this fell through to the address [OWNER
+  // 2026-08-26: a user with a linked name commented on a post and saw their own name missing on their own screen,
+  // while other devices showed it]. Same own-first rule, same storage fallback and the same unconditional return
+  // as resolveWalletChannelDisplay: nothing below may re-label your own wallet.
+  const ownAddress = plathoWallet?.address ?? storedPlathoWalletRecord()?.address ?? null;
+  if (ownAddress && sameWalletAddress(wallet, ownAddress)) {
+    const ownLabel = readLinkedPlathoUsername(ownAddress)?.label;
+    return ownLabel ? canonicalUsernameDisplay(ownLabel) : shortAddress(wallet);
+  }
   // Registry-VERIFIED channel username wins over everything: it is the author's own linked .ath, proven on-chain to
   // be owned by this wallet (owner == author). Read-only, synchronous — the verification ran async at profile-resolve
   // time (verifyChannelUsernameClaim) and only a proven name is ever written here, so this can never surface a
@@ -13185,6 +13320,17 @@ function assemblePublicParts(items) {
         continue;
       }
     }
+    // THE AUTHOR'S NAME, OFF THE POST ITSELF [OWNER 2026-08-26: the feed card and its "Display as" menu showed
+    // only the wallet address for an author who owns a name]. Until now the only public carrier of the claim was
+    // the channel-profile block, so an author without a saved profile could not be named at all. Guarded on the
+    // claim EXISTING: a legacy post carries no tag, and calling the verifier with an empty claim would strip a
+    // name already proven from a profile — absence is not a renunciation.
+    let senderClaim = '';
+    for (const block of documentBlocks) if (block?.type === 'sender') { senderClaim = String(block.username ?? ''); break; }
+    if (senderClaim) {
+      documentBlocks = documentBlocks.filter((block) => block?.type !== 'sender');
+      adoptPostSenderUsernameClaim(first?.authorWallet, senderClaim);
+    }
     const readEntryId = ordered.reduce((max, item) => {
       const value = publicEntryIdBigInt(item.entryId) ?? -1n;
       return value > max ? value : max;
@@ -13273,6 +13419,33 @@ function setChannelProfileFromWalk(authorWallet, profileBlock, entryId, createdA
   publicChannelProfileCache = { ...publicChannelProfileCache, [key]: incoming };
   persistChannelProfileCache();
   verifyChannelUsernameClaim(authorWallet, incoming.ownerUsername);
+}
+
+/**
+ * Adopt a .ath claim carried by an ordinary POST into the channel-profile cache, then verify it.
+ *
+ * applyVerifiedChannelUsername writes into an EXISTING cache entry only, and an author who never saved a channel
+ * profile has none — the verified name would be computed and dropped. So a missing entry is seeded here, with
+ * createdAtSec 0, which is what keeps the seed subordinate: setChannelProfileFromWalk is latest-wins by
+ * created_at, so ANY real profile the walk ever finds replaces the seed outright. An existing entry is left
+ * intact — except an empty ownerUsername on a never-verified entry, which adopts the claim so a later re-walk of
+ * that same stale profile re-verifies the same name instead of silently clearing it.
+ */
+function adoptPostSenderUsernameClaim(authorWallet, claim) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key || !claim) return;
+  const prev = publicChannelProfileCache[key] ?? null;
+  if (!prev) {
+    publicChannelProfileCache = {
+      ...publicChannelProfileCache,
+      [key]: normalizeChannelProfile({ description: '', tags: [], ownerUsername: claim, entryId: '', createdAtSec: 0, fetchedAt: nowSec() }),
+    };
+    persistChannelProfileCache();
+  } else if (!prev.ownerUsername && !prev.verifiedUsername) {
+    publicChannelProfileCache = { ...publicChannelProfileCache, [key]: { ...prev, ownerUsername: claim } };
+    persistChannelProfileCache();
+  }
+  verifyChannelUsernameClaim(authorWallet, claim);
 }
 
 // Verify a channel's self-declared owner-username CLAIM against the on-chain registry and cache the VERIFIED display
@@ -20920,6 +21093,7 @@ function displayBlocksFromDocumentBlocks(blocks) {
         url: block.url ?? `data:${block.mime ?? 'application/octet-stream'};base64,${bytesToBase64(bytes)}`,
       };
     }
+    if (block.type === 'sender') return { type: 'sender', username: String(block.username ?? '') };
     return null;
   }).filter(Boolean);
 }
@@ -25372,6 +25546,14 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // denormalized display snapshot — codec in capsule-part-policy.mjs. Old clients skip it via the tolerant
   // decode on BOTH surfaces (the private DISPLAY decode has been tolerant since v646).
   SHARE: 8,
+  // The author's .ath CLAIM riding an ordinary PUBLIC post/comment (2026-08-26). The private surface has carried
+  // senderUsername on every message from the start; the public surface carried it ONLY in the channel-profile
+  // block, so an author who never saved a profile (or saved it before linking) stayed a bare address on every
+  // card [OWNER: "the user posts to the feed. The user has a username, but the app does not see it"]. A claim,
+  // never a proof — the receive path verifies it against the registry exactly like the profile claim. PUBLIC
+  // documents only (their decode is tolerant, so old clients skip it); the private path neither needs nor takes
+  // it — its envelope already carries the same fact.
+  SENDER: 9,
 });
 // v759: `[file N]` joins `[image N]` as a positional composer marker — a file attachment lands at the
 // cursor like an image does, instead of silently appending after the body. Group 1 = image index,
@@ -25453,6 +25635,9 @@ function encodeMessageDocumentBlocks(blocks, options = {}) {
     } else if (block.type === 'share') {
       type = PLATHO_DOCUMENT_BLOCK_TYPES.SHARE;
       content = encodeShareBlockContent(block);
+    } else if (block.type === 'sender') {
+      type = PLATHO_DOCUMENT_BLOCK_TYPES.SENDER;
+      content = new TextEncoder().encode(canonicalUsernameDisplay(String(block.username ?? '')));
     } else {
       throw new Error('Unsupported document block type');
     }
@@ -25526,6 +25711,9 @@ function decodeMessageDocumentBlocks(bytesLike, options = {}) {
       // Same null-on-malformed rule: a bad share frame is dropped, never poisons the carrying message.
       const share = decodeShareBlockContent(content);
       if (share) blocks.push({ type: 'share', ...share });
+    } else if (type === PLATHO_DOCUMENT_BLOCK_TYPES.SENDER) {
+      const username = new TextDecoder().decode(content).trim();
+      if (username) blocks.push({ type: 'sender', username });
     } else if (tolerateUnknownBlocks) {
       // Skip an unrecognized block (offset already advanced past its content above) — forward-compat.
       continue;
@@ -29678,7 +29866,13 @@ function imagePartsForSend(attachment, label = 'image') {
 function publicDocumentBlocksFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {
   // Explicit replyDraft + shareDraft: the PUBLIC surface reads its OWN drafts (publicCommentReplyTo /
   // publicShareDraft) — never the private composer's (composerBlocksFromDraft defaults to the private ones).
-  return composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments), publicShareDraft);
+  const blocks = composerBlocksFromDraft(text, normalizePublicImageAttachments(attachments), publicCommentReplyTo, normalizePrivateFileAttachments(fileAttachments), publicShareDraft);
+  if (blocks.length <= 0) return blocks;
+  // The author's .ath rides every public post and comment, the way senderUsername rides every private message —
+  // the public twin the surface never had. Only when a name is LINKED: an unlinked wallet claims nothing.
+  const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
+  if (linkedLabel) blocks.push({ type: 'sender', username: canonicalUsernameDisplay(linkedLabel) });
+  return blocks;
 }
 
 function publicDocumentBytesFromDraft(text, attachments = publicImageAttachments, fileAttachments = publicFileAttachments) {

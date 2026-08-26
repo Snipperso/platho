@@ -25,8 +25,8 @@
 
 import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=24';
 import { readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=26';
-import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=5';
-import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=5';
+import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=6';
+import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=6';
 import { publicShardAddressBytes, rawAddress } from './shard-address.mjs?v=7';
 import {
   publicBeaconScanAddresses,
@@ -539,7 +539,8 @@ export function createPublicLane({
         // paged one would hand back the newest rows under the guise of older ones.
         const snapshot = paged ? null : readShardSnapshot(key, marker);
         if (snapshot) {
-          posts.push(...snapshot.posts);
+          // Older snapshots predate the stamp — served posts gain it here, since the shard is known at serve time.
+          posts.push(...snapshot.posts.map((post) => (post.shard_key ? post : { ...post, shard_key: key })));
           cursors[key] = { from: snapshot.from, entryCount: snapshot.entryCount, oldestLt: snapshot.oldestLt ?? null };
           report();
           continue;
@@ -552,16 +553,25 @@ export function createPublicLane({
         // /messages for the window ending just before it (toncenter `end_lt`, measured honoured). A cursor without an
         // lt (an endpoint that gave none) falls back to the newest window, which is the old behaviour, not a loss.
         const previousOldestLt = previous?.oldestLt == null ? null : (() => { try { return String(BigInt(previous.oldestLt) - 1n); } catch { return null; } })();
+        // A cursor WITHOUT an lt used to fall back to the newest bodies window — honest for the page right behind
+        // the tail, and the wrong END of the shard for a deep window. Synthesized cursors (the date-jump reader,
+        // and the first-visit open that starts a thread at row 0) never have an lt, so their bodies are aimed by
+        // the ROWS' OWN TIME instead (readPosts messagesByRowTime — the INTRO lane's ±600s technique).
         const { posts: shardPosts, entry_count: entryCount, oldestLt } = await readShardPosts(address, {
           ...(fromId === null ? {} : { fromId, maxCount: BigInt(pageRows) }),
           ...(paged && previousOldestLt !== null ? { messagesEndLt: previousOldestLt } : {}),
+          ...(paged && previousOldestLt === null ? { messagesByRowTime: true } : {}),
         });
         const count = Number(entryCount ?? 0);
         const from = fromId === null ? Math.max(0, count - PAGE_ROWS) : Number(fromId);
         // Same gate as the sweep: a window whose bodies were DECLINED by the paced pump (a non-strict /messages
         // answers [] under a rate limit) must not be remembered as "no comments" until the marker moves.
-        if (!paged && (shardPosts.length > 0 || count === 0)) writeShardSnapshot(key, marker, { posts: shardPosts, from, entryCount: count, oldestLt: oldestLt ?? null });
-        posts.push(...shardPosts);
+        // The row's HOME SHARD rides each post: a reader's saved position must name where its row lives,
+        // because entry_ids are 0-based per era shard and collide across them. Stamped BEFORE the snapshot write,
+        // so the durable copy carries the stamp too.
+        const stampedPosts = shardPosts.map((post) => ({ ...post, shard_key: key }));
+        if (!paged && (shardPosts.length > 0 || count === 0)) writeShardSnapshot(key, marker, { posts: stampedPosts, from, entryCount: count, oldestLt: oldestLt ?? null });
+        posts.push(...stampedPosts);
         cursors[key] = { from, entryCount: count, oldestLt: oldestLt ?? null };
         report();
       }

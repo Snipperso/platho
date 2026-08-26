@@ -114,6 +114,64 @@ describe('public comment scroll-into-view', () => {
     expect(openScroll, 'the first unread is simply the row after the marked one').toMatch(/rows\[markIndex \+ 1\] \?\? null/);
   });
 
+  it('CMTREAD-04: a mark DEEPER than the tail window reopens AT the mark, through the same jump', () => {
+    // [OWNER 2026-08-26: "доведи, чтобы было как положено"] — the follow-through on CMTREAD-03. A reader who
+    // left mid-thread has a mark outside the newest window; the old fallback landed them at the end. The mark
+    // now rides with its PLACE — era shard + 0-based row, which the row index alone cannot say because
+    // entry_ids restart per era shard — and the open jumps the window machinery straight to it.
+    const app = readFileSync('web/app.js', 'utf8');
+    // The place is stamped at the source: the lane names each post\u0027s home shard, the converter carries it
+    // onto the comment (JSON-safe — comments persist to IndexedDB), and the assembler\u0027s ...first spread
+    // keeps a multipart comment on its first row.
+    const lane = readFileSync('web/public-lane.mjs', 'utf8');
+    expect(lane).toMatch(/shardPosts\.map\(\(post\) => \(\{ \.\.\.post, shard_key: key \}\)\)/);
+    expect(lane, 'served snapshots gain the stamp too').toMatch(/post\.shard_key \? post : \{ \.\.\.post, shard_key: key \}/);
+    expect(app).toMatch(/shardKey: tp\.shard_key \?\? null,/);
+    expect(app).toMatch(/shardRow: tp\.entry_id === undefined \|\| tp\.entry_id === null \? null : Number\(tp\.entry_id\),/);
+    // The stored cursor is the mark PLUS its place; a bare string (saved before places existed) still answers
+    // "which comment" and keeps the old honest end-fallback.
+    expect(app).toMatch(/function publicCommentReadPlace\(postKey\)/);
+    expect(app).toMatch(/\[postKey\]: place \? \{ mark: markKey, \.\.\.place \} : markKey/);
+    // The open jumps only when the mark is NOT already in the tail window, and only with a place to jump to.
+    expect(app).toMatch(/openMark !== null\s*\n\s*&& !publicPostDetailChainComments\.some\(\(comment\) => publicCommentRowKey\(comment\) === openMark\)/);
+    expect(app).toMatch(/if \(openPlace\) await jumpPublicPostDetailToPlace\(item, publicPostDetailCommentCursors \?\? \{\}, openPlace\);/);
+    // Both directions from the landing window: eras BEFORE the target page above from their own tails, eras
+    // AFTER it are exhausted for the older sentinel — their rows belong to the newer pager.
+    expect(app).toMatch(/from: index < shardIdx \? shard\.entryCount : \(index === shardIdx \? windowStart : 0\)/);
+  });
+  it('CMTREAD-03: a thread seen for the FIRST time opens at its FIRST comment and pages toward the present', () => {
+    // [OWNER 2026-08-26: "I opened comments from a new profile and landed in the LAST batch, though I see the
+    // thread for the first time and should see the comments from the very first."] The tail default anchors
+    // every window at the newest rows — right for a reader with a mark, wrong for a first visit: a conversation
+    // is read from its beginning. The fix re-points the FIRST clean load of an unread deep thread at row 0 of
+    // the OLDEST era shard and hands the reader to the forward pager the date jump already owned — which until
+    // now had NO seeder at all: publicPostDetailNewerCursor was only ever assigned inside the pager itself, so
+    // the "newer" sentinel was unreachable, a documented mechanism that never ran.
+    expect(app).toMatch(/async function jumpPublicPostDetailToPlace/);
+    // Hooked AFTER the clean tail branch (cache, retirement and cursors are exactly what a tail open produces),
+    // and ONLY for a never-read thread deeper than its window — one that fits needs nothing, its first row is
+    // already the first comment.
+    expect(app).toMatch(/if \(openMark === null && publicPostDetailHasMoreComments\) \{/);
+    // Once per open: the forward pager finishes with a clean tail refresh, which must not re-seed another trip.
+    expect(app).toMatch(/if \(publicPostDetailHeadSeeded\) return false;/);
+    expect(app).toMatch(/publicPostDetailHeadSeeded = false;/);
+    // The seeder walks the cursors OLDEST-first (the lane inserts newest-era-first), reads the [0, PAGE) window
+    // through the SAME window reader the jump uses, REPLACES the tail window, arms the forward pager, and turns
+    // the older sentinel off — nothing is older than the first comment.
+    expect(app).toMatch(/Object\.entries\(cursors \?\? \{\}\)\.reverse\(\)/);
+    expect(app).toMatch(/readPublicCommentWindow\(item, cursors, target\.key, endRow, null\)/);
+    expect(app).toMatch(/publicPostDetailNewerCursor = atTail \? null : \{ shards: entries, shardIdx, from: endRow \};/);
+    // Honest failure: a start that cannot be reached leaves the tail window standing.
+    expect(app).toMatch(/if \(!result \|\| result\.degraded\) return false;/);
+    // And the bodies of a deep window are aimed by the ROWS OWN TIME: a synthesized cursor has no lt, and the
+    // old fallback aimed /messages at the newest window — the wrong END of the shard for row 0.
+    const lane = readFileSync('web/public-lane.mjs', 'utf8');
+    expect(lane).toMatch(/paged && previousOldestLt === null \? \{ messagesByRowTime: true \}/);
+    const provider = readFileSync('web/public-shard-ton-rpc-provider.mjs', 'utf8');
+    expect(provider).toMatch(/messagesByRowTime = false/);
+    expect(provider).toMatch(/startUtime: Math\.max\(0, Number\(minAt\) - 600\)/);
+  });
+
   it('CMTREAD-02: a page arriving above the reader must not move the reader — including at the very top', () => {
     // [OWNER 2026-08-24: "I scrolled up, comments started loading, a page appeared, filled the screen and
     // immediately loaded another one. I'd like the position not to jump like that — for older comments to load

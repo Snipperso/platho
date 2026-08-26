@@ -411,6 +411,46 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/identityMenuButton\.hidden = identityMenuHidden\(thread\);/);
   });
 
+  it('PWA-PUBNAME-02: the author sees their OWN name on their own posts, comments and links', () => {
+    // [OWNER 2026-08-26: a user with a linked name commented on a post and saw their own name missing on their
+    // own screen, while other devices showed it.] The verified-claim cache is only ever filled by RECEIVING posts,
+    // and you do not receive your own — so every reader that consulted ONLY that cache had a permanent blind spot
+    // for the author themselves. resolveWalletChannelDisplay solved this with an own-first branch long ago; these
+    // two readers were its missed twins.
+    const app = readFileSync('web/app.js', 'utf8');
+    const label = app.slice(app.indexOf('function publicAuthorLabel(authorWallet)'), app.indexOf('function ensurePublicChannelForAuthorWallet('));
+    expect(label.length, 'the slice really spans the label resolver').toBeGreaterThan(600);
+    expect(label).toMatch(/const ownAddress = plathoWallet\?\.address \?\? storedPlathoWalletRecord\(\)\?\.address \?\? null;/);
+    expect(label, 'the own branch returns unconditionally — nothing below may re-label the own wallet').toMatch(/return ownLabel \? canonicalUsernameDisplay\(ownLabel\) : shortAddress\(wallet\);/);
+    const segment = app.slice(app.indexOf('function publicPostPermalinkAuthorSegment('), app.indexOf('function publicPostPermalink('));
+    expect(segment).toMatch(/const verified = ownLabel \?\? publicChannelProfileCache/);
+  });
+
+  it('PWA-PUBNAME-01: the author username rides ordinary public posts, verified and never strip-by-absence', () => {
+    // [OWNER 2026-08-26: a feed author who owns a .ath showed as a bare address on the card and in its menu.]
+    // The private surface stamps senderUsername on every message; the public surface carried the claim ONLY in
+    // the channel-profile block, so an author who never saved a profile (or saved it before linking the name)
+    // could not be named at all. The tag is a document block: the public decode is tolerant, so old clients
+    // skip it, and the codec comment predicted exactly this addition.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/SENDER: 9,/);
+    expect(app).toMatch(/block\.type === 'sender'/);
+    expect(app).toMatch(/if \(username\) blocks\.push\(\{ type: 'sender', username \}\);/);
+    // ONE producer: only the PUBLIC draft builder stamps it — the private path already carries the same fact in
+    // its envelope, and its strict decode must never meet this block.
+    expect((app.match(/blocks\.push\(\{ type: 'sender', username: canonical/g) ?? []).length).toBe(1);
+    expect(app).toMatch(/function publicDocumentBlocksFromDraft\([\s\S]{0,900}?type: 'sender', username: canonicalUsernameDisplay\(linkedLabel\)/);
+    // Receive: adopt ONLY when the tag exists — a legacy post carries none, and an empty claim fed to the
+    // verifier would clear a name already proven from a profile. Absence is not a renunciation.
+    expect(app).toMatch(/if \(senderClaim\) \{\s*\n\s*documentBlocks = documentBlocks\.filter/);
+    expect(app).toMatch(/adoptPostSenderUsernameClaim\(first\?\.authorWallet, senderClaim\);/);
+    // The adopter seeds a missing cache entry SUBORDINATE to any real profile (createdAtSec 0 loses latest-wins
+    // to every walk-found profile), and never rewrites an entry that has a claim or a verified name.
+    expect(app).toMatch(/function adoptPostSenderUsernameClaim\(authorWallet, claim\)/);
+    expect(app).toMatch(/ownerUsername: claim, entryId: '', createdAtSec: 0/);
+    expect(app).toMatch(/else if \(!prev\.ownerUsername && !prev\.verifiedUsername\)/);
+  });
+
   it('PWA-CONFIG-01H: Public wallet channels share the Private "Display as" name + avatar per counterparty', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -1950,23 +1990,27 @@ describe('PWA runtime config guard', () => {
   });
 
 
-  it('PWA-TMA-VIEWPORT-01: a Telegram viewport change is re-asked, not read once mid-animation', () => {
-    // [OWNER 2026-08-25: "the interface flew almost off the screen ... it happened when I minimised the mini-app
-    // window and then restored it. I cannot reach it with a finger, the whole interface seems to have collapsed
-    // into a narrow strip."] Telegram sends viewportChanged WHILE the window is still moving — minimise and restore
-    // both do — and viewportStableHeight can still be catching up when the "stable" one arrives. Reading once and
-    // stopping latches a height measured half-way through the move, and nothing asks again: the shell stays built
-    // to that number for as long as the app is open.
+  it('PWA-TMA-VIEWPORT-01: a viewport move is re-asked by ONE settle ladder — Telegram events and keyboard height changes alike', () => {
+    // Round one [OWNER 2026-08-25]: the Telegram mini-app window, minimised and restored, collapsed the shell
+    // into a strip — viewportChanged arrives mid-animation and a single read latched a half-way height.
+    // Round two [OWNER 2026-08-26]: the same disease on the plain iPhone — "Android resizes the app window when
+    // the keyboard appears; the iPhone just draws the keyboard OVER the window, and the message repositioning
+    // does not account for that". On iOS the window never resizes; the shell is rebuilt from the visual
+    // viewport, iOS settles the real geometry LAZILY after the one event, and the one-shot pin ran against
+    // numbers still in motion ("many messages in the dialog, just above the screen"). One ladder serves both
+    // doors, because each rung is idempotent: the sync writes what it measures, the zero undoes only a scroll
+    // the system made, and the pin fires only while the reader is at the end.
     const app = readFileSync('web/app.js', 'utf8');
-    expect(app).toMatch(/const TELEGRAM_VIEWPORT_RESYNC_MS = \[60, 180, 420, 900\];/);
-    expect(app).toMatch(/function handleTelegramViewportChanged\(\) \{[\s\S]{0,340}?scheduleTelegramViewportResync\(\);/);
-    // The subscription goes through it — a bare syncViewportCssVars is the single read this fixes.
+    expect(app).toMatch(/const VIEWPORT_SETTLE_RESYNC_MS = \[60, 180, 420, 900\];/);
+    // The ladder rung does all three enforcements, in order.
+    expect(app).toMatch(/viewportSettleResyncTimers = VIEWPORT_SETTLE_RESYNC_MS\.map\(\(delay\) => setTimeout\(\(\) => \{\s*\n\s*syncViewportCssVars\(\);\s*\n\s*if \(\(window\.scrollY[^)]*\) !== 0\) window\.scrollTo\(0, 0\);\s*\n\s*pinOpenThreadsToEndAfterViewportChange\(\);/);
+    // Re-armed, not stacked: a burst of events during one animation leaves no pile of timers.
+    expect(app).toMatch(/for \(const timer of viewportSettleResyncTimers\) clearTimeout\(timer\);/);
+    // Door one: the Telegram event goes through the handler, never a bare one-shot sync.
     expect(app).toMatch(/tg\.onEvent\('viewportChanged', handleTelegramViewportChanged\);/);
     expect(app, 'the one-shot subscription must not come back').not.toMatch(/onEvent\('viewportChanged', syncViewportCssVars\)/);
-    // Re-armed, not stacked: a burst of events during one animation must not leave a pile of timers behind.
-    const ladder = app.slice(app.indexOf('function scheduleTelegramViewportResync()'), app.indexOf('function handleTelegramViewportChanged'));
-    expect(ladder.length, 'the slice really spans the ladder').toBeGreaterThan(150);
-    expect(ladder).toMatch(/for \(const timer of telegramViewportResyncTimers\) clearTimeout\(timer\);/);
+    // Door two: a measured height CHANGE (the keyboard, on every platform) arms the same ladder.
+    expect(app).toMatch(/pinOpenThreadsToEndAfterViewportChange\(\);\s*\n(\s*\/\/.*\n)*\s*armViewportSettleLadder\(\);\s*\n\s*\}/);
   });
   it('PWA-QUICKSTART-TMA-01: quick-start works inside the Telegram Mini App (modal stacking, awaitable export, TG link, cloud dismissal)', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -4018,7 +4062,8 @@ describe('PWA runtime config guard', () => {
     // READ: readProfileDocument carries the claim through (the sole funnel for every chain read path).
     expect(app).toMatch(/ownerUsername: typeof profile\.ownerUsername === 'string' \? profile\.ownerUsername : '',/);
     // ANTI-IMPERSONATION: publicAuthorLabel shows ONLY the registry-verified name, NEVER the raw ownerUsername claim.
-    const label = app.slice(app.indexOf('function publicAuthorLabel('), app.indexOf('function publicAuthorLabel(') + 700);
+    const label = app.slice(app.indexOf('function publicAuthorLabel('), app.indexOf('function ensurePublicChannelForAuthorWallet('));
+    expect(label.length, 'the slice really spans the resolver').toBeGreaterThan(600);
     expect(label).toMatch(/publicChannelProfileCache\[channelProfileCacheKey\(wallet\)\]\?\.verifiedUsername/);
     expect(label).not.toMatch(/\.ownerUsername/); // the raw claim is never read by the label
     // VERIFY: tolerant parse (no throw on hostile claims) + only strip a name on a PROVEN definitive cached-null mismatch.
@@ -5652,6 +5697,22 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/\.app-shell\[data-chat-open="true"\]\[data-view="chats"\] \.chat-pane \{\s*display: grid;[\s\S]*?padding-top: var\(--header-top-offset\);/);
     // The mobile conversation header carries no vertical padding of its own (the bar is the shared height).
     expect(css).toMatch(/padding: 0 var\(--gutter\) 0 \d+px;/);
+  });
+
+  it('PWA-CHAT-BOTTOM-01: strip content that does not fill hugs the composer, and only the chat strip does', () => {
+    // [OWNER 2026-08-26: "a message was written, the keyboard was dismissed, and the message stayed in place
+    // instead of moving down to the composer"]. The strip is a flex column with no bottom anchoring, so content
+    // that does not overflow sat at the TOP: with the keyboard up the strip is short and top IS bottom; the
+    // keyboard leaves, the strip grows, and the message stays glued under the header. No scroll fix can reach it
+    // — a strip that does not overflow has nothing to scroll. The auto margin on the FIRST child absorbs the free
+    // height and collapses to zero on overflow, so scroll behaviour is untouched.
+    const css = readFileSync('web/styles.css', 'utf8');
+    expect(css).toMatch(/\.message-strip > :first-child \{\s*\n\s*margin-top: auto;\s*\n\}/);
+    // The empty state keeps its own centring: auto top from the anchor + its own auto bottom still centres.
+    expect(css).toMatch(/\.conversation-empty \{[^}]*margin: auto 0;/);
+    // NOT the comments list — a thread reads DOWNWARD from the post, one comment belongs at the top, under what
+    // it answers. Anchoring it to the bottom would apply the fix against that surface's reading direction.
+    expect(css).not.toMatch(/\.comment-list > :first-child \{[^}]*margin-top: auto/);
   });
 
   it('PWA-CHAT-SCROLL-01: only the act of sending moves the dialog — status ticks patch in place, restores use the live position', () => {

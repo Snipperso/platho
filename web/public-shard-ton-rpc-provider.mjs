@@ -272,7 +272,12 @@ export function createPublicShardTonRpcProvider(options = {}) {
     // messages found nothing, which is how "show earlier comments" worked once and then did nothing (owner,
     // 2026-08-21). The result reports `oldestLt`, the lt of the oldest body it matched, so the caller can ask for
     // the window before it next time.
-    async readPosts(shardAddress, { readMessagesWithSource, fromId = null, maxCount = 96n, callOptions = {}, entryCount = null, messagesEndLt = null } = {}) {
+    // `messagesByRowTime`: aim the /messages window by the ROWS' OWN TIME instead of an lt cursor. A HEAD read
+    // (rows [0..N) of an old shard) has no lt to page back from — the bodies it needs are the shard's OLDEST
+    // messages, arbitrarily far behind the newest-128 window. The rows carry created_at, so the window is asked
+    // by time: [min-600, max+600] — the same measured-honoured start_utime/end_utime technique the INTRO lane
+    // uses for bodies beyond the newest window. Requires an explicit fromId (a head read always has one).
+    async readPosts(shardAddress, { readMessagesWithSource, fromId = null, maxCount = 96n, callOptions = {}, entryCount = null, messagesEndLt = null, messagesByRowTime = false } = {}) {
       if (typeof readMessagesWithSource !== 'function') {
         throw new PublicShardTonRpcProviderError('readPosts requires a readMessagesWithSource(address) function');
       }
@@ -283,6 +288,45 @@ export function createPublicShardTonRpcProvider(options = {}) {
       // at 120 entries the reader returned entries 0..95 and the channel's 24 newest posts were invisible; at
       // 260 the windows stopped overlapping entirely and the shard read back EMPTY — every paid post gone from
       // the feed, silently. A caller that genuinely wants an older slice passes fromId explicitly.
+      if (messagesByRowTime === true) {
+        if (fromId === null) throw new PublicShardTonRpcProviderError('messagesByRowTime requires an explicit fromId');
+        const matchByTime = async (rows) => {
+          if (rows.length === 0) return [];
+          let minAt = rows[0].created_at;
+          let maxAt = rows[0].created_at;
+          for (const row of rows) {
+            if (row.created_at < minAt) minAt = row.created_at;
+            if (row.created_at > maxAt) maxAt = row.created_at;
+          }
+          const timed = await readMessagesWithSource(raw, {
+            startUtime: Math.max(0, Number(minAt) - 600),
+            endUtime: Number(maxAt) + 600,
+          });
+          return matchRows(rows, timed);
+        };
+        const page = await this.getPage(raw, BigInt(fromId), maxCount, callOptions);
+        const entryCountHead = page.entry_count;
+        if (page.rows.length === 0) return { entry_count: entryCountHead, posts: [], oldestLt: null };
+        let headPosts = await matchByTime(page.rows);
+        // FORWARD STRADDLE: a multipart stream that begins inside the window and ends past it is dropped by every
+        // assembler above (incomplete group), and the NEXT forward page drops its head parts the same way — the
+        // mirror of the tail path's backward extension, capped identically at one extra page.
+        const nextRow = BigInt(fromId) + BigInt(page.rows.length);
+        if (hasIncompletePublicStream(headPosts) && nextRow < entryCountHead) {
+          const more = await this.getPage(raw, nextRow, maxCount, callOptions);
+          if (more.rows.length > 0) {
+            const merged = new Map();
+            for (const post of [...headPosts, ...(await matchByTime(more.rows))]) merged.set(String(post.entry_id), post);
+            headPosts = [...merged.values()];
+          }
+        }
+        headPosts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+        const oldestHead = headPosts.reduce((acc, post) => {
+          if (post.lt === null || post.lt === undefined) return acc;
+          try { const lt = BigInt(post.lt); return acc === null || lt < acc ? lt : acc; } catch { return acc; }
+        }, null);
+        return { entry_count: entryCountHead, posts: headPosts, oldestLt: oldestHead === null ? null : oldestHead.toString() };
+      }
       let start;
       let known = entryCount === null ? null : BigInt(entryCount);
       if (fromId === null) {
@@ -295,9 +339,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
       } else {
         start = BigInt(fromId);
       }
-      // The bodies are read ONCE and reused across pages: /messages is the expensive call, get_page is cheap.
-      const messages = await readMessagesWithSource(raw, messagesEndLt === null || messagesEndLt === undefined ? {} : { endLt: messagesEndLt });
-      const matchRows = async (rows) => {
+      const matchRows = async (rows, messages) => {
         // [CHANGED 2026-07-30, wave-8 HIGH] On a duplicate body_commit the OLDEST entry wins, not the newest.
         //
         // The publisher tag alone is not enough here, and that is worth spelling out: the shard genuinely accepts both
@@ -344,6 +386,8 @@ export function createPublicShardTonRpcProvider(options = {}) {
         return out;
       };
 
+      // The bodies are read ONCE and reused across pages: /messages is the expensive call, get_page is cheap.
+      const messages = await readMessagesWithSource(raw, messagesEndLt === null || messagesEndLt === undefined ? {} : { endLt: messagesEndLt });
       let posts = [];
       let entryCountSeen = 0n;
       let cursor = start;
@@ -361,7 +405,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
         // 6..95), so merge by entry_id — a duplicated part would otherwise inflate a stream past its part_count
         // and make an incomplete group look complete.
         const merged = new Map();
-        for (const post of [...(await matchRows(page.rows)), ...posts]) merged.set(String(post.entry_id), post);
+        for (const post of [...(await matchRows(page.rows, messages)), ...posts]) merged.set(String(post.entry_id), post);
         posts = [...merged.values()];
         if (fromId !== null || cursor === 0n) break;
         if (!hasIncompletePublicStream(posts)) break;
