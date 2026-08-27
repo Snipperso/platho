@@ -2926,6 +2926,32 @@ describe('PWA runtime config guard', () => {
     expect(refreshNow).toMatch(/vaultRefreshInFlightFlags = null;/);
   });
 
+  it('PWA-SENDGATE-KEYS-01: the keys-loading window says what is happening, not "unlock and activate"', () => {
+    // The branch fires only UNLOCKED (the lock nulls plathoWallet with the keys, and the wallet check precedes
+    // it), i.e. during the seconds after the password while the messaging keys derive. The old line claimed the
+    // account needed unlocking AND activation — wrong on both counts for every reachable case [OWNER 2026-08-27].
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/if \(!localIdentity \|\| !localRecipientKeyPair \|\| !localSignedPublicBundle\) \{\n(\s*\/\/[^\n]*\n)*\s*return t\('send\.preparingKeys'\);/);
+    const i18n = readFileSync('web/i18n-strings.mjs', 'utf8');
+    expect(i18n.split('send.preparingKeys').length - 1, 'the honest line exists in every locale').toBe(10);
+    expect(i18n, 'the lying key is retired').not.toContain('send.unlockActivateBeforeSending');
+    expect(app).not.toContain('send.unlockActivateBeforeSending');
+  });
+
+  it('PWA-SENDGATE-KEYS-02: unlocking repaints the wallet rows at once — no Unlock row beside a live balance', () => {
+    // The wallet is assigned seconds before bootCrypto finishes deriving the messaging keys, and nothing
+    // repainted in between: the tab kept its locked-era paint, offering Unlock wallet next to a balance
+    // [OWNER 2026-08-27]. All three wallet-assignment flows repaint on assignment now.
+    const app = readFileSync('web/app.js', 'utf8');
+    const unlockAt = app.indexOf("async function loadPlathoWallet()");
+    const unlockEnd = app.indexOf('async function setPlathoWallet(', unlockAt);
+    expect(unlockAt).toBeGreaterThan(-1);
+    expect(unlockEnd).toBeGreaterThan(unlockAt);
+    expect(app.slice(unlockAt, unlockEnd), 'the unlock path repaints on assignment').toContain('refreshMessagingControls();');
+    const replaceEnd = app.indexOf('queueVaultRefreshAfterWalletChange', unlockEnd);
+    expect(app.slice(unlockEnd, replaceEnd), 'the replace path repaints on assignment').toContain('refreshMessagingControls();');
+  });
+
   it('PWA-AIRDROP-GONE-01: the spent airdrop leaves no UI, no reads and no dead strings behind', () => {
     // The epoch ended on chain (MEASURED 2026-08-26: remaining_budget = 0, all 15,000,000 ATH delivered in 3,672
     // payouts), and a claim pressed at zero would BURN the ticket credits: the pool floors the payout to 0 and

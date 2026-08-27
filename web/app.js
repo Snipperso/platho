@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=69';
+} from './public-channel-subscriptions.mjs?v=70';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -251,7 +251,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=92';
+} from './i18n.mjs?v=93';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -271,7 +271,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.11';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.12';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -18288,6 +18288,11 @@ async function loadPlathoWallet() {
       setBootScreenPhase('loading');
       markWalletUnlocked();
       scheduleWalletAutoLock();
+      // Repaint the wallet rows NOW, not at bootCrypto's tail: the wallet is unlocked this instant, but the key
+      // derivation ahead takes seconds, and the tab kept its locked-era paint the whole time — an "Unlock wallet"
+      // row beside a live balance [OWNER 2026-08-27]. Every row's own predicate is already honest (the Unlock row
+      // keys on plathoWallet, the composer says "preparing keys"); they just needed to be re-asked.
+      refreshMessagingControls();
       markNavVaultBalancePending('wallet loaded', {
         resetRetry: true,
         retry: true,
@@ -18310,6 +18315,7 @@ async function setPlathoWallet(wallet, { password } = {}) {
   prepareWalletScopedRuntimeForWallet(wallet, 'wallet replaced');
   plathoWallet = wallet;
   markWalletUnlocked();
+  refreshMessagingControls();   // same locked-era-paint window as loadPlathoWallet — repaint on assignment
   localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
   await writeStoredPlathoWallet(wallet, password);
   scheduleWalletAutoLock();
@@ -18716,7 +18722,12 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
   if (!plathoWallet) return t('common.walletRequired');
   if (pendingServiceWorkerAppShellReload === true) return t('common.updateReadyReload');
   if (!localIdentity || !localRecipientKeyPair || !localSignedPublicBundle) {
-    return t('send.unlockActivateBeforeSending');
+    // This branch can only fire UNLOCKED: the lock nulls plathoWallet together with the keys, and the wallet
+    // check above already returned. So the only state left is the seconds right after the password while the
+    // messaging keys derive — and the line here used to say "Unlock and activate Platho account", a double lie
+    // for that window [OWNER 2026-08-27: "the ability to write comes back a few seconds later, but the line lies
+    // about unlocking and activation"]. Say what is actually happening.
+    return t('send.preparingKeys');
   }
   // Activation gate, mirroring the public send button (refreshPublicSendButtonState): an unlocked-but-not-
   // activated sender has the local keys but NO Vault user record, so publishing would be rejected downstream
@@ -25067,6 +25078,7 @@ async function activateImportedEncryptedWalletRecord(wallet, record, { toncenter
   markWalletKeyBackupDone(wallet.address);
   localProfileAvatarPointer = readStoredProfileAvatarPointer(wallet.address);
   markWalletUnlocked();
+  refreshMessagingControls();   // same locked-era-paint window as loadPlathoWallet — repaint on assignment
   scheduleWalletAutoLock();
   await bootCrypto();
   // bootCrypto refreshed the avatar at its tail (serialized after sync); fire the vault refresh after it
