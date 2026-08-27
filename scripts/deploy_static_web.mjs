@@ -144,4 +144,34 @@ try {
 }
 
 console.log(`deployed ${release} to ${SITE_HOST} (${HOST})`);
+
+// CERTIFICATE WATCH, on the ritual that actually runs every day [OWNER 2026-08-27: "do we watch the renewals?
+// can they die suddenly?"]. There is no monitoring on either machine (empty crontabs, no custom timers — the
+// netwatch of record was not found on 2026-08-27), so the deploy — the one thing that provably happens daily —
+// carries the check. Caddy starts renewing 30 days before expiry and retries forever, so a cert can only die
+// after ~30 days of SILENT failures; shouting at <21 days means the renewal has already been failing for 9+
+// days and someone finally hears it. A check failure must never fail the deploy it rides on.
+try {
+  const { connect } = await import('node:tls');
+  const days = await new Promise((resolveDays) => {
+    const socket = connect({ host: HOST, port: 443, servername: SITE_HOST, timeout: 10_000 }, () => {
+      const cert = socket.getPeerCertificate();
+      socket.end();
+      const until = Date.parse(cert?.valid_to ?? '');
+      resolveDays(Number.isFinite(until) ? Math.floor((until - Date.now()) / 86_400_000) : null);
+    });
+    socket.on('error', () => resolveDays(null));
+    socket.on('timeout', () => { socket.destroy(); resolveDays(null); });
+  });
+  if (days === null) {
+    console.warn(`cert check: could not read the ${SITE_HOST} certificate from ${HOST}`);
+  } else if (days < 21) {
+    console.error(`\n!!! CERTIFICATE ALERT: ${SITE_HOST} on ${HOST} expires in ${days} day(s) — Caddy renewal has`);
+    console.error('!!! been failing for over a week. Check journalctl -u caddy on the machine NOW.\n');
+  } else {
+    console.log(`cert: ${SITE_HOST} valid for ${days} more days`);
+  }
+} catch (certError) {
+  console.warn('cert check skipped:', String(certError?.message ?? certError).slice(0, 120));
+}
 console.log(`tarball: ${tarPath}`);
