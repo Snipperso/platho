@@ -4,8 +4,8 @@
     "sha256": "63f9226ea8306b8add41ff440902b380fd11ca2f6c561beb2d3fd2f44bb2b892"
   },
   "boot-guard.js": {
-    "version": "7",
-    "sha256": "c837b3944ee9b7d27eb161465ad0f2b7c454fb93cb7926192a3a59d4fbdcb206"
+    "version": "8",
+    "sha256": "3172b9a0769084d754b7fa963c43973e81e40cb6980b465440eb8d476cfa13ef"
   },
   "boot-signal-field.mjs": {
     "version": "2",

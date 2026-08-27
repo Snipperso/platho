@@ -8207,6 +8207,17 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/<script src="\/boot-guard\.js\?v=\d+"><\/script>/);
     expect(sw).toMatch(/\.\/boot-guard\.js\?v=\d+/);
 
+    // The guard names the FILES, not just the failure class [a real user screenshot, 2026-08-27, carried only
+    // the browser-masked message and proved a file died without saying which]. Resource timing answers: failed
+    // entries by responseStatus, and the newest arrival shows where a stalled dribble stopped. The collector
+    // must never be able to break the guard it serves.
+    expect(bootGuard).toMatch(/function collectNetworkDiagnostics\(\)/);
+    expect(bootGuard).toMatch(/entry\.responseStatus/);
+    expect(bootGuard).toMatch(/failed to load: /);
+    expect(bootGuard).toMatch(/catch \(diagError\) \{ \/\* the guard must outlive its own diagnostics \*\/ \}/);
+    // ES5 discipline: this file runs on browsers the app itself cannot. No arrows, no let/const.
+    expect(bootGuard).not.toMatch(/=>|\bconst \b|\blet \b/);
+
     // No reachable vendor module may keep a bare @noble specifier.
     // curves/index.js is not reachable from the runtime graph and keeps an
     // unresolvable upstream specifier; everything else must be relative.

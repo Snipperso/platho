@@ -90,6 +90,39 @@
     rememberBootError('rejection: ' + (reason && reason.message ? reason.message : reason));
   });
 
+  // NAME THE FILE, not just the failure class. A real user's screenshot (2026-08-27, Android/Chrome via a
+  // VPN-ish path) carried only "Script error." - the browser masks module errors, so the screen proved a file
+  // died without saying WHICH. Resource timing knows: entries with responseStatus 0/4xx/5xx are the failed
+  // downloads (Chrome 109+; the field is simply absent elsewhere and the list stays empty), and the newest
+  // responseEnd shows where a stalled dribble stopped. Same-origin file names only - nothing sensitive.
+  function collectNetworkDiagnostics() {
+    var lines = [];
+    try {
+      var entries = (window.performance && performance.getEntriesByType) ? performance.getEntriesByType('resource') : [];
+      var lastEntry = null;
+      var failedCount = 0;
+      for (var i = 0; i < entries.length; i += 1) {
+        var entry = entries[i];
+        if (!lastEntry || (entry.responseEnd || 0) > (lastEntry.responseEnd || 0)) lastEntry = entry;
+        var status = entry.responseStatus;
+        if (status === 0 || (typeof status === 'number' && status >= 400)) {
+          failedCount += 1;
+          if (lines.length < 3) {
+            var nameParts = String(entry.name).split('/');
+            lines.push('failed to load: ' + nameParts[nameParts.length - 1] + (status ? ' (HTTP ' + status + ')' : ' (network)'));
+          }
+        }
+      }
+      if (failedCount > 3) lines.push('...and ' + (failedCount - 3) + ' more files failed');
+      if (lastEntry) {
+        var lastParts = String(lastEntry.name).split('/');
+        var ago = Math.round(((Date.now() - (performance.timeOrigin || 0)) - (lastEntry.responseEnd || 0)) / 1000);
+        lines.push('files arrived: ' + entries.length + '; last: ' + lastParts[lastParts.length - 1] + (ago >= 0 && ago < 100000 ? ' (' + ago + 's ago)' : ''));
+      }
+    } catch (diagError) { /* the guard must outlive its own diagnostics */ }
+    return lines;
+  }
+
   function styled(tag, styles) {
     var node = document.createElement(tag);
     for (var key in styles) {
@@ -169,6 +202,24 @@
         });
         line.textContent = bootErrors[i];
         overlay.appendChild(line);
+      }
+    }
+
+    var netLines = collectNetworkDiagnostics();
+    if (netLines.length > 0) {
+      var netTitle = styled('div', { fontWeight: '600', margin: '10px 0 6px' });
+      netTitle.textContent = 'Network:';
+      overlay.appendChild(netTitle);
+      for (var n = 0; n < netLines.length; n += 1) {
+        var netLine = styled('div', {
+          fontFamily: 'ui-monospace, Menlo, monospace',
+          fontSize: '12px',
+          color: '#e8c07a',
+          marginBottom: '4px',
+          wordBreak: 'break-word',
+        });
+        netLine.textContent = netLines[n];
+        overlay.appendChild(netLine);
       }
     }
 
