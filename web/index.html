@@ -30,7 +30,7 @@
             <div class="network-pill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">1.3.10</span>
+              <span class="app-version-label" id="appVersionLabel">1.3.11</span>
             </div>
           </div>
         </div>
@@ -387,20 +387,15 @@
 
             <section class="profile-section" aria-label="ATH">
               <h2>ATH</h2>
-              <!-- [OWNER 2026-08-03] The claim leads the section, and the separate "activity credits" row is gone:
-                   it said the same thing as the button's own status, and two controls for one number is one too many.
-                   The button carries the progress ("0 ATH / 100 ATH") and stays disabled until the threshold. -->
+              <!-- [OWNER 2026-08-27] The airdrop claim row and the "Activity drop issued" stat are GONE, not hidden:
+                   the pool's budget is spent on chain (remaining 0, all 15,000,000 ATH delivered), so the rows only
+                   flashed on open while two RPC reads re-learned a permanent fact. -->
               <div class="settings-list">
-                <button id="claimAirdropButton" type="button"><span data-i18n="profile.claimAirdrop">Claim ATH</span><strong class="profile-action-status" id="claimAirdropStatus" data-i18n="profile.statusChecking">checking</strong></button>
                 <!-- [OWNER 2026-08-08] The other way to get ATH: buy it from the sealed reserve instead of earning it.
                      The status carries the PRICE, like every other row here that spends money. -->
                 <button id="buyAthButton" type="button"><span data-i18n="profile.buyAth">Buy ATH</span><strong class="profile-action-status" id="buyAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
               </div>
               <div class="profile-stat-list">
-                <div class="profile-stat-row">
-                  <span data-i18n="profile.activityDropIssued">Activity drop issued</span>
-                  <strong id="athDropIssuedStatus">-</strong>
-                </div>
                 <div class="profile-stat-row">
                   <span data-i18n="profile.currentSupply">Current supply</span>
                   <strong id="athSupplyStatus">-</strong>
@@ -436,7 +431,7 @@
                    text, and still carries the click handler that copies the private-lane diagnostic; removing
                    `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
                    the element would also break PWA-CONFIG-01B. -->
-              <span class="app-version-label" id="profileVersionLabel" hidden>1.3.10</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.3.11</span>
             </div>
             <div class="header-actions">
               <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
@@ -896,6 +891,6 @@
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="/vendor/telegram-web-app.js?v=1"></script>
-    <script src="/app.js?v=b1283a01c" type="module"></script>
+    <script src="/app.js?v=b04068aa9" type="module"></script>
   </body>
 </html>

@@ -1,12 +1,4 @@
 {
-  "airdrop-pool-read.mjs": {
-    "version": "1",
-    "sha256": "abb2b78e66245b57365069c15aefd43287c9ca71e940c87474968e6b73f5866e"
-  },
-  "airdrop-ticket-read.mjs": {
-    "version": "21",
-    "sha256": "2b49cc86da905e14b23c4a199f932894da37e0163cfda0a5b1f2c691d8739c78"
-  },
   "ath-ton-rpc-provider.mjs": {
     "version": "59",
     "sha256": "63f9226ea8306b8add41ff440902b380fd11ca2f6c561beb2d3fd2f44bb2b892"
@@ -68,12 +60,12 @@
     "sha256": "9c45e27d8b6a3bed431641d0e2d09af40271ddd82def381f69e6ac0210c31e9f"
   },
   "i18n-strings.mjs": {
-    "version": "93",
-    "sha256": "d1e9bf6eb4cf3988d06a851f1de3a00fbf54e6d16658cfed0ad1defda5e4bcd1"
+    "version": "94",
+    "sha256": "b22d9a6d21a4fb695ea7afe1ecd1064578fb0936a71be85dcc133cb52b213ae5"
   },
   "i18n.mjs": {
-    "version": "91",
-    "sha256": "8fa12bd1c46013f9d4230712485006142db61dd6f44bea6ba61ca9a9edaa6a9c"
+    "version": "92",
+    "sha256": "be9fc6e9109fa67255de6a7280455291e521d28142b3e3f90a9557c8c23f7f6e"
   },
   "intro-bucket.mjs": {
     "version": "21",
@@ -180,8 +172,8 @@
     "sha256": "69c3ccf72c8f4542b93baca73a387db181803d4a310ab0590bbc26dc93df9216"
   },
   "public-channel-subscriptions.mjs": {
-    "version": "68",
-    "sha256": "8511d65fda1ba8e87662e25422b114de47d2d7384c2e921bfe1f52ebf31fc890"
+    "version": "69",
+    "sha256": "b91120e717a740acec20b0c2cd7b275377b5ea3f3018df3789980906225a7f71"
   },
   "public-lane-send.mjs": {
     "version": "23",

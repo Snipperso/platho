@@ -47,7 +47,9 @@ describe('wallet tab + durable comment cache guard', () => {
       // dedicated placement assertion below — moving it must not mean losing track of it.
       // flushAthButton was in this list until v890, when the row was deleted outright — see the absence gate
       // in tests/pwa-runtime-config.test.ts PWA-CONFIG-07C.
-      'athDropIssuedStatus', 'athSupplyStatus',
+      // athDropIssuedStatus (and the claim row) left with the spent airdrop on 2026-08-27 — the absence gate is
+      // PWA-AIRDROP-GONE-01 in tests/pwa-runtime-config.test.ts.
+      'athSupplyStatus',
     ];
     for (const id of moved) {
       expect(walletPanel, `${id} lives in the Wallet tab`).toContain(`id="${id}"`);

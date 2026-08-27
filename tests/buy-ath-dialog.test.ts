@@ -22,18 +22,16 @@ describe('buy ATH from the reserve', () => {
     expect(app).toMatch(/function marketStabilityUnitPriceLabel/);
   });
 
-  it('BUYATH-02: the copy is assembled from the airdrop pool state, not hardcoded', () => {
+  it('BUYATH-02: the footnotes are the two lines that stay true forever', () => {
+    // The dialog used to carry two more, PHASE-BOUND lines — the airdrop earning line and the coming pool's
+    // launch terms — gated on the airdrop pool's remaining budget so they would end themselves when it did
+    // ("prose about a phase goes stale in silence"). The budget IS spent (2026-08-26: remaining 0, all
+    // 15,000,000 ATH delivered) and the airdrop UI plus its pool/ticket reads were removed wholesale [OWNER
+    // 2026-08-27], so the ended-phase branch is deleted rather than kept eternally false (PWA-AIRDROP-GONE-01).
     expect(app).toMatch(/function buyAthFootnotes\(state\)/);
-    expect(app).toMatch(/const remaining = athPoolState\.remainingBudget;/);
-    // The number comes from ONE source now — two callers ask it and want opposite defaults for "not read".
-        expect(app).toMatch(/function activityAirdropRemainingAtomic\(\)/);
-        expect(app).toMatch(/const airdropStillRunning = \(activityAirdropRemainingAtomic\(\) \?\? 0n\) > 0n;/);
-    // The two PHASE-BOUND footnotes — a pool that does not exist yet and an airdrop still paying out — ride the same
-    // condition, because they stop being true on the same event. The step price and "you can already spend it" are
-    // unconditional: both stay true forever.
-    expect(app).toMatch(/if \(airdropStillRunning\) \{[\s\S]{0,400}profile\.buyAthFootPool[\s\S]{0,300}profile\.buyAthFootAirdrop[\s\S]{0,40}\}/);
-    expect(app, 'the step line is unconditional').toMatch(/const lines = \[t\('profile\.buyAthFootStep'/);
-    expect(app, 'so is the spend line').toMatch(/\}\s*\n\s*lines\.push\(t\('profile\.buyAthFootSpend'\)\);/);
+    expect(app).toMatch(/const lines = \[t\('profile\.buyAthFootStep'/);
+    expect(app).toMatch(/lines\.push\(t\('profile\.buyAthFootSpend'\)\);/);
+    expect(app).not.toMatch(/airdropStillRunning|buyAthFootPool|buyAthFootAirdrop/);
   });
 
   it('BUYATH-02B: the CONTROLS come first and the prose sits under the button', () => {
@@ -53,17 +51,6 @@ describe('buy ATH from the reserve', () => {
     expect(app).not.toMatch(/buyAthTitleStar/);
     // The footnote list renders AFTER the submit button in the markup, not before it.
     expect(html).toMatch(/id="actionSubmitButton"[\s\S]{0,700}id="actionFootnotes"/);
-  });
-
-  it('BUYATH-03: an UNREADABLE pool falls to the SHORT copy, never the long one', () => {
-    // The pool reader leaves remainingBudget null when the read fails, and null must NOT read as "still running".
-    // Getting this backwards would print "ATH is earned by writing" at a user for whom it may already be false.
-    expect(app).toMatch(/remainingBudget: pool\.remainingBudget,/);
-    expect(app).toMatch(/remainingBudget: null \}/);
-    expect(app, 'an unread pool must fail the running test, not pass it')
-          .toMatch(/const airdropStillRunning = \(activityAirdropRemainingAtomic\(\) \?\? 0n\) > 0n;/);
-        // ...and the source itself keeps null as null, so each caller can decide what to do with it.
-        expect(app).toMatch(/return remaining === null \|\| remaining === undefined \? null : nonNegativeBigInt\(remaining\);/);
   });
 
   it('BUYATH-04: the amount is clamped by BOTH contract bounds before it can be composed', () => {
@@ -111,10 +98,12 @@ describe('buy ATH from the reserve', () => {
     expect(queue).toContain('refreshVaultNavBalanceInBackground().catch(() => {});');
     expect(queue).toMatch(/for \(const delayMs of ATH_POST_TRANSACTION_REFRESH_DELAYS_MS\) setTimeout\(tick, delayMs\);/);
     // Counter-case: both money lanes must go through it, or the next one drifts the same way.
+    // The claim lane left with the spent airdrop (2026-08-27): definition + the BUY sender remain, and pinning
+    // the exact count is what makes a silently-dropped sender (or a resurrected one) visible.
     expect(
       (app.match(/queueAthPostTransactionRefresh\(\)/g) ?? []).length,
-      'every lane that moves ATH queues the shared refresh (definition + claim + buy)',
-    ).toBeGreaterThanOrEqual(3);
+      'the shared refresh has exactly its definition and the BUY sender',
+    ).toBe(2);
   });
 
   it('BUYATH-07: every user-visible string goes through t(), in all ten locales', async () => {
@@ -123,8 +112,7 @@ describe('buy ATH from the reserve', () => {
       'profile.buyAth', 'profile.buyAthTitle', 'profile.buyAthSubmit',
       'profile.buyAthFromPrice', 'profile.buyAthSoldOut', 'profile.buyAthUnavailable',
       'profile.buyAthWalletRequired', 'profile.buyAthTitle', 'profile.buyAthAmountLabel',
-      'profile.buyAthCostLabel', 'profile.buyAthFootStep', 'profile.buyAthFootPool',
-      'profile.buyAthFootAirdrop', 'profile.buyAthFootSpend',
+      'profile.buyAthCostLabel', 'profile.buyAthFootStep', 'profile.buyAthFootSpend',
       'profile.buyAthSummaryAmount', 'profile.buyAthSummaryPrice', 'profile.buyAthSummaryFee',
       'profile.buyAthSummaryBalance', 'profile.buyAthEnterAmount', 'profile.buyAthLowBalance',
       'profile.buyAthSending', 'profile.buyAthSent', 'profile.buyAthBusy', 'profile.buyAthFailed',
@@ -140,17 +128,8 @@ describe('buy ATH from the reserve', () => {
     for (const locale of Object.keys(I18N_STRINGS)) {
       expect(I18N_STRINGS[locale]['profile.buyAthFootStep'], `${locale} step line`).toContain('{price}');
       expect(I18N_STRINGS[locale]['profile.buyAthFootStep'], `${locale} step line`).toContain('{amount}');
-      expect(I18N_STRINGS[locale]['profile.buyAthFootPool'], `${locale} pool line`).toContain('{price}');
-      expect(I18N_STRINGS[locale]['profile.buyAthFootPool'], `${locale} pool line`).toContain('{liquidityAth}');
     }
   });
 
-  it('BUYATH-08: the pool launch price is stated, never derived from the seller ladder', () => {
-    // 0.001 is the POOL price (15,000,000 ATH against 15,000 GRAM). The seller's ladder starts at x2 = 0.002, so
-    // computing "the pool price" from the seller's own multiplier would print the seller's price twice and quietly
-    // turn an honest comparison into a tautology.
-    expect(app).toMatch(/const POOL_LAUNCH_PRICE_LABEL = '0\.001';/);
-    expect(app).toMatch(/price: POOL_LAUNCH_PRICE_LABEL,/);
-    expect(app).toMatch(/const POOL_LIQUIDITY_ATH_LABEL = '15 000 000';/);
-  });
+
 });

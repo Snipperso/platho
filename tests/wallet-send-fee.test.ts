@@ -257,8 +257,8 @@ describe('WALLET-SEND-FEE', () => {
     expect(preflights.length, 'the pre-flight sites should all be found').toBeGreaterThanOrEqual(9);
     const flat = preflights.filter((argument) => !argument.includes('walletSendFeeReserveNanotons('));
     expect(flat, `these pre-flights do not reserve the send fee:\n${flat.join('\n---\n')}`).toEqual([]);
-    // The airdrop claim checks the balance by hand instead of through the helper — it needs the term too.
-    expect(source).toMatch(/const required = value \+ walletSendFeeReserveNanotons\(\);/);
+    // The airdrop claim used to check its balance by hand and carried this term too; the claim lane left with
+    // the spent airdrop (2026-08-27, PWA-AIRDROP-GONE-01), so the helper call sites above are the whole set.
 
     // The reserve is the thing the old constant was not: bigger for a bigger message.
     expect(walletSendFeeNanotons([32])).toBeGreaterThan(FLOOR);

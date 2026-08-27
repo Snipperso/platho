@@ -74,7 +74,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=68';
+} from './public-channel-subscriptions.mjs?v=69';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -139,7 +139,6 @@ import {
   readPublicPostPayloadV2,
   createUsernameRegistryMessage,
   createWalletTransaction,
-  buildAirdropTicketClaimBody,
   buildVaultReplaceMessagingKeysExternalBoc,
   buildVaultWithdrawAthExternalBoc,
   buildVaultWithdrawTonExternalBoc,
@@ -200,8 +199,6 @@ import {
 } from './intro-send-state.mjs?v=2';
 import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=21';
 import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=28';
-import { createAirdropTicketReader } from './airdrop-ticket-read.mjs?v=21';
-import { createAirdropPoolReader } from './airdrop-pool-read.mjs?v=1';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
@@ -254,7 +251,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=91';
+} from './i18n.mjs?v=92';
 import { createBootSignalField } from './boot-signal-field.mjs?v=2';
 
 const appConfig = PLATHO_APP_CONFIG;
@@ -274,7 +271,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.10';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.11';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -826,9 +823,6 @@ refreshToncenterKeyUi();
 const buyAthButton = document.querySelector('#buyAthButton');
 const buyAthStatus = document.querySelector('#buyAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
-const athDropIssuedStatus = document.querySelector('#athDropIssuedStatus');
-const claimAirdropButton = document.querySelector('#claimAirdropButton');
-const claimAirdropStatus = document.querySelector('#claimAirdropStatus');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
 const brandNetworkLabel = document.querySelector('#brandNetworkLabel');
 const chatCountLabel = document.querySelector('#chatCountLabel');
@@ -1820,23 +1814,10 @@ function walletSendFeeReserveNanotons(sizeClasses = []) {
   return measured > WALLET_FEE_HEADROOM_NANOTONS ? measured : WALLET_FEE_HEADROOM_NANOTONS;
 }
 
-// This wallet's activity-credit ticket. `credits === null` means NOT READ YET — distinct from a read that found no
-// account, which is `credits = 0n` and the ordinary state of a wallet that has not published. Conflating the two
-// would put a confident zero where the truth is "unknown".
-let athTicketState = { credits: null, minClaimCredits: null, inFlight: 0n, claimMinValue: null, address: null };
-
-// The pool's own numbers: how much of the activity airdrop has gone out, and how much ATH one credit is worth.
-// `athPerCredit` is what turns an internal credit count into the figure a user can act on — 10 credits is not
-// "10 of something", it is 100 ATH.
-let athPoolState = { distributedTotal: null, totalPool: null, athPerCredit: null, remainingBudget: null };
 // The reserve seller. `null` state means "not read yet / unreadable", which the buy dialog treats as UNKNOWN rather
 // than as sold out — a confident "no" from a failed read is the worse of the two errors here.
 let marketStabilityState = null;
 let marketStabilityBuyInFlight = false;
-// pendingSince: a claim was broadcast and the chain has not shown it yet. Distinct from `busy` (which covers only the
-// signing/broadcast itself) — the gap between those two is where the button used to re-enable on a live claim.
-let athClaimState = { busy: false, error: null, errorCode: null, pendingSince: null };
-
 function localStorageOrNull() {
   return typeof localStorage === 'undefined' ? null : localStorage;
 }
@@ -18842,20 +18823,6 @@ function privateSendRetryMaxAttempts(error = null, message = null) {
   return PRIVATE_SEND_RETRY_MAX_ATTEMPTS;
 }
 
-/**
- * HOW MUCH OF THE ACTIVITY AIRDROP IS STILL TO BE EARNED — atomic ATH, or null for "not read".
- *
- * The one number the post-airdrop epoch turns on: the buy dialog stops promising that writing earns ATH, and the
- * claim row goes away once this wallet has taken its last credits. It comes from AirdropPool itself, because the
- * alternative is prose about a phase of the project, and prose about a phase goes stale in silence.
- *
- * Each caller picks its OWN default for null, and they differ on purpose — see the two call sites.
- */
-function activityAirdropRemainingAtomic() {
-  const remaining = athPoolState.remainingBudget;
-  return remaining === null || remaining === undefined ? null : nonNegativeBigInt(remaining);
-}
-
 function normalizePrivateSizeClass(sizeClass = 1) {
   const normalized = Number(sizeClass);
   return [1, 2, 4, 8, 16, 32].includes(normalized) ? normalized : 1;
@@ -19471,18 +19438,6 @@ function profileAvatarFloorNanotons() {
 }
 
 /**
- * Mirrors of the AirdropTicket constants the claim note quotes. Pinned against contracts/AirdropTicket.tact by
- * PWA-AIRDROP-CLAIM-NOTE-01, because a note that drifts from the chain is worse than no note: it would advise a
- * batch the contract refuses, or quote a cost the wallet does not actually ask for.
- *
- * The cost is not a deposit that comes back. AirdropTicket's own comment records it: a claim's whole inbound value
- * leaves again with the redeem hop, so 0.063 GRAM is spent per claim no matter how much ATH the claim carries —
- * which is exactly why claiming in large batches is worth advising.
- */
-const AIRDROP_CLAIM_MIN_VALUE_NANOTONS = 63_000_000n;   // AT_CLAIM_MIN_VALUE
-const AIRDROP_MAX_CREDITS_PER_CLAIM = 1000n;            // AT_MAX_CREDITS_PER_CLAIM
-
-/**
  * The profile rows that quote a figure. They carry no `data-i18n`: the static pass calls `t(key)` without
  * params and would render the `{amount}` placeholder literally, so this is their only writer.
  *
@@ -19500,16 +19455,6 @@ function refreshProfileFeeLabels() {
   if (setAvatarStatus) {
     setAvatarStatus.textContent = t('avatar.setFee', { amount: formatTonNanotons(profileAvatarFloorNanotons()) });
   }
-}
-
-/**
- * What a claim will cost the wallet: the live figure once the ticket has reported one, the mirrored constant
- * before that. It belongs on the row rather than in a paragraph beneath it (owner, 2026-08-08) — the row is where
- * the decision is made, and an explanation underneath is something to read instead of a number to see.
- */
-function airdropClaimCostLabel() {
-  const cost = nonNegativeBigInt(athTicketState.claimMinValue ?? AIRDROP_CLAIM_MIN_VALUE_NANOTONS);
-  return t('common.gramAmount', { amount: formatTonNanotons(cost) });
 }
 
 function profileAvatarTonFeeLabel(attachment) {
@@ -23364,73 +23309,6 @@ linkUsernameButton?.addEventListener('click', async () => {
   }
 });
 
-/**
- * Claim the accrued airdrop: send TicketClaim (opcode 0x41544332, empty body) from the OWNER wallet to its own
- * AirdropTicket, carrying at least the ticket's own claim_min_value.
- *
- * The contract gates are sender==owner (27010), nothing already in flight (27011), credits >= the minimum (27012)
- * and enough value to fund the delivery (27013) — that last one is checked in COMPUTE deliberately, so a claim that
- * cannot pay its own way bounces instead of moving credits into flight and failing invisibly in ACTION. The wallet
- * balance is checked HERE for the same reason the flush does it: a zero-GRAM broadcast never lands, and the user
- * would be left staring at a pending state with nothing to act on.
- */
-async function submitAirdropClaim() {
-  requireNoPendingServiceWorkerAppShellReload();
-  requirePlathoWallet();
-  if (!athTicketState.address) throw new Error('Airdrop ticket address is not known yet');
-  if (!athClaimReady()) throw new Error('No airdrop is ready to claim');
-  const value = nonNegativeBigInt(athTicketState.claimMinValue ?? 0n);
-  if (value <= 0n) throw new Error('Airdrop ticket did not report its claim value');
-
-  const required = value + walletSendFeeReserveNanotons();
-  const walletBalanceNanotons = await loadConnectedTonWalletBalance().catch(() => null);
-  if (walletBalanceNanotons !== null && nonNegativeBigInt(walletBalanceNanotons) < required) {
-    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(required) }));
-    error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
-    throw error;
-  }
-
-  athClaimState = { busy: true, error: null, errorCode: null, pendingSince: null };
-  renderAthClaimStatus();
-  const transaction = createWalletTransaction([{
-    address: athTicketState.address,
-    amount: value.toString(),
-    payload: buildAirdropTicketClaimBody(),
-  }]);
-  await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
-  // Reflect the in-flight state immediately: the ticket moves the credits the moment it executes, and a user who
-  // sees the old number would reasonably press again into gate 27011.
-  athTicketState = { ...athTicketState, inFlight: athTicketState.credits ?? 0n, credits: 0n };
-  // Not `busy` any more (the external is away), but NOT claimable either until the chain shows it — see athClaimReady.
-  athClaimState = { busy: false, error: null, errorCode: null, pendingSince: Date.now() };
-  renderAthProfileStats();
-  renderAthClaimStatus();
-  queueAthPostTransactionRefresh();
-}
-
-claimAirdropButton?.addEventListener('click', async () => {
-  try {
-    claimAirdropButton.disabled = true;
-    await submitAirdropClaim();
-  } catch (error) {
-    athClaimState = {
-      busy: false,
-      error: String(error?.message ?? error ?? 'Airdrop claim blocked'),
-      errorCode: error?.code ?? null,
-      // KEEP any pending marker. A throw AFTER the broadcast (an ambiguous send, a confirm read that failed) leaves a
-      // claim that may well be executing; clearing the lock here would re-offer the button and invite a second claim
-      // into gate 27011. The grace releases it either way.
-      pendingSince: athClaimState.pendingSince ?? null,
-    };
-    flashWalletIdentityStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
-      ? t('common.needsWalletGram')
-      : t('common.syncDelayed'));
-    console.error(error);
-  } finally {
-    renderAthClaimStatus();
-  }
-});
-
 buyAthButton?.addEventListener('click', () => { openBuyAthDialog().catch((error) => console.error(error)); });
 
 replaceVaultKeysButton?.addEventListener('click', async () => {
@@ -24863,94 +24741,8 @@ function formatAthAtomicGrouped(value) {
   return groupDecimalText(formatAthAtomic(value));
 }
 
-function formatBasisPointsPercent(bps) {
-  const basis = nonNegativeBigInt(bps);
-  const whole = basis / 100n;
-  const fraction = basis % 100n;
-  return fraction === 0n
-    ? `${whole}%`
-    : `${whole}.${fraction.toString().padStart(2, '0').replace(/0+$/, '')}%`;
-}
-
-/** Whether a claim can be signed right now, and why not when it cannot. */
-// How long a submitted claim keeps the button locked while we wait for the chain to show it. Bounded so a claim that
-// never lands cannot disable the button forever — past this the on-chain state is believed again.
-const ATH_CLAIM_PENDING_GRACE_MS = 180_000;
-
-/** A claim we broadcast but have not yet seen on chain. */
-function athClaimPending() {
-  const since = athClaimState.pendingSince;
-  return Number.isFinite(since) && (Date.now() - since) < ATH_CLAIM_PENDING_GRACE_MS;
-}
-
-function athClaimReady() {
-  // [OWNER 2026-08-03] The button went ACTIVE AGAIN moments after a claim was submitted. A claim broadcasts in a
-  // second but executes a few seconds later, and the +5s ticket re-read still returned the OLD credits — which read
-  // as "claimable" and re-enabled the button on a claim already in flight. Pressing it again walks straight into
-  // gate 27011. The submitted-but-unseen window is now a state of its own rather than a gap between two truths.
-  if (athClaimPending()) return false;
-  const credits = athTicketState.credits;
-  const need = athTicketState.minClaimCredits;
-  if (credits === null || need === null) return false;
-  return nonNegativeBigInt(athTicketState.inFlight) === 0n && credits >= need;
-}
-
-function athAirdropClosedForThisWallet() {
-  const remaining = activityAirdropRemainingAtomic();
-  if (remaining === null || remaining > 0n) return false;
-  if (athClaimState.busy || athClaimState.pendingSince) return false;
-  if (athTicketState.credits === null) return false;              // not read: say nothing
-  if (nonNegativeBigInt(athTicketState.credits) > 0n) return false;
-  return nonNegativeBigInt(athTicketState.inFlight) === 0n;
-}
-
-function renderAthClaimStatus() {
-  // The whole row, not just its label: an epoch that is over leaves no control behind.
-  const closed = athAirdropClosedForThisWallet();
-  if (claimAirdropButton) {
-    claimAirdropButton.hidden = closed;
-    claimAirdropButton.disabled = closed || athClaimState.busy || !athClaimReady();
-  }
-  if (closed) return;
-  if (!claimAirdropStatus) return;
-  if (athClaimState.busy) { setText(claimAirdropStatus, t('profile.claiming')); return; }
-  if (athClaimState.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED') { setText(claimAirdropStatus, t('common.needsWalletGram')); return; }
-  if (athClaimState.error) { setText(claimAirdropStatus, t('common.syncDelayed')); return; }
-  if (athTicketState.credits === null) { setText(claimAirdropStatus, t('profile.statusChecking')); return; }
-  // A claim already on its way: the ticket moved the credits into flight and is waiting on the redeem leg. Showing
-  // the pending state is what stops a user from signing a second one that gate 27011 would refuse anyway.
-  if (nonNegativeBigInt(athTicketState.inFlight) > 0n) { setText(claimAirdropStatus, t('profile.claimPending')); return; }
-  const perCredit = athPoolState.athPerCredit ?? null;
-  const credits = athTicketState.credits;
-  if (!athClaimReady()) {
-    const need = athTicketState.minClaimCredits ?? 0n;
-    setText(claimAirdropStatus, perCredit && perCredit > 0n && need > 0n
-      ? `${formatAthAtomicGrouped(credits * perCredit)} / ${formatAthProfileAmount(need * perCredit)}`
-      : t('profile.zeroAthReady'));
-    return;
-  }
-  // Claimable amount AND what taking it costs, on the row itself. The cost does not scale with the amount, which
-  // is the whole reason it is worth showing: it is the same 0.063 GRAM whether the claim carries 100 ATH or 10,000.
-  setText(claimAirdropStatus, t('profile.amountWithCost', {
-    amount: perCredit && perCredit > 0n ? formatAthProfileAmount(credits * perCredit) : String(credits),
-    cost: airdropClaimCostLabel(),
-  }));
-}
-
 function renderAthProfileStats() {
   setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
-  renderAthClaimStatus();
-  // The GLOBAL figure, from AirdropPool. distributed_total is read directly rather than derived as
-  // total-minus-remaining: the pool CAPS remaining_budget at seal, so the subtraction has an edge the field does not.
-  // A pool not yet read shows a dash — never 0%, which would read as "nothing has gone out yet".
-  const poolTotal = athPoolState.totalPool ?? null;
-  const distributed = athPoolState.distributedTotal ?? null;
-  if (distributed === null || poolTotal === null || poolTotal <= 0n) {
-    setText(athDropIssuedStatus, '-');
-    return;
-  }
-  const percent = (distributed * 10_000n) / poolTotal;
-  setText(athDropIssuedStatus, `${formatBasisPointsPercent(percent)} / ${formatAthProfileAmount(distributed)}`);
 }
 
 function normalizeUsernameInput(input) {
@@ -26425,68 +26217,6 @@ async function refreshAthProtocolStats() {
   return await refreshAthProtocolStatsRun();
 }
 /**
- * Read this wallet's airdrop ticket. A missing account is the NORMAL state before the first publish, so it resolves
- * to zero credits rather than an error; only a transport failure leaves the previous value in place, because a
- * transient RPC blip must not blank a figure the user was just looking at.
- */
-async function refreshAthTicketState() {
-  const wallet = plathoWallet?.address ? parseTonAddress(plathoWallet.address).raw : null;
-  if (!wallet) { athTicketState = { credits: null, minClaimCredits: null, address: null }; return; }
-  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  if (!transport?.runGetMethod) return;
-  try {
-    const read = createAirdropTicketReader((call) => transport.runGetMethod(call));
-    const ticket = await read(wallet);
-    athTicketState = ticket.exists
-      ? {
-        credits: ticket.credits,
-        minClaimCredits: ticket.minClaimCredits,
-        inFlight: ticket.inFlight,
-        claimMinValue: ticket.claimMinValue,
-        address: ticket.address,
-      }
-      : { credits: 0n, minClaimCredits: null, inFlight: 0n, claimMinValue: null, address: ticket.address };
-    // The claim we broadcast is now VISIBLE on chain (credits consumed, or the ticket reports it in flight), so the
-    // submitted-but-unseen lock is over. Without this the button would stay disabled for the full grace even after
-    // settlement — which matters the moment new credits are earned inside that window.
-    if (athClaimState.pendingSince
-      && (nonNegativeBigInt(athTicketState.inFlight) > 0n || nonNegativeBigInt(athTicketState.credits) === 0n)) {
-      athClaimState = { ...athClaimState, pendingSince: null };
-    }
-    renderAthClaimStatus();
-  } catch (error) {
-    if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] ticket read failed', error);
-  }
-}
-
-/** The pool's distributed total and ath-per-credit. A failed read leaves the previous values rather than blanking. */
-async function refreshAthPoolState() {
-  const address = PLATHO_APP_CONFIG.airdropPool?.address ?? null;
-  const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
-  if (!address || !transport?.runGetMethod) return;
-  try {
-    const pool = await createAirdropPoolReader((call) => transport.runGetMethod(call))(address);
-    if (pool.exists) {
-      athPoolState = {
-        distributedTotal: pool.distributedTotal,
-        totalPool: pool.totalPool,
-        athPerCredit: pool.athPerCredit,
-        // Read for the BUY dialog, which must stop saying "ATH is earned by writing" once nothing is left to earn.
-        // The owner called that out before a line of copy was written: prose about a phase of the project goes stale
-        // silently, so the phase has to be a value the client reads rather than a sentence someone remembers to edit.
-        remainingBudget: pool.remainingBudget,
-      };
-      // The claim row shows ATH, and ATH is credits x ath-per-credit — a figure that only exists once this read
-      // lands. Without a render here the row keeps showing the raw credit count until the next ticket refresh
-      // happens to come round.
-      renderAthClaimStatus();
-    }
-  } catch (error) {
-    if (!noteTonRpcRateLimit(error)) console.warn('[airdrop] pool read failed', error);
-  }
-}
-
-/**
  * The reserve seller's live state: the price step, what is left on it, and whether it can take a sale at all.
  *
  * A failed read leaves `marketStabilityState` as it was (or null on the first pass) rather than writing zeros. The
@@ -26535,41 +26265,19 @@ function renderBuyAthStatus() {
   setText(buyAthStatus, price ? t('profile.buyAthFromPrice', { price }) : t('profile.statusChecking'));
 }
 
-// WHY THE COPY IS ASSEMBLED FROM STATE INSTEAD OF WRITTEN OUT.
-//
-// The owner, reading the draft: "after the airdrop is handed out, part of this text stops being true". He is right,
-// and about the two most load-bearing lines — "ATH is earned by writing" and "take a short name before they are
-// gone". Both describe a PHASE of the project, and prose about a phase goes stale in silence, in ten languages at
-// once. So the phase is a value the client reads: while the airdrop pool still has budget the earning line is true
-// and shown; when it is exhausted both lines go away on their own.
-//
-// An UNREADABLE pool shows the shorter text, not the longer one. That is the whole discipline in one line: the
-// shorter version asserts strictly less, so it cannot be the wrong thing to say when we do not know.
+// [OWNER 2026-08-27] The buy dialog used to carry two more lines — "ATH is earned by writing" and the coming
+// pool's launch terms — gated on the airdrop pool's remaining budget, so both would end themselves the moment
+// the budget did ("prose about a phase goes stale in silence"). The budget IS spent now (measured 2026-08-26:
+// remaining 0, all 15,000,000 ATH delivered), the airdrop UI is removed wholesale along with the pool/ticket
+// reads that fed the gate — so the ended-phase branch is deleted rather than kept eternally false.
 function buyAthFootnotes(state) {
-  // UNKNOWN SAYS LESS: an unread pool drops the earning line rather than promising a payout that may be over.
-  const airdropStillRunning = (activityAirdropRemainingAtomic() ?? 0n) > 0n;
   const lines = [t('profile.buyAthFootStep', {
     price: marketStabilityUnitPriceLabel(state) ?? '-',
     amount: formatAthAtomicGrouped(maxBuyableAtomic(state)),
   })];
-  if (airdropStillRunning) {
-    // Both of these describe the PRE-LAUNCH world: a pool that does not exist yet, and an airdrop still paying out.
-    // They ride the same signal because they end on the same event.
-    lines.push(t('profile.buyAthFootPool', {
-      price: POOL_LAUNCH_PRICE_LABEL,
-      liquidityAth: POOL_LIQUIDITY_ATH_LABEL,
-      liquidityGram: POOL_LIQUIDITY_GRAM_LABEL,
-    }));
-    lines.push(t('profile.buyAthFootAirdrop'));
-  }
   lines.push(t('profile.buyAthFootSpend'));
   return lines;
 }
-
-/** The price the liquidity pool will open at — 15,000,000 ATH against 15,000 GRAM. Stated, never computed from it. */
-const POOL_LAUNCH_PRICE_LABEL = '0.001';
-const POOL_LIQUIDITY_ATH_LABEL = '15 000 000';
-const POOL_LIQUIDITY_GRAM_LABEL = '15 000';
 
 /**
  * Wait for the seller to be free, then buy.
@@ -26756,8 +26464,6 @@ async function refreshAthProtocolStatsRun() {
         ? null
         : nonNegativeBigInt(data.total_supply),
     };
-    await refreshAthTicketState();
-    await refreshAthPoolState();
     await refreshMarketStabilityState();
     renderAthProfileStats();
     return athProtocolState;
@@ -27608,8 +27314,8 @@ async function submitUsernameMintDirect(username) {
   // MEASURED on a real user's failed mint, 2026-08-20: balance 0.266225197 before, 0.265632119 after, the
   // transaction's own action phase reporting `tot_actions 1, skipped_actions 1, msgs_created 0`. They lost 0.0006
   // GRAM to fees, not the 1.1 an explorer displays — an explorer renders the INTENDED action — and they tried
-  // nine times because nothing told them what was wrong. submitAirdropClaim already guards its send for exactly
-  // this reason and says so in its own comment; this lane and the avatar lane below never grew the same check.
+  // nine times because nothing told them what was wrong. The airdrop claim lane guarded its send for exactly
+  // this reason (removed with the spent airdrop, 2026-08-27); this lane and the avatar lane below lacked it.
   await assertWalletGramAtLeast(
     USERNAME_MINT_DIRECT_REQUEST_VALUE + walletSendFeeReserveNanotons(), 'mint a name');
   setUsernameMintStatus(t('username.signing'));

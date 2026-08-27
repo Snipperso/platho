@@ -1036,11 +1036,11 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/nativeCanvasWebpEncodeSupported = false/);
     expect(app).toMatch(/Image encoder did not produce WebP bytes/);
     expect(enCopy).toMatch(/avatar media is public/);
-    // The ATH block moved to the WALLET tab with the rest of the money surface, and its two stats swapped order on
-    // purpose: "activity drop issued" is the number this user's own ATH comes from, so it leads; "current supply"
-    // is protocol context and follows. The actions (claim, buy) lead the section; the flush row that used to
-    // trail the stats was deleted in v890 and the section now ENDS on the numbers.
-    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="claimAirdropButton"[\s\S]*id="buyAthButton"[\s\S]*id="athDropIssuedStatus"[\s\S]*id="athSupplyStatus"/);
+    // The ATH block moved to the WALLET tab with the rest of the money surface. [OWNER 2026-08-27] The claim
+    // row and the "Activity drop issued" stat are GONE with the spent airdrop (PWA-AIRDROP-GONE-01): the section
+    // is the buy action and the supply figure now.
+    expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="buyAthButton"[\s\S]*id="athSupplyStatus"/);
+    expect(html).not.toMatch(/claimAirdropButton|athDropIssuedStatus/);
     const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
     expect(walletPanel, 'the ATH block lives in the Wallet tab now').toMatch(/id="athSupplyStatus"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
@@ -2924,6 +2924,31 @@ describe('PWA runtime config guard', () => {
     // macrotask-free delay(0) hop, then runs ONLY the jobs the running one did not cover. Nothing overlaps.
     expect(refreshNow).toMatch(/return vaultRefreshPromise\s*\.catch\(\(\) => null\)\s*\.then\(\(\) => delay\(0\)\)\s*\.then\(\(\) => refreshVaultNow\(\{ includeActivation: missingActivation, includeStats: missingStats \}\)\);/);
     expect(refreshNow).toMatch(/vaultRefreshInFlightFlags = null;/);
+  });
+
+  it('PWA-AIRDROP-GONE-01: the spent airdrop leaves no UI, no reads and no dead strings behind', () => {
+    // The epoch ended on chain (MEASURED 2026-08-26: remaining_budget = 0, all 15,000,000 ATH delivered in 3,672
+    // payouts), and a claim pressed at zero would BURN the ticket credits: the pool floors the payout to 0 and
+    // returns without bouncing while the ticket has already consumed them. The first fix disarmed and labelled
+    // the rows; the owner's final call [2026-08-27]: "after opening the app the rows render and then hide — those
+    // are wasted requests; remove the items entirely." So the claim row, the issued counter, both chain readers
+    // and their per-profile-open RPC reads are gone wholesale, and this gate keeps them gone. The 100-ATH claim
+    // floor (AT_MIN_CLAIM_CREDITS) and the unclaimed-credit story move to the clean-18 ticket export.
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    for (const trace of ['claimAirdropButton', 'athDropIssuedStatus', 'athClaimReady', 'athPoolState',
+      'athTicketState', 'activityAirdropRemainingAtomic', 'createAirdropTicketReader', 'createAirdropPoolReader',
+      'submitAirdropClaim']) {
+      expect(app, trace + ' must stay removed').not.toContain(trace);
+      expect(html, trace + ' must stay removed from the shell').not.toContain(trace);
+    }
+    expect(existsSync('web/airdrop-ticket-read.mjs'), 'the ticket reader module is deleted').toBe(false);
+    expect(existsSync('web/airdrop-pool-read.mjs'), 'the pool reader module is deleted').toBe(false);
+    const i18n = readFileSync('web/i18n-strings.mjs', 'utf8');
+    for (const key of ['profile.claimAirdrop', 'profile.claiming', 'profile.claimPending', 'profile.zeroAthReady',
+      'profile.amountWithCost', 'profile.activityDropIssued', 'profile.buyAthFootPool', 'profile.buyAthFootAirdrop']) {
+      expect(i18n, key + ' retired in every locale').not.toContain(key);
+    }
   });
 
   it('PWA-QSTDZ-01: an install prompt fired mid-evaluation stores itself; only the module tail paints it', () => {
@@ -7243,16 +7268,8 @@ describe('PWA runtime config guard', () => {
     // status instead of "sync delayed". The pre-check must come before the transaction is built, or it is
     // decoration. Browser zoom is disabled app-wide (viewport meta + html/body touch-action + the WebKit
     // gesture kill) while the lightbox keeps its OWN pointer/transform zoom (touch-action:none viewport).
-    const claimSubmitSource = app.slice(
-      app.indexOf('async function submitAirdropClaim()'),
-      app.indexOf("claimAirdropButton?.addEventListener('click'"),
-    );
-    expect(claimSubmitSource).toMatch(/const walletBalanceNanotons = await loadConnectedTonWalletBalance\(\)\.catch\(\(\) => null\);/);
-    expect(claimSubmitSource).toMatch(/if \(walletBalanceNanotons !== null && nonNegativeBigInt\(walletBalanceNanotons\) < required\)/);
-    expect(claimSubmitSource).toMatch(/error\.code = 'PLATHO_WALLET_GRAM_REQUIRED';/);
-    expect(claimSubmitSource.indexOf("error.code = 'PLATHO_WALLET_GRAM_REQUIRED'"))
-      .toBeLessThan(claimSubmitSource.indexOf('const transaction = createWalletTransaction('));
-    expect(app).toMatch(/if \(athClaimState\.errorCode === 'PLATHO_WALLET_GRAM_REQUIRED'\) \{ setText\(claimAirdropStatus, t\('common\.needsWalletGram'\)\); return; \}/);
+    // [OWNER 2026-08-27] The airdrop claim lane is REMOVED with the spent pool (PWA-AIRDROP-GONE-01), and its
+    // GRAM-precheck pins went with it; the localized shortfall string survives on the flows that still spend.
     // Renamed out of the profile.flush* family with the row: the string now serves the claim alone, and a key
     // named after a deleted feature is how a reader concludes the feature is still there.
     expect(EN_STRINGS['common.needsWalletGram']).toBe('top up wallet GRAM');
@@ -7346,58 +7363,6 @@ describe('PWA runtime config guard', () => {
     expect(handlerSource).toMatch(/finally \{\s*messageSyncManualInFlight = false;/);
   });
 
-
-  it('PWA-AIRDROP-CLAIM-NOTE-01: the claim and flush rows quote a cost taken from the source, not typed', () => {
-    // REWORKED 2026-08-08. This began as a paragraph under the row and the owner cut it: the price belongs ON the
-    // row, where the decision is, with no explanation around it. (The paragraph was also attached to the WRONG
-    // row — "Flush ATH" instead of "Claim ATH" — and browser-checking that it rendered proved the mechanism while
-    // saying nothing about the placement.)
-    //
-    // What survives is the rule worth keeping: both figures come from the source that the wallet is actually asked
-    // to sign. A stale cost on a money row is the defect this file already records three times.
-    const app = readFileSync('web/app.js', 'utf8');
-    const ticket = readFileSync('contracts/AirdropTicket.tact', 'utf8');
-
-    const contractValue = (name: string): string => {
-      const match = ticket.match(new RegExp(`const ${name}: Int = (\\d+);`));
-      expect(match, `${name} must exist in AirdropTicket.tact`).toBeTruthy();
-      return (match as RegExpMatchArray)[1];
-    };
-    const clientValue = (source: string, name: string): string => {
-      const match = source.match(new RegExp(`const ${name} = ([0-9_]+)n;`));
-      expect(match, `${name} must exist`).toBeTruthy();
-      return (match as RegExpMatchArray)[1].replaceAll('_', '');
-    };
-
-    expect(clientValue(app, 'AIRDROP_CLAIM_MIN_VALUE_NANOTONS'), 'claim cost mirrors AT_CLAIM_MIN_VALUE')
-      .toBe(contractValue('AT_CLAIM_MIN_VALUE'));
-
-    // The claim row: live figure when the ticket reported one, the mirror before that.
-    expect(app).toMatch(/athTicketState\.claimMinValue \?\? AIRDROP_CLAIM_MIN_VALUE_NANOTONS/);
-    expect(app).toMatch(/cost: airdropClaimCostLabel\(\)/);
-
-    // The flush row is gone (v890), and with it the only client-side caller of the burn-flush message value. The
-    // CONSTANT stays in the transaction codec — the on-chain flushes still exist and the operator console fires
-    // them — but nothing in the app may quote or send it any more.
-    const transactions = readFileSync('web/pwa-contract-transactions.mjs', 'utf8');
-    expect(clientValue(transactions, 'REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS')).toBeTruthy();
-    expect(app).not.toMatch(/REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS/);
-    // The claim row still prices itself, and still only when there is something to charge for: a price beside a
-    // button that will refuse is its own small lie.
-    expect(app).toMatch(/setText\(claimAirdropStatus, t\('profile\.amountWithCost'/);
-
-    // The paragraph and its keys are gone, and so is the one-off class it needed.
-    expect(app).not.toMatch(/flushAthNote/);
-    expect(readFileSync('web/index.html', 'utf8')).not.toMatch(/flushAthNote|settings-note/);
-    expect(readFileSync('web/styles.css', 'utf8')).not.toMatch(/settings-note/);
-    for (const locale of ['en', 'ru'] as const) {
-      const dict = I18N_STRINGS[locale] as Record<string, string>;
-      expect(dict['profile.claimCostNote'], `${locale} note key retired`).toBeUndefined();
-      expect(dict['profile.claimCostBatchNote'], `${locale} batch note key retired`).toBeUndefined();
-      expect(dict['profile.amountWithCost']).toContain('{amount}');
-      expect(dict['profile.amountWithCost']).toContain('{cost}');
-    }
-  });
 
   it('PWA-CONFIG-06B: profile avatar rides ONE direct-pay wallet transfer (shard bytes + paid pointer)', () => {
     const app = readFileSync('web/app.js', 'utf8');
@@ -7771,10 +7736,6 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function setView(view)'),
       app.indexOf('function renderThreads'),
     );
-    const claimSource = app.slice(
-      app.indexOf('async function submitAirdropClaim()'),
-      app.indexOf("claimAirdropButton?.addEventListener('click'"),
-    );
     expect(initialStateSource).toMatch(/total_supply:\s*null/);
     expect(renderSource).toMatch(/if \(value === null \|\| value === undefined\) return '-'/);
     expect(refreshSource).toMatch(/provider\.getJettonData\(\{ address: requireAthMasterAddress\(\) \}\)/);
@@ -7786,12 +7747,11 @@ describe('PWA runtime config guard', () => {
     // Burn ATH user row removed (see the index.html assertions). The ATHBurn message primitive itself stays
     // for the protocol buyback/burn-due path; there is no longer a user-facing wallet-burn handler to assert.
     expect(app).not.toMatch(/async function submitAthWalletBurn/);
-    // [OWNER 2026-08-03] Starts at 2s: the claimed balance took visibly long to appear, and post-April TON
-    // settles in well under a second, so a 5s first look was pure waiting. Renamed off the flush in v890 —
-    // the airdrop claim is the only sender that queues it now.
+    // [OWNER 2026-08-03] Starts at 2s: a claimed balance took visibly long to appear, and post-April TON
+    // settles in well under a second, so a 5s first look was pure waiting. The claim lane left with the spent
+    // airdrop (2026-08-27); the BUY lane is the one sender that queues the ladder now (BUYATH-06B counts it).
     expect(app).toMatch(/const ATH_POST_TRANSACTION_REFRESH_DELAYS_MS = \[2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000\]/);
     expect(app).toMatch(/function queueAthPostTransactionRefresh\(\)/);
-    expect(claimSource).toMatch(/queueAthPostTransactionRefresh\(\)/);
     // [OWNER 2026-08-09] The "Flush ATH" row is DELETED, and this is the gate that keeps it deleted. It swept the
     // registries' burn dues to ATHMaster — protocol housekeeping with no reason to face a user — and its state
     // cost TWO registry getGlobal reads on every ATH stats refresh, on the phone, to render a row that read "0

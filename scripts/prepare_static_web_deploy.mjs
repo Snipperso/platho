@@ -60,7 +60,6 @@ const ROOT_RUNTIME_FILES = new Set([
   // simply 404s in production and the app fails to boot, which is why WEB-GRAPH-01 walks the graph.
   'key-shard-ton-rpc-provider.mjs',
   'shard-address.mjs',
-  'airdrop-ticket-read.mjs',
   'airdrop-pool-read.mjs',
   // The reserve seller: its live state (price step + what is left on it) and the buy message.
   'market-stability-read.mjs',
