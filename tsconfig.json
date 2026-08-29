@@ -1,0 +1,17 @@
+{
+  "//": "Type-check-only configuration (noEmit). Gates the deploy / mainnet / readiness tooling under scripts/, which type-checks cleanly under strict mode. The test suite (tests/) is intentionally not covered yet: it currently has type drift between the sandbox helpers and their call sites (see the note in the CI type-check step / PR). Widen `include` to tests/ once that drift is resolved.",
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["scripts/**/*.ts"]
+}
