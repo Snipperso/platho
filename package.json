@@ -39,7 +39,8 @@
     "test:debug:files": "bash scripts/debug-test-files.sh",
     "web:deploy": "node scripts/deploy_static_web.mjs",
     "web:deploy:preview": "node scripts/deploy_static_web.mjs --mode preview",
-    "admin": "node scripts/serve_admin.mjs"
+    "admin": "node scripts/serve_admin.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [],
   "author": "Platho",
@@ -63,6 +64,10 @@
     "@ton/ton": "^16.2.4",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "@types/node": "^22.20.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
