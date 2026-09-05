@@ -27,25 +27,65 @@ import { readFileSync } from 'node:fs';
 
 const SCAN_EVERYTHING = process.argv.includes('--all');
 
+/*
+ * Vendored third-party code is not scanned for CONTENT. We did not write it, a "secret" published in a public
+ * npm package is neither ours nor secret, and the noise was overwhelming: four-part RFC section numbers in the
+ * Argon2 and NIST-curve comments are shaped exactly like addresses, and the ciphers README demonstrates
+ * encryption with a well-known joke passphrase. Seventeen of eighteen address findings came from here.
+ * Filenames are still checked, so a key smuggled in under a vendor path is still refused.
+ *
+ * The literal examples are described rather than quoted ON PURPOSE. The first draft of this comment pasted them
+ * in, and the scanner then reported its own documentation — which would have blocked every future commit of this
+ * very file. Comments are NOT stripped before scanning, because a comment is a perfectly good place to leak a
+ * real secret; the fix is to not write specimens down.
+ */
+const NOT_OUR_CODE = /^web\/vendor\//;
+
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 /*
+ * The real word list, so the mnemonic rule can tell a seed phrase from an English sentence. Without it the
+ * rule fired on `expect(body, 'the first text block must reach the renderer with its markers intact')` —
+ * twelve lowercase words, which is a sentence, not a wallet.
+ */
+const MNEMONIC_WORDS = (() => {
+  try {
+    const raw = readFileSync('web/ton-mnemonic-wordlist.mjs', 'utf8');
+    const words = new Set((raw.match(/"[a-z]{3,8}"/g) ?? []).map((quoted) => quoted.slice(1, -1)));
+    return words.size >= 2000 ? words : null;
+  } catch {
+    return null; // list moved or gone: fall back to shape alone rather than silently dropping the rule
+  }
+})();
+
+/* These name a public service, not one of ours. netwatch and the uptime watch use one as a network canary. */
+const PUBLIC_RESOLVERS = new Set(['1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '9.9.9.9', '149.112.112.112']);
+
+/*
  * Each rule earns its place: it either fires on something that has actually gone wrong somewhere, or it guards
- * the one mistake this particular project cannot survive. `allow` exists so a rule can stay narrow instead of
- * being deleted the first time it is wrong.
+ * the one mistake this particular project cannot survive. `allow` (tested against the whole line) keeps a rule
+ * narrow instead of it being deleted the first time it is wrong; `confirm` decides on the match itself, for the
+ * cases where a regex cannot tell a secret from a coincidence.
  */
 const RULES = [
   {
     name: 'private-key',
     why: 'a private key in a public repository is compromised the moment it is pushed',
-    pattern: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----/,
+    pattern: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----/g,
   },
   {
     name: 'wallet-mnemonic',
-    why: 'a BIP39 seed phrase IS the wallet — this project holds real funds',
-    // Quoted, and exactly a valid mnemonic length. Prose does not arrive as a quoted run of exactly 12/15/18/24
-    // lowercase words, which keeps this from firing on ordinary sentences.
-    pattern: /["'`](?:[a-z]{3,8} ){11}(?:[a-z]{3,8}(?: [a-z]{3,8}){2}(?: [a-z]{3,8}){0,9})?[a-z]{3,8}["'`]/,
+    why: 'a BIP39/TON seed phrase IS the wallet — this project holds real funds',
+    // Shape first (a quoted run of lowercase words), then the actual word list. Shape alone was not enough:
+    // English prose is also lowercase words, and it fired on ordinary test descriptions.
+    pattern: /["'`]([a-z]{3,8}(?: [a-z]{3,8}){11,23})["'`]/g,
+    confirm: (match) => {
+      const words = match[1].split(' ');
+      if (![12, 15, 18, 21, 24].includes(words.length)) return false;
+      if (!MNEMONIC_WORDS) return true;
+      // A real phrase is 100% from the list. A sentence shares a few common words with it and no more.
+      return words.filter((word) => MNEMONIC_WORDS.has(word)).length / words.length >= 0.9;
+    },
   },
   {
     name: 'telegram-bot-token',
@@ -53,35 +93,54 @@ const RULES = [
     // {30,} and no trailing \b, deliberately. The first draft pinned the secret part at exactly 35 characters —
     // today's length — and a 36-character probe walked straight past it. A detector that depends on a vendor not
     // changing a field width is a detector that fails silently on the day it matters.
-    pattern: /\b\d{8,10}:[A-Za-z0-9_-]{30,}/,
+    pattern: /\b\d{8,10}:[A-Za-z0-9_-]{30,}/g,
   },
   {
     name: 'aws-access-key',
     why: 'a cloud access key id',
-    pattern: /\bAKIA[0-9A-Z]{16}\b/,
+    pattern: /\bAKIA[0-9A-Z]{16}\b/g,
   },
   {
     name: 'credential-assignment',
     why: 'a secret assigned a literal value — move it to a file outside git and read it at runtime',
-    pattern: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)\s*[:=]\s*["'][^"'\n]{8,}["']/i,
-    // Placeholders and the words themselves are how you DOCUMENT the rule; they are not the rule being broken.
-    allow: /(?:example|placeholder|your[_-]|redacted|xxx+|\.\.\.|<[^>]+>|process\.env|readFileSync|getenv|\$\{)/i,
+    pattern: /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|private[_-]?key)\s*[:=]\s*["'][^"'\n]{8,}["']/gi,
+    // Placeholders, obvious fixtures, and the words themselves are how you DOCUMENT the rule; they are not the
+    // rule being broken. `test`/`fake`/`dummy` were added after this fired on `apiKey: 'test-api-key'` in two
+    // suites — a gate that shouts at every test double is a gate somebody turns off.
+    allow: /(?:example|placeholder|your[_-]|redacted|xxx+|\btest\b|test[_-]|[_-]test|fake|dummy|sample|\.\.\.|<[^>]+>|process\.env|readFileSync|getenv|\$\{)/i,
   },
   {
     name: 'machine-address',
     why: 'a routable address names a real machine — addresses belong in artifacts/local/deploy-hosts.env',
-    pattern: /\b(?!0\.0\.0\.0\b)(?!10\.)(?!127\.)(?!169\.254\.)(?!192\.168\.)(?!192\.0\.2\.)(?!198\.51\.100\.)(?!203\.0\.113\.)(?!172\.(?:1[6-9]|2\d|3[01])\.)(?!255\.255\.255\.255\b)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/,
+    // The boundaries matter more than the digits: without them this matched four-part SLICES of longer dotted
+    // runs and reported OIDs out of the vendored crypto as machines ("2.16.840.1" from 1.2.840.113549...).
+    pattern: /(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.])/g,
+    confirm: (match) => {
+      const [a, b, c] = [match[1], match[2], match[3]].map(Number);
+      if ([match[1], match[2], match[3], match[4]].some((part) => Number(part) > 255)) return false; // a version
+      if (PUBLIC_RESOLVERS.has(match[0])) return false;
+      if (a === 0 || a === 10 || a === 127 || a >= 224) return false;          // unspecified, private, loopback, multicast
+      if (a === 169 && b === 254) return false;                                 // link-local
+      if (a === 172 && b >= 16 && b <= 31) return false;                        // private
+      if (a === 192 && b === 168) return false;                                 // private
+      if (a === 192 && b === 0 && c === 2) return false;                        // RFC 5737 documentation
+      if (a === 198 && b === 51 && c === 100) return false;                     // RFC 5737 documentation
+      if (a === 203 && b === 0 && c === 113) return false;                      // RFC 5737 documentation
+      return true;
+    },
   },
   {
     name: 'home-path',
     why: 'an absolute home path names the operator and their machine layout',
-    pattern: /(?:[A-Za-z]:\\Users\\[^\\\s"'`]+|\/home\/[a-zA-Z0-9._-]+\/|\/Users\/[a-zA-Z0-9._-]+\/)/,
-    allow: /(?:\$\{?HOME|%USERPROFILE%|<user>|USERNAME)/i,
+    // The Windows branch takes either slash. A drive-letter path written with forward slashes was already
+    // caught by the third alternative, so this is consistency rather than a hole that was closed.
+    pattern: /(?:[A-Za-z]:[\\/]Users[\\/][^\\/\s"'`]+|\/home\/[a-zA-Z0-9._-]+\/|\/Users\/[a-zA-Z0-9._-]+\/)/g,
+    allow: /(?:\$\{?HOME|%USERPROFILE%|<user>|USERNAME|os\.homedir|USERPROFILE)/i,
   },
   {
     name: 'email-address',
     why: 'a personal address, once indexed, is spam and a password-reset target forever',
-    pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/,
+    pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
     allow: /(?:noreply@|@example\.(?:com|org)|user@host|name@domain)/i,
   },
 ];
@@ -149,10 +208,23 @@ if (SCAN_EVERYTHING) {
 }
 
 for (const target of scanTargets) {
+  if (NOT_OUR_CODE.test(target.file)) continue;
   for (const rule of RULES) {
-    if (!rule.pattern.test(target.content)) continue;
     if (rule.allow && rule.allow.test(target.content)) continue;
-    findings.push({ file: target.file, line: target.line, name: rule.name, why: rule.why, text: target.content.trim() });
+    // Every match on the line, not just the first: a line can hold a harmless OID and a real address, and
+    // stopping at the first one would let the second through.
+    for (const match of target.content.matchAll(rule.pattern)) {
+      if (rule.confirm && !rule.confirm(match)) continue;
+      findings.push({
+        file: target.file,
+        line: target.line,
+        name: rule.name,
+        why: rule.why,
+        text: target.content.trim(),
+        match: match[0],
+      });
+      break; // one finding per rule per line is enough to make somebody look at the line
+    }
   }
 }
 
@@ -167,6 +239,7 @@ for (const finding of findings) {
   const where = finding.line > 0 ? `${finding.file}:${finding.line}` : finding.file;
   console.error(`  ${finding.name}  ${where}`);
   console.error(`    ${finding.why}`);
+  if (finding.match) console.error(`    matched: ${finding.match.slice(0, 120)}`);
   console.error(`    ${finding.text.slice(0, 160)}\n`);
 }
 console.error('If a finding is wrong, narrow the rule in scripts/check_staged_for_secrets.mjs — do not reach for');
