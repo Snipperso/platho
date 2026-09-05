@@ -1,0 +1,16 @@
+#!/bin/sh
+# Refuse a commit that ADDS a secret to a public repository.
+#
+# Git hooks live in the git directory, which is not tracked, so this tracked copy is the one that survives a
+# fresh clone. Install it with:
+#
+#   cp scripts/hooks/pre-commit "$(git rev-parse --git-dir)/hooks/pre-commit"
+#   chmod +x "$(git rev-parse --git-dir)/hooks/pre-commit"
+#
+# (This repository keeps its git directory outside .git — `git rev-parse --git-dir` is why the command above
+# works anyway, rather than hardcoding a path that is wrong here.)
+#
+# The check reads only ADDED lines, so it does not re-litigate what a file already contained. If it is ever
+# wrong, narrow the rule in scripts/check_staged_for_secrets.mjs rather than passing --no-verify: a bypass
+# habit turns every later commit into one nobody checked, which is how the addresses got in.
+exec node scripts/check_staged_for_secrets.mjs
