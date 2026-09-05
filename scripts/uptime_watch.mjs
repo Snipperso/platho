@@ -345,6 +345,40 @@ async function tick(nowMs = Date.now()) {
 process.on('unhandledRejection', (reason) => console.error(`[watch] unhandled rejection: ${reason}`));
 process.on('uncaughtException', (error) => console.error(`[watch] uncaught: ${error?.stack ?? error}`));
 
+/**
+ * Seconds since THIS machine booted, or null where that cannot be read.
+ *
+ * /proc/uptime rather than os.uptime() only because the former makes the source explicit: both read the same
+ * file, and inside these LXC containers it is the CONTAINER's uptime, not the host's — verified 2026-09-05,
+ * when A reported "up 15 days 21:57" against a journal boot of 2026-08-20 12:02, to the minute. Do not assume
+ * the same of every /proc file here: /proc/loadavg on the same machines leaks the HOST's numbers (load 4.2 and
+ * 14317 tasks while every local process idles), because this host runs no lxcfs.
+ */
+function machineUptimeSeconds() {
+  try {
+    const seconds = Number.parseFloat(readFileSync('/proc/uptime', 'utf8').split(/\s+/)[0]);
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds;
+  } catch {
+    // Not Linux, or /proc is not mounted. The ping is still worth sending without this.
+  }
+  return null;
+}
+
+/** Coarse on purpose: this is read at a glance in a chat window, not subtracted from anything. */
+function humanDuration(seconds) {
+  const s = Math.floor(seconds);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+
+/** Longer than any boot here (the container reaches this unit ~2s in) and shorter than any plausible gap
+ *  between a boot and someone restarting the unit by hand. */
+const JUST_BOOTED_S = 180;
+
 if (ONCE) {
   await tick();
 } else {
@@ -352,7 +386,17 @@ if (ONCE) {
   console.error(`[watch] ${LABEL} every ${INTERVAL_MS / 1000}s -> ${CHAT ?? 'nowhere'} | ${role}`);
   // A startup ping validates the token and the chat id NOW rather than during the first real outage, and gives
   // the reader something that distinguishes "quiet because all is well" from "quiet because I am not running".
-  if (!(await tell(`👁 ${LABEL} watch started — ${role}`))) {
+  //
+  // It also carries the machine's uptime, because on 2026-09-05 three reboots (the provider restarted B at
+  // 09:52 and A at 10:35, then A again at 11:24) produced three IDENTICAL "watch started" lines. That message
+  // is in fact the most reliable reboot detector here — it fires exactly once per boot, where the 60s polling
+  // observer missed a 2s outage entirely by sampling either side of it — but it could not say whether the
+  // machine had rebooted or somebody had merely restarted the unit. Now it says which.
+  const uptime = machineUptimeSeconds();
+  const since = uptime === null ? 'machine uptime unknown'
+    : uptime < JUST_BOOTED_S ? `MACHINE REBOOTED ${humanDuration(uptime)} ago`
+    : `service restarted; machine up ${humanDuration(uptime)}`;
+  if (!(await tell(`👁 ${LABEL} watch started — ${role} | ${since}`))) {
     console.error('[watch] WARNING: the startup ping was not delivered. Alerting may be misconfigured; this '
       + 'process will keep probing, but nothing it finds may reach anyone.');
   }
