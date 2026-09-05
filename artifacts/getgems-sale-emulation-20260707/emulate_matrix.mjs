@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { Blockchain } from '@ton/sandbox';
 import { Cell, Address, beginCell } from '@ton/core';
 
-const DIR = 'C:/Users/redacted/AppData/Local/Temp/claude/C--platho/962ed46d-ac7c-4436-9615-a83dddbf955c/scratchpad';
+// The scratch directory holding nft_support.json. Was a literal path into one operator's Windows profile --
+// in a public repository, and pointing at a session temp directory that has not existed since 2026-07-07.
+const DIR = process.env.PLATHO_EMULATION_DIR ?? '.';
 const nftInfo = JSON.parse(readFileSync(`${DIR}/nft_support.json`, 'utf8'));
 const cellFromMaybeHex = (s) => Cell.fromBoc(Buffer.from(s, /^[0-9a-fA-F]+$/.test(s) ? 'hex' : 'base64'))[0];
 

@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { Blockchain } from '@ton/sandbox';
 import { Cell, Address, beginCell, Slice, loadMessage } from '@ton/core';
 
-const DIR = 'C:/Users/redacted/AppData/Local/Temp/claude/C--platho/962ed46d-ac7c-4436-9615-a83dddbf955c/scratchpad';
+// The scratch directory holding the captured state. Was a literal path into one operator's Windows profile --
+// in a public repository, and pointing at a session temp directory that has not existed since 2026-07-07.
+const DIR = process.env.PLATHO_EMULATION_DIR ?? '.';
 
 function readJson(name) { return JSON.parse(readFileSync(`${DIR}/${name}`, 'utf8')); }
 function cellFromMaybeHex(s) {
