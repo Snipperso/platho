@@ -1,11 +1,18 @@
 param(
-    [string] $HostName = "45.142.141.141",
-    [string] $AdminUser = "platho",
-    [string] $AdminKey = "$HOME\.ssh\platho_njalla_ed25519",
-    [string] $KnownHosts = "artifacts\local\njalla_known_hosts"
+    [string] $HostName,
+    [string] $AdminUser,
+    [string] $AdminKey,
+    [string] $KnownHosts
 )
 
 $ErrorActionPreference = "Stop"
+
+# Target from artifacts/local/deploy-hosts.env, never from a default baked into this public repo.
+. (Join-Path $PSScriptRoot "lib\deploy-hosts.ps1")
+if (-not $HostName)   { $HostName   = Get-PlathoSetting -Name "PLATHO_HOST_PRODUCTION" }
+if (-not $AdminUser)  { $AdminUser  = Get-PlathoSetting -Name "PLATHO_ADMIN_USER" }
+if (-not $AdminKey)   { $AdminKey   = Get-PlathoSshKey  -Name "PLATHO_ADMIN_KEY" }
+if (-not $KnownHosts) { $KnownHosts = Get-PlathoSetting -Name "PLATHO_KNOWN_HOSTS" }
 
 if (-not (Test-Path -LiteralPath $AdminKey)) {
     throw "Admin key not found: $AdminKey"
@@ -77,8 +84,7 @@ mkdir "__REMOTE_DIR__"
 for f in \
   /etc/caddy/Caddyfile \
   /etc/ssh/sshd_config \
-  /etc/ssh/sshd_config.d/njalla.conf \
-  /etc/ssh/sshd_config.d/99-platho-hardening.conf \
+  /etc/ssh/sshd_config.d/*.conf \
   /etc/fail2ban/jail.d/sshd.local \
   /usr/local/bin/platho-deploy-receive; do
   if [ -e "$f" ]; then

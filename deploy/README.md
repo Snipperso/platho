@@ -80,7 +80,9 @@ HOSTCFG-04): a stand with its own headers or cache policy proves nothing about p
 
 Server side (done on A, 2026-08-22): `/srv/platho-stage/{releases,.uploads}` with the same ownership and modes
 as `/srv/platho`, the same receiver (`scripts/server/platho-deploy-receive.sh`) — a command prefixed with
-`stage ` is the same command against `/srv/platho-stage`. DNS `A stage.platho.app -> 45.142.140.101`.
+`stage ` is the same command against `/srv/platho-stage`. The stand has its own `A stage.platho.app` record
+pointing at the machine named by `PLATHO_HOST_STAGE`; machine addresses live in `artifacts/local/deploy-hosts.env`
+(outside git — see `deploy/deploy-hosts.env.example`) rather than in this public repository.
 
 Ship a build to the stand (any version, including the one already live — a stand is not a release):
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // TWO COPIES OF THE WEB SERVER CONFIG, AND ONLY ONE OF THEM WAS RIGHT.
@@ -103,6 +103,28 @@ describe('HOSTING — the web server config has ONE source of truth', () => {
     expect((caddy.match(/try_files \{path\} \/index\.html/g) ?? []).length).toBe(1);
   });
 
+  it('HOSTCFG-06: a preview deploy cannot reach the production site, and the guard runs before anything else', () => {
+    // MEASURED 2026-08-29 (audit 7). `--mode` and `--site` are independent axes and `--site` defaults to
+    // production, so `npm run web:deploy:preview` — the script whose name promises a rehearsal — addressed
+    // platho.app while BOTH production gates stood down, because each is written `MODE === 'production' && ...`:
+    // the genesis-verified blocker, the testnet-config blocker and the version-must-move guard. The bundle is the
+    // same either way (one prep, one bundleSha256, no mode in the file selection), so the danger was never wrong
+    // bytes — it was every gate switched off on the live site by a flag that reads like a rehearsal.
+    const deploy = readFileSync('scripts/deploy_static_web.mjs', 'utf8');
+    expect(deploy, 'preview must refuse the production site')
+      .toMatch(/if \(MODE === 'preview' && SITE === 'production'\) \{/);
+    // BEFORE the key/known-hosts/prep existence checks, or the refusal depends on what happens to be on disk.
+    expect(deploy.indexOf("MODE === 'preview' && SITE === 'production'"))
+      .toBeLessThan(deploy.indexOf('if (!existsSync(path)) die('));
+    // And the npm script the operator actually types names the stand explicitly rather than relying on a default.
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(pkg.scripts['web:deploy:preview'], 'the preview script must name the stand')
+      .toBe('node scripts/deploy_static_web.mjs --mode preview --site stage');
+    // The two the owner actually uses, pinned so this stays a three-way distinction rather than drifting into one.
+    expect(pkg.scripts['web:deploy']).toBe('node scripts/deploy_static_web.mjs');
+    expect(pkg.scripts['web:deploy:stage']).toBe('node scripts/deploy_static_web.mjs --site stage');
+  });
+
   it('HOSTCFG-05: the stand is deployed by the SAME receiver and the SAME script, addressed by a site prefix', () => {
     // One deploy path: "stage <release>" over the same forced command maps to /srv/platho-stage and changes
     // nothing else (release-name rules, archive checks, ownership, the atomic switch); the client script names
@@ -115,10 +137,53 @@ describe('HOSTING — the web server config has ONE source of truth', () => {
     const deploy = readFileSync('scripts/deploy_static_web.mjs', 'utf8');
     expect(deploy).toMatch(/const SITE = arg\('--site', 'production'\);/);
     expect(deploy).toMatch(/const SITE_HOST = SITE === 'stage' \? 'stage\.platho\.app' : 'platho\.app';/);
-    expect(deploy).toMatch(/const HOST = arg\('--host', SITE === 'stage' \? '45\.142\.140\.101' : '45\.142\.141\.141'\);/);
+    // The site still chooses the MACHINE, not merely the vhost — but by setting name now, not by a literal
+    // address: the addresses moved out of this public repo on 2026-09-05 (see HOSTCFG-06).
+    expect(deploy).toMatch(
+      /const HOST = arg\('--host', null\) \?\? setting\(SITE === 'stage' \? 'PLATHO_HOST_STAGE' : 'PLATHO_HOST_PRODUCTION'\);/,
+    );
     expect(deploy).toMatch(/`\$\{SITE === 'stage' \? 'stage ' : ''\}\$\{release\}`/);
     expect(deploy).toMatch(/live === shipping && SITE === 'stage'/);
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
     expect(pkg.scripts['web:deploy:stage']).toBe('node scripts/deploy_static_web.mjs --site stage');
+  });
+
+  it('HOSTCFG-06: no machine address is written down in this PUBLIC repository', () => {
+    // 2026-09-05. The production address, the standby address, both SSH key filenames and the deploy account were
+    // hardcoded as DEFAULTS across six tracked scripts and deploy/README.md. None of it is a credential — SSH here
+    // is key-only behind AllowUsers, fail2ban and a default-deny firewall — so nothing that grants access was
+    // exposed. What was handed over for free was the target list, and one entry of it is worse than the rest:
+    // the standby machine's only real property is that it is ABSENT FROM DNS and carries no organic traffic, and
+    // this repository named it as the DEFAULT deploy host. The production address is public through DNS anyway.
+    //
+    // Addresses now live in artifacts/local/deploy-hosts.env (gitignored). This gate is what stops one
+    // copy-pasted default from quietly putting them back, because the previous defence was that nobody had
+    // thought about it.
+    const OPERATOR_FILES = [
+      'scripts/deploy_static_web.mjs',
+      'scripts/deploy_static_web.ps1',
+      'scripts/manage_static_web.ps1',
+      'scripts/check_server_health.ps1',
+      'scripts/backup_server_config.ps1',
+      'scripts/deploy_about_web.sh',
+      'deploy/README.md',
+    ];
+    // Loopback, the unspecified address, and RFC 5737's documentation ranges name no real machine.
+    const NAMES_NO_MACHINE = /^(127\.|0\.0\.0\.0$|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)/;
+    for (const path of OPERATOR_FILES) {
+      const found = (readFileSync(path, 'utf8').match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g) ?? [])
+        .filter((address) => !NAMES_NO_MACHINE.test(address));
+      expect(found, `${path} names a real machine — that address belongs in artifacts/local/deploy-hosts.env, `
+        + 'which is outside git. See deploy/deploy-hosts.env.example.').toEqual([]);
+    }
+    // The documented shape has to STAY in git, or the local file becomes a guessing game and the next operator
+    // reintroduces the defaults out of frustration.
+    expect(existsSync('deploy/deploy-hosts.env.example'), 'the example that documents every setting is missing')
+      .toBe(true);
+    const example = readFileSync('deploy/deploy-hosts.env.example', 'utf8');
+    for (const setting of ['PLATHO_HOST_PRODUCTION', 'PLATHO_HOST_STAGE', 'PLATHO_DEPLOY_USER',
+      'PLATHO_DEPLOY_KEY', 'PLATHO_ADMIN_USER', 'PLATHO_ADMIN_KEY', 'PLATHO_KNOWN_HOSTS']) {
+      expect(example, `the example does not document ${setting}`).toContain(setting);
+    }
   });
 });

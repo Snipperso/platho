@@ -19,9 +19,14 @@ artifacts/m20t_live_testnet_run.local.json
 artifacts/m20t_wallet_private.local.json
 artifacts/platho-web-static-*/
 artifacts/local/
+# Machine addresses and SSH key filenames. artifacts/local/ already covers the real file; this second rule is
+# here so a copy left anywhere else cannot be staged by a wide `git add`. The repo is public.
+deploy-hosts.env
+**/deploy-hosts.env
+!deploy/deploy-hosts.env.example
 artifacts/edge-*/
 artifacts/logo.*
-artifacts/platho_njalla_ed25519.pub.txt
+artifacts/*_ed25519.pub.txt
 artifacts/platho_external_audit*.zip
 artifacts/platho_external_audit*.zip.sha256
 artifacts/platho_external_audit*.zip.sha256.txt
@@ -103,3 +108,8 @@ tools/admin/
 # The design working copy lives OUTSIDE the repo (C:\plathodesign) and must never be committed — even if copied in.
 plathodesign/
 /plathodesign/
+
+# clean-18 contract lane - local-only while in development [OWNER 2026-08-27: a separate folder, not pushed
+# yet; hotfixes to the live app must never depend on or collide with it]. The canonical test suite includes
+# tests/** only, so nothing here can change the release evidence either.
+contracts18/

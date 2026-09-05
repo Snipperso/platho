@@ -1,16 +1,16 @@
 #!/bin/bash
 # Platho flight recorder.
 #
-# WHY THIS EXISTS. Twice on 2026-08-20 both Njalla boxes fell off the network while the machines themselves kept
+# WHY THIS EXISTS. Twice on 2026-08-20 both boxes fell off the provider network while the machines themselves kept
 # running: 13:52-13:55 UTC one could reach neither platho.app nor api.telegram.org, the kernel logged nothing
 # (journalctl -k is EMPTY on this host — it is an LXC container, we have no kernel of our own), and by the time
-# anyone could log back in there was nothing left to read. Njalla asked, reasonably: "do you not have anything in
+# anyone could log back in there was nothing left to read. The provider asked, reasonably: "do you not have anything in
 # the servers own logs about why it failed?" We did not.
 #
 # So this writes one line every few seconds and FSYNCS IT, because a sample still sitting in the page cache when
 # the machine vanishes never existed. After the next event, the last lines say which layer broke:
 #
-#   gw=FAIL  net=FAIL          -> the provider's edge is gone. Not ours. This is the line to send Njalla.
+#   gw=FAIL  net=FAIL          -> the provider's edge is gone. Not ours. This is the line to send the provider.
 #   gw=OK    net=FAIL          -> the edge answers but the world does not: upstream routing.
 #   net=OK   dns=FAIL          -> only name resolution died. The site was FINE for users; the alert was false.
 #   link=DOWN or route=GONE    -> the virtual NIC or our route went away; in a container the host did that.

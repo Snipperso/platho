@@ -33,13 +33,60 @@ const MODE = arg('--mode', 'production');
 const SITE = arg('--site', 'production');
 if (!['production', 'stage'].includes(SITE)) die(`--site must be production or stage, got ${SITE}`);
 const SITE_HOST = SITE === 'stage' ? 'stage.platho.app' : 'platho.app';
-const HOST = arg('--host', SITE === 'stage' ? '45.142.140.101' : '45.142.141.141');
-const USER = arg('--user', 'platho-deploy');
-const KEY = arg('--key', resolve(process.env.HOME ?? process.env.USERPROFILE ?? '.', '.ssh/platho_deploy_ed25519'));
-const KNOWN_HOSTS = arg('--known-hosts', 'artifacts/local/njalla_known_hosts');
+// WHERE THE BYTES GO IS NOT WRITTEN DOWN IN THIS REPOSITORY. [2026-09-05: the repo is public and it published
+// both machine addresses, both SSH key filenames and the deploy account as defaults right here. None of that is a
+// credential — SSH is key-only behind AllowUsers, fail2ban and a default-deny firewall — but one line of it
+// mattered: the standby machine's only real property is that it is absent from DNS and carries no organic
+// traffic, and this file named it as the DEFAULT deploy host. The production address is public through DNS
+// anyway; the standby's was not, until we printed it.]
+//
+// Order: an explicit flag, then the environment, then the local file — and then a NAMED abort. Never a built-in
+// address: a fallback would silently undo the removal, and could aim a release at the wrong machine while
+// looking like it had worked.
+const HOSTS_FILE = 'artifacts/local/deploy-hosts.env';
+const hostSettings = (() => {
+  if (!existsSync(HOSTS_FILE)) return null;
+  const parsed = new Map();
+  for (const line of readFileSync(HOSTS_FILE, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const at = trimmed.indexOf('=');
+    if (at < 1) continue;
+    parsed.set(trimmed.slice(0, at).trim(), trimmed.slice(at + 1).trim());
+  }
+  return parsed;
+})();
+const setting = (name) => {
+  const fromEnv = (process.env[name] ?? '').trim();
+  if (fromEnv) return fromEnv;
+  const fromFile = (hostSettings?.get(name) ?? '').trim();
+  if (fromFile) return fromFile;
+  die(hostSettings === null
+    ? `${name} is not set and ${HOSTS_FILE} does not exist — copy deploy/deploy-hosts.env.example there and fill it in`
+    : `${name} is missing from ${HOSTS_FILE} — deploy/deploy-hosts.env.example lists every setting these scripts read`);
+};
+
+const HOST = arg('--host', null) ?? setting(SITE === 'stage' ? 'PLATHO_HOST_STAGE' : 'PLATHO_HOST_PRODUCTION');
+const USER = arg('--user', null) ?? setting('PLATHO_DEPLOY_USER');
+// A key setting holds a BASENAME inside ~/.ssh, not a path, so the local file carries between machines.
+const KEY = arg('--key', null) ?? resolve(process.env.HOME ?? process.env.USERPROFILE ?? '.', '.ssh', setting('PLATHO_DEPLOY_KEY'));
+const KNOWN_HOSTS = arg('--known-hosts', null) ?? setting('PLATHO_KNOWN_HOSTS');
 const PREP = 'artifacts/web_static_deploy_prep.json';
 
 if (!['preview', 'production'].includes(MODE)) die(`--mode must be preview or production, got ${MODE}`);
+// PREVIEW MAY NOT TOUCH THE PRODUCTION SITE. [MEASURED 2026-08-29, audit 7: `--mode` and `--site` were
+// independent axes and `--site` defaulted to production, so `npm run web:deploy:preview` — the script whose name
+// promises a rehearsal — shipped to platho.app with BOTH production gates skipped, because each is written
+// `MODE === 'production' && ...`. The bundles are identical (one prep, one bundleSha256, no mode in the file
+// selection), so nothing wrong would be uploaded; what was wrong is that the genesis-verified blocker, the
+// testnet-config blocker and the version-must-move guard all stand down on the live site.
+// The owner deploys with `web:deploy` and `web:deploy:stage` only; preview exists for rehearsal, so it is pinned
+// to the stand. Reaching production is `--mode production`, which is what turns the gates back on.]
+if (MODE === 'preview' && SITE === 'production') {
+  die('--mode preview may not target the production site: it stands the production gates down '
+    + '(genesis verification, config mode, version-must-move). Use --site stage to rehearse, '
+    + 'or --mode production to release.');
+}
 for (const [label, path] of [['deploy key', KEY], ['known hosts', KNOWN_HOSTS], ['deploy prep', PREP]]) {
   if (!existsSync(path)) die(`${label} not found: ${path}`);
 }

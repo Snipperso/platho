@@ -18,8 +18,25 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-REMOTE="platho@45.142.141.141"
-KEY="$HOME/.ssh/platho_njalla_ed25519"
+# The target machine is NOT written down in this public repository — it comes from a gitignored local file, and a
+# missing value aborts by name rather than falling back to an address baked in here. See
+# deploy/deploy-hosts.env.example for the shape and for why this moved out on 2026-09-05.
+HOSTS_FILE="artifacts/local/deploy-hosts.env"
+if [[ ! -f "$HOSTS_FILE" ]]; then
+  echo "ABORT: $HOSTS_FILE not found — copy deploy/deploy-hosts.env.example there and fill it in" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$HOSTS_FILE"
+for required in PLATHO_ADMIN_USER PLATHO_HOST_PRODUCTION PLATHO_ADMIN_KEY; do
+  if [[ -z "${!required:-}" ]]; then
+    echo "ABORT: $required is missing from $HOSTS_FILE" >&2
+    exit 1
+  fi
+done
+
+REMOTE="${PLATHO_ADMIN_USER}@${PLATHO_HOST_PRODUCTION}"
+KEY="$HOME/.ssh/${PLATHO_ADMIN_KEY}"
 SSHOPTS=(-i "$KEY" -o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new)
 SRC="web-about"
 TS="$(date -u +%Y%m%d-%H%M%S)"
