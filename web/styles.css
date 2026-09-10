@@ -52,8 +52,24 @@
   --glass-edge-2: rgba(255, 255, 255, 0.045);
   --line: #263139;
   --line-soft: #1d262d;
-  --text: #eef4f2;
-  --muted: #94a5a2;
+  /* THE TWO INK SETS, named by the ground they are read on. The palettes below point at them — one source — and
+     the profile card's hero picks a set by its OWN measured ink rather than by the theme, because the hero is the
+     gift's surface, not the app's (.profile-card-hero[data-gift-hero-ink]) [owner, 2026-09-10]. */
+  --ink-on-dark: 255 255 255;
+  --ink-on-light: 0 0 0;
+  --text-on-dark: #eef4f2;
+  --text-on-light: #16211f;
+  --muted-on-dark: #94a5a2;
+  --muted-on-light: #5e716d;
+  --id-platho-on-dark: #8fdcc8;
+  --id-platho-on-light: #0e8a72;
+  --id-platho-epic-on-dark: #e7c469;
+  --id-platho-epic-on-light: #8a6b12;
+  --id-platho-rare-on-dark: #c6d2dc;
+  --id-platho-rare-on-light: #5a6672;
+  --hero-ink: var(--ink-on-dark);
+  --text: var(--text-on-dark);
+  --muted: var(--muted-on-dark);
   --muted-2: #66757a;
   --text-halo: 0 1px 3px rgba(0, 0, 0, 0.6);          /* halo under small text that sits right on the plasma */
   --text-muted: var(--muted);
@@ -80,12 +96,12 @@
   --a25: rgba(var(--accent-rgb), 0.25);
   --a40: rgba(var(--accent-rgb), 0.4);
   --id-ton: #9fd3f2;
-  --id-platho: #8fdcc8;
+  --id-platho: var(--id-platho-on-dark);
   /* TIER COLOURS FOR .ath NAMES (owner): four characters is EPIC, five is RARE — gold and silver, the same two
      the NFT art marks them with, so the scarcity is visible where the name actually appears and not only on the
      token. COMMON keeps --id-platho: it is the default, and colouring it would say nothing. */
-  --id-platho-epic: #e7c469;
-  --id-platho-rare: #c6d2dc;
+  --id-platho-epic: var(--id-platho-epic-on-dark);
+  --id-platho-rare: var(--id-platho-rare-on-dark);
   /* Ink for a monogram sitting ON the metal. Defined ONCE and deliberately absent from the theme overrides below:
      gold and silver are the same gold and silver in every theme, so ink that followed the theme would go pale on
      one of them.
@@ -136,8 +152,9 @@
   --glass-edge-2: rgba(23, 49, 44, 0.06);
     --line: #d2deda;
     --line-soft: #dee7e4;
-    --text: #16211f;
-    --muted: #5e716d;
+    --hero-ink: var(--ink-on-light);
+    --text: var(--text-on-light);
+    --muted: var(--muted-on-light);
     --muted-2: #8b9995;
   --text-halo: 0 1px 3px rgba(255, 255, 255, 0.8);
     --accent: #0f9d81;
@@ -155,9 +172,9 @@
     --a25: rgba(var(--accent-rgb), 0.28);
     --a40: rgba(var(--accent-rgb), 0.45);
     --id-ton: #2b7ab8;
-    --id-platho: #0e8a72;
-    --id-platho-epic: #8a6b12;
-    --id-platho-rare: #5a6672;
+    --id-platho: var(--id-platho-on-light);
+    --id-platho-epic: var(--id-platho-epic-on-light);
+    --id-platho-rare: var(--id-platho-rare-on-light);
     --bubble-in: #ffffff;
     /* Same branded bubble in BOTH themes (owner): an outgoing message looks identical everywhere. */
     --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
@@ -200,8 +217,9 @@
   --glass-edge-2: rgba(23, 49, 44, 0.06);
     --line: #d2deda;
     --line-soft: #dee7e4;
-    --text: #16211f;
-    --muted: #5e716d;
+    --hero-ink: var(--ink-on-light);
+    --text: var(--text-on-light);
+    --muted: var(--muted-on-light);
     --muted-2: #8b9995;
   --text-halo: 0 1px 3px rgba(255, 255, 255, 0.8);
     --accent: #0f9d81;
@@ -219,9 +237,9 @@
     --a25: rgba(var(--accent-rgb), 0.28);
     --a40: rgba(var(--accent-rgb), 0.45);
     --id-ton: #2b7ab8;
-    --id-platho: #0e8a72;
-    --id-platho-epic: #8a6b12;
-    --id-platho-rare: #5a6672;
+    --id-platho: var(--id-platho-on-light);
+    --id-platho-epic: var(--id-platho-epic-on-light);
+    --id-platho-rare: var(--id-platho-rare-on-light);
     --bubble-in: #ffffff;
     /* Same branded bubble in BOTH themes (owner): an outgoing message looks identical everywhere. */
     --bubble-out: linear-gradient(155deg, #1a6450, #103f34);
@@ -829,10 +847,18 @@ select,
   color: var(--accent);
 }
 
-/* Dialog ✕ is a header control too (contract). */
+/* Dialog ✕ is a header control too (contract). THE CLOSE MARK READS LIKE THE TITLE [owner, 2026-09-10, light theme:
+   "the cross is still barely visible — write it the way the word Settings is"]. The settings pane has no plate of
+   its own: its title, its headings and its close mark lie straight on the dimmed backdrop, which is mid-grey on
+   the light theme — where the palette's muted grey vanishes and the title's own ink is what survives. */
 .modal-backdrop header .icon-button {
   width: var(--header-button-size);
   height: var(--header-button-size);
+  color: var(--text);
+}
+
+.modal-backdrop header .icon-button:hover {
+  color: var(--accent);
 }
 
 /* Global sync indicator: spinner while syncing, check when idle (contract). */
@@ -2725,6 +2751,21 @@ a .avatar.has-image,
    height, which exists to line a pane's title up with the app bar and has nothing to line up with in a card. */
 .profile-settings-dialog header {
   min-height: 0;
+}
+
+/* THE SETTINGS PANE LIES ON THE BACKDROP, and the backdrop is dark on every theme (55 % black over the page) — so
+   the chrome on it reads with the ink for dark ground whatever the theme [owner, 2026-09-10, light theme: the
+   muted grey vanished, black "is not it — make it white; the headings and the subheadings"]. The rows below
+   carry their own plates and their own ink and are not touched. */
+.profile-settings-dialog .pane-header h1,
+.profile-settings-dialog header .icon-button {
+  color: var(--text-on-dark);
+}
+
+.profile-settings-dialog .pane-header p,
+.profile-settings-dialog .profile-section h2 {
+  color: var(--text-on-dark);
+  opacity: 0.85;
 }
 
 .wallet-scroll-content,
@@ -7754,6 +7795,32 @@ html[data-look-preview] .action-dialog {
     radial-gradient(ellipse 58% 96% at 50% 38%,
       rgb(var(--gift-hero-inner, 255 255 255 / 0)) 0%,
       rgb(var(--gift-hero-edge, 255 255 255 / 0)) 88%);
+}
+
+/* THE HERO IS THE GIFT'S SURFACE, NOT THE THEME'S [owner, 2026-09-10: on the light theme the name was hard to read
+   and the close mark vanished — "the hero should look the same on every theme"]. Its ink is measured against the
+   gift's backdrop (applyGiftHeroTokens), so the tones its text wears follow THAT ink, not the app's palette: light
+   ink takes the set the dark palette reads with, dark ink the light palette's. Undressed, the hero is the panel
+   and reads with the theme's own ink (--hero-ink), so the close mark is dark on a light panel too. */
+.profile-card-hero {
+  --gift-hero-ink: var(--hero-ink);
+  color: var(--text);
+}
+
+.profile-card-hero[data-gift-hero-ink="light"] {
+  --text: var(--text-on-dark);
+  --muted: var(--muted-on-dark);
+  --id-platho: var(--id-platho-on-dark);
+  --id-platho-epic: var(--id-platho-epic-on-dark);
+  --id-platho-rare: var(--id-platho-rare-on-dark);
+}
+
+.profile-card-hero[data-gift-hero-ink="dark"] {
+  --text: var(--text-on-light);
+  --muted: var(--muted-on-light);
+  --id-platho: var(--id-platho-on-light);
+  --id-platho-epic: var(--id-platho-epic-on-light);
+  --id-platho-rare: var(--id-platho-rare-on-light);
 }
 
 /* THE RARITY IS THE FRAME. plathoUsernameTier decides it — four characters epic, five rare — and the tones are the

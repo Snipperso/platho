@@ -1150,6 +1150,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Others still see this name on your channel and card. Publishing the profile without it removes it there.",
     "username.publishFailed": "The name could not be published",
     "public.channelLookPreviewHint": "The app behind this window wears the look as visitors will see it.",
+    "profileCard.readPartial": "Partly read",
   },
   ru: {
     "public.olderUnavailable": "Более старые комментарии уже недоступны для чтения.",
@@ -2303,6 +2304,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Другие всё ещё видят это имя в вашем канале и карточке. Публикация профиля без него уберёт его оттуда.",
     "username.publishFailed": "Не удалось опубликовать имя",
     "public.channelLookPreviewHint": "Приложение за этим окном одето так, как ваш канал увидят гости.",
+    "profileCard.readPartial": "Прочитано не всё",
   },
   zh: {
     "public.olderUnavailable": "更早的评论已无法读取。",
@@ -3426,6 +3428,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "其他人仍能在你的频道和资料卡上看到这个名字。发布不含它的资料会将其从那里移除。",
     "username.publishFailed": "名字发布失败",
     "public.channelLookPreviewHint": "此窗口后面的应用正以访客将看到的样子呈现外观。",
+    "profileCard.readPartial": "部分已读取",
   },
   es: {
     "public.olderUnavailable": "Los comentarios más antiguos ya no se pueden recuperar.",
@@ -4559,6 +4562,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Los demás aún ven este nombre en tu canal y tu tarjeta. Publicar el perfil sin él lo quita de ahí.",
     "username.publishFailed": "No se pudo publicar el nombre",
     "public.channelLookPreviewHint": "La app detrás de esta ventana luce el aspecto tal como lo verán los visitantes.",
+    "profileCard.readPartial": "Leído en parte",
   },
   pt: {
     "public.olderUnavailable": "Comentários mais antigos não podem mais ser recuperados.",
@@ -5692,6 +5696,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Os outros ainda veem este nome no seu canal e no seu cartão. Publicar o perfil sem ele o remove de lá.",
     "username.publishFailed": "Não foi possível publicar o nome",
     "public.channelLookPreviewHint": "O app atrás desta janela veste o visual como os visitantes o verão.",
+    "profileCard.readPartial": "Lido em parte",
   },
   fr: {
     "public.olderUnavailable": "Les commentaires plus anciens ne peuvent plus être récupérés.",
@@ -6825,6 +6830,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Les autres voient encore ce nom sur votre chaîne et votre carte. Publier le profil sans lui l’en retire.",
     "username.publishFailed": "Le nom n’a pas pu être publié",
     "public.channelLookPreviewHint": "L’app derrière cette fenêtre porte l’apparence telle que les visiteurs la verront.",
+    "profileCard.readPartial": "Lu en partie",
   },
   de: {
     "public.olderUnavailable": "Ältere Kommentare können nicht mehr geladen werden.",
@@ -7958,6 +7964,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Andere sehen diesen Namen noch auf deinem Kanal und deiner Karte. Das Profil ohne ihn zu veröffentlichen entfernt ihn dort.",
     "username.publishFailed": "Der Name konnte nicht veröffentlicht werden",
     "public.channelLookPreviewHint": "Die App hinter diesem Fenster trägt das Aussehen so, wie Besucher es sehen werden.",
+    "profileCard.readPartial": "Teilweise gelesen",
   },
   hi: {
     "public.olderUnavailable": "पुरानी टिप्पणियाँ अब उपलब्ध नहीं हैं।",
@@ -9091,6 +9098,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "दूसरे अभी भी आपके चैनल और कार्ड पर यह नाम देखते हैं। इसके बिना प्रोफ़ाइल प्रकाशित करने से यह वहाँ से हट जाएगा।",
     "username.publishFailed": "नाम प्रकाशित नहीं हो सका",
     "public.channelLookPreviewHint": "इस विंडो के पीछे ऐप वही रूप पहने है जो आगंतुकों को दिखेगा।",
+    "profileCard.readPartial": "आंशिक रूप से पढ़ा गया",
   },
   id: {
     "public.olderUnavailable": "Komentar yang lebih lama tidak dapat diambil lagi.",
@@ -10214,6 +10222,7 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "Orang lain masih melihat nama ini di kanal dan kartu Anda. Menerbitkan profil tanpanya akan menghapusnya dari sana.",
     "username.publishFailed": "Nama tidak dapat diterbitkan",
     "public.channelLookPreviewHint": "Aplikasi di balik jendela ini memakai tampilan seperti yang akan dilihat pengunjung.",
+    "profileCard.readPartial": "Terbaca sebagian",
   },
   ja: {
     "public.olderUnavailable": "これより古いコメントは取得できません。",
@@ -11337,5 +11346,6 @@ export const I18N_STRINGS = {
     "username.unpublishHint": "他の人にはまだチャンネルとカードでこの名前が見えています。これなしでプロフィールを公開すると、そこから外れます。",
     "username.publishFailed": "名前を公開できませんでした",
     "public.channelLookPreviewHint": "この画面の背後のアプリは、訪問者に見えるとおりの外観をまとっています。",
+    "profileCard.readPartial": "一部のみ読み取り",
   },
 };

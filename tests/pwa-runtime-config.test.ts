@@ -379,7 +379,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function displayIdentityLabel\(identity\)[\s\S]*canonicalUsernameDisplay\(identity\.label \?\? identity\.value \?\? ''\)/);
     expect(css).toMatch(/\.identity-label-ton\s*\{\s*color:\s*var\(--id-ton\);/);
     expect(css).toMatch(/\.identity-label-platho\s*\{\s*color:\s*var\(--id-platho\);/);
-    expect(css, 'and the two tones are distinct, per theme').toMatch(/--id-ton: #9fd3f2;\s*\n\s*--id-platho: #8fdcc8;/);
+    // 2026-09-10: the tones live in the two ink sets the palettes point at (the hero picks a set by its own ink).
+    expect(css, 'and the two tones are distinct, per theme').toMatch(/--id-platho-on-dark: #8fdcc8;\s*\n\s*--id-platho-on-light: #0e8a72;/);
+    expect(css).toMatch(/--id-ton: #9fd3f2;\s*\n\s*--id-platho: var\(--id-platho-on-dark\);/);
     expect(app).toMatch(/function identityDisplayOptions\(thread\)[\s\S]*subtitle: t\('chat\.localName'\)[\s\S]*uniqueDisplayIdentityVariants\(thread\)/);
     expect(EN_STRINGS['chat.localName']).toBe('Local name');
     expect(app).toMatch(/thread\.displayIdentity = selected\.identity \?\? null/);
@@ -5110,7 +5112,7 @@ describe('PWA runtime config guard', () => {
     // The pills are the APP's, so they clear with the theme; the hero's ink clears only when no gift is worn at all
     // (PWA-GIFT-14 — the hero is dressed whenever a gift is worn, theme or not).
     expect(app, 'cleared with the rest when the theme is not in effect').toMatch(/dropRootToken\('--bubble-out-flat'\);\s*\n\s*dropRootToken\('--cta-fill'\);\s*\n\s*dropRootToken\('--cta-glow'\);\s*\n\s*dropRootToken\('--cta-ink'\);/);
-    expect(app).toMatch(/if \(!theme\) \{\s*\n\s*node\.removeAttribute\('data-gift-hero-pattern'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-inner'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-edge'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-ink'\);/);
+    expect(app).toMatch(/if \(!theme\) \{\s*\n\s*node\.removeAttribute\('data-gift-hero-pattern'\);\s*\n\s*node\.removeAttribute\('data-gift-hero-ink'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-inner'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-edge'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-ink'\);/);
     expect(css, 'no rule keys on the gift theme for this either').not.toContain('data-gift-theme=');
     // …and the hero draws it on the same kind of layer the pills do, so a change of gift GLOWS IN on both rather
     // than snapping on one [owner, 2026-09-07]: background-image cannot animate, a layer's opacity can.
@@ -5330,7 +5332,7 @@ describe('PWA runtime config guard', () => {
     // three lanes report and the fourth thing is carried by one of them.
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toContain("const PROFILE_CARD_LANES = ['latest', 'names', 'gifts'];");
-    expect(app).toMatch(/const synced = PROFILE_CARD_LANES\.every\(\(lane\) => profileCardLanesDone\.has\(lane\)\);\s*\n\s*const status = synced \? t\('sync\.synced'\) : t\('profileCard\.giftsLoading'\);/);
+    expect(app).toMatch(/const synced = PROFILE_CARD_LANES\.every\(\(lane\) => profileCardLanesDone\.has\(lane\)\);[\s\S]{0,260}?const status = synced \? t\(partial \? 'profileCard\.readPartial' : 'sync\.synced'\) : t\('profileCard\.giftsLoading'\);/);
     expect(app).toMatch(/setText\(profileCardMeta, own \? `\$\{appConfig\.network\?\.label \?\? appConfig\.mode\} · \$\{PLATHO_APP_RUNTIME_VERSION\} · \$\{status\}` : status\);/);
     // Each lane reports its final answer for the wallet the card shows, and only then.
     expect(app).toMatch(/profileCardNamesConfirmedFor = raw;\s*\n\s*void writeStoredUsernameNftList\(raw, result\);\s*\n\s*markProfileCardLaneDone\(raw, 'names'\);/);
@@ -5350,7 +5352,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/renderProfileCardLatestPost\(raw\);\s*\n\s*void restoreOrQueueLatestPost\(raw\);/);
     // Reset per card, guarded like every reader of the card's subject.
     expect(app).toMatch(/profileCardLanesDone = new Set\(\);\s*\n\s*renderProfileCardMeta\(\);/);
-    expect(app).toMatch(/function markProfileCardLaneDone\(wallet, lane\) \{\s*\n\s*let subject = null;\s*\n\s*try \{\s*\n\s*subject = profileCardSubject;/);
+    expect(app).toMatch(/function markProfileCardLaneDone\(wallet, lane, \{ partial = false \} = \{\}\) \{\s*\n\s*let subject = null;\s*\n\s*try \{\s*\n\s*subject = profileCardSubject;/);
     // THE DESCRIPTION IS REMEMBERED AND QUIETLY REFRESHED: painted from the durable profile cache at open, and
     // painted again when a walk writes a newer profile for the wallet the card shows.
     expect(app).toMatch(/function renderProfileCardAbout\(raw\) \{\s*\n\s*if \(!profileCardAbout\) return;\s*\n\s*const about = String\(cachedChannelProfile\(raw\)\?\.description \?\? ''\)\.trim\(\);/);
@@ -6059,7 +6061,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function driveProfileCardRead\(subject, lane, attempt = 0\)/);
     // BOTH failure shapes retry: a read that says it is incomplete, and a read that threw.
     expect(app).toMatch(/if \(retrying\) scheduleProfileCardRetry\(subject, lane, attempt\);/);
-    expect(app).toMatch(/lane\.render\(null, \{ retrying: true \}\);[\s\S]{0,140}scheduleProfileCardRetry\(subject, lane, attempt\);/);
+    expect(app).toMatch(/lane\.render\(null, \{ retrying \}\);[\s\S]{0,140}scheduleProfileCardRetry\(subject, lane, attempt\);/);
     // …and a thrown read must read as UNFINISHED, not as an empty wallet. `result?.complete === false` is false
     // for null, which sent a failed read straight to "no Telegram gifts".
     expect(app).toMatch(/if \(!result \|\| result\.complete === false\) profileCardGiftsNote\.textContent = t\('profileCard\.giftsIncomplete'\);/);
@@ -6077,8 +6079,10 @@ describe('PWA runtime config guard', () => {
     // chain is being read in both cases, and that is what the note says.
     // …though the note itself is BLANK for it now — the foot of the card carries the one "reading" line (PWA-GIFT-15).
     expect(app).toMatch(/if \(retrying \|\| unconfirmed\) profileCardGiftsNote\.textContent = '';/);
-    expect(app).toMatch(/const retrying = result\?\.complete === false;\s*\n\s*lane\.render\(result, \{ retrying \}\);/);
-    expect(app).toMatch(/lane\.render\(null, \{ retrying: true \}\);/);
+    // 2026-09-10: the verdict has two steps — incomplete, and still within the ladder.
+    expect(app).toMatch(/const incomplete = result\?\.complete === false;\s*\n\s*const retrying = incomplete && attempt \+ 1 < PROFILE_CARD_MAX_ATTEMPTS;\s*\n\s*lane\.render\(result, \{ retrying \}\);/);
+    // 2026-09-10: `retrying` is decided by the ladder now (false past its end), so the object is shorthand.
+    expect(app).toMatch(/lane\.render\(null, \{ retrying \}\);/);
   });
 
   it('PWA-GIFT-05: the loading screen wears the gift too, and no canvas is ever posted to the worker', () => {

@@ -227,8 +227,11 @@ describe('.ath name tiers', () => {
       expect(css, `${tone} needs a rule`).toContain(`.identity-label-${tone} {\n  color: var(--id-${tone});\n}`);
     }
     // dark, system-light and toggled-light — a token defined once would leave one theme with no colour at all.
-    expect((css.match(/--id-platho-epic:/g) ?? []).length).toBe(3);
-    expect((css.match(/--id-platho-rare:/g) ?? []).length).toBe(3);
+    // 2026-09-10: the three palettes point at the ink sets, and the profile card hero remaps the token twice more
+    // (one rule per ink it can wear) — five declarations, all of them var(--id-platho-*-on-dark|light).
+    expect((css.match(/--id-platho-epic:/g) ?? []).length).toBe(5);
+    expect((css.match(/--id-platho-rare:/g) ?? []).length).toBe(5);
+    expect((css.match(/--id-platho-epic: var\(--id-platho-epic-on-(dark|light)\);/g) ?? []).length).toBe(5);
     // And the price reads the same tier function rather than repeating the lengths.
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/function localUsernameMintPriceAtomic\(username\) \{\s*\n\s*const tier = plathoUsernameTier\(username\);/);

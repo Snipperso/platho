@@ -73,7 +73,7 @@ import {
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=112';
+} from './public-channel-subscriptions.mjs?v=113';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -273,7 +273,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=131';
+} from './i18n.mjs?v=132';
 import { createBootSignalField } from './boot-signal-field.mjs?v=14';
 import { cutoverUpdateRequired, generationForEpoch, CUTOVER_EPOCH } from './cutover-epoch.mjs?v=4';
 
@@ -294,7 +294,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.14';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.15';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -37513,6 +37513,7 @@ function applyGiftHeroTokens(node, theme) {
   if (!node) return;
   if (!theme) {
     node.removeAttribute('data-gift-hero-pattern');
+    node.removeAttribute('data-gift-hero-ink');
     node.style.removeProperty('--gift-hero-inner');
     node.style.removeProperty('--gift-hero-edge');
     node.style.removeProperty('--gift-hero-ink');
@@ -37526,6 +37527,8 @@ function applyGiftHeroTokens(node, theme) {
   node.style.setProperty('--gift-hero-edge', `${er} ${eg} ${eb}`);
   const heroInk = readableInkOn([ir, ig, ib]);
   node.style.setProperty('--gift-hero-ink', heroInk.join(' '));
+  // Which SET of tones the hero's text reads with — the stylesheet keys on it [owner, 2026-09-10].
+  node.setAttribute('data-gift-hero-ink', heroInk[0] === 255 ? 'light' : 'dark');
   const tile = typeof theme.patternTile === 'string' ? theme.patternTile : null;
   if (tile) {
     node.style.setProperty('--gift-hero-pattern', `url("${tile}")`);
@@ -39360,19 +39363,22 @@ let profileCardSubject = null;
 // gifts have all been read"]. The description rides the latest-post walk — the feed's decoder diverts profile
 // documents into the cache on the way — so three lanes cover the four things.
 let profileCardLanesDone = new Set();
+let profileCardLanesPartial = new Set();   // done, but with a hole the ladder could not close [2026-09-10]
 const PROFILE_CARD_LANES = ['latest', 'names', 'gifts'];
 
 function renderProfileCardMeta() {
   if (!profileCardMeta || !profileCardSubject) return;
   const own = sameWalletAddress(profileCardSubject, plathoWallet?.address ?? '');
   const synced = PROFILE_CARD_LANES.every((lane) => profileCardLanesDone.has(lane));
-  const status = synced ? t('sync.synced') : t('profileCard.giftsLoading');
+  // "Synced" is a claim: with a lane that gave up it would be a false one, and "reading" forever was the bug.
+  const partial = synced && profileCardLanesPartial.size > 0;
+  const status = synced ? t(partial ? 'profileCard.readPartial' : 'sync.synced') : t('profileCard.giftsLoading');
   // Network and version belong to THIS app, not to a contact; the reading status is everyone's.
   setText(profileCardMeta, own ? `${appConfig.network?.label ?? appConfig.mode} · ${PLATHO_APP_RUNTIME_VERSION} · ${status}` : status);
 }
 
 /** A lane has its final answer for the wallet the card shows. Guarded: the latest-post lane lives far above. */
-function markProfileCardLaneDone(wallet, lane) {
+function markProfileCardLaneDone(wallet, lane, { partial = false } = {}) {
   let subject = null;
   try {
     subject = profileCardSubject;
@@ -39380,6 +39386,7 @@ function markProfileCardLaneDone(wallet, lane) {
     return;
   }
   if (!subject || subject !== wallet) return;
+  if (partial) profileCardLanesPartial.add(lane);
   profileCardLanesDone.add(lane);
   renderProfileCardMeta();
 }
@@ -39468,6 +39475,12 @@ function closeProfileCardDialog() {
  * a closed card, and nothing should be asked on its behalf.
  */
 const PROFILE_CARD_RETRY_LADDER_MS = [0, 4_000, 12_000, 30_000];
+// THE LADDER ENDS [owner, 2026-09-10: "Reading the chain…" sometimes stays forever; only closing and reopening the
+// card helps]. Past its last rung the driver used to keep asking every 30 s for as long as the card was open, and
+// a read that kept coming back with a hole — one collection unreadable, a shard behind a rate limit — kept the
+// foot on "reading" with the remembered list on screen. One attempt per rung and one more; then the lane settles
+// as PARTIAL: whatever was found stays painted, the note says the read was incomplete, the foot says so too.
+const PROFILE_CARD_MAX_ATTEMPTS = PROFILE_CARD_RETRY_LADDER_MS.length + 1;
 let profileCardRetryTimers = [];
 
 function clearProfileCardRetries() {
@@ -39481,15 +39494,19 @@ function driveProfileCardRead(subject, lane, attempt = 0) {
       if (profileCardSubject !== subject) return;
       // `complete: false` is the read saying so itself: it reached the end with a hole in it. Whatever it DID
       // find is still painted — only the verdict is withheld, because another attempt is already on its way.
-      const retrying = result?.complete === false;
+      const incomplete = result?.complete === false;
+      const retrying = incomplete && attempt + 1 < PROFILE_CARD_MAX_ATTEMPTS;
       lane.render(result, { retrying });
       if (retrying) scheduleProfileCardRetry(subject, lane, attempt);
+      else if (incomplete) markProfileCardLaneDone(subject, lane.name, { partial: true });
     })
     .catch((error) => {
       console.warn('profile card read unavailable', error);
       if (profileCardSubject !== subject) return;
-      lane.render(null, { retrying: true });   // a throw is an unfinished read, not an empty wallet
-      scheduleProfileCardRetry(subject, lane, attempt);
+      const retrying = attempt + 1 < PROFILE_CARD_MAX_ATTEMPTS;
+      lane.render(null, { retrying });   // a throw is an unfinished read, not an empty wallet
+      if (retrying) scheduleProfileCardRetry(subject, lane, attempt);
+      else markProfileCardLaneDone(subject, lane.name, { partial: true });
     });
 }
 
@@ -40122,6 +40139,7 @@ async function openProfileCardDialog(subject) {
   if (profileCardMintNameRow) profileCardMintNameRow.hidden = !own;
   // Network and version belong to THIS app, not to a contact — and they are the two facts the corner's pill used to
   // carry before a gift took its place.
+  profileCardLanesPartial = new Set();
   profileCardLanesDone = new Set();
   renderProfileCardMeta();
   if (profileCardNames) profileCardNames.replaceChildren();
@@ -40151,6 +40169,7 @@ async function openProfileCardDialog(subject) {
     renderProfileCardNames(stored, own, { unconfirmed: true });
   });
   driveProfileCardRead(raw, {
+    name: 'names',
     load: () => loadUsernameNftsForWallet(raw, own),
     render: (result, state) => {
       if (state?.retrying && nameLane.stored) {
@@ -40175,6 +40194,7 @@ async function openProfileCardDialog(subject) {
     renderProfileCardGifts(stored, own, { unconfirmed: true });
   });
   driveProfileCardRead(raw, {
+    name: 'gifts',
     load: () => loadTelegramGiftsForWallet(raw),
     render: (result, state) => {
       // An INCOMPLETE answer must not replace a complete list from last time with a shorter one: while another
