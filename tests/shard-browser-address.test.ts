@@ -84,7 +84,7 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
 
   it('ADDR-06: the READ path and the WRITE path derive the SAME recovery slot key, at every index', async () => {
     // ADDR-03 compares the two ADDRESS derivations given a slot key. Nothing compared the derivation of the slot
-    // key ITSELF — H(RS_SLOT_DOMAIN ‖ owner_pubkey ‖ slot_index) — and those are the two halves of one round trip:
+    // key ITSELF — H(RS_SLOT_DOMAIN ‖ decided_pubkey ‖ slot_index) — and those are the two halves of one round trip
     //
     //   WRITE: web/publish-builder.mjs (@ton/core)      -> where the blob is stored and paid for
     //   READ:  web/shard-discovery.mjs (browser hasher) -> where a restoring client looks for it
@@ -200,6 +200,23 @@ describe('SHARD-BROWSER-ADDRESS — two implementations, one address', () => {
     await expect(keyShardAddressBytes('EQDG8kf4ikGQRyTZcZ2POIWEqwqAaZWbi9Y6qPp3EXTa_Pq7', '0:' + '11'.repeat(32)))
       .rejects.toThrow();
     await expect(keyShardAddressBytes('0:' + '11'.repeat(32), undefined as any)).rejects.toThrow();
+
+    // THE KEY AXIS REFUSES A GENERATION IT CANNOT SUPPLY [audit 2026-09-02]. KeyShard used to take its code cell
+    // directly, with no generation parameter at all, on the written claim that its code was byte-identical across
+    // the flip. The owner's decision to redeploy it made that false, and the failure it left was the silent kind
+    // past the boundary the derivation would still ANSWER, with the clean-17 cell, and identity and avatar reads
+    // would land on the orphaned shard while a register landed where the new registry does not look. The three
+    // lane shards were always protected by this refusal; KEY was not.
+    // Thrown SYNCHRONOUSLY, like every other lane derivation: laneCodeBoc is evaluated as an argument, before the
+    // async work begins, so `.rejects` would never see it.
+    expect(() => keyShardAddressBytes('0:' + '11'.repeat(32), '0:' + '22'.repeat(32), 18),
+      'asking for a generation this build has no cell for must THROW, not answer with the other one')
+      .toThrow(/no key shard code cell for generation 18/);
+
+    // …and the default is still today's live generation, unchanged for every existing caller.
+    const seventeen = rawAddress(await keyShardAddressBytes('0:' + '11'.repeat(32), '0:' + '22'.repeat(32)));
+    const explicit = rawAddress(await keyShardAddressBytes('0:' + '11'.repeat(32), '0:' + '22'.repeat(32), 17));
+    expect(seventeen).toBe(explicit);
   }, 60_000);
 
   it('ADDR-05: the checked-in code constants are exactly what build/ produces', () => {

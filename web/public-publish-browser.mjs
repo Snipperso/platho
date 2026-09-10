@@ -15,9 +15,10 @@
 // tests/public-publish-browser.test.ts pins the message against the @ton/core reference (by representation hash)
 // and against a live PublicShard in a sandbox.
 
-import { beginCell } from './pwa-contract-transactions.mjs?v=37';
-import { publicShardAddressBytes, publicShardStateInit, rawAddress } from './shard-address.mjs?v=7';
-import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=6';
+import { beginCell } from './pwa-contract-transactions.mjs?v=47';
+import { publicShardAddressBytesFor, publicShardStateInitFor, rawAddress } from './shard-address.mjs?v=29';
+import { generationForEpochAt, CUTOVER_EPOCH } from './cutover-epoch.mjs?v=4';
+import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=28';
 
 // "PSP1" — message(0x50535031) PublicPublish. MUST equal the opcode PublicShard.tact declares; mirrored here (not
 // imported from the reader) because a builder that derives its own opcode is the independent check, and drift shows
@@ -51,14 +52,38 @@ export function buildPublicPublishBody({ kind, keyArg = 0n, shardSeq = 0, header
  * proves the shard already holds entries — overpaying costs nothing (the shard returns the change) and underpaying a
  * fresh shard is refused in compute. StateInit is attached unconditionally for the lazy-deploy reason above.
  */
-export async function buildPublicPublishBrowser({ kind, keyArg = 0n, shardSeq = 0, header, body, value, partitionKey, epochTag }) {
-  const address = await publicShardAddressBytes(partitionKey, epochTag);
+export async function buildPublicPublishBrowser({ kind, keyArg = 0n, shardSeq = 0, header, body, value, partitionKey, epochTag, nowUnix, boundary = CUTOVER_EPOCH }) {
+  // WRITE-TIME OWNS THE GENERATION [CUTOVER.md item 3]: within the one era that straddles the flip, a pre-E
+  // publish belongs to the clean-17 era-shard and a post-E one to the clean-18 shard of the SAME era index — so
+  // the generation comes from the write instant, never from the era.
+  //
+  // ONE CLOCK, HANDED IN — NOT READ AGAIN HERE [audit 2026-08-31, round 5]. This used to call Date.now() itself
+  // while the caller had computed `epochTag` from its OWN, earlier Date.now(); between the two sits an RPC
+  // (assertWalletGramAtLeast) and the part build. When E lands on an era boundary — a 1-in-30 chance for the
+  // 30-day CHANNEL/THREAD eras, since E is a day boundary — a publish whose two reads straddle midnight-E writes
+  // to (generation 18, the era ENDING at E), a shard no reader ever derives (that era resolves to [17] alone):
+  // silent, permanent loss, wallet reporting success. Two reads of a moving value is the whole defect, so the
+  // instant is threaded in and this builder never asks a clock of its own.
+  const writeUnix = Number(nowUnix);
+  if (!Number.isFinite(writeUnix) || writeUnix <= 0) {
+    throw new TypeError('buildPublicPublishBrowser: nowUnix (the SAME instant the caller derived epochTag from) '
+      + 'is required — deriving it here would re-open the two-clock straddle loss');
+  }
+  // ONE DERIVATION, AND IT IS RETURNED. `boundary` defaults to the baked CUTOVER_EPOCH, so the shipped path is
+  // byte-identical to the `generationForUnixSeconds(writeUnix)` this replaced — the injected form only lets the
+  // flip be REHEARSED, which the CONV twin has been able to do since its vault door landed. Returning the
+  // generation matters more than taking it: the vault door needs the same answer for its StateInit halves, and
+  // a second derivation there is what named one generation's shard while carrying the other's code — exit 0 at
+  // the vault, nothing stored, send reported green [CONVVAULT-01, and its PUBLIC copy caught by PDR-01].
+  const generation = generationForEpochAt(Math.floor(writeUnix / 86400), boundary);
+  const address = await publicShardAddressBytesFor(generation, partitionKey, epochTag);
   return {
     to: rawAddress(address),
     addressBytes: address,
+    generation,
     value,
     body: buildPublicPublishBody({ kind, keyArg, shardSeq, header, body }),
-    init: publicShardStateInit(partitionKey, epochTag),
+    init: publicShardStateInitFor(generation, partitionKey, epochTag),
     commit: await publicBodyCommit(header, body),
   };
 }

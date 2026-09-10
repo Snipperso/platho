@@ -17,6 +17,7 @@
 import { openSync, closeSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { stalePrepFiles } from './lib/deploy-prep-freshness.mjs';
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(name);
@@ -28,7 +29,7 @@ const MODE = arg('--mode', 'production');
 // WHICH SITE ON THE MACHINE. `production` is platho.app (/srv/platho on the server); `stage` is the stand,
 // stage.platho.app (/srv/platho-stage) — the same bundle, the same receiver, the same Caddy site body, a different
 // root, so a build can be tried under the exact production headers and cache policy before it is released
-// [OWNER 2026-08-21: "копия сайта для тестирования … по безопасности сделай также как на основном сайте"].
+// [decided 2026-08-21].
 // The stand lives on the machine its DNS names (A); production defaults to the second machine as before.
 const SITE = arg('--site', 'production');
 if (!['production', 'stage'].includes(SITE)) die(`--site must be production or stage, got ${SITE}`);
@@ -98,6 +99,18 @@ if (MODE === 'production' && prep.productionReady !== true) {
 }
 const bundleHash = prep.runtime?.bundleSha256;
 if (!bundleHash) die(`missing runtime.bundleSha256 in ${PREP}`);
+
+// THE PREP IS A SNAPSHOT, AND THE TARBALL BELOW IS MADE FROM THE SNAPSHOT — nothing here rebuilds anything.
+// [2026-09-08] Two source edits and a module bump went into web/ after the last prepare step, and `web:deploy:stage`
+// shipped the earlier bundle without a word: the log said "deployed", the stand still showed the old build id. The
+// prep records every bundled file with a hash (see scripts/lib/deploy-prep-freshness.mjs), so a tree that has
+// moved on is refused here, before a byte leaves the machine.
+const stale = stalePrepFiles(prep);
+if (stale.length > 0) {
+  die(`deploy prep is older than web/ — ${stale.length} file(s) changed since it was made `
+    + `(${stale.slice(0, 5).join(', ')}${stale.length > 5 ? ', …' : ''}). Re-run the prepare step:\n`
+    + '  node scripts/bump_module_versions.mjs --run && npm run web:deploy:prepare');
+}
 
 // THE VERSION MUST MOVE, AND THIS IS THE ONLY PLACE THAT CAN INSIST.
 //
@@ -192,8 +205,7 @@ try {
 
 console.log(`deployed ${release} to ${SITE_HOST} (${HOST})`);
 
-// CERTIFICATE WATCH, on the ritual that actually runs every day [OWNER 2026-08-27: "do we watch the renewals?
-// can they die suddenly?"]. There is no monitoring on either machine (empty crontabs, no custom timers — the
+// CERTIFICATE WATCH, on the ritual that actually runs every day [decided 2026-08-27]. There is no monitoring on either machine (empty crontabs, no custom timers — the
 // netwatch of record was not found on 2026-08-27), so the deploy — the one thing that provably happens daily —
 // carries the check. Caddy starts renewing 30 days before expiry and retries forever, so a cert can only die
 // after ~30 days of SILENT failures; shouting at <21 days means the renewal has already been failing for 9+

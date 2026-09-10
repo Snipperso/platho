@@ -34,6 +34,9 @@ const ROOT_RUNTIME_FILES = new Set([
   'i18n-strings.mjs',
   'boot-signal-field.mjs',
   'boot-signal-worker.js',
+  // The cutover boundary [CUTOVER.md items 6/7]: app.js and the wallet send funnel import it at the top, so a
+  // bundle without it dies on the boot import, not gracefully.
+  'cutover-epoch.mjs',
   'platho-config.mjs',
   'capsule-part-policy.mjs',
   'message-pricing-policy.mjs',
@@ -47,7 +50,6 @@ const ROOT_RUNTIME_FILES = new Set([
   'recipient-identities.mjs',
   'encrypted-message-store.mjs',
   'pwa-contract-transactions.mjs',
-  'publish-batch-orchestration.mjs',
   'platho-wallet.mjs',
   'ton-mnemonic-wordlist.mjs',
   'ton-rpc-transport.mjs',
@@ -59,10 +61,13 @@ const ROOT_RUNTIME_FILES = new Set([
   // hashes into the shipped bundle for the first time. A missing file here is not a build error: the import
   // simply 404s in production and the app fails to boot, which is why WEB-GRAPH-01 walks the graph.
   'key-shard-ton-rpc-provider.mjs',
+  'fee-vault-read.mjs',
   'shard-address.mjs',
+  'vault-account.mjs',
   'airdrop-pool-read.mjs',
   // The reserve seller: its live state (price step + what is left on it) and the buy message.
   'market-stability-read.mjs',
+  'telegram-gift-nfts.mjs',
   'username-nft-owned.mjs',
   'username-nft-transfer.mjs',
   'market-stability-buy-send.mjs',
@@ -96,11 +101,26 @@ const ROOT_RUNTIME_FILES = new Set([
   // shared shard plumbing (address derivation, RPC, discovery) that replaced the removed Vault/CapsuleHub path.
   'conv-lane.mjs',
   'conv-lane-send.mjs',
+  'group-protocol.mjs',
+  'public-reactions.mjs',
+  'group-lane-send.mjs',
+  'group-lane-read.mjs',
+  'group-store.mjs',
+  'group-record-store.mjs',
+  'group-runtime.mjs',
+  // THE FEE VAULT SHIPS NOW [audit 2026-09-02]. It was written whole and imported by nothing, so it had never
+  // entered the bundle; conv-lane-send imports it because clean-18's RecordShard has NO direct publish door —
+  // `VaultPublish` through the payer's own vault is the only CONV door there. WEB-GRAPH-01 named this file the
+  // moment the import landed, which is what that gate is for: a module reachable from app.js and missing here
+  // 404s in production and bricks boot.
+  'fee-vault.mjs',
   'conv-lane-read.mjs',
   'conv-discovery.mjs',
   'conv-key-store.mjs',
   'conv-key-persist.mjs',
   'conv-reply-bundle.mjs',
+  'device-secret-store.mjs',
+  'm21c-envelope.mjs',
   'intro-lane.mjs',
   'intro-lane-send.mjs',
   'intro-send-state.mjs',
@@ -115,6 +135,8 @@ const ROOT_RUNTIME_FILES = new Set([
   'public-lane-send.mjs',
   'public-shard-ton-rpc-provider.mjs',
   'publish-price.mjs',
+  'shard-debt.mjs',
+  'moderation.mjs',
   'wallet-send-fee.mjs',
   'key-shard-register-send.mjs',
   'shard-rpc.mjs',

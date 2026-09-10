@@ -42,6 +42,19 @@
 export const INTRO_SAFE_CAP = 8000;          // mirrors IS_SAFE_CAP in contracts/IntroShard.tact
 export const BYTES_PER_BUCKET_ASKED = 57;    // measured: the address in the request URL
 export const BYTES_PER_BUCKET_LIVE = 439;    // measured: one account in an include_boc=false response
+// AND THE TERM THAT WAS MISSING ENTIRELY UNTIL 2026-08-29: the RECORDS themselves.
+//
+// A leak-free scan cannot ask "which entries are mine" — it downloads every (r, view_tag) pair of every live bucket
+// and recomputes the tag locally, which is the whole privacy argument of this lane. So the bytes that actually move
+// are proportional to the NETWORK'S first-contact volume, and that was the one term the cost model did not have:
+// it counted addresses asked and account rows returned, and derived the poll interval from that. The client
+// therefore believed it was inside its 30 MiB day while spending multiples of it — at a million first contacts a
+// day network-wide the model priced a pass at 186,684 B and stretched the interval to ~9 minutes (29.1 MB/day
+// counted) while the real spend was 29.1 + 46.8 = ~76 MB, 2.5x the budget it was reporting as met.
+//
+// MEASURED by tests/intro-scan-page SCAN-03 on a real IntroShard: 35.07 B per pair as BOC — 32 of those bytes are
+// `r` itself, so the floor is structural — and the getter hands that BOC over base64-encoded, which is 4/3 of it.
+export const BYTES_PER_RECORD = 47;          // 35.07 B BOC x 4/3 = 46.8 B on the wire, rounded up
 
 // Defaults chosen to feel instant while staying small; every one of them is a product knob, not a law.
 // The window is ten epochs, but only three of them can still CHANGE: the publish gate (13684) accepts a shard
@@ -76,9 +89,22 @@ export const liveBucketsFor = (introsPerDay) => Math.max(1, Math.ceil(introsPerD
  * reported a 30 MiB budget as met while the pass actually spent 284 MiB. A phone on a metered plan would have
  * paid ten times what this module promised.
  */
-export function passCostBytes({ asked, live, epochs = 1 }) {
-  return epochs * asked * BYTES_PER_BUCKET_ASKED + live * BYTES_PER_BUCKET_LIVE;
+export function passCostBytes({ asked, live, epochs = 1, records = 0 }) {
+  return epochs * asked * BYTES_PER_BUCKET_ASKED
+    + live * BYTES_PER_BUCKET_LIVE
+    + Math.max(0, Number(records) || 0) * BYTES_PER_RECORD;
 }
+
+/**
+ * The RECORD traffic of a whole day, in bytes.
+ *
+ * It is a DAILY cost, not a per-pass one, and that distinction is the whole reason it is handled separately from
+ * `asked` and `live`. Cursors mean each record is downloaded exactly ONCE however often the client polls: polling
+ * twice as often halves the records per pass and changes nothing about the day. So it cannot be divided into the
+ * interval — it is subtracted from the budget first, like the full sweep's own overhead, and the interval is
+ * derived from what is left.
+ */
+export const recordBytesPerDay = (recordsPerDay) => Math.max(0, Number(recordsPerDay) || 0) * BYTES_PER_RECORD;
 
 /**
  * The scan plan for right now.
@@ -97,6 +123,10 @@ export function planIntroScan({
   readSpace,
   currentEpoch = null,
   msSinceFullSweep = Infinity,
+  // WHAT THE NETWORK IS ACTUALLY WRITING, as this client has observed it — see BYTES_PER_RECORD. The runner keeps a
+  // decaying estimate from the records each pass really downloaded, so this is measurement, not a guess about the
+  // network's size, and it is zero on a client that has not completed a pass yet (the old behaviour exactly).
+  recordsPerDay = 0,
   policy = {},
 } = {}) {
   const p = { ...DEFAULT_POLICY, ...policy };
@@ -135,7 +165,13 @@ export function planIntroScan({
       epochs: HOT_EPOCHS,
     })
     : cost;
-  const hotBudget = Math.max(0, p.budgetBytesPerDay - sweepsPerDay * fullCost);
+  const recordsBytes = recordBytesPerDay(recordsPerDay);
+  const hotBudget = Math.max(0, p.budgetBytesPerDay - sweepsPerDay * fullCost - recordsBytes);
+  // WHEN THE RECORDS ALONE ARE OVER BUDGET there is no interval that fixes it: polling less often does not make the
+  // network write less, and every record still arrives exactly once. The plan says so rather than quietly spending
+  // it — the honest answer to "the scan costs more than its budget" is a number the caller can show, not a slower
+  // poll that changes nothing.
+  const recordsOverBudget = recordsBytes >= Math.max(0, p.budgetBytesPerDay - sweepsPerDay * fullCost);
 
   // A pass that costs nothing still respects minIntervalMs — polling faster than a minute buys freshness nobody
   // perceives and costs battery, which no byte budget accounts for.
@@ -162,6 +198,14 @@ export function planIntroScan({
     extraBuckets,
     intervalMs,
     estimatedPassBytes: cost,
-    estimatedDailyBytes: Math.round(cost * (86_400_000 / intervalMs)),
+    // THE DAY, HONESTLY: the polls, plus the sweeps they are amortised against, plus the records the network
+    // writes. The old figure counted the first of the three and was therefore the number that made a 76 MB day
+    // read as 29 MB. `records.overBudget` is the case no interval can fix — see the note beside hotBudget.
+    estimatedDailyBytes: Math.round(cost * (86_400_000 / intervalMs) + sweepsPerDay * fullCost + recordsBytes),
+    records: {
+      perDay: Math.max(0, Number(recordsPerDay) || 0),
+      bytesPerDay: Math.round(recordsBytes),
+      overBudget: recordsOverBudget,
+    },
   };
 }

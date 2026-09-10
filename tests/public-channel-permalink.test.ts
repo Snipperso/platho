@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // CHANNEL LINKS — platho.app/<username|wallet>
 //
-// Owner, 2026-08-19: "было бы классно иметь возможность поделиться именно каналом, а не сообщением".
+// decided 2026-08-19.
 //
 // The post form (tests/public-post-permalink.test.ts) can afford a permissive first segment because its second
 // segment is digits and dots. A single segment has nothing to lean on: the server answers every path it has no
@@ -125,7 +125,7 @@ describe('CHANLINK — a channel is shareable on its own', () => {
   it('CHANLINK-09: a clipboard copy is CONFIRMED on screen, because nothing else would be', () => {
     // SHIPPED BROKEN 2026-08-19 and found by the owner: the button copied the link correctly and reported it
     // through setPublicStatus, which is a console.debug wrapper and not a UI surface at all. From the outside the
-    // control looked dead — "ничего не происходит, в консоли ошибок нет".
+    // control looked dead —.
     const status = app.slice(app.indexOf('function setPublicStatus('), app.indexOf('function setPublicStatus(') + 260);
     expect(status, 'if this ever becomes a real surface, this gate should be revisited').toContain('console.debug');
     const primitive = app.slice(app.indexOf('async function shareLinkOutOfPlatho('));

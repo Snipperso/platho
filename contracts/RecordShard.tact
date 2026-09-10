@@ -79,8 +79,7 @@ const RS_PUBLISH_GAS: Int = 2500000;
 // Restoring it also removes what looked like an airdrop-farm: publishing must cost the fee, not just the rent.
 const RS_PROTOCOL_FEE: Int = 10000000;
 
-// THE FEE PASSES THROUGH THIS SHARD — IT DOES NOT LIVE HERE. [OWNER 2026-07-19: "в шарде должна быть только
-// его рента на год, а моя комиссия это моя комиссия".] The publish receiver forwards it to FeeAccumulator in the
+// THE FEE PASSES THROUGH THIS SHARD — IT DOES NOT LIVE HERE. [decided 2026-07-19] The publish receiver forwards it to FeeAccumulator in the
 // same transaction that stores the record, so this account's balance is its own rent and nothing else.
 //
 // THE PREVIOUS REVISION ACCUMULATED IT, AND THAT WAS AN ARCHITECTURE BUILT AROUND ANOTHER CONTRACT'S WRONG
@@ -118,8 +117,7 @@ const RS_PROTOCOL_FEE: Int = 10000000;
 // No cycle, but it must be walked in that order at genesis, and PT-04/PIN pins the result.
 const RS_FEE_SINK: Address = address("EQAgWSAucibv2D3SOIhL1wKFwg27wIRkeiObu5uxgOfNpO6E");
 
-// TRANSPORT OF THE FEE, PAID BY THE PUBLISHER. [OWNER 2026-07-19, asked directly whose column this comes out of:
-// "естественно платит публикатор... Рожа у пользователей не треснет?"] So the fee arrives at the pool WHOLE —
+// TRANSPORT OF THE FEE, PAID BY THE PUBLISHER. [decided 2026-07-19] So the fee arrives at the pool WHOLE —
 // 15_000 GRAM, not 14_550 — and the publish minimum carries the cost instead. It is the same ~450 GRAM either
 // way; only the payer differs.
 //

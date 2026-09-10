@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // THE PRODUCT VERSION — one semantic number, written out in four places.
 //
-// Owner, 2026-08-19: "что-то версия залипла на 1.0.34" ... "ну надо сделать автоматически значит, ты же
-// забудешь через минуту". He was right on both counts: several releases had shipped without it moving.
+// decided 2026-08-19.... He was right on both counts: several releases had shipped without it moving.
 //
 // It cannot simply auto-increment. The version was deliberately split away from the cache keys on 2026-08-09 so
 // that it could STAND STILL through a one-line hotfix while the keys move on every deploy — tying it back to the

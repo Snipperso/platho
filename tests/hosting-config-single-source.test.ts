@@ -67,8 +67,7 @@ describe('HOSTING — the web server config has ONE source of truth', () => {
   });
 
   it('HOSTCFG-04: the stand (stage.platho.app) IS the production site body — one snippet, two roots, one extra header', () => {
-    // [OWNER 2026-08-21: "сделай копию сайта для тестирования … по безопасности сделай также как на основном
-    // сайте".] A stand that served a build under different headers, a different cache policy or a different
+    // [decided 2026-08-21] A stand that served a build under different headers, a different cache policy or a different
     // route chain would prove nothing about production, and a second copy of the body would drift the way the
     // two files in HOSTCFG-01 drifted. So the body is written ONCE as a snippet whose only argument is the root,
     // and each site is nothing but "the headers, the snippet with my root" — the stand adds exactly one header

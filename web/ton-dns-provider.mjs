@@ -1,6 +1,6 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
-import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=80';
+import { parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=21';
+import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=47';
+import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=89';
 
 export class TonDnsProviderError extends Error {
   constructor(message) {
@@ -82,10 +82,11 @@ function readStackCellBocOrNull(stack, index, name) {
   throw new TonDnsProviderError(`${name} must be a TON cell stack item or null`);
 }
 
+// Defers to the ONE shared implementation [2026-08-28]: this used to wrap the ASYNCHRONOUS
+// crypto.subtle.digest, whose per-call overhead is the whole cost on small inputs (MEASURED 16x on the shard
+// derivation path). The async signature is kept so every caller stays unchanged.
 async function sha256BigInt(text) {
-  const cryptoImpl = globalThis.crypto;
-  if (!cryptoImpl?.subtle) throw new TonDnsProviderError('crypto.subtle is unavailable');
-  const digest = new Uint8Array(await cryptoImpl.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  const digest = sha256Sync(new TextEncoder().encode(text));
   return tonCell.bytesToBigInt(digest);
 }
 

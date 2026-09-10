@@ -22,7 +22,7 @@
 // reader can cross-check. tests/recovery-blob.test.ts pins the seed round-trip, the wrong-seed refusal, the essentials
 // that survive, the non-essentials that default, and the non-zero hashes.
 
-import { tonCell } from './pwa-contract-transactions.mjs?v=37';
+import { tonCell } from './pwa-contract-transactions.mjs?v=47';
 
 const RECOVERY_BLOB_SALT = 'PLATHO.RECOVERY.BLOB.SALT.V1';
 const RECOVERY_BLOB_INFO = 'PLATHO.RECOVERY.BLOB.KEY.V1';
@@ -134,15 +134,32 @@ export async function sealRecoveryBlob(seed, map) {
  * Open a recovery body (the snake cell read back from the slot) to the conversation key Map, using the seed. Throws if
  * the blob was sealed under a different seed (wrong key). A missing/foreign/unsupported record opens to an empty map.
  */
+export const RECOVERY_BLOB_UNREADABLE_CODE = 'RECOVERY_BLOB_UNREADABLE';
+
+function recoveryBlobUnreadable(reason) {
+  const error = new Error(`Recovery blob cannot be read: ${reason}`);
+  error.code = RECOVERY_BLOB_UNREADABLE_CODE;
+  return error;
+}
+
 export async function openRecoveryBlob(seed, body) {
   const bytes = tonCell.readSnakeCellBytes(body, { name: 'recovery blob' });
   const record = JSON.parse(fromUtf8(bytes));
-  if (record?.version !== SEAL_VERSION || record.alg !== 'AES-256-GCM' || !record.ciphertext) return new Map();
+  // A BLOB WE CANNOT READ IS NOT AN EMPTY SLOT [audit 2026-09-01, round 9]. Both of these used to answer with an
+  // empty Map, which the restore counted as a clean read of a slot holding nothing — and the next dirty-slot
+  // backup then published OVER it at seq+1, destroying every conversation it held. The live case is a PWA
+  // rollout: SEAL_VERSION is 2 and version 1 existed, so two devices on different builds is all it takes.
+  //
+  // Answering with an error is safe precisely because the slot address is SEED-DERIVED and the contract makes the
+  // slot commit to the owner key, so only this seed's own blobs can be here. A blob at our own slot that will not
+  // open is OUR blob from another generation of this app — never a stranger's, and never nothing.
+  if (record?.version !== SEAL_VERSION) throw recoveryBlobUnreadable(`sealed under version ${record?.version}`);
+  if (record.alg !== 'AES-256-GCM' || !record.ciphertext) throw recoveryBlobUnreadable('malformed record');
   const key = await recoveryBlobKey(seed);
   const plaintext = await cryptoApi().subtle.decrypt(
     { name: 'AES-GCM', iv: unb64(record.nonce), additionalData: sealAad(), tagLength: 128 }, key, unb64(record.ciphertext));
   const payload = JSON.parse(fromUtf8(new Uint8Array(plaintext)));
-  if (payload?.version !== SEAL_VERSION) return new Map();
+  if (payload?.version !== SEAL_VERSION) throw recoveryBlobUnreadable(`payload version ${payload?.version}`);
   return deserializeRecoveryMap(payload.map);
 }
 

@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // COMMENTS OFF MEANS OFF ON EVERY ROUTE INTO A POST.
 //
-// Owner, 2026-08-20, opening a real permalink: "вижу косяк. по прямой ссылке комменты открыты в посте с
-// отключёнными комментами."
+// decided 2026-08-20, opening a real permalink
 //
 // The check existed — once, inside the feed card, which disables its Comments button. That guarded the DOOR, and
 // a permalink is a second door: openPublicPostDetail was called directly and armed the comment composer without

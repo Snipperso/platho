@@ -32,6 +32,15 @@ const BROWSER_ENTRY_POINTS = [
   'web/publish-price.mjs',
   'web/shard-rpc.mjs',
   'web/intro-lane.mjs',
+  // The M21C discount door. It is not wired into app.js yet — clean-17 shards have no vault door to knock on —
+  // but it is written for the browser and must stay loadable there, or the cutover would discover on the day
+  // that its transitive graph pulled in @ton/core. That is exactly the failure this gate exists for, and the
+  // cheapest moment to catch it is before anything depends on it.
+  'web/fee-vault.mjs',
+  'web/fee-vault-read.mjs',
+  // The cutover boundary [CUTOVER.md items 6/7]: one tiny pure module, but the wallet send funnel imports it,
+  // so a load failure here would take every send path down with it.
+  'web/cutover-epoch.mjs',
 ];
 
 /** Imports that exist only in Node: the browser has no bundler step here, it loads these files as-is. */

@@ -117,9 +117,7 @@ describe('CONV-KEY-STORE', () => {
     const backupMap = backup.snapshot();
 
     // import into a FRESH device store — the conversation (K_root + wallet) comes back, and it ARRIVES COLD: the
-    // backing-up device's scan cursor is not this device's knowledge. [OWNER 2026-08-22, a device restored from the
-    // slots: "only the peer's latest replies came" — the imported cursor made the receive lane read only the steady
-    // window; with no cursor it scans the conversation from its birth, once.]
+    // backing-up device's scan cursor is not this device's knowledge. [decided 2026-08-22]
     const fresh = createMemoryConvKeyStore();
     expect(await fresh.importConversations(backupMap), 'one record imported').toBe(1);
     expect(hx(fresh.getConversation(A, B)!.kRootCurrent)).toBe(hx(kroot(1)));

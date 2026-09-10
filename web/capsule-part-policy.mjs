@@ -1,4 +1,14 @@
 export const SINGLE_CAPSULE_USEFUL_BYTES = 1024;
+
+// HOW MANY CAPSULES ONE MESSAGE MAY SPAN. Two bounds meet at 8 and both are real: it caps the worst-case send
+// at the measured slow terminal (~21 minutes scaled — the number the composer's own comment carries), and it
+// was also, until 2026-09-01, the most publishes one signed vault external could carry. That external door is
+// deleted [OWNER: the money for sending travels WITH the message], so each part is now its own wallet message
+// and no door caps the count — the measured slow-terminal ceiling is the only bound left, and it is the one
+// that mattered for the user anyway.
+// [2026-08-29] Until today this number lived as MAX_BATCH_PARTS in the batch machinery of the DELETED Vault
+// contract, and the whole of that machinery shipped to every user so the composer could read one constant.
+export const MAX_MESSAGE_PARTS = 8;
 export const CAPSULE_USEFUL_SIZE_BYTES = Object.freeze([1024, 2048, 4096, 8192, 16384, 32768]);
 export const MAX_CAPSULE_USEFUL_BYTES = CAPSULE_USEFUL_SIZE_BYTES[CAPSULE_USEFUL_SIZE_BYTES.length - 1];
 
@@ -311,11 +321,23 @@ export function normalizeProfileTags(tags) {
 export function encodeProfileBlockContent(profile) {
   const description = textEncoder.encode(truncateUtf8ToBytes(profile?.description ?? '', PROFILE_DESCRIPTION_MAX_BYTES));
   const tags = normalizeProfileTags(profile?.tags).map((tag) => textEncoder.encode(tag));
-  // Owner .ath username claim (bare name, no ".ath"), appended after tags — see PROFILE_USERNAME_MAX_BYTES.
+  // decided), appended after tags — see PROFILE_USERNAME_MAX_BYTES.
   const ownerUsername = textEncoder.encode(truncateUtf8ToBytes(String(profile?.ownerUsername ?? '').trim(), PROFILE_USERNAME_MAX_BYTES));
+  // THE LOOK, appended after the username [2026-09-07]: [appearanceLen:u8][kind:u8][payload]. A reader that stops
+  // at the username reads exactly what it read before, and a profile without one adds not a byte.
+  const appearance = encodeProfileAppearance(profile?.appearance);
+  // THE WORN GIFT, its own trailer [2026-09-09]: the gift a wallet WEARS (its profile card) is not the gift its
+  // CHANNEL is dressed in (the look's own choice) — the owner may show one on the card and none on the channel. A
+  // raw item address, after the appearance trailer; when a worn gift is carried and there is no appearance, an
+  // EMPTY appearance trailer (length 0) is written so the reader's trailers stay in order. Readers before this
+  // field stop at the appearance and never see it — forward-compatible by the same rule the appearance used.
+  const wornGift = textEncoder.encode(normalizeProfileWornGift(profile?.wornGift) ?? '');
   let total = 1 + 2 + description.length + 1;
   for (const tag of tags) total += 1 + tag.length;
   total += 1 + ownerUsername.length; // [usernameLen:u8][username:utf8]
+  if (appearance) total += 1 + appearance.length;
+  else if (wornGift.length > 0) total += 1;   // the empty appearance trailer the worn gift rides behind
+  if (wornGift.length > 0) total += 1 + wornGift.length;   // [wornGiftLen:u8][rawAddress:utf8]
   const out = new Uint8Array(total);
   out[0] = PROFILE_BLOCK_CONTENT_VERSION;
   out[1] = (description.length >> 8) & 0xff;
@@ -334,7 +356,129 @@ export function encodeProfileBlockContent(profile) {
   offset += 1;
   out.set(ownerUsername, offset);
   offset += ownerUsername.length;
+  if (appearance) {
+    out[offset] = appearance.length;
+    offset += 1;
+    out.set(appearance, offset);
+    offset += appearance.length;
+  } else if (wornGift.length > 0) {
+    out[offset] = 0;
+    offset += 1;
+  }
+  if (wornGift.length > 0) {
+    out[offset] = wornGift.length;
+    offset += 1;
+    out.set(wornGift, offset);
+    offset += wornGift.length;
+  }
   return out;
+}
+
+/** The worn gift's item address as the block carries it: raw, lowercase — or null for anything else. */
+export function normalizeProfileWornGift(value) {
+  const address = String(value ?? '').trim().toLowerCase();
+  return RAW_ADDRESS_RE.test(address) ? address : null;
+}
+
+// --- Channel appearance (a trailer of the PROFILE block) ---
+// The one kind so far: a Telegram gift, named by its item's raw address. The address is the whole claim — the
+// gift's slug and number are chain facts read from the item itself when the claim is proven (see the reader), so
+// nothing a publisher writes here can dress a channel in a gift it does not hold.
+export const PROFILE_APPEARANCE_KIND_TELEGRAM_GIFT = 1;
+// THE LOOK, kind 2 [decided 2026-09-09]: a channel's whole appearance for its visitors, not only a gift — the
+// theme the owner chose for guests, the background animation and its settings, and the gift if there is one.
+// [kind:u8][theme:u8][background:u8][n:u8][n × value:u16 BE][giftLen:u8][gift:utf8]. A background index this
+// reader does not know (a mode a newer build shipped) decodes as "not carried", so the guest keeps their own;
+// the settings are clamped to the sliders' own bounds, so a hostile profile cannot ask a guest's device for more
+// than the Appearance dialog allows.
+export const PROFILE_APPEARANCE_KIND_LOOK = 2;
+export const PROFILE_LOOK_THEMES = Object.freeze(['dark', 'light']);
+export const PROFILE_LOOK_BACKGROUNDS = Object.freeze(['none', 'plasma', 'nodes']);
+// [min, max, default] per slider, in the sliders' own order — the Appearance dialog's `min`/`max`/`value`.
+export const PROFILE_LOOK_SETTING_RANGES = Object.freeze({
+  none: Object.freeze([]),
+  plasma: Object.freeze([[0, 100, 30], [1, 16, 5], [25, 600, 175], [0, 200, 50]]),   // glow, suns, speed, energy
+  nodes: Object.freeze([[0, 300, 100], [0, 300, 100], [25, 300, 100], [0, 300, 100]]), // brightness, signals, speed, flashlights
+});
+const RAW_ADDRESS_RE = /^-?\d{1,3}:[0-9a-f]{64}$/i;
+
+function normalizeLookSettings(background, values) {
+  const ranges = PROFILE_LOOK_SETTING_RANGES[background] ?? [];
+  return ranges.map(([min, max, fallback], index) => {
+    const raw = Number(Array.isArray(values) ? values[index] : undefined);
+    return Number.isFinite(raw) ? Math.max(min, Math.min(max, Math.round(raw))) : fallback;
+  });
+}
+
+export function normalizeProfileAppearance(value) {
+  if (!value || typeof value !== 'object') return null;
+  if (value.kind === 'telegram-gift') {
+    const itemAddress = String(value.itemAddress ?? '').trim().toLowerCase();
+    return RAW_ADDRESS_RE.test(itemAddress) ? { kind: 'telegram-gift', itemAddress } : null;
+  }
+  if (value.kind !== 'look') return null;
+  const theme = PROFILE_LOOK_THEMES.includes(value.theme) ? value.theme : 'dark';
+  // null = not carried (a background this build does not know): the guest keeps their own.
+  const background = PROFILE_LOOK_BACKGROUNDS.includes(value.background) ? value.background : null;
+  const settings = background ? normalizeLookSettings(background, value.settings) : [];
+  const address = String(value.itemAddress ?? '').trim().toLowerCase();
+  const itemAddress = RAW_ADDRESS_RE.test(address) ? address : null;
+  return { kind: 'look', theme, background, settings, itemAddress };
+}
+
+function encodeProfileAppearance(value) {
+  const appearance = normalizeProfileAppearance(value);
+  if (!appearance) return null;
+  if (appearance.kind === 'telegram-gift') {
+    const address = textEncoder.encode(appearance.itemAddress);
+    const out = new Uint8Array(1 + address.length);
+    out[0] = PROFILE_APPEARANCE_KIND_TELEGRAM_GIFT;
+    out.set(address, 1);
+    return out;
+  }
+  const gift = appearance.itemAddress ? textEncoder.encode(appearance.itemAddress) : new Uint8Array(0);
+  const settings = appearance.settings;
+  const out = new Uint8Array(1 + 1 + 1 + 1 + settings.length * 2 + 1 + gift.length);
+  out[0] = PROFILE_APPEARANCE_KIND_LOOK;
+  out[1] = PROFILE_LOOK_THEMES.indexOf(appearance.theme);
+  out[2] = appearance.background ? PROFILE_LOOK_BACKGROUNDS.indexOf(appearance.background) : 0;
+  out[3] = settings.length;
+  let offset = 4;
+  for (const setting of settings) {
+    out[offset] = (setting >> 8) & 0xff;
+    out[offset + 1] = setting & 0xff;
+    offset += 2;
+  }
+  out[offset] = gift.length;
+  offset += 1;
+  out.set(gift, offset);
+  return out;
+}
+
+function decodeProfileLook(bytes) {
+  // bytes: the trailer WITHOUT its kind byte
+  if (bytes.length < 4) return null;
+  const theme = PROFILE_LOOK_THEMES[bytes[0]] ?? 'dark';
+  const backgroundIndex = bytes[1];
+  const count = bytes[2];
+  let offset = 3;
+  if (offset + count * 2 + 1 > bytes.length) return null;
+  const settings = [];
+  for (let index = 0; index < count; index += 1) {
+    settings.push((bytes[offset] << 8) | bytes[offset + 1]);
+    offset += 2;
+  }
+  const giftLength = bytes[offset];
+  offset += 1;
+  if (offset + giftLength > bytes.length) return null;
+  const itemAddress = giftLength > 0 ? new TextDecoder().decode(bytes.subarray(offset, offset + giftLength)) : null;
+  return normalizeProfileAppearance({
+    kind: 'look',
+    theme,
+    background: PROFILE_LOOK_BACKGROUNDS[backgroundIndex] ?? 'unknown',   // unknown → not carried
+    settings,
+    itemAddress,
+  });
 }
 
 export function decodeProfileBlockContent(content) {
@@ -366,9 +510,37 @@ export function decodeProfileBlockContent(content) {
     offset += 1;
     if (usernameLength > 0 && offset + usernameLength <= bytes.length) {
       ownerUsername = decoder.decode(bytes.subarray(offset, offset + usernameLength));
+      offset += usernameLength;   // the trailer after this one starts where the name ends
     }
   }
-  return { description, tags, ownerUsername };
+  // The look. Same contract as the name: a truncated or unknown trailer never nulls the profile — the channel is
+  // simply undressed, and an unknown kind is a kind this build does not draw.
+  let appearance = null;
+  if (offset < bytes.length) {
+    const appearanceLength = bytes[offset];
+    offset += 1;
+    if (appearanceLength > 1 && offset + appearanceLength <= bytes.length) {
+      if (bytes[offset] === PROFILE_APPEARANCE_KIND_TELEGRAM_GIFT) {
+        appearance = normalizeProfileAppearance({
+          kind: 'telegram-gift',
+          itemAddress: decoder.decode(bytes.subarray(offset + 1, offset + appearanceLength)),
+        });
+      } else if (bytes[offset] === PROFILE_APPEARANCE_KIND_LOOK) {
+        appearance = decodeProfileLook(bytes.subarray(offset + 1, offset + appearanceLength));
+      }
+      offset += appearanceLength;
+    }
+  }
+  let wornGift = null;
+  if (offset < bytes.length) {
+    const wornGiftLength = bytes[offset];
+    offset += 1;
+    if (wornGiftLength > 0 && offset + wornGiftLength <= bytes.length) {
+      wornGift = normalizeProfileWornGift(decoder.decode(bytes.subarray(offset, offset + wornGiftLength)));
+      offset += wornGiftLength;
+    }
+  }
+  return { description, tags, ownerUsername, appearance, wornGift };
 }
 
 // --- Shared-post content codec (document block type SHARE) ---
@@ -454,7 +626,7 @@ export function decodeShareBlockContent(content) {
   // NO v1 COMPATIBILITY PATH, and that is not an oversight. v1 packed the entry id as a uint64, which means it
   // could never encode a public post at all — clean-17's feed id is `epochTag.shardSeq.entryId`, BigInt() threw on
   // it, and the send died there. So no v1 share was ever written to the wire: carrying a reader for it would be
-  // dead weight pretending to be caution. [OWNER 2026-08-04: "there are no sent ones".]
+  // dead weight pretending to be caution. [decided 2026-08-04]
   if (bytes.length < 45 || bytes[0] !== SHARE_BLOCK_CONTENT_VERSION) return null;
   const flags = bytes[1];
   const decoder = new TextDecoder();

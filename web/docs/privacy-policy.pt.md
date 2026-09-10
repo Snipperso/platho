@@ -1,6 +1,6 @@
 # Política de Privacidade
 
-Última atualização: 18 de agosto de 2026
+Última atualização: 29 de agosto de 2026
 
 O Platho é um mensageiro sem backend. Este documento é curto porque há muito
 pouco a divulgar — e é específico onde algo realmente sai do seu dispositivo.
@@ -23,11 +23,24 @@ Não pedimos endereço de e-mail, número de telefone nem nome.
 - O seu histórico de mensagens e os seus rascunhos.
 - As suas definições, incluindo uma chave de API opcional de um fornecedor público de nós TON.
 
-Estes dados são guardados no armazenamento local do seu navegador e são cifrados
-com uma palavra-passe à sua escolha (AES-GCM-256 com derivação de chave
-PBKDF2-SHA-256). Nunca os recebemos. Limpar os dados do navegador apaga-os e, sem
-a sua frase de recuperação, não podem ser restaurados por nós nem por mais
-ninguém.
+Nada disso chega até nós, e a proteção não é a mesma para cada item — por isso
+cada um é nomeado separadamente, em vez de uma única afirmação para os três:
+
+- **A frase de recuperação e as chaves derivadas dela** são cifradas com uma senha
+  que você escolhe (AES-GCM-256, derivação de chave PBKDF2-SHA-256). Sem essa
+  senha não podem ser lidas, nem por nós nem por quem estiver com o dispositivo.
+- **O histórico de mensagens e os rascunhos** são cifrados com uma chave que o seu
+  navegador gera neste dispositivo e guarda de forma que não pode ser exportada —
+  não com a sua senha. Copiar os dados armazenados para outra máquina não produz
+  nada legível; isso não protege contra alguém que já esteja usando o seu
+  navegador desbloqueado.
+- **As configurações** — tema, idioma, o que você segue — são guardadas como texto
+  comum; nada ali é segredo e nada chega até nós. O único valor que é, a chave de
+  API opcional de um provedor de nós, é selado com o mesmo tipo de chave do
+  dispositivo que o histórico de mensagens, em vez de ficar à vista.
+
+Limpar os dados do navegador apaga tudo isso e, sem a sua frase de recuperação,
+nem nós nem ninguém mais podemos restaurá-lo.
 
 ## O que é público por conceção
 
@@ -53,6 +66,7 @@ navegador envia pedidos para:
 - `toncenter.com`
 - `tonapi.io`
 - `mainnet-v4.tonhubapi.com`
+- `nft.fragment.com`
 
 Estes fornecedores veem necessariamente o seu endereço IP e os pedidos que o seu
 dispositivo faz, e operam ao abrigo das suas próprias políticas de privacidade,

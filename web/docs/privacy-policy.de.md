@@ -1,6 +1,6 @@
 # Datenschutzerklärung
 
-Zuletzt aktualisiert: 18. August 2026
+Zuletzt aktualisiert: 29. August 2026
 
 Platho ist ein Messenger ohne Backend. Dieses Dokument ist kurz, weil es sehr
 wenig offenzulegen gibt — und genau dort konkret, wo tatsächlich etwas Ihr Gerät
@@ -25,11 +25,26 @@ einem Namen.
 - Ihr Nachrichtenverlauf und Ihre Entwürfe.
 - Ihre Einstellungen, einschließlich eines optionalen API-Schlüssels für einen öffentlichen TON-Node-Anbieter.
 
-Diese Daten werden im lokalen Speicher Ihres Browsers abgelegt und mit einem von
-Ihnen gewählten Passwort verschlüsselt (AES-GCM-256 mit Schlüsselableitung über
-PBKDF2-SHA-256). Wir erhalten sie zu keinem Zeitpunkt. Wenn Sie Ihre
-Browserdaten löschen, werden diese Daten gelöscht, und ohne Ihre
-Wiederherstellungsphrase können sie weder von uns noch von sonst jemandem
+Nichts davon erreicht uns, und geschützt ist es auf unterschiedliche Weise —
+deshalb wird hier jeder Punkt einzeln benannt statt mit einer Aussage für alle:
+
+- **Die Wiederherstellungsphrase und die daraus abgeleiteten Schlüssel** sind mit
+  einem von Ihnen gewählten Passwort verschlüsselt (AES-GCM-256, Schlüssel­ableitung
+  über PBKDF2-SHA-256). Ohne dieses Passwort sind sie weder für uns noch für
+  jemanden mit dem Gerät in der Hand lesbar.
+- **Nachrichtenverlauf und Entwürfe** sind mit einem Schlüssel verschlüsselt, den
+  Ihr Browser auf diesem Gerät erzeugt und in nicht exportierbarer Form aufbewahrt
+  — nicht mit Ihrem Passwort. Auf einen anderen Rechner kopierte Daten sind daher
+  unlesbar; gegen jemanden, der Ihren entsperrten Browser bereits benutzt, schützt
+  das nicht.
+- **Einstellungen** — Design, Sprache, Abonnements — werden als gewöhnlicher Text
+  gespeichert; nichts davon ist geheim, und zu uns gelangt nichts davon. Das eine,
+  was es ist — der optionale API-Schlüssel eines Node-Anbieters —, wird mit
+  derselben Art Geräteschlüssel versiegelt wie der Nachrichtenverlauf, statt offen
+  zu liegen.
+
+Wenn Sie Ihre Browserdaten löschen, wird all das gelöscht, und ohne Ihre
+Wiederherstellungsphrase kann es weder von uns noch von sonst jemandem
 wiederhergestellt werden.
 
 ## Was systembedingt öffentlich ist
@@ -58,6 +73,7 @@ nutzen, sendet Ihr Browser Anfragen an:
 - `toncenter.com`
 - `tonapi.io`
 - `mainnet-v4.tonhubapi.com`
+- `nft.fragment.com`
 
 Diese Anbieter sehen zwangsläufig Ihre IP-Adresse und die Anfragen, die Ihr
 Gerät stellt, und sie handeln nach ihren eigenen Datenschutzerklärungen, auf die

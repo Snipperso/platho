@@ -81,7 +81,7 @@ describe('PUBLIC-LANE — the read assembly', () => {
   }, 300_000);
 
   it('PL-YEAR-01: a channel is read over the RETENTION year, and an unchanged shard is never re-read', async () => {
-    // [OWNER 2026-08-04] "in the channel itself posts should honestly hang for a year". PublicShard keeps a CHANNEL
+    // [decided 2026-08-04] PublicShard keeps a CHANNEL
     // post for 1 year (PS_RETENTION_POST) while the reader stopped at 3 eras = 90 days, so a channel's own posts
     // vanished from it while still on chain and still paid for. Harmless for a news feed; wrong for a book
     // published a chapter at a time, which is exactly what this lane is about to carry.

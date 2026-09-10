@@ -24,18 +24,59 @@
 //   4. include_boc is all-or-nothing: with it on you also download code_boc, which is identical for every shard.
 //      The cheap pass therefore runs with it OFF and uses data_hash / last_transaction_lt to spot changes.
 
-import { addrKey } from './shard-discovery.mjs?v=23';
+import { addrKey } from './shard-discovery.mjs?v=58';
 
 // One request covers a full 1024-bucket read space with headroom under the measured 1149 ceiling. Deliberately
 // NOT set to 1149: the limit is in bytes, so a longer address form or an extra query parameter would silently
 // push a maximal request over the wall and turn a scan into an HTTP 414.
 export const ACCOUNT_STATES_MAX_PER_CALL = 1024;
 
-/** Split addresses into request-sized groups. */
-export function chunkAddresses(addresses, size = ACCOUNT_STATES_MAX_PER_CALL) {
+// ...AND THE COUNT CAP ALONE WAS NOT ENOUGH — the paragraph above described the exact failure it then suffered
+// [audit 2026-08-31, round 8]. `ACCOUNT_STATES_MAX_PER_CALL` was sized for the FRIENDLY form (57.1 B), but a
+// caller passing RAW hex spends 77.1 B, so a full 1024-chunk builds a 78,907 B URL against a 65,553 B wall —
+// 20% over, HTTP 414, and 414 was handled nowhere. MEASURED on the batched public feed: 15 followed channels is
+// the last safe count (64,739 B) and 16 is the first that fails (69,051 B), after which the feed stops updating
+// FOREVER with nothing but a console.warn. A count cannot bound a byte limit; only bytes can.
+//
+// The wall is the largest URL toncenter ACCEPTED (fact 1 above). The reserve covers what this module cannot
+// see — the origin and path (42 B today), `&include_boc=false` (18 B), and room for a longer host or one added
+// query parameter — so the budget stays right if the endpoint moves.
+export const ACCOUNT_STATES_URL_MAX = 65_553;
+export const ACCOUNT_STATES_URL_RESERVE = 1_024;
+export const ACCOUNT_STATES_URL_BUDGET = ACCOUNT_STATES_URL_MAX - ACCOUNT_STATES_URL_RESERVE;
+
+/** What one address costs in the querystring: `address=` + its percent-encoded wire form + the `&` joining it. */
+export function accountStatesAddressCost(wire) {
+  return 'address='.length + encodeURIComponent(String(wire)).length + 1;
+}
+
+/**
+ * Split addresses into request-sized groups, bounded by BOTH a count and a byte budget.
+ *
+ * The count cap stays because the deadline ladder (`statesBatchCeiling`, STATES_BATCH_FLOOR, the halving on a
+ * timed-out batch) is expressed in counts and must keep composing; the byte budget is what makes the split
+ * correct for whatever address form the caller actually passes. Addresses are measured in their WIRE form, so
+ * the two callers that pass raw hex are charged what they really cost.
+ *
+ * A single address that cannot fit alone is still emitted as its own chunk: refusing here would turn a
+ * pathological input into a silent gap, and the endpoint's own error is the honest answer.
+ */
+export function chunkAddresses(addresses, size = ACCOUNT_STATES_MAX_PER_CALL, maxBytes = ACCOUNT_STATES_URL_BUDGET) {
   if (!Number.isInteger(size) || size < 1) throw new Error(`chunk size must be a positive integer, got ${size}`);
   const out = [];
-  for (let i = 0; i < addresses.length; i += size) out.push(addresses.slice(i, i + size));
+  let group = [];
+  let bytes = 0;
+  for (const address of addresses) {
+    const cost = accountStatesAddressCost(toWireAddress(address));
+    if (group.length > 0 && (group.length >= size || bytes + cost > maxBytes)) {
+      out.push(group);
+      group = [];
+      bytes = 0;
+    }
+    group.push(address);
+    bytes += cost;
+  }
+  if (group.length > 0) out.push(group);
   return out;
 }
 
@@ -245,6 +286,20 @@ export async function readAccountStates(addresses, { request, includeBoc = false
       // omitted, because for the lanes that read this map an omitted address means "never written, skip it", and
       // that is the silent-loss shape. An unknown row carries no marker, which every lane already treats as "read
       // it, remember nothing".
+      // A 414 MEANS WE BUILT A URL WE SHOULD NEVER HAVE BUILT [audit 2026-08-31, round 8]. The byte budget above
+      // is the prevention; this is the net, because the wall is the ENDPOINT's and can move without us. Split and
+      // retry exactly as the deadline arm does, and lower the ceiling so the rest of the pass stays under it.
+      // console.error, not warn: the owner reads red rows, and a URI-too-long is our bug, not the provider's —
+      // the old behaviour rethrew, the whole feed pass died, and a console.warn was the only trace.
+      if (error?.status === 414 && wire.length > 1) {
+        console.error(`[shard-reader] HTTP 414 on ${wire.length} addresses — the request URL exceeded the endpoint `
+          + 'limit; splitting. This means the byte budget is stale or a caller passed a longer address form.');
+        noteBatchTimedOut(wire.length);
+        const half = Math.max(1, Math.floor(wire.length / 2));
+        await readGroup(wire.slice(0, half));
+        await readGroup(wire.slice(half));
+        return;
+      }
       if (error?.status === 422) {
         // The body under BOTH names it has worn: the Go-style "index N of address" text (measured on the owner's
         // console) and the FastAPI detail[].loc shape (the verbatim body, when the request function kept it).
@@ -266,8 +321,7 @@ export async function readAccountStates(addresses, { request, includeBoc = false
           // SPLIT DOWN TO THE FLOOR, NOT TO ONE. A deadline that is about the endpoint's LOAD rather than the
           // batch's size recurs at every size, and halving all the way to single addresses then turns one slow
           // minute into 2N requests, each waiting out the endpoint's deadline — hours for a 666-address probe,
-          // with the one serial pump held the whole time [OWNER 2026-08-22: "after that 422 everything seems to
-          // stop"]. Below the floor the batch is small enough that a timeout says nothing about it; its addresses
+          // with the one serial pump held the whole time [decided 2026-08-22]. Below the floor the batch is small enough that a timeout says nothing about it; its addresses
           // are UNANSWERED this pass (the lanes read them the slow way) and go back on the wire next pass, when
           // the remembered ceiling already keeps the batches small.
           if (wire.length > STATES_BATCH_FLOOR) {

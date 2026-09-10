@@ -27,11 +27,23 @@
 //
 // These mirror contract constants BY HAND, because the modules that need them must load in a browser and cannot
 // import the compiled wrappers. [STALE FOR A DAY, 2026-07-20..21] RS_FEE_TRANSPORT rose twice to carry the
+import { WRITES_GENERATION } from './cutover-epoch.mjs?v=4';
 // airdrop credit and these four figures were not moved with it, so the client attached 13_400_000 against a
 // gate demanding 15_600_000 — every publish refused. PP-01 caught it exactly as the next sentence promises;
 // what failed was propagation, not detection. tests/publish-price.test.ts pins every one of them against the .tact sources and
 // against the live getters, so a drift is loud rather than a refused publish in production.
 
+// ⚠️ AND THAT RULE WAS BROKEN ONCE, ON 2026-09-02, AND CAUGHT BY PLS-PRICE. The clean-18 squat repair raised
+// three PublicShard base endowments, and these three figures were moved to follow them — which is right for the
+// generation being BUILT and wrong for the one that is DEPLOYED. `tests/public-lane-send.test.ts` compares this
+// file against `build/` (clean-17), so the client would have over-attached to every live shard while the gate
+// went red for the right reason. The clean-18 values live in CUTOVER item 9 until the flip carries them.
+// 🔴 CUTOVER: contracts18/docs/CUTOVER.md item 9. These figures are the SEALED clean-17 floors and MUST stay
+// so until the flip — the live client keeps sending them. On cutover day they move DOWN (the clean-18 floors
+// are lower — the fee left the shard, and the fee-sink transport fell 2,600,000 → 400,000 for the direct
+// lanes), so a stale figure over-attaches and mode-128 refunds it: a safe direction, never a refused publish.
+// web/fee-vault.mjs's FV_FEE_TRANSPORT (the clean-17 transport share) is what vaultActionValue strips back out
+// of these one-source figures on the vault route; the two move together at the flip.
 /** RS_MIN_VALUE — what a publish into an EXISTING RecordShard must bring. Steady state. */
 export const CONV_MIN_VALUE = 15_600_000n;
 /** RS_DEPLOY_MIN_VALUE — what the FIRST publish must bring; also what a client should always attach. */
@@ -95,16 +107,29 @@ export const PUBLIC_BEACON_PUBLISH_VALUE = 31_400_000n;
 //  behind means gate 13704 refuses every first avatar publish in production while every contract test stays green.
 export const PUBLIC_AVATAR_PUBLISH_VALUE = 39_500_000n;
 
-const PUBLIC_PUBLISH_VALUE_BY_KIND = Object.freeze({
-  0: PUBLIC_CHANNEL_PUBLISH_VALUE,
-  1: PUBLIC_THREAD_PUBLISH_VALUE,
-  2: PUBLIC_BEACON_PUBLISH_VALUE,
-  3: PUBLIC_AVATAR_PUBLISH_VALUE,
+// THE FIGURES ARE PER GENERATION [2026-09-04, CUTOVER item 15]. The four above are clean-17's, pinned EXACTLY to the
+// live getters (PLS-PRICE: a client that pays the deploy figure is never refused and never overspends). Clean-18's
+// PublicShard carries the moderation door (SetEntryHidden + the gate derivation) and, after the third audit round,
+// the HIDDEN INDEX a reader refreshes held rows from — together they grew every empty account 47 -> 60 cells and
+// raised the base endowments (POST 7.0M, BEACON 19.0M, AVATAR 30.1M; LR-03 measures 1.467x / 1.244x / 1.32x over
+// the full admissible life). Its deploy figures are 20.6M / 20.6M / 33.8M / 45.6M, and these carry the headroom
+// the 17 figures carry over the 18 gates (SQUAT-01 pins the slack non-negative against the compiled lane). The
+// default generation is the build's WRITE generation, so the flip release moves the figures by moving
+// WRITES_GENERATION alone — no call site changes.
+const PUBLIC_PUBLISH_VALUE_BY_GENERATION = Object.freeze({
+  17: Object.freeze({ 0: PUBLIC_CHANNEL_PUBLISH_VALUE, 1: PUBLIC_THREAD_PUBLISH_VALUE, 2: PUBLIC_BEACON_PUBLISH_VALUE, 3: PUBLIC_AVATAR_PUBLISH_VALUE }),
+  // [RAISED 2026-09-05, reactions] CHANNEL/THREAD 20.7M -> 21.6M: PS_BASE_ENDOWMENT_POST 7.0M -> 7.9M after the reaction
+  // counters grew the empty PublicShard 60 -> 68 cells (LR-03 measured the channel at 1.320x against the 1.45 margin).
+  // BEACON 33.9M -> 36.4M the same day: PS_BASE_ENDOWMENT_BEACON 19.0M -> 21.5M (LR-03 read 1.121x against the 1.15 solvency bar at 19.0M, 1.229x against the 1.24 accepted margin at 21.0M).
+  // AVATAR 45.7M -> 49.6M the same day: PS_BASE_ENDOWMENT_AVATAR 30.1M -> 34.0M (LR-03 read 1.191x over six years against the 1.32 accepted margin at 30.1M, 1.3188x at 33.6M).
+  18: Object.freeze({ 0: 21_600_000n, 1: 21_600_000n, 2: 36_400_000n, 3: 49_600_000n }),
 });
 
-/** The deploy figure to attach to a PublicShard publish of the given KIND (0..3). */
-export function publicPublishValueForKind(kind) {
-  const value = PUBLIC_PUBLISH_VALUE_BY_KIND[Number(kind)];
+/** The deploy figure to attach to a PublicShard publish of the given KIND (0..3) into `generation` (default: the build's write generation). */
+export function publicPublishValueForKind(kind, generation = WRITES_GENERATION) {
+  const table = PUBLIC_PUBLISH_VALUE_BY_GENERATION[Number(generation)];
+  if (!table) throw new Error(`publicPublishValueForKind: no PublicShard deploy figures for generation ${generation}`);
+  const value = table[Number(kind)];
   if (value === undefined) throw new Error(`publicPublishValueForKind: unknown PublicShard kind ${kind} (expected 0..3)`);
   return value;
 }

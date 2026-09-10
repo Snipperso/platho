@@ -167,7 +167,7 @@ describe('wallet unlock prompt on resume', () => {
   });
 
   it('UNLOCKRES-03B: a dialog lost WITHOUT the user is not a decline — the next resume still asks', () => {
-    // [OWNER 2026-08-13] "I never pressed the ✕." He did not have to: openActionDialog closes whatever is open
+    // [decided 2026-08-13] He did not have to: openActionDialog closes whatever is open
     // (web/app.js — `if (activeActionDialog) closeActionDialog(null)`), so any other dialog opening over the
     // password prompt resolves it to null with nobody deciding anything; and readStoredPlathoWallet's catch
     // swallows every exception into the same null. Reading "declined" off that null — which is what the first

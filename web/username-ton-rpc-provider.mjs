@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=80';
+import { parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=21';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=89';
 
 export class UsernameTonRpcProviderError extends Error {
   constructor(message) {
@@ -126,10 +126,11 @@ function uint32Bytes(value) {
   ]);
 }
 
+// Defers to the ONE shared implementation [2026-08-28]: this used to wrap the ASYNCHRONOUS
+// crypto.subtle.digest, whose per-call overhead is the whole cost on small inputs (MEASURED 16x on the shard
+// derivation path). The async signature is kept so every caller stays unchanged.
 async function sha256(bytes) {
-  const cryptoImpl = globalThis.crypto;
-  if (!cryptoImpl?.subtle) throw new UsernameTonRpcProviderError('crypto.subtle is unavailable');
-  return new Uint8Array(await cryptoImpl.subtle.digest('SHA-256', bytes));
+  return sha256Sync(bytes);
 }
 
 function normalizeUsername(username) {

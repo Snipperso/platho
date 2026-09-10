@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // THE FEED FILLS WHILE IT SCANS, INSTEAD OF APPEARING WHEN THE SCAN IS DONE.
 //
-// Owner, 2026-08-20, after the influx: "Всю публичную ленту засрали. Можно сделать, чтобы лента не целиком
-// появлялась после сканирования всего, а прямо в процессе сканирования постепенно?"
+// decided 2026-08-20, after the influx
 //
 // The pass built a private copy of the feed cache and assigned it after the loop. With a handful of channels
 // nobody noticed; with a crowd of them the screen stays empty for the whole walk and then fills at once.

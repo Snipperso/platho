@@ -58,9 +58,17 @@ describe('CONV-LANE-READ', () => {
     expect(parsed, 'the published body parses').toBeTruthy();
     expect(Number(parsed!.seq)).toBe(7);
 
-    // transport-level auth: the write sig verifies under the conversation write key, and a wrong key is refused.
-    expect(await verifyConvWriteSignature(parsed, WRITE_PUB), 'write sig verifies under the conversation write key').toBe(true);
-    expect(await verifyConvWriteSignature(parsed, ed25519.getPublicKey(new Uint8Array(32).fill(0x09))), 'a wrong write key is refused').toBe(false);
+    // Transport-level auth: the write sig verifies under the conversation write key, and a wrong key is refused.
+    // THE EPOCH IS AN ARGUMENT because the digest has two shapes [2026-09-01]: clean-17 signs
+    // H(domain | seq | frameCommit), clean-18 appends the shard's own epoch — without it one signature was
+    // accepted by two different accounts (measured on the real contracts, exit 0 at both). The epoch names the
+    // generation, exactly as it does for the address derivation, so the verifier asks the question the shard
+    // asked. On the shipped boundary (null) this is the clean-17 shape, byte-identical to before.
+    expect(await verifyConvWriteSignature(parsed, WRITE_PUB, EPOCH), 'write sig verifies under the conversation write key').toBe(true);
+    expect(await verifyConvWriteSignature(parsed, ed25519.getPublicKey(new Uint8Array(32).fill(0x09)), EPOCH), 'a wrong write key is refused').toBe(false);
+    // …and a verifier given no epoch refuses rather than guessing a shape: dropping a real message is silent
+    // loss on the read side, so the omission has to be loud at the call site, not defaulted here.
+    expect(await verifyConvWriteSignature(parsed, WRITE_PUB), 'no epoch, no verdict').toBe(false);
 
     // crypto-level: reconstruct the chain-entry and open it to the recipient's keys.
     const entry = convChainEntryFromParsed(parsed, { createdAtSec: CLOCK });

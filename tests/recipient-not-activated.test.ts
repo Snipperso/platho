@@ -75,7 +75,18 @@ describe('NOTACTIVATED — a recipient who never set Platho up is an answer, not
   });
 
   it('NOTACT-06: the send does not retry a question already answered', () => {
-    const fatal = app.slice(app.indexOf('function isFatalPrivateSendError'));
-    expect(fatal.slice(0, 1400)).toContain('RECIPIENT_NOT_ACTIVATED');
+    // THE WHOLE FUNCTION, BY BRACE BALANCE. This used to read `fatal.slice(0, 1400)`, and a comment added to an
+    // EARLIER branch of the same classifier pushed this code past character 1400 — the test went red while the
+    // property it names was untouched. A length window over source rots as the prose grows; balance cannot.
+    // [audit 2026-09-01, round 9 — the third fixed-window rot found in one day.]
+    const at = app.indexOf('function isFatalPrivateSendError');
+    expect(at, 'the fatal classifier must still be there').toBeGreaterThan(-1);
+    let depth = 0; let stop = -1;
+    for (let i = app.indexOf('{', at); i < app.length; i += 1) {
+      if (app[i] === '{') depth += 1;
+      else if (app[i] === '}') { depth -= 1; if (depth === 0) { stop = i + 1; break; } }
+    }
+    expect(stop, 'braces must balance').toBeGreaterThan(at);
+    expect(app.slice(at, stop)).toContain('RECIPIENT_NOT_ACTIVATED');
   });
 });

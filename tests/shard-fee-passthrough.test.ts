@@ -14,7 +14,7 @@ import { FA_BUYBACK } from './helpers/fee-sink-fixture';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // SHARD-FEE-PASSTHROUGH — the fee does not live in a shard; it passes through on the way to FeeAccumulator.
 //
-// [OWNER 2026-07-19: "в шарде должна быть только его рента на год, а моя комиссия это моя комиссия".]
+// [decided 2026-07-19]
 //
 // This replaces an accumulate-then-remit design that was, in the end, an architecture built around another
 // contract's wrong constant: FeeAccumulator demanded 2_000_000 of execution reserve per deposit, so the fee was
@@ -23,7 +23,7 @@ import { FA_BUYBACK } from './helpers/fee-sink-fixture';
 // unit" nearly caused the correct measurement to be thrown away — and fixing it at the source removed the reason
 // for the whole mechanism.
 //
-// The publisher pays transport, so the pool receives the fee whole. [OWNER: "естественно платит публикатор".]
+// The publisher pays transport, so the pool receives the fee whole. [decided]
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const cell = (f: number) => beginCell().storeBuffer(Buffer.alloc(64, f)).endCell();
@@ -325,7 +325,7 @@ describe('SHARD-FEE-PASSTHROUGH — the shard keeps its rent, the fee goes strai
   }, 300_000);
 
   it('PT-09: the deposit surplus is RECOVERABLE and reaches the treasury wallet', async () => {
-    // [OWNER 2026-07-19: "разве нельзя вывести и излишки, если они будут? ... лишние деньги я могу потратить".]
+    // [decided 2026-07-19]
     // Before SweepUnaccounted the answer was NO, and that was the whole reason a thin reserve looked prudent:
     // FlushTreasuryDue can only send what SplitAccumulated moved out of accumulated_ton, which only ever comes
     // from a DECLARED deposit amount. Every nanoton of the execution reserve that the gas did not burn was

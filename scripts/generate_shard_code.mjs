@@ -11,11 +11,28 @@ import { readFileSync, writeFileSync } from 'node:fs';
 // hash(code, data) over a code cell the browser cannot import, and both the identity read and the avatar read
 // now resolve through it. PublicShard (added 2026-07-21) is the public/avatar lane; the client derives channel,
 // thread, beacon and avatar shard addresses from its code hash to sweep the directory and render the feed.
-// AirdropTicket (added 2026-08-03) is not a shard, but it reaches the browser for exactly the same reason: its
-// address is hash(code, data) over the owner wallet, FeeAccumulator derives it that way internally, and the sealed
-// contract exposes no getter that would hand it out. Without the code cell the client cannot find a user's own
-// airdrop credits — which is why the wallet screen showed a dash while the ticket on chain held 8 of them.
-const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard', 'PublicShard', 'AirdropTicket'];
+// AIRDROPTICKET WAS HERE AND IS GONE [2026-09-02]. Added 2026-08-03 so the wallet screen could name a user's own
+// ticket address (FeeAccumulator derives it internally and the sealed contract exposes no getter). The airdrop was
+// delivered in full and its UI was removed wholesale on 2026-08-27, leaving the cell, the derivation and the claim
+// builder with no caller anywhere - about a kilobyte of base64 in every bundle for a screen that no longer exists.
+// 🔴 CUTOVER: contracts18/docs/CUTOVER.md item 4. FeeVault is deliberately ABSENT from this clean-17 list —
+// clean-18 is not the deployed generation, and shipping its code cell early would put an unused 10-deep tree in
+// every bundle. Its supplier now exists below [2026-08-31]: `--generation 18` emits web/shard-code-18.mjs with
+// the three moving lane shards AND FeeVault (the vault is the ONLY CONV door, and the internal door's lazy
+// deploy needs the FULL cell for StateInit — hash+depth alone derive the address but deploy nothing). That file
+// is generated AT THE SEAL, never before: any pre-seal snapshot rots (the FeeVault code hash moved twice on
+// 2026-08-31 alone), which is why gate GEN18-CELLS proves the MECHANISM against contracts18/build on every lane
+// run instead of pinning tracked bytes.
+const SHARDS = ['RecordShard', 'IntroShard', 'RecoveryShard', 'KeyShard', 'PublicShard'];
+
+// The clean-18 set: exactly the shards whose code MOVES across the flip. RecoveryShard and the token
+// cluster stay byte-identical and keep their clean-17 cells; FeeVault is new (CUTOVER.md item 4).
+//
+// KEYSHARD JOINED THEM [owner 2026-09-02]. It is redeployed because it registers a key bundle with no proof
+// the registrant holds it, which a frozen contract cannot fix. Without a supplier here the flip release has
+// no gen-18 KeyShard cell to ship, and web/shard-address.mjs would refuse every KEY derivation past the
+// boundary - which is the correct refusal, but only until this list can answer it.
+const SHARDS_18 = ['RecordShard', 'IntroShard', 'PublicShard', 'FeeVault', 'KeyShard', 'ReportShard', 'SanctionShard'];   // ReportShard, SanctionShard: the moderation lane (CUTOVER item 15)
 
 export function renderShardCodeModule() {
   const lines = [
@@ -35,7 +52,34 @@ export function renderShardCodeModule() {
   return lines.join('\n');
 }
 
+/** The clean-18 module — run at the SEAL (`--generation 18`), imported by web/shard-address.mjs in the flip
+ *  release. Reads the gitignored contracts18/build, so it can only run on a machine that built the lane. */
+export function renderShardCodeModule18() {
+  const lines = [
+    '// shard-code-18 — the SEALED clean-18 shard code cells, as base64 BOC, for the BROWSER path.',
+    '//',
+    '// GENERATED AT THE SEAL by `node scripts/generate_shard_code.mjs --generation 18` from contracts18/build.',
+    '// Do not hand-edit, and do not regenerate from a pre-seal build: a stale cell here derives a WRONG address,',
+    '// and under lazy deploy a message to a wrong address succeeds with its compute phase skipped — gone, with',
+    '// the wallet reporting success. CUTOVER.md items 2 and 4 record when this file ships.',
+    '',
+  ];
+  for (const name of SHARDS_18) {
+    const boc = readFileSync(`contracts18/build/${name}/${name}_${name}.code.boc`).toString('base64');
+    lines.push(`export const ${name.toUpperCase()}_CODE_BOC_18 = '${boc}';`);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
 if (process.argv[1] && process.argv[1].endsWith('generate_shard_code.mjs')) {
-  writeFileSync('web/shard-code.mjs', renderShardCodeModule());
-  console.log('web/shard-code.mjs regenerated');
+  if (process.argv.includes('--generation')) {
+    const generation = process.argv[process.argv.indexOf('--generation') + 1];
+    if (generation !== '18') throw new RangeError(`unknown generation ${generation} — only 18 has a second module`);
+    writeFileSync('web/shard-code-18.mjs', renderShardCodeModule18());
+    console.log('web/shard-code-18.mjs regenerated from contracts18/build (seal-time artifact)');
+  } else {
+    writeFileSync('web/shard-code.mjs', renderShardCodeModule());
+    console.log('web/shard-code.mjs regenerated');
+  }
 }

@@ -31,6 +31,10 @@ import { deployFeeSink } from './helpers/fee-sink-fixture';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const CLOCK = 1_790_000_000;
+// The write instant every builder call threads in [round 5]. buildPublicPublishBrowser REFUSES to read a clock of
+// its own: the caller derives epochTag from one instant, and the generation must come from that SAME instant, or
+// a publish whose two reads straddle a boundary midnight lands in a shard no reader derives.
+const NOW_UNIX = CLOCK;
 const KIND = { CHANNEL: 0, THREAD: 1, BEACON: 2, AVATAR: 3 } as const;
 // a valid friendly address to hash for the CHANNEL/AVATAR owner in the parity test (PUB-01 only needs both
 // builders to receive the SAME partition_key; the real senderHash check is PUB-02 against the chain).
@@ -81,7 +85,8 @@ describe('PUBLIC-PUBLISH-BROWSER — the same PublicPublish, built without @ton/
       });
       const browser = await buildPublicPublishBrowser({
         kind: c.kind, keyArg: c.keyArg, shardSeq: 0, header: c.header, body: c.body,
-        value: toNano('0.05'), partitionKey: c.partitionKey, epochTag: c.epochTag,
+        // The write instant, threaded from the caller — the same one the epochTag came from [round 5].
+        value: toNano('0.05'), partitionKey: c.partitionKey, epochTag: c.epochTag, nowUnix: NOW_UNIX,
       });
 
       expect(browser.to, `destination for ${c.name}`).toBe(reference.to.toRawString());
@@ -107,7 +112,7 @@ describe('PUBLIC-PUBLISH-BROWSER — the same PublicPublish, built without @ton/
     const epochTag = publicEpochTag(KIND.CHANNEL, publicEraOf(KIND.CHANNEL, blockchain.now));
     const built = await buildPublicPublishBrowser({
       kind: KIND.CHANNEL, keyArg: 0n, header: cellOf(0x55), body: cellOf(0x56, 256),
-      value: toNano('0.1'), partitionKey, epochTag,
+      value: toNano('0.1'), partitionKey, epochTag, nowUnix: NOW_UNIX,
     });
 
     const dest = Address.parseRaw(built.to);
@@ -140,7 +145,7 @@ describe('PUBLIC-PUBLISH-BROWSER — the same PublicPublish, built without @ton/
     const partitionKey = await publicChannelPartitionKey(ownerHash, 0);
     const epochTag = publicEpochTag(KIND.CHANNEL, publicEraOf(KIND.CHANNEL, blockchain.now));
     const built = await buildPublicPublishBrowser({
-      kind: KIND.CHANNEL, keyArg: 0n, header: cellOf(1), body: cellOf(2), value: toNano('0.1'), partitionKey, epochTag,
+      kind: KIND.CHANNEL, keyArg: 0n, header: cellOf(1), body: cellOf(2), value: toNano('0.1'), partitionKey, epochTag, nowUnix: NOW_UNIX,
     });
     const dest = Address.parseRaw(built.to);
     const res = await payer.send({ to: dest, value: built.value, body: toCoreCell(built.body), bounce: false } as any);

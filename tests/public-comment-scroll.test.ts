@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // YOUR OWN COMMENT MUST BE ON SCREEN AFTER YOU SEND IT.
 //
-// Owner, 2026-08-13: "неплохо было бы скроллить окошко в публичной ветке, когда я пишу публичный комментарий к
-// посту. Сейчас новый коммент появляется под композером."
+// decided 2026-08-13
 //
 // Comments append to the bottom of the thread and the scroll position stayed where it was, so the one comment the
 // author is certain to want to see — the one they just wrote — landed below the fold, behind the composer.
@@ -69,9 +68,7 @@ describe('public comment scroll-into-view', () => {
   });
 
   it('CMTREAD-01: a comment thread reads OLDEST FIRST, and reopens where the reader stopped', () => {
-    // [OWNER 2026-08-23: "the developer made our comments backwards — fresh on top, then older load. That's mad.
-    // Old comments should come first … people could be replying to each other, reading it in reverse is perverse.
-    // But if I read down to some comment, coming back into that thread I want to be at the last comment I read."]
+    // [decided 2026-08-23]
     //
     // A feed is a list of unrelated posts, where the freshest matters most; a comment thread is a CONVERSATION,
     // where a reply means nothing before the comment it answers. So the thread renders in chain order, and both
@@ -115,7 +112,7 @@ describe('public comment scroll-into-view', () => {
   });
 
   it('CMTREAD-04: a mark DEEPER than the tail window reopens AT the mark, through the same jump', () => {
-    // [OWNER 2026-08-26: "доведи, чтобы было как положено"] — the follow-through on CMTREAD-03. A reader who
+    // [decided 2026-08-26] — the follow-through on CMTREAD-03. A reader who
     // left mid-thread has a mark outside the newest window; the old fallback landed them at the end. The mark
     // now rides with its PLACE — era shard + 0-based row, which the row index alone cannot say because
     // entry_ids restart per era shard — and the open jumps the window machinery straight to it.
@@ -124,8 +121,9 @@ describe('public comment scroll-into-view', () => {
     // onto the comment (JSON-safe — comments persist to IndexedDB), and the assembler\u0027s ...first spread
     // keeps a multipart comment on its first row.
     const lane = readFileSync('web/public-lane.mjs', 'utf8');
-    expect(lane).toMatch(/shardPosts\.map\(\(post\) => \(\{ \.\.\.post, shard_key: key \}\)\)/);
-    expect(lane, 'served snapshots gain the stamp too').toMatch(/post\.shard_key \? post : \{ \.\.\.post, shard_key: key \}/);
+    //...and since 2026-09-04 the thread's coordinates ride beside it (`...where`, CUTOVER item 15) — the stamp is unchanged
+    expect(lane).toMatch(/shardPosts\.map\(\(post\) => \(\{ \.\.\.post, \.\.\.where, shard_key: key \}\)\)/);
+    expect(lane, 'served snapshots gain the stamp too').toMatch(/post\.shard_key && post\.thread_pk \? post : \{ \.\.\.post, \.\.\.where, shard_key: key \}/);
     expect(app).toMatch(/shardKey: tp\.shard_key \?\? null,/);
     expect(app).toMatch(/shardRow: tp\.entry_id === undefined \|\| tp\.entry_id === null \? null : Number\(tp\.entry_id\),/);
     // The stored cursor is the mark PLUS its place; a bare string (saved before places existed) still answers
@@ -140,8 +138,7 @@ describe('public comment scroll-into-view', () => {
     expect(app).toMatch(/from: index < shardIdx \? shard\.entryCount : \(index === shardIdx \? windowStart : 0\)/);
   });
   it('CMTREAD-03: a thread seen for the FIRST time opens at its FIRST comment and pages toward the present', () => {
-    // [OWNER 2026-08-26: "I opened comments from a new profile and landed in the LAST batch, though I see the
-    // thread for the first time and should see the comments from the very first."] The tail default anchors
+    // [decided 2026-08-26] The tail default anchors
     // every window at the newest rows — right for a reader with a mark, wrong for a first visit: a conversation
     // is read from its beginning. The fix re-points the FIRST clean load of an unread deep thread at row 0 of
     // the OLDEST era shard and hands the reader to the forward pager the date jump already owned — which until
@@ -173,9 +170,7 @@ describe('public comment scroll-into-view', () => {
   });
 
   it('CMTREAD-02: a page arriving above the reader must not move the reader — including at the very top', () => {
-    // [OWNER 2026-08-24: "I scrolled up, comments started loading, a page appeared, filled the screen and
-    // immediately loaded another one. I'd like the position not to jump like that — for older comments to load
-    // above, and to be able to scroll up calmly to the next load."]
+    // [decided 2026-08-24]
     //
     // The anchor existed but was skipped at scrollTop 0 — a leftover from the newest-first layout, where the top
     // held the FRESHEST comments and a reader sitting at 0 wanted to be shown what had just arrived. Reading runs
@@ -201,8 +196,7 @@ describe('public comment scroll-into-view', () => {
 
   it('CMTSCROLL-04: it scrolls AFTER layout, and again once late images settle', () => {
     expect(scroller.length, 'the scroller slice must not collapse').toBeGreaterThan(200);
-    // Layout is not final on the tick the row is appended. Comments read OLDEST FIRST again [OWNER 2026-08-23:
-    // "reading it in reverse is perverse"], so the freshest comment is the LAST row and "latest" is the end.
+    // Layout is not final on the tick the row is appended. Comments read OLDEST FIRST again [decided 2026-08-23], so the freshest comment is the LAST row and "latest" is the end.
     expect(scroller).toMatch(/requestAnimationFrame\(toLatest\);/);
     expect(scroller).toContain('body.scrollTop = body.scrollHeight;');
     // An image above the section (the post card) finishes loading a few frames later and shifts the section under

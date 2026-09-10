@@ -7,8 +7,8 @@
 // pure and driven over an injectable blob backend (tests/conv-key-persist.test.ts pins the round-trip + that the blob
 // is ciphertext). createIndexedDbConvKeyStore is the thin production glue that supplies a real IndexedDB backend.
 
-import { createConvKeyStore } from './conv-key-store.mjs?v=5';
-import { tonCell } from './pwa-contract-transactions.mjs?v=37';
+import { createConvKeyStore } from './conv-key-store.mjs?v=12';
+import { tonCell } from './pwa-contract-transactions.mjs?v=47';
 
 const KEY_STORE_NAME = 'convKeys';
 const BLOB_STORE_NAME = 'convKeyBlob';
@@ -45,6 +45,14 @@ export function serializeConvKeyMap(map) {
       adoptedIntroNonce: b64(r.adoptedIntroNonce),
       outgoingSeq: { ...(r.outgoingSeq ?? {}) },
       lastScannedEpoch: r.lastScannedEpoch == null ? null : Number(r.lastScannedEpoch),
+      // THE CURSOR'S GENERATION MUST REACH DISK, or the mark that outlives the build is the one thing that does
+      // not [audit 2026-08-31, round 7 — a round-6 fix that was inert in production]. This serializer is a STRICT
+      // WHITELIST: round 6 taught advanceConvScanCursor to record which generation the cursor was earned in, and
+      // this list silently dropped it on every persist. The consumer requires a non-null value to detect a stale
+      // cursor, so after any reload the rewind never fired — and a reload is exactly the event it targets (the
+      // device takes the new build and restarts). Within one session both sides derive from the same baked
+      // CUTOVER_EPOCH and can never disagree, so the field only means anything once it has survived a restart.
+      lastScannedGeneration: r.lastScannedGeneration == null ? null : Number(r.lastScannedGeneration),
     };
   }
   return out;
@@ -63,6 +71,10 @@ export function deserializeConvKeyMap(obj) {
       adoptedIntroNonce: unb64(r.adoptedIntroNonce),
       outgoingSeq: { ...(r.outgoingSeq ?? {}) },
       lastScannedEpoch: r.lastScannedEpoch == null ? null : Number(r.lastScannedEpoch),
+      // null for a record written before round 7 — which reads as "this cursor names no generation", and the
+      // consumer then leaves it alone rather than rewinding on a guess. The first advance after the update
+      // stamps it, and from then on a build disagreement is detectable.
+      lastScannedGeneration: r.lastScannedGeneration == null ? null : Number(r.lastScannedGeneration),
     });
   }
   return map;
@@ -102,13 +114,96 @@ export async function openConvKeyMap(key, record) {
  * are the storage backend (IndexedDB in production, an in-memory closure in tests). The whole map is re-sealed on every
  * mutation — cheap, because a user's active conversation set is small — and hydrated once via the store's own load().
  */
-export async function createSealedConvKeyStore({ key, readBlob, writeBlob }) {
+/**
+ * MERGE TWO TABS' VIEWS OF THE SAME CONVERSATION MAP.
+ *
+ * The persisted form is ONE sealed blob, so a write is a write of EVERYTHING — which is why a tab holding a stale
+ * view erases what another tab learned. The union below is what makes a whole-map write safe:
+ *
+ *  • a conversation only the OTHER writer has is kept, whole. This is the erasure that mattered: a K_root adopted
+ *    for a first contact the peer PAID for, gone because a sibling tab persisted a cursor.
+ *  • a conversation both have takes the record with the newer `adoptedCreatedAt` — the same rule
+ *    importConversations uses for a restored backup, so a re-INTRO can never be rolled back to a retired root.
+ *  • the monotonic fields then take the MAX across both, whichever record won. Both tabs read the same chain for
+ *    the same account into the same message store, so each cursor is an honest claim for this DEVICE; and rolling
+ *    `outgoingSeq` back is not merely wasteful but wrong — the chain refuses a seq that does not advance
+ *    (RecordShard gate 13653), so a rolled-back counter bounces the next send of that conversation-day.
+ *  • `kRootsForRead` unions, because a root either side retired is still needed to decrypt that side's history.
+ */
+export function mergeConvKeyMaps(theirs, mine) {
+  const merged = new Map(mine instanceof Map ? mine : []);
+  if (!(theirs instanceof Map)) return merged;
+  const num = (value) => (value == null ? null : Number(value));
+  const maxOf = (a, b) => {
+    if (a == null) return b;
+    if (b == null) return a;
+    return a >= b ? a : b;
+  };
+  for (const [id, theirRecord] of theirs) {
+    const myRecord = merged.get(id);
+    if (!myRecord) { merged.set(id, theirRecord); continue; }
+    const theirsIsNewer = Number(theirRecord?.adoptedCreatedAt ?? 0) > Number(myRecord?.adoptedCreatedAt ?? 0);
+    const base = theirsIsNewer ? theirRecord : myRecord;
+    // The highest epoch either writer has fully scanned, with the generation stamp that belongs to it.
+    const myEpoch = num(myRecord?.lastScannedEpoch);
+    const theirEpoch = num(theirRecord?.lastScannedEpoch);
+    const epoch = maxOf(myEpoch, theirEpoch);
+    const generationSource = epoch == null ? base
+      : (theirEpoch != null && epoch === theirEpoch ? theirRecord : myRecord);
+    const outgoingSeq = { ...(myRecord?.outgoingSeq ?? {}) };
+    for (const [epochKey, seq] of Object.entries(theirRecord?.outgoingSeq ?? {})) {
+      const held = Number(outgoingSeq[epochKey] ?? -1);
+      if (Number(seq) > held) outgoingSeq[epochKey] = Number(seq);
+    }
+    const roots = new Map();
+    for (const entry of [...(myRecord?.kRootsForRead ?? []), ...(theirRecord?.kRootsForRead ?? [])]) {
+      const hex = Array.from(entry?.kRoot ?? [], (b) => (b & 0xff).toString(16).padStart(2, '0')).join('');
+      if (hex && !roots.has(hex)) roots.set(hex, entry);
+    }
+    merged.set(id, {
+      ...base,
+      lastScannedEpoch: epoch,
+      lastScannedGeneration: generationSource?.lastScannedGeneration ?? null,
+      outgoingSeq,
+      kRootsForRead: [...roots.values()],
+    });
+  }
+  return merged;
+}
+
+/**
+ * Serialize the read-merge-write against the other tabs of this wallet. navigator.locks is the only cross-tab
+ * primitive this app uses; where it is unavailable the merge still runs, which closes the erasure for every
+ * interleaving except two writes overlapping to the millisecond.
+ */
+async function withConvKeyWriteLock(name, run) {
+  const locks = globalThis.navigator?.locks;
+  if (!name || typeof locks?.request !== 'function') return run();
+  try {
+    return await locks.request(name, run);
+  } catch {
+    return run();   // a lock manager that refuses must not stop the write
+  }
+}
+
+export async function createSealedConvKeyStore({ key, readBlob, writeBlob, lockName = null }) {
   if (!key) throw new Error('createSealedConvKeyStore requires a seal key');
   if (typeof readBlob !== 'function' || typeof writeBlob !== 'function') {
     throw new Error('createSealedConvKeyStore requires readBlob/writeBlob');
   }
   const store = createConvKeyStore({
-    persist: async (map) => { await writeBlob(await sealConvKeyMap(key, map)); },
+    // READ-MODIFY-WRITE, NOT WRITE [audit 2026-09-01, round 9]. This used to seal the caller's map and put it
+    // down whole. With one blob for the whole map and no cross-tab coordination anywhere in this app, that meant
+    // a tab which hydrated at boot erased everything every other tab had learned since — MEASURED: tab 1 adopts a
+    // conversation, tab 2 advances an unrelated cursor, and the conversation is gone from disk in three writes.
+    // The chance arrives every sync tick (12-60 s), because a quiet conversation persists its cursor on each one.
+    // The merged map is returned so the writing tab stops being stale at the moment it writes.
+    persist: async (map) => withConvKeyWriteLock(lockName, async () => {
+      const onDisk = await openConvKeyMap(key, await readBlob());
+      const merged = mergeConvKeyMaps(onDisk, map);
+      await writeBlob(await sealConvKeyMap(key, merged));
+      return merged;
+    }),
     load: async () => openConvKeyMap(key, await readBlob()),
   });
   await store.load();
@@ -157,6 +252,8 @@ export async function createIndexedDbConvKeyStore({ dbName }) {
   const key = await getOrCreateDeviceKey(db);
   return createSealedConvKeyStore({
     key,
+    // Scoped to this wallet's database, so two wallets' stores never wait on each other.
+    lockName: `platho.convkeys.${dbName}`,
     readBlob: async () => {
       const tx = db.transaction(BLOB_STORE_NAME, 'readonly');
       const record = await reqToPromise(tx.objectStore(BLOB_STORE_NAME).get(BLOB_ID));

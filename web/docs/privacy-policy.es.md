@@ -1,6 +1,6 @@
 # Política de Privacidad
 
-Última actualización: 18 de agosto de 2026
+Última actualización: 29 de agosto de 2026
 
 Platho es un mensajero sin backend. Este documento es breve porque hay muy poco
 que revelar, y es concreto allí donde algo sale realmente de tu dispositivo.
@@ -24,11 +24,25 @@ nombre.
 - Tu historial de mensajes y tus borradores.
 - Tus ajustes, incluida una clave de API opcional de un proveedor público de nodos TON.
 
-Estos datos se guardan en el almacenamiento local de tu navegador y se cifran con
-una contraseña que tú eliges (AES-GCM-256 con derivación de claves
-PBKDF2-SHA-256). Nunca los recibimos. Borrar los datos de tu navegador los
-elimina y, sin tu frase de recuperación, ni nosotros ni nadie más podemos
-restaurarlos.
+Nada de esto llega hasta nosotros, y no todo está protegido igual, así que se
+nombra cada elemento por separado en lugar de hacer una sola afirmación:
+
+- **La frase de recuperación y las claves derivadas de ella** se cifran con una
+  contraseña que tú eliges (AES-GCM-256, derivación de claves PBKDF2-SHA-256). Sin
+  esa contraseña no pueden leerse, ni por nosotros ni por quien tenga el
+  dispositivo.
+- **El historial de mensajes y los borradores** se cifran con una clave que tu
+  navegador genera en este dispositivo y guarda de forma que no puede exportarse,
+  no con tu contraseña. Copiar los datos almacenados a otra máquina no da nada
+  legible; no es una defensa frente a quien ya está usando tu navegador
+  desbloqueado.
+- **Los ajustes** — el tema, el idioma, lo que sigues — se guardan como texto
+  normal; nada de ello es secreto y nada nos llega. Lo único que sí lo es, la clave
+  de API opcional de un proveedor de nodos, se cifra con el mismo tipo de clave de
+  dispositivo que el historial de mensajes, en vez de quedar a la vista.
+
+Borrar los datos de tu navegador elimina todo ello y, sin tu frase de
+recuperación, ni nosotros ni nadie más podemos restaurarlo.
 
 ## Qué es público por diseño
 
@@ -55,6 +69,7 @@ tu navegador envía solicitudes a:
 - `toncenter.com`
 - `tonapi.io`
 - `mainnet-v4.tonhubapi.com`
+- `nft.fragment.com`
 
 Estos proveedores ven necesariamente tu dirección IP y las solicitudes que hace
 tu dispositivo, y operan bajo sus propias políticas de privacidad, que nosotros

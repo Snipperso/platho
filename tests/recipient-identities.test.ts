@@ -189,9 +189,7 @@ describe('PWA recipient identity routing', () => {
 });
 
 describe('.ath name tiers', () => {
-  // [OWNER 2026-08-24: "we have ordinary usernames (6+ letters), rare (5) and epic (4). On the NFT picture we mark
-  // that with colours — gold, silver. Maybe we should mark 4-5 letter usernames with gold and silver in the app
-  // too?"] Yes — and from ONE definition of where a tier begins, because the mint price already had those same
+  // [decided 2026-08-24] Yes — and from ONE definition of where a tier begins, because the mint price already had those same
   // boundaries written out separately. Two copies is how the price and the colour end up disagreeing.
   it('ATHTIER-01: four characters is epic, five is rare, six and up is common', () => {
     expect(plathoUsernameTier('nova')).toBe(PLATHO_USERNAME_TIERS.EPIC);
@@ -240,8 +238,7 @@ describe('.ath name tiers', () => {
 
 describe('.ath tier on the avatar', () => {
   it('ATHTIER-04: the icon wears the tier too, from the SAME tone as the name', () => {
-    // [OWNER 2026-08-24: "let's colour the icon for silver and gold too. Make the background so it's immediately
-    // clear it's silver."] A flat fill reads as "some yellow square"; metal is read from the band of light across
+    // [decided 2026-08-24] A flat fill reads as "some yellow square"; metal is read from the band of light across
     // it, so each tier is a three-stop diagonal — bright, dark, bright.
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -259,7 +256,7 @@ describe('.ath tier on the avatar', () => {
       // background-COLOR: the `background` shorthand resets the cover/center the base rule fits a picture with,
       // which showed the dark corner of the 512px plate as a black square.
       expect(css).toMatch(new RegExp(`\\.avatar\\[data-tier="${tier}"\\] \\{\\s*\\n\\s*background-color: #[0-9a-f]{6};`));
-      // [OWNER 2026-08-24: "green on gold is not great. Make the text dark green maybe."] Brand green on metal is
+      // [decided 2026-08-24] Brand green on metal is
       // both illegible and off — the monogram takes the ONE ink both bands carry.
       expect(css).toMatch(new RegExp(`\\.avatar\\[data-tier="${tier}"\\] \\{[^}]*color: var\\(--tier-ink\\);`));
     }

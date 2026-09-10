@@ -1,9 +1,8 @@
 // AirdropPool — clean-16 Durable-Core (6th frozen contract).
 //
 // Holds the 15M ATH airdrop budget in its OWN ATHWallet and pays it out as ATH accrues to credit buyers.
-// Design: artifacts/PLATHO_CLEAN16_AIRDROP_POOL_DESIGN.md, with the owner's later decision overriding §0:
-// the trigger is CREDIT PURCHASE, not a username claim ("да, хорошая идея перевести эйрдроп на покупку
-// кредитов, одобряю. Но математику оставляем прежней").
+// Design: artifacts/PLATHO_CLEAN16_AIRDROP_POOL_DESIGN.md, with the owner's later decision overriding §0
+// the trigger is CREDIT PURCHASE, not a username claim.
 //
 // THE OWNER'S MATH, UNCHANGED: 1.5M credits x 10 ATH = 15M ATH distributed; 1.5M x 10_995_000 nanoTON of credit
 // price collects ~16.5k TON of protocol fee -> the DeFi pool. One capsule = one credit = 10 ATH on every lane.

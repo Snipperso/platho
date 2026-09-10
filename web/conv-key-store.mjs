@@ -21,7 +21,8 @@
 // encrypted-message-store; the memory store does not persist). The ADOPTION and SEQ logic is pure and testable
 // independent of storage — tests/conv-key-store.test.ts pins both, including the mutation that removes the compare.
 
-import { conversationOrder, base64urlDecode } from './crypto/conv-routing.mjs?v=3';
+import { conversationOrder, base64urlDecode } from './crypto/conv-routing.mjs?v=5';
+import { generationForEpoch } from './cutover-epoch.mjs?v=4';
 
 // [CORRECTED 2026-08-02] Strings arrive in TWO forms and this accepted only one.
 //
@@ -134,12 +135,35 @@ export function adoptKRoot(existing, candidate) {
 export function createConvKeyStore({ persist = null, load: loadImpl = null } = {}) {
   const byConv = new Map();
 
+  /**
+   * PERSIST, THEN ADOPT WHAT CAME BACK.
+   *
+   * [audit 2026-09-01, round 9.] The persisted form is ONE sealed blob holding the whole map, hydrated once at
+   * boot and never re-read — and nothing in this app coordinates tabs (no BroadcastChannel, no navigator.locks,
+   * no storage listener anywhere in web/). So two tabs of one wallet destroyed each other's work: tab 1 adopts a
+   * K_root for a first contact the peer PAID for, tab 2 — which hydrated before that conversation existed — does
+   * any unrelated write, and the blob goes back to what tab 2 remembers. MEASURED: three writes, and the newly
+   * adopted conversation was gone. The window opens every 12-60 seconds, because advanceConvScanCursor persists
+   * on every sync tick of every quiet conversation.
+   *
+   * The write layer now re-reads and MERGES before it seals (see conv-key-persist), and returns the merged map so
+   * the tab that wrote it stops being stale the moment it writes. A persist that returns nothing is left alone —
+   * the in-memory store and every test double keep working unchanged.
+   */
+  const persistAndAdopt = async () => {
+    if (!persist) return;
+    const merged = await persist(byConv);
+    if (!(merged instanceof Map) || merged === byConv) return;
+    byConv.clear();
+    for (const [id, record] of merged) byConv.set(id, record);
+  };
+
   const store = {
     /** Adopt (or retire) a K_root for a conversation. Returns the adoption outcome. */
     async upsertConversationKRoot(selfKeyId, peerKeyId, candidate) {
       const id = conversationId(selfKeyId, peerKeyId);
       const { record, outcome } = adoptKRoot(byConv.get(id), { ...candidate, peerKeyId });
-      if (outcome !== 'duplicate') { byConv.set(id, record); if (persist) await persist(byConv); }
+      if (outcome !== 'duplicate') { byConv.set(id, record); await persistAndAdopt(); }
       return outcome;
     },
 
@@ -159,10 +183,23 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       if (!record) return;
       const e = Number(epoch);
       if (!Number.isFinite(e)) return;
-      if (record.lastScannedEpoch == null || e > record.lastScannedEpoch) {
-        record.lastScannedEpoch = e;
-        if (persist) await persist(byConv);
-      }
+      // THE STAMP IS WRITTEN EVEN WHEN THE EPOCH DOES NOT ADVANCE [audit 2026-08-31, round 7]. It used to live
+      // inside the advance guard, so a rewound cursor that finished its catch-up on the SAME calendar day could
+      // never record which generation it had just covered: the next tick saw a stale stamp, rewound again, and
+      // kept rewinding every sync until UTC midnight — on the busiest day of the migration. Re-stamping is
+      // idempotent and cheap; only the persist below is conditional on something having actually changed.
+      const generation = generationForEpoch(e);
+      const stampChanged = record.lastScannedGeneration !== generation;
+      const advanced = record.lastScannedEpoch == null || e > record.lastScannedEpoch;
+      if (advanced) record.lastScannedEpoch = e;
+      // WHICH GENERATION THIS CURSOR WAS EARNED IN [audit 2026-08-31, round 6]. The cursor says "scanned
+      // through epoch X" and is monotonic — it never rewinds — but it outlives the build that set it. A device
+      // running a boundary-less build scans epochs past E as generation 17 (the only generation it knows) and
+      // advances the cursor; after the update those same epochs are generation 18, whose RecordShards it has
+      // never read, and the cursor declares them done. MEASURED: eight days of private messages skipped
+      // permanently, with the manual Sync (which walks from birth) the only unadvertised way back.
+      record.lastScannedGeneration = generation;
+      if (advanced || stampChanged) await persistAndAdopt();
     },
 
     /**
@@ -180,9 +217,23 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       const e = Number(epoch);
       const floor = Number(coldFloor ?? 0);
       const base = record.outgoingSeq[e] !== undefined ? Math.max(record.outgoingSeq[e], floor) : floor;
+      // `base + 1` STOPS ADVANCING at 2^53 [audit 2026-09-01, round 9]. The floor can come from the chain
+      // (decodeRecordShardLastSeq, read when this device holds no counter for the day), and the peer can raise
+      // the shard's last_seq to anything it likes — both directions' write keys come from the shared K_root, so
+      // it can publish into the shard this device writes into. At that point `base + 1 === base`, the client
+      // hands back a seq the chain has already seen, gate 13653 refuses it, and EVERY message to that peer
+      // bounces for the rest of the UTC day with the client believing it advanced. The chain really has been
+      // denied for that shard-day and no client can undo it — but it must say so once, not bounce silently.
       const next = base + 1;
+      // The test is on the RESULT, not the base: MAX_SAFE_INTEGER is itself safe and still advances once, while
+      // one step past it is where a Number stops being able to name the value at all.
+      if (!Number.isSafeInteger(base) || !Number.isSafeInteger(next) || next <= base) {
+        const error = new Error(`Conversation shard-day ${e} cannot accept another message: its sequence is exhausted`);
+        error.code = 'CONV_SEQ_EXHAUSTED';
+        throw error;
+      }
       record.outgoingSeq[e] = next;
-      if (persist) await persist(byConv);
+      await persistAndAdopt();
       return next;
     },
 
@@ -211,7 +262,7 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
           changed += 1;
         }
       }
-      if (changed > 0 && persist) await persist(byConv);
+      if (changed > 0) await persistAndAdopt();
       return changed;
     },
 

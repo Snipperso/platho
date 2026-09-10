@@ -4,9 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // TWO DEVICES, ONE WALLET — a dead send's (shard, seq) claim must not swallow the sibling device's message.
 //
-// [OWNER 2026-08-26, relaying a user] "my phone ran out of GRAM paying for a message and it did not send; I
-// topped up and wrote from the PC — all fine; but the phone still shows the unsent message and does not show
-// the messages I sent from the PC, even though everything is synced."
+// [decided 2026-08-26]
 //
 // The mechanics: the send stamps chainEntryId + convShardAddress on its echo BEFORE broadcasting (that is what
 // makes an own message replyable during the 4-200s broadcast→block gap), and nextOutgoingSeq consumes the seq

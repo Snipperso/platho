@@ -14,10 +14,10 @@
 // WHY ITS OWN MODULE rather than lines in app.js: app.js cannot be tested without a browser; here the whole read lane
 // runs against a stub transport and fixed key-ids, the way the public and intro lanes do.
 
-import { incomingRecordShards } from './conv-discovery.mjs?v=22';
-import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=28';
-import { changeMarkerOf } from './shard-reader.mjs?v=26';
-import { addrKey } from './shard-discovery.mjs?v=23';
+import { incomingRecordShards } from './conv-discovery.mjs?v=58';
+import { parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature } from './conv-lane-read.mjs?v=70';
+import { changeMarkerOf } from './shard-reader.mjs?v=61';
+import { addrKey } from './shard-discovery.mjs?v=58';
 
 // Mirrors createShardMessagesWithSourceReader's default `limit`. When a single shard returns exactly this many bodies,
 // it MAY hold older ones the newest-page read did not return. The reader now pages, but only to get PAST junk when an
@@ -36,6 +36,19 @@ const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
 // burst; the cap keeps a flood from turning one sync pass into a thousand requests — beyond it the gap is real and
 // is said ONCE per shard, not once per pass (fifteen shards at the cap produced fifteen lines every twelve seconds).
 const CONV_MAX_OLDER_BODY_PAGES = 4;
+
+// WHAT A **MANUAL FULL RESCAN** MAY PULL, which is a different question and had the same answer until 2026-08-29.
+// The four-page cap above is a defence for the ROUTINE pass: it stops a flooded shard turning one sync into a
+// thousand requests, and beyond it the gap is real, said once, and left. That is a sound trade for a pass the user
+// did not ask for. It is the WRONG trade for the one they did: app.js lends knownSeqOf = () => 0 for a manual
+// rescan — "hold nothing, but DO descend" — and its own comment says the lane then pages every full shard down to
+// its first record "within its per-pass page cap". With the cap at four that sentence is not true: 128 + 4x128 =
+// 640 bodies against RS_SAFE_CAP = 4096 the contract will store, so on the shard the note above MEASURED at 3,968
+// records a full rescan reaches 640 of them, reports success, and the UI says up to date. The user asked to walk
+// everything and was told it had been done.
+// 32 pages x 128 = 4,096 is exactly what one shard-day can hold, so a full rescan can now actually finish. It
+// costs what reading everything costs, which is the point of asking for it; the routine pass is unchanged.
+const CONV_MAX_OLDER_BODY_PAGES_FULL = 32;
 const convGapWarnedShards = new Set();
 
 /**
@@ -119,8 +132,16 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
      * `onShardFailed(address, error)` is called for every shard whose read threw and was skipped (the swallow stays:
      * the rest of the window is still returned). A caller that advances a scan cursor on a clean pass MUST listen —
      * the lane's own mark for that shard does not move, but nothing else would tell the caller the pass was short.
+     *
+     * `onShardGap(address, { known, oldest })` is the OTHER way a pass comes back short, and until 2026-08-31 it
+     * was not reported at all [audit round 9]. Nothing failed: the shard answered, the newest window was full, and
+     * the descent below hit its per-pass page cap before reaching what the caller already holds. The bodies in
+     * between are on chain, paid for, and were never read — and the caller, seeing a clean pass, advanced its seq
+     * high-water to the top of the window and its scan cursor past the epoch. That loss is PERMANENT: the mark is
+     * rebuilt at boot as the MAX of stored messages, so a reload re-derives the same mark above the same hole.
+     * A caller must treat this exactly as it treats a failed shard — do not advance, and come back deeper.
      */
-    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null, onShardFailed = null }) {
+    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null, onShardFailed = null, onShardGap = null, fullWalk = false }) {
       const shardFailed = (address, error) => {
         laneStats.failed += 1;
         try { onShardFailed?.(address, error); } catch { /* a listener must not break the walk */ }
@@ -167,10 +188,39 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
         // the newest window as it always did, silently; paging back is for a mark the window did not reach.
         const known = typeof knownSeqOf === 'function' ? Number(knownSeqOf(bucket.address)) : NaN;
         if ((messages?.length ?? 0) >= CONV_SHARD_MESSAGE_PAGE_LIMIT && Number.isFinite(known) && known >= 0) {
-          const oldestSeqOf = (rows) => {
+          // ONLY A CAPSULE THIS CONVERSATION SIGNED MAY DECIDE HOW FAR TO PAGE [audit 2026-09-01, round 15].
+          // This read `seq` straight out of whatever the endpoint returned, and the descent then stopped on it.
+          // A shard's address is public the instant anyone publishes to it — contracts/RecordShard.tact says so
+          // in capitals, having learned it by measurement — so anyone can send it a message carrying this
+          // reader's own opcode. The chain refuses it (13654, nothing stored), but a refused message is still an
+          // inbound message of the account and the indexer returns it: MEASURED on live toncenter, 19 of 19
+          // compute-failed transactions had their inbound message in /messages.
+          // So the stop condition was attacker-chosen. MEASURED before this fix, three real capsules under 128
+          // refused messages: the routine pass returned NOTHING, the MANUAL full rescan returned nothing, and
+          // both reported a clean pass — no gap, no failure. Private messages, paid for, on chain, gone, with a
+          // green tick at the sender because delivery is confirmed against the shard's STATE, not its history.
+          // Verification is memoised because the same bodies are verified again at the bottom of this function;
+          // an honest window therefore costs nothing extra, and only junk pays for a signature check twice.
+          const verified = new Map();
+          const isOurs = async (row) => {
+            const cell = row?.bodyCell;
+            if (!cell) return null;
+            if (verified.has(cell)) return verified.get(cell);
+            const parsed = parseCapsulePublishBody(cell);
+            let answer = null;
+            if (parsed) {
+              answer = (!verifyWriteSig
+                || await verifyConvWriteSignature(parsed, bucket.writePublicKey, bucket.epoch,
+                  bucket.boundary === undefined ? {} : { boundary: bucket.boundary })) ? parsed : null;
+            }
+            verified.set(cell, answer);
+            return answer;
+          };
+          const oldestSeqOf = async (rows) => {
             let oldest = null;
             for (const row of rows ?? []) {
-              const seq = Number(parseCapsulePublishBody(row?.bodyCell)?.seq);
+              const parsed = await isOurs(row);
+              const seq = Number(parsed?.seq);
               if (Number.isFinite(seq) && (oldest === null || seq < oldest)) oldest = seq;
             }
             return oldest;
@@ -183,10 +233,16 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
             }
             return oldest;
           };
+          // A manual full rescan descends far enough to actually finish; a routine pass keeps its spam bound.
+          const olderPageCap = fullWalk ? CONV_MAX_OLDER_BODY_PAGES_FULL : CONV_MAX_OLDER_BODY_PAGES;
           let page = messages;
-          while (pagedBack < CONV_MAX_OLDER_BODY_PAGES) {
-            const oldestSeq = oldestSeqOf(page);
-            if (oldestSeq === null || (Number.isFinite(known) && oldestSeq <= known + 1)) break;   // reached what we hold
+          while (pagedBack < olderPageCap) {
+            const oldestSeq = await oldestSeqOf(page);
+            // A PAGE WITH NOTHING OF OURS IN IT IS NOT THE END OF THE HISTORY — it is a page to get past. This
+            // read `oldestSeq === null` as "reached what we hold" and stopped, which is precisely how a window
+            // full of refused messages ended the walk. The history running out is detected below, by an EMPTY
+            // page; a full page of somebody else's traffic is detected here, and paged through.
+            if (oldestSeq !== null && Number.isFinite(known) && oldestSeq <= known + 1) break;   // reached what we hold
             const oldestLt = oldestLtOf(page);
             if (oldestLt === null) break;                                   // no lt on the wire — cannot page
             let older;
@@ -201,27 +257,44 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
             messages = [...messages, ...older];
             page = older;
           }
-          const stillOldest = oldestSeqOf(page);
+          const stillOldest = await oldestSeqOf(page);
           const gapRemains = stillOldest !== null && Number.isFinite(known) && stillOldest > known + 1
-            && pagedBack >= CONV_MAX_OLDER_BODY_PAGES;
-          if (gapRemains && !convGapWarnedShards.has(key)) {
-            convGapWarnedShards.add(key);
+            && pagedBack >= olderPageCap;
+          if (gapRemains) {
             laneStats.gaps = (laneStats.gaps ?? 0) + 1;
-            console.warn('[conv] incoming shard outran the reader — bodies between seq', known, 'and', stillOldest, 'could not be paged this pass (cap', CONV_MAX_OLDER_BODY_PAGES, 'pages); said once for', bucket.address);
+            // TELL THE CALLER, EVERY TIME. The warn is throttled to once per shard because fifteen capped shards
+            // printed fifteen lines every twelve seconds; the CALLBACK is not, because it is what keeps the
+            // caller's mark off a hole and brings it back deeper — throttling that would restore the loss on the
+            // second pass and every pass after it.
+            try { onShardGap?.(bucket.address, { known, oldest: stillOldest }); } catch { /* a listener must not break the walk */ }
+            if (!convGapWarnedShards.has(key)) {
+              convGapWarnedShards.add(key);
+              console.warn('[conv] incoming shard outran the reader — bodies between seq', known, 'and', stillOldest, 'could not be paged this pass (cap', olderPageCap, 'pages); said once for', bucket.address);
+            }
           }
         }
         if (olderReadFailed) { shardFailed(bucket.address, olderReadFailed); continue; }   // see the note at the older read
         if (marker !== null) markShard(key, marker);
-        for (const { bodyCell } of messages ?? []) {
+        for (const { bodyCell, createdAt } of messages ?? []) {
           const parsed = parseCapsulePublishBody(bodyCell);
           if (!parsed) continue;
-          if (verifyWriteSig && !(await verifyConvWriteSignature(parsed, bucket.writePublicKey))) continue;
+          // THE EPOCH RIDES ALONG because the digest has two shapes and the epoch names the generation
+          // [audit 2026-09-01, round 11]. Omitting it does not let junk through — the shard is the authority —
+          // but it drops REAL messages, which is silent loss on the read side.
+          if (verifyWriteSig
+            && !(await verifyConvWriteSignature(parsed, bucket.writePublicKey, bucket.epoch,
+              bucket.boundary === undefined ? {} : { boundary: bucket.boundary }))) continue;
           out.push({
             epoch: bucket.epoch,
             dir: bucket.dir,
             address: bucket.address,
             seq: parsed.seq === undefined || parsed.seq === null ? null : String(parsed.seq),
             entry: convChainEntryFromParsed(parsed),
+            // THE CHAIN'S OWN STAMP, carried through [audit 2026-09-05, round 1]. The RPC row had it (`created_at`)
+            // and this row dropped it, so a reader that must order control messages the way every device agrees
+            // — the group roster fold — fell back to the sender's self-claimed `sentAt` on every row. Unix seconds,
+            // or null when the endpoint did not say.
+            createdAt: Number.isFinite(Number(createdAt)) && Number(createdAt) > 0 ? Number(createdAt) : null,
           });
         }
       }

@@ -4,7 +4,7 @@ import { ml_kem768 } from '../vendor/@noble/post-quantum/ml-kem.js';
 // Every other HKDF in this file stays on WebCrypto, where the per-call cost is irrelevant.
 import { hkdf as nobleHkdf } from '../vendor/@noble/hashes/hkdf.js';
 import { sha256 as nobleSha256 } from '../vendor/@noble/hashes/sha2.js';
-import { buildIntroHandshake, openIntroHandshake } from './intro-handshake.mjs';
+import { buildIntroHandshake, openIntroHandshake } from './intro-handshake.mjs?v=3';
 
 export const CRYPTO_SUITES = Object.freeze({
   CLASSICAL_V1: 'classical-v1',
@@ -357,6 +357,22 @@ export async function __x25519FastPathActiveForTests() {
 // work. That gap is invisible anywhere else in this file and is a third of the remaining per-entry cost in the one
 // place that runs once per foreign intro. HKDF-SHA256 is deterministic, so both produce identical bytes —
 // tests/intro-scan-native-ecdh pins each tag against a WebCrypto-derived reference, which is exactly that claim.
+/**
+ * SHA-256, SYNCHRONOUS. [2026-08-28 — owner's standing speed directive.] Five modules each carried their own
+ * `async function sha256` wrapping `crypto.subtle.digest`, and one of them sits on the client's hottest loop:
+ * every shard address is two cell hashes, and an intro sweep derives INTRO_READ_SPACE x epochs of them.
+ * crypto.subtle is asynchronous, and on a 71-byte cell preimage its per-call overhead is the entire cost —
+ * MEASURED over one sweep's 16,384 hashes: 240 ms via crypto.subtle against 15 ms here, a 16x difference for
+ * byte-identical output. The vendored implementation was already loaded in this very file (nobleHkdf runs on
+ * it), so this costs nothing to ship and removes four duplicate wrappers.
+ *
+ * It is deliberately NOT a drop-in for key material: HKDF, PBKDF2 and AES-GCM stay on WebCrypto where the
+ * platform's own implementation is the point. This is for hashing bytes we already hold in memory.
+ */
+export function sha256Sync(bytes) {
+  return nobleSha256(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+}
+
 async function deriveStealthViewTag(scanSharedSecret, ephemeralPublicKey) {
   const ikm = assertBytes('stealth.scanSharedSecret', scanSharedSecret, X25519_PUBLIC_KEY_BYTES);
   const salt = utf8(STEALTH_VIEWTAG_SALT_DOMAIN);
@@ -1540,7 +1556,45 @@ export function encodeCompactPayload(input, options = {}) {
   throw new Error('Unsupported Platho compact payload type');
 }
 
+/**
+ * THE CODE EVERY DECODE FAILURE CARRIES OUT.
+ *
+ * [audit 2026-09-01, round 9.] A body that will not decode is PERMANENTLY unreadable — the bytes are on chain and
+ * will never change — but the CONV scan classified it by matching the error's English sentence against a list, and
+ * the payload layer's wordings were not on that list. MEASURED, eight real failures (a bumped version, a part
+ * index past the count, non-zero reserved bytes, a truncated content length, non-zero padding, a broken magic, an
+ * unknown content type, partCount 0): 8 of 8 classified TRANSIENT. The classifier knows `magic mismatch` while the
+ * throw says `Invalid Platho compact payload magic`, and `compact body` while every one of these says `compact
+ * payload`.
+ *
+ * What a transient verdict costs here: the scan bars the bucket's seq mark, DROPS the lane's change marker so the
+ * shard is re-read unconditionally, and refuses to advance the scan cursor. So the whole shard history is
+ * re-fetched and every capsule in it re-decrypted on every 12-second pass, forever, the read window widens by an
+ * epoch a day to the 366 cap, and the account never reports itself up to date again. One body does that.
+ *
+ * And it is NOT only hostile: `Unsupported compact payload version` and `Unsupported Platho compact payload type`
+ * are exactly what an older client throws on a message from a NEWER one. The layer above already learned this
+ * lesson — tolerateUnknownBlocks (v646) exists so a future block kind degrades to "block skipped" instead of
+ * throwing the whole message into the strike machine. The payload layer never got the same treatment.
+ *
+ * A code rather than more sentences, because sentences drift and there are 62 of them behind this door. The
+ * classifier still keeps its SAFE DEFAULT — anything it cannot place is treated as transient and re-walked, so a
+ * genuine RPC failure can never advance a cursor past a message that was readable.
+ */
+export const PLATHO_CAPSULE_UNREADABLE_CODE = 'PLATHO_CAPSULE_UNREADABLE';
+
 function decodeCompactPayloadBytes(bytesLike, options = {}) {
+  try {
+    return decodeCompactPayloadBytesInner(bytesLike, options);
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === undefined) {
+      try { error.code = PLATHO_CAPSULE_UNREADABLE_CODE; } catch { /* frozen error — best effort */ }
+    }
+    throw error;
+  }
+}
+
+function decodeCompactPayloadBytesInner(bytesLike, options = {}) {
   const {
     type,
     flags,
@@ -2616,7 +2670,11 @@ export function convCapsuleHeader0ObjectFromBytes(bytesLike) {
 
 // clean-16 hybrid header0 — INTRO lane (42 bytes): magic(4) PH0C || version(1) || publishKind(1)=3 || sizeClass(1) ||
 // cryptoSuite(1) || ephemeral_R(32) || view_tag(u16 BE). ephemeral_R at bytes 8..40 (bits 64..320), view_tag at
-// bytes 40..42 (bits 320..336) — mirrors the contract intro extractors. Sender identity is inside the encrypted body.
+// bytes 40..42 (bits 320..336). NOTHING ON CHAIN CONSTRAINS THOSE OFFSETS: this line used to say it mirrored
+// "the contract intro extractors", and IntroShard has none — it never parses header_0, only feeds it whole to
+// bodyCommit as an opaque cell, and takes r and view_tag as separate message fields it stores verbatim. The
+// layout is a client-side contract with itself, which is a weaker guarantee than the old wording implied.
+// Sender identity is inside the encrypted body.
 export function introCapsuleHeader0Bytes(header0) {
   if (header0?.version !== PROTOCOL_VERSION) throw new Error('Invalid Platho INTRO capsule header0');
   if (header0.publishKind !== CAPSULE_PUBLISH_KIND.INTRO) throw new Error('INTRO capsule header0 publishKind must be 3');
@@ -2669,7 +2727,7 @@ export function introCapsuleHeader0ObjectFromBytes(bytesLike) {
 // nothing the recipient needs. But the shared capsule machinery binds the body AEAD to header1Hash, so a per-message
 // header1 (sender-chosen timestamps + a random clientNonce) could never be recovered from the 2-cell on-chain form —
 // which is why chain-receive was impossible. Fixed canonical values keep the AEAD binding intact AND let the recipient
-// reproduce header1Hash exactly, with NO extra on-chain footprint. [OWNER 2026-07-22: the "do it right" fix —
+// reproduce header1Hash exactly, with NO extra on-chain footprint. [decided 2026-07-22] fix —
 // canonicalise header1; do NOT publish it (that would bloat the deliberately-minimal stealth entry + need an
 // IntroShard change). Only INTRO is canonical; CONV/legacy 'private' keep their real per-message header1.]
 export function introCanonicalHeader1() {

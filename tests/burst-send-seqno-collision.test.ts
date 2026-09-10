@@ -223,7 +223,7 @@ describe('BURSTSEQ — consecutive sends must not collide on one wallet seqno', 
 
     // publishConvLaneParts wraps THAT object one level down, and the dump must follow it down.
     const lane = readFileSync('web/conv-lane-send.mjs', 'utf8');
-    expect(lane).toContain('return { parts: prepared, result };');
+    expect(lane).toContain('return { parts: prepared, deploy, result };');
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toContain('seqno: result?.result?.seqno ?? null,');
     expect(app).toContain('externals: result?.result?.batchCount ?? 1,');

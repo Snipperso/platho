@@ -22,7 +22,7 @@
     </header>
     <main class="doc">
       <h1>Privacy Policy</h1>
-      <p>Last updated: 18 August 2026</p>
+      <p>Last updated: 29 August 2026</p>
       <p>Platho is a messenger with no backend. This document is short because there is very little to disclose — and specific where something genuinely leaves your device.</p>
       <h2>What we collect</h2>
       <p>Nothing.</p>
@@ -34,7 +34,13 @@
       <li>Your message history and drafts.</li>
       <li>Your settings, including an optional API key for a public GRAM node provider.</li>
       </ul>
-      <p>This data is stored in your browser's local storage and is encrypted with a password you choose (AES-GCM-256 with PBKDF2-SHA-256 key derivation). We never receive it. Clearing your browser data deletes it, and without your recovery phrase it cannot be restored by us or by anyone else.</p>
+      <p>None of it reaches us, and what protects each of them is not the same — so this names them one by one rather than making a single claim for all three:</p>
+      <ul>
+      <li><strong>The recovery phrase and the keys derived from it</strong> are encrypted with a password you choose (AES-GCM-256, key derivation PBKDF2-SHA-256). Without that password they cannot be read, by us or by anyone holding the device.</li>
+      <li><strong>Message history and drafts</strong> are encrypted with a key your browser generates on this device and keeps in a form that cannot be exported — not with your password. Copying the stored data to another machine therefore yields nothing readable; it is not a defence against someone already using your unlocked browser.</li>
+      <li><strong>Settings</strong> — a theme, a language, what you follow — are stored as ordinary text; nothing among them is secret, and none of it reaches us. The one value that is, the optional API key for a node provider, is sealed with the same kind of device key as the message history rather than written in the clear.</li>
+      </ul>
+      <p>Clearing your browser data deletes all of it, and without your recovery phrase it cannot be restored by us or by anyone else.</p>
       <h2>What is public by design</h2>
       <p><strong>Private messages are encrypted on your device</strong> before they are published, and only the intended recipient can read their contents.</p>
       <p><strong>Public posts are not encrypted.</strong> They are written to the TON blockchain in plain text, and they are permanent: neither we, nor an administrator, nor a government, nor you as their author can remove them. Do not publish anything publicly that you would need to withdraw later.</p>
@@ -45,6 +51,7 @@
       <li><code>toncenter.com</code></li>
       <li><code>tonapi.io</code></li>
       <li><code>mainnet-v4.tonhubapi.com</code></li>
+      <li><code>nft.fragment.com</code></li>
       </ul>
       <p>These providers necessarily see your IP address and the requests your device makes, and they operate under their own privacy policies, which we do not control. This is the one place where information about you leaves your device to a party other than the blockchain itself. If you use a VPN or the Tor network, these providers see that instead.</p>
       <p>If you supply your own API key for one of these providers, it is stored locally on your device and sent only to that provider.</p>

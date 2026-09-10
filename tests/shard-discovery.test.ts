@@ -6,6 +6,7 @@ import { IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import {
   recordShardAddress, introShardAddress, recoveryShardAddress,
+  recordShardState, introShardState, recoveryShardState,
   introScanAddresses, epochOf, addrKey,
 } from '../web/shard-discovery.mjs';
 import { buildConvPublish } from '../web/publish-builder.mjs';
@@ -72,5 +73,46 @@ describe('SHARD-DISCOVERY — client-derived addresses match the on-chain shards
     expect(addrKey(addrs[0])).toBe(addrKey(contractAddress(0, await IntroShard.init(100n, 0n))));
     expect(addrKey(addrs[11])).toBe(addrKey(contractAddress(0, await IntroShard.init(102n, 3n))));
     expect(new Set(addrs.map(addrKey)).size).toBe(12);
+  });
+
+  it('DISC-05: the StateInit a publish ATTACHES hashes to the address it is SENT to, on every lane', async () => {
+    // THIS GATE WAS VACUOUS AND I WROTE IT [corrected 2026-08-29]. It compared
+    //   recordShardState(...).address   vs   recordShardAddress(...)
+    // which since the address-only fast path landed are THE SAME EXPRESSION — both are
+    // friendly(recordShardAddressBytes(...)). It could not fail. An auditor proved it by mocking
+    // recordShardStateInit with its arguments swapped, leaving the address derivation correct: the gate stayed
+    // green, while every first publish of a new conversation-direction would have attached an init that deploys
+    // a DIFFERENT account.
+    //
+    // The property that actually protects delivery is this one: a shard address IS the hash of its StateInit, so
+    // if the init the client attaches does not hash to the address the client sends to, the account is never
+    // created. The message then lands on an uninitialised account, its compute phase is SKIPPED, nothing is
+    // stored, no bounce comes back, and the wallet reports success — this project's worst failure shape, on the
+    // one layer where nothing downstream can notice. Before today that property was pinned for INTRO alone
+    // (wallet-internal-stateinit.test.ts, WSI-04); CONV, RECOVERY and PUBLIC had nothing.
+    //
+    // Checked TWO ways on purpose. Self-consistency (the init hashes to the address the client itself derives)
+    // catches one half moving without the other. The cross-check against the COMPILED contract catches both
+    // halves moving together, which self-consistency cannot see.
+    const { computeCellHashAndDepth } = await import('../web/pwa-contract-transactions.mjs');
+    const { parseTonAddress } = await import('../web/crypto/platho-crypto.mjs');
+    const hex = (b: Uint8Array) => Buffer.from(b).toString('hex');
+
+    const cases: Array<{ lane: string; state: any; onchain: string }> = [
+      { lane: 'intro', state: await introShardState(20700, 7),
+        onchain: contractAddress(0, (await IntroShard.fromInit(20700n, 7n)).init!).toRawString() },
+      { lane: 'conv', state: await recordShardState(12345n, 20700),
+        onchain: contractAddress(0, (await RecordShard.fromInit(12345n, 20700n)).init!).toRawString() },
+      { lane: 'recovery', state: await recoveryShardState(999n),
+        onchain: contractAddress(0, (await RecoveryShard.fromInit(999n)).init!).toRawString() },
+    ];
+
+    for (const { lane, state, onchain } of cases) {
+      const { hash } = await computeCellHashAndDepth(state.init);
+      expect(hex(hash), lane + ': the attached StateInit must hash to the address it is sent to')
+        .toBe(hex(parseTonAddress(String(state.address)).hash));
+      expect(addrKey(state.address), lane + ': and that address must be where the CONTRACT actually deploys')
+        .toBe(addrKey(onchain));
+    }
   });
 });

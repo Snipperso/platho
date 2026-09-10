@@ -802,6 +802,57 @@ ProfileRegistry (контракт, которым определяется по�
 7. **Горизонты хранения** (immutable): сообщения 1 год · recovery 3 года · intro 1 неделя. Поднятие любого требует
    синхронного подъёма эндаумента.
 
+### AFTER THE CLEAN-18 LAUNCH — not before
+
+> English on purpose, in a document that is otherwise Russian: `tests/locale-guard.test.ts` is a RATCHET over this
+> file's recorded Cyrillic line count (822) and that count may only go DOWN. The owner's words below are therefore
+> translated rather than quoted, including his ruling that this waits.
+
+- ○ **DISCOVERY BECOMES A FEED OF POSTS, NOT A LIST OF CHANNELS.** [OWNER 2026-09-01. He deferred it himself, to
+  after the contract launch: what matters now is perfect contracts and a client that can work with them.]
+
+  **What he asked for:** a reader opens Find Channels to see something fresh and interesting; they do not need to
+  read every channel. Scrolled to the bottom → load more. Come back later → see something NEW, not what they have
+  already read. Read like a Twitter feed. And explicitly: if a channel has several fresh posts there is no reason
+  to show only one — several posts from one channel landing in the sample is fine.
+
+  **What exists today** (verified by reading the chain end to end, 2026-09-01):
+  * `openPublicDiscovery` → `discoverChannels` → `discoverChannelsFromBeacon` → `lane.sweepChannelCatalog`. One
+    screen, two entry points (open, and its refresh button). Nothing else reads the BEACON directory.
+  * The sweep reads at most `PUBLIC_SWEEP_BUCKET_CAP = 64` live buckets of `PUBLIC_BEACON_READ_SPACE = 1024`,
+    ordered by `last_transaction_lt`. NOTE: the comment above `publicDiscoveryCache` still says the lane reads
+    "EVERY live bucket ... an ORDER, not a selection". That stopped being true on 2026-08-29 when the cap landed,
+    and reading it instead of the code is how this item was first mis-analysed. Fix the comment when this is built.
+  * `readLatestChannelPosts(wallet, { beforeEra })` already returns up to `PUBLIC_LATEST_POST_WINDOW = 32` posts
+    per channel and already carries a working backward cursor (`{ posts, era, exhausted }`). The card calls it
+    lazily, one channel at a time, at `priority: 'profile'`, non-skippable, behind a concurrency cap. The paging
+    machinery is therefore already written — the screen simply truncates it to one post and renders a channel card.
+  * NO paging at the screen level: no offset into the sweep, no "load more", and the renderer paints the whole
+    result list with no cap.
+  * NO memory across visits: `publicDiscoverySurfaceRegistry` is cleared on every open (it is card-appearance
+    animation state), and `publicDiscoveryCache` is an in-memory `{ at, results }` with a TTL that dies on reload
+    and, within the TTL, hands back literally the same list.
+
+  **The shape to build:** the sweep supplies channels; each channel supplies its posts through the existing
+  cursor; the screen merges them into ONE list ordered by post time, with several posts from one channel allowed.
+  Reaching the bottom loads more — first deeper into the channels already open (`beforeEra`), then wider into the
+  next buckets. What has been SHOWN is remembered ACROSS VISITS, keyed BY POST (he confirmed 2026-09-01: by posts,
+  not by channels), in wallet-scoped storage (`personalPublicStorageKey`, built 2026-09-01), bounded and evicting
+  oldest-first so long-unseen items return by themselves and the screen is never empty.
+
+  **What this dissolves.** The 64-bucket cut is ordered by `last_transaction_lt`, and lt moves on ANY inbound
+  transaction — a bare value message trips no contract gate. MEASURED 2026-09-01: 1,304,069 nanotons per touch, so
+  0.0835 GRAM buys the top of the default sweep (about 0.0195 GRAM when touching one's own buckets, since the
+  value lands in one's own shard). `web/public-lane.mjs` records this as a red open trade-off. With paging and a
+  per-post seen-set, buying the top buys the FIRST PAGE OF THE FIRST VISIT and nothing more — so it need not be
+  resolved on its own terms. Build the feed and it goes away.
+
+  **The ceiling, recorded so nobody re-derives it wrongly:** the BEACON directory holds
+  `1024 buckets x 192 readable rows = 196,608` visible announcements per year-long era.
+  `PUBLIC_BEACON_READ_SPACE` is a CLIENT constant in no contract gate and is widen-only with no redeploy (widen
+  the reader, let it propagate, then let announcers use the new range), so this is NOT a genesis decision and
+  nothing about it blocks the seal. Widening costs sweep requests: 4096 -> 12, 8192 -> 24, 32768 -> 96, against 3.
+
 ---
 
 ## 🔒 SEAL-ГЕЙТЫ

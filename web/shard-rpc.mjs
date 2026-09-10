@@ -17,8 +17,8 @@
 // user's toncenter budget, and the whole per-client-key rate model (8 rps under one key, one queue inside one
 // client) depends on there being exactly one queue.
 
-import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=80';
-import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=37';
+import { scheduleToncenterHttpRequest, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=89';
+import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=47';
 
 /**
  * A scan is background work: it must yield to anything the user is waiting on.
@@ -95,6 +95,47 @@ const resolveApiKey = (explicit) => explicit ?? globalThis.plathoToncenterApiKey
  */
 /** How much of toncenter's answer a failed /accountStates carries VERBATIM. Enough for a 422 `detail` array; never a whole page. */
 const ACCOUNT_STATES_ERROR_TEXT_MAX = 4096;
+
+/**
+ * A `fetch`-shaped function for any toncenter v3 REST read that is not one of the shard lanes above.
+ *
+ * WHY IT LIVES HERE. Two reasons, and the second is the one that cost a debugging session. First, app.js must not
+ * schedule raw toncenter HTTP — it talks to the chain through a replaceable transport, and PWA-CHAIN-03 keeps that
+ * seam honest. Second, WHICH QUEUE a request joins is decided by `rateLimitKey`, not by calling the scheduler:
+ * omit it and the request silently derives its own bucket, i.e. a second worker with its own spacing and backoff,
+ * firing a parallel connection to the same IP. Routing every such read through `scanRequestOptions` here makes the
+ * shared bucket the DEFAULT, so a caller cannot reintroduce that by forgetting an option.
+ *
+ * A null answer from the pump means the request never ran (a 429 park). That is not an empty result, so it is
+ * thrown with the status a caller can branch on.
+ */
+export function createToncenterRestFetch({ endpoint, apiKey, fetch: fetchImpl, requestOptions = null } = {}) {
+  const doFetch = fetchImpl ?? globalThis.fetch;
+  if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
+  return async (url, init = {}) => {
+    const base = resolveEndpoint('accountStates', endpoint);
+    const key = resolveApiKey(apiKey);
+    const headers = { Accept: 'application/json', ...(init.headers ?? {}) };
+    if (key) headers['X-API-Key'] = key;
+    const response = await scheduleToncenterHttpRequest(
+      base, key, (signal) => doFetch(String(url), { ...init, headers, signal }), scanRequestOptions(requestOptions));
+    if (!response) {
+      const error = new Error('toncenter REST: the request did not run (rate-limited or dropped)');
+      error.status = 429;
+      throw error;
+    }
+    return response;
+  };
+}
+
+/** The v3 REST origin the app is configured for, so a custom endpoint carries these reads with it. */
+export function toncenterRestOrigin(endpoint = null) {
+  try {
+    return new URL(resolveEndpoint('accountStates', endpoint)).origin;
+  } catch {
+    return 'https://toncenter.com';
+  }
+}
 
 export function createShardStatesRequest({ endpoint, apiKey, fetch: fetchImpl, requestOptions = null, strict = false } = {}) {
   const doFetch = fetchImpl ?? globalThis.fetch;
@@ -265,14 +306,39 @@ async function readMessageRows({ base, key, doFetch, address, limit, opcode, max
     if (offset > 0 && pageMark === previousPageMark) break;
     previousPageMark = pageMark;
 
-    const inBound = bound === null
-      ? pageRows
-      : pageRows.filter((row) => { try { return row?.created_lt == null || BigInt(row.created_lt) <= bound; } catch { return false; } });
+    // THE TIME BOUND IS ENFORCED HERE, NOT JUST ASKED FOR [audit 2026-09-01, round 14]. `end_lt` has always been
+    // re-checked against the rows; `start_utime`/`end_utime` were set as query parameters and trusted. That broke
+    // this file's own stated rule — "support is proven by checking the ROWS, never the status code" — and it is
+    // the rule that matters, because FastAPI drops unknown parameters silently and answers 200. An endpoint that
+    // ignored the time window would hand back the plain newest-first page, and the caller that asked for a time
+    // window is precisely the caller defending itself against newer junk (see readPosts' row-time path): the
+    // defence would have evaporated with no error anywhere. A row with no created_at is AMBIGUOUS and is kept,
+    // the same asymmetry rowIsForeign uses — dropping it would let an endpoint that omits the field blind the
+    // lane completely.
+    const atOf = (row) => {
+      const raw = row?.created_at;
+      if (raw === null || raw === undefined || raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    };
+    const inBound = pageRows.filter((row) => {
+      if (bound !== null) {
+        try { if (row?.created_lt != null && BigInt(row.created_lt) > bound) return false; } catch { return false; }
+      }
+      const at = atOf(row);
+      if (at === null) return true;                     // ambiguous — never dropped
+      if (fromUtime !== null && at < fromUtime) return false;
+      if (toUtime !== null && at > toUtime) return false;
+      return true;
+    });
     const wanted = (opcode === null || opcode === undefined)
       ? inBound
       : inBound.filter((row) => !rowIsForeign(row, opcode));
-    // A row belonging to someone else is the ONLY proof that the filter was ignored — the status code says
-    // nothing, since an unknown query parameter is dropped silently and still answers 200.
+    // A row belonging to someone else is the ONLY proof that the OPCODE filter was ignored — the status code
+    // says nothing, since an unknown query parameter is dropped silently and still answers 200.
+    // A row outside the requested TIME WINDOW is the same proof for that filter, and it must page on for the
+    // same reason: the rows it wants are further down. Both are folded into one flag because both mean the same
+    // thing to the loop below — this page is not purely ours, so there is more to fetch.
     if (wanted.length !== pageRows.length) serverFiltered = false;
     rows.push(...wanted);
 
@@ -359,5 +425,55 @@ export function createShardMessagesWithSourceReader({ endpoint, apiKey, fetch: f
       out.push({ bodyCell, source: message?.source ?? null, createdLt, lt: createdLt, createdAt: message?.created_at ?? null });
     }
     return out;
+  };
+}
+
+/**
+ * `readLastTransaction(address) -> { now, storageFeesDue } | null` — the unix time of an account's most recent
+ * transaction and the storage debt that transaction left unpaid, or null when the account has none. toncenter v3
+ * `/transactions?account=…&limit=1&sort=desc`, whose rows carry `now` (unix seconds) and `description.storage_ph`
+ * with `storage_fees_collected` always and `storage_fees_due` only when it is non-zero (a Maybe in the TL-B) —
+ * MEASURED against the live endpoint 2026-09-03 (`lt`, `now`, `account`, `description`, … on every row;
+ * `address_book` + `transactions` at the top level).
+ *
+ * WHY THIS READER EXISTS: an account's storage debt is the rent since its last transaction (the storage phase
+ * stamps `last_paid = now` on every transaction and charges the interval) PLUS whatever that transaction could not
+ * collect and booked as `due_payment` — and neither is in the accountStates batch (`last_transaction_lt` is a
+ * logical time, not a clock; the due is not exposed at all). Both ride the newest transaction's row. Without the
+ * carried due, a squatter poking the account once a month would hide years of arrears behind a fresh timestamp.
+ * web/shard-debt.mjs asks this only for an account that EXISTS and is about to receive a publish, so the quiet
+ * lanes never pay for it.
+ *
+ * `strict` (default true): a request that did not run THROWS rather than answering null — a null here would be read
+ * as "no transactions, no debt", which is the shape of an underpaid publish refused at the shard.
+ */
+export function createShardLastTransactionReader({ endpoint, apiKey, fetch: fetchImpl, requestOptions = null, strict = true } = {}) {
+  const doFetch = fetchImpl ?? globalThis.fetch;
+  if (typeof doFetch !== 'function') throw new Error('shard-rpc: fetch is unavailable');
+  return async (address) => {
+    const base = resolveEndpoint('transactions', endpoint);
+    const key = resolveApiKey(apiKey);
+    const url = new URL(base);
+    url.searchParams.set('account', String(address));
+    url.searchParams.set('limit', '1');
+    url.searchParams.set('sort', 'desc');
+    const headers = { Accept: 'application/json' };
+    if (key) headers['X-API-Key'] = key;
+    const options = scanRequestOptions(requestOptions ?? { skipIfRateLimited: false });
+    const response = await scheduleToncenterHttpRequest(
+      base, key, (signal) => doFetch(url.toString(), { method: 'GET', headers, signal }), options);
+    if (!response) {
+      if (strict) throw new Error('transactions: the request did not run (rate-limited or dropped) — the account age is unknown');
+      return null;
+    }
+    if (!response.ok) throw new Error(`transactions failed with HTTP ${response.status}`);
+    const body = await response.json();
+    const row = Array.isArray(body?.transactions) ? body.transactions[0] : null;
+    if (!row) return null;
+    const now = Number(row.now ?? row.utime);
+    if (!Number.isFinite(now) || now <= 0) return null;
+    let storageFeesDue = 0n;
+    try { storageFeesDue = BigInt(row.description?.storage_ph?.storage_fees_due ?? 0); } catch { storageFeesDue = 0n; }
+    return { now: Math.floor(now), storageFeesDue: storageFeesDue > 0n ? storageFeesDue : 0n };
   };
 }

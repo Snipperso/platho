@@ -23,36 +23,17 @@ import {
   PUBLIC_COMMENT_TEXT_MAX_BYTES,
   PUBLIC_POST_TEXT_MAX_BYTES,
   PROFILE_AVATAR_PRICE_ATH,
-  VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN,
-  VAULT_CRYPTO_SUITE,
-  VAULT_PROFILE_AVATAR_SIGNING_DOMAIN,
-  VAULT_PUBLISH_KIND,
   VAULT_SIZE_CLASS,
-  VAULT_WITHDRAW_ATH_SIGNING_DOMAIN,
-  VAULT_WITHDRAW_TON_SIGNING_DOMAIN,
-  VAULT_USERNAME_MINT_SIGNING_DOMAIN,
   buildAthWalletMessageBody,
   buildProfileRegistryMessageBody,
   buildUsernameRegistryMessageBody,
-  buildVaultBalancePublishBodyCell,
-  buildVaultBalancePublishExternalBoc,
-  buildVaultProfileAvatarBodyCell,
-  buildVaultProfileAvatarExternalBoc,
-  buildVaultReplaceMessagingKeysExternalBoc,
-  buildVaultWithdrawAthExternalBoc,
-  buildVaultWithdrawTonExternalBoc,
-  buildVaultUsernameMintBodyCell,
-  buildVaultUsernameMintExternalBoc,
-  buildVaultMessageBody,
   createAthWalletMessage,
   createProfileRegistryMessage,
   createPublicPostPayload,
   createUsernameRegistryMessage,
   createWalletTransaction,
-  createVaultWalletMessage,
   estimateAthWalletAttachedValueNanotons,
   REGISTRY_BURN_FLUSH_MESSAGE_VALUE_NANOTONS,
-  estimateVaultAttachedValueNanotons,
   readPublicPostPayload,
   readPublicPartHeaderInfo,
   tonCell,
@@ -186,138 +167,6 @@ describe('PWA contract transaction builders', () => {
     }))).toEqual(bytes);
   });
 
-  it('PWA-TX-01B: TON withdrawal and key rotation are signed Vault external BOCs, not wallet message bodies', async () => {
-    const signingSecretKey = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
-    expect(() => buildVaultMessageBody('ReplaceMessagingKeys', {})).toThrow(/Unsupported Vault message type/);
-    expect(() => buildVaultMessageBody('WithdrawTonFromVaultBalance', {})).toThrow(/Unsupported Vault message type/);
-    expect(() => buildVaultMessageBody('WithdrawAthFromVaultBalance', {})).toThrow(/Unsupported Vault message type/);
-
-    const replaceExternal = await buildVaultReplaceMessagingKeysExternalBoc({
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-      client_nonce: 12n,
-      enc_pubkey: 0x33n,
-      sign_pubkey: 0x44n,
-      pq_kem_pubkey_hash: 0x55n,
-      pq_kem_pubkey_len: 1184n,
-      pq_kem_pubkey: PQ_PUBKEY_BYTES,
-      crypto_suite_mask: 2n,
-    });
-    const withdrawExternal = await buildVaultWithdrawTonExternalBoc({
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-      client_nonce: 13n,
-      amount: 55_000_000n,
-      recipient: RECIPIENT,
-    });
-    const withdrawAthExternal = await buildVaultWithdrawAthExternalBoc({
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-      client_nonce: 14n,
-      amount: 500n,
-      recipient: RECIPIENT,
-    });
-
-    const withdrawSlice = expectVaultAddressSignedDataEnvelope(withdrawExternal.signedData, VAULT_WITHDRAW_TON_SIGNING_DOMAIN, OWNER);
-    expect(withdrawSlice.loadUintBig(64)).toBe(13n);
-    expect(withdrawSlice.remainingBits).toBe(0);
-    expect(withdrawSlice.remainingRefs).toBe(1);
-    const withdrawAction = withdrawSlice.loadRef().beginParse();
-    expect(withdrawAction.loadUintBig(128)).toBe(55_000_000n);
-    expect(withdrawAction.loadAddress()?.equals(Address.parseRaw(RECIPIENT))).toBe(true);
-    expect(withdrawAction.remainingBits).toBe(0);
-    expect(withdrawAction.remainingRefs).toBe(0);
-    const withdrawAthSlice = expectVaultAddressSignedDataEnvelope(withdrawAthExternal.signedData, VAULT_WITHDRAW_ATH_SIGNING_DOMAIN, OWNER);
-    expect(withdrawAthSlice.loadUintBig(64)).toBe(14n);
-    expect(withdrawAthSlice.remainingBits).toBe(0);
-    expect(withdrawAthSlice.remainingRefs).toBe(1);
-    const withdrawAthAction = withdrawAthSlice.loadRef().beginParse();
-    expect(withdrawAthAction.loadUintBig(128)).toBe(500n);
-    expect(withdrawAthAction.loadAddress()?.equals(Address.parseRaw(RECIPIENT))).toBe(true);
-    expect(withdrawAthAction.remainingBits).toBe(0);
-    expect(withdrawAthAction.remainingRefs).toBe(0);
-
-    for (const external of [replaceExternal, withdrawExternal, withdrawAthExternal]) {
-      expect(external.vaultAddress).toBe(VAULT);
-      expect(external.boc).toMatch(/^te6/);
-      expect(external.signedDataHash).toMatch(/^[0-9a-f]{64}$/);
-      expect(external.signature).toMatch(/^[0-9a-f]{128}$/);
-      expect(ed25519.verify(
-        Buffer.from(external.signature, 'hex'),
-        Buffer.from(external.signedDataHash, 'hex'),
-        ed25519.getPublicKey(signingSecretKey),
-      )).toBe(true);
-    }
-  });
-
-  it('PWA-TX-02: quotes exact explicit Vault reserve values used by the PWA', () => {
-    expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: false })).toBe(12_001_000n);
-    expect(estimateVaultAttachedValueNanotons('DepositTon', { amount: 1_000n }, { userExists: true })).toBe(2_001_000n);
-    expect(() => estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 1n }, { userExists: false })).toThrow(/hybrid-v1/);
-    expect(estimateVaultAttachedValueNanotons('RegisterMessagingKeys', { crypto_suite_mask: 2n }, { userExists: true })).toBe(32_000_000n);
-  });
-
-  it.each([
-    [
-      'ATHTransferRequest',
-      {
-        query_id: 11n,
-        amount: 500n,
-        recipient: RECIPIENT,
-        response_destination: OWNER,
-      },
-      storeATHTransferRequest({
-        $$type: 'ATHTransferRequest',
-        query_id: 11n,
-        amount: 500n,
-        recipient: Address.parseRaw(RECIPIENT),
-        response_destination: Address.parseRaw(OWNER),
-      }),
-    ],
-    [
-      'ATHTransferRequestWithNotify',
-      {
-        query_id: 12n,
-        amount: 700n,
-        recipient: VAULT,
-        response_destination: OWNER,
-        notify_destination: VAULT,
-        notify_value: 30_000_000n,
-      },
-      storeATHTransferRequestWithNotify({
-        $$type: 'ATHTransferRequestWithNotify',
-        query_id: 12n,
-        amount: 700n,
-        recipient: Address.parseRaw(VAULT),
-        response_destination: Address.parseRaw(OWNER),
-        notify_destination: Address.parseRaw(VAULT),
-        notify_value: 30_000_000n,
-      }),
-    ],
-    [
-      'ATHBurn',
-      {
-        query_id: 14n,
-        amount: 900n,
-        response_destination: OWNER,
-      },
-      storeATHBurn({
-        $$type: 'ATHBurn',
-        query_id: 14n,
-        amount: 900n,
-        response_destination: Address.parseRaw(OWNER),
-      }),
-    ],
-  ])('PWA-TX-06: %s ATHWallet body matches generated Tact wrapper encoding', (type, params, store) => {
-    expect(buildAthWalletMessageBody(type, params)).toBe(generatedBody(store));
-  });
-
   it('PWA-TX-06B: direct ATHWallet username/avatar product actions are unsupported', () => {
     expect(() => buildAthWalletMessageBody('WalletProductMintUsername', {
       query_id: 13n,
@@ -445,59 +294,6 @@ describe('PWA contract transaction builders', () => {
     })));
   });
 
-  it('PWA-TX-04: creates signed Vault-balance private publish bodies', async () => {
-    const fixture = privatePublishFixture(58_000_000n);
-    const signingSecretKey = new Uint8Array(32).fill(0x11);
-    const built = await buildVaultBalancePublishBodyCell('PublishPrivateFromVaultBalance', {
-      ...fixture,
-      owner_wallet: OWNER,
-      vaultAddress: VAULT,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey,
-    });
-
-    expect(built.signature).toHaveLength(128);
-    expect(built.signedDataHash).toHaveLength(64);
-    expect(ed25519.verify(
-      Buffer.from(built.signature, 'hex'),
-      Buffer.from(built.signedDataHash, 'hex'),
-      ed25519.getPublicKey(signingSecretKey),
-    )).toBe(true);
-    expectPublishSignedDataEnvelope(
-      built.signedData,
-      VAULT_PUBLISH_KIND.PRIVATE,
-      OWNER,
-      VAULT_SIZE_CLASS.STANDARD,
-      VAULT_CRYPTO_SUITE.HYBRID,
-    );
-    expect(tonCell.bytesToBase64(tonCell.serializeBoc(built.bodyCell))).toMatch(/^te6/);
-  });
-
-  it('PWA-TX-04B: Vault-balance external publish builder requires deployment manifest hash', async () => {
-    const fixture = privatePublishFixture(58_000_000n);
-    await expect(buildVaultBalancePublishExternalBoc('PublishPrivateFromVaultBalance', {
-      ...fixture,
-      owner_wallet: OWNER,
-      signingSecretKey: new Uint8Array(32).fill(0x11),
-    }, {
-      vaultAddress: VAULT,
-    })).rejects.toThrow(/deployment_manifest_hash must be an integer/);
-  });
-
-  it('PWA-TX-04C: Vault-balance external publish accepts bare hex deployment manifest hashes', async () => {
-    const built = await buildVaultBalancePublishExternalBoc('PublishPrivateFromVaultBalance', {
-      ...privatePublishFixture(58_000_000n),
-      owner_wallet: OWNER,
-      signingSecretKey: new Uint8Array(32).fill(0x11),
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH.slice(2),
-    }, {
-      vaultAddress: VAULT,
-    });
-
-    expect(built.boc).toMatch(/^te6/);
-    expect(built.signature).toHaveLength(128);
-  });
-
   it('PWA-TX-04D2: profile avatar pays ProfileRegistry directly, with no Vault route read', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const direct = app.slice(
@@ -520,7 +316,7 @@ describe('PWA contract transaction builders', () => {
   // Vault external. Direct pay signs no Vault external — the wallet pays the registry from the config+manifest
   // pin — so there is no declared route to cross-check. The mint message itself stays byte-pinned above.
 
-  it('PWA-TX-09: creates public post payload cells and signed Vault-balance public publish messages', async () => {
+  it('PWA-TX-09: creates public post payload cells (V1 reader wire)', async () => {
     const bodyText = 'p'.repeat(PUBLIC_POST_TEXT_MAX_BYTES);
     const payload = await createPublicPostPayload(bodyText);
     const headerCell = Cell.fromBoc(Buffer.from(payload.headerBoc, 'base64'))[0];
@@ -547,38 +343,8 @@ describe('PWA contract transaction builders', () => {
       text: bodyText,
     });
 
-    const publish = {
-      publish_kind: VAULT_PUBLISH_KIND.PUBLIC,
-      size_class: payload.size_class,
-      crypto_suite: VAULT_CRYPTO_SUITE.PUBLIC_NONE,
-      header_0_hash: payload.headerHash,
-      header_hash: payload.headerHash,
-      body_hash: payload.bodyHash,
-      header_0_cell: payload.header_cell,
-      header_cell: payload.header_cell,
-      body_cell: payload.body_cell,
-    };
-
-    const built = await buildVaultBalancePublishExternalBoc('PublishPublicFromVaultBalance', {
-      owner_wallet: OWNER,
-      client_nonce: 4n,
-      max_charge: 57_000_000n,
-      publish,
-      deploymentManifestHash: DEPLOYMENT_MANIFEST_HASH,
-      signingSecretKey: new Uint8Array(32).fill(0x22),
-    }, {
-      vaultAddress: VAULT,
-    });
-    expect(built.vaultAddress).toBe(VAULT);
-    expect(built.boc).toMatch(/^te6/);
-    expect(built.signature).toHaveLength(128);
-    expectPublishSignedDataEnvelope(
-      built.signedData,
-      VAULT_PUBLISH_KIND.PUBLIC,
-      OWNER,
-      VAULT_SIZE_CLASS.KIB_32,
-      VAULT_CRYPTO_SUITE.PUBLIC_NONE,
-    );
+    // The size class the READERS key their limits on — the Vault-balance publish that used to ride here went
+    // with the Vault batch machinery (2026-08-29).
     expect(payload.size_class).toBe(VAULT_SIZE_CLASS.KIB_32);
   });
 

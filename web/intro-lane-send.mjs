@@ -19,9 +19,10 @@
 //
 // FUNDING: always INTRO_PUBLISH_VALUE (the deploy figure). The shard keeps only what it needs and returns the surplus.
 
-import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=21';
-import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=38';
+import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=57';
+import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=47';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=57';
+import { applyShardSurcharge, surchargeExtraNanotons, LANE_INTRO } from './shard-debt.mjs?v=12';
 
 /** base64url → bytes (the capsule advertises ephemeralR / view material as base64url, not standard base64). */
 function b64urlToBytes(value) {
@@ -97,6 +98,16 @@ export async function buildIntroPublishWalletMessage({ epoch, bucket, capsule, v
 export async function publishIntroLane({ wallet, transport, epoch, bucket, capsule, value }, options = {}) {
   if (!wallet) throw new Error('publishIntroLane requires a wallet');
   const prepared = await buildIntroPublishWalletMessage({ epoch, bucket, capsule, value });
-  const result = await sendPlathoWalletTransaction(wallet, { messages: [prepared.message] }, { ...options, transport });
+  // THE SQUAT SURCHARGE, PER SHARD [2026-09-03]: every message carries a refundable cushion (a year of an empty shard's
+  // rent) and, for an account seen pre-created and starved, the debt its age says it owes — the value gate of every
+  // clean-18 shard demands `myStorageDue()` on top of the price (13712/13660/13688) and refuses a publish that cannot
+  // cover it, so this is what turns a stranger's squat from a lost post into a few thousandths of a GRAM. The amount is
+  // resolved by web/shard-debt.mjs (two reads at most, cached per address; none when the account does not exist) and
+  // reported to the caller's `assertAffordable` when it exceeds the cushion the caller already budgeted for.
+  const { shardDebt, assertAffordable, ...sendOptions } = options;
+  const { cushion } = await applyShardSurcharge(LANE_INTRO, [prepared], { resolver: shardDebt });
+  const aboveBudget = surchargeExtraNanotons({ prepared: [prepared], budgeted: [value], cushion });
+  if (aboveBudget > 0n && typeof assertAffordable === 'function') await assertAffordable(aboveBudget);
+  const result = await sendPlathoWalletTransaction(wallet, { messages: [prepared.message] }, { ...sendOptions, transport });
   return { ...prepared, result };
 }

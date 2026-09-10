@@ -488,8 +488,7 @@ describe('PUBLISH-BUILDER — direct-paid publish, and the body actually arrives
     expect(constOf(rec, 'RS_PROTOCOL_FEE'), 'the service fee is 0.01 GRAM, as in the deleted CreditSale').toBe(10_000_000n);
     const recTerms = minValueTerms(rec, 'RS_MIN_VALUE');
     // RS_FEE_TRANSPORT joined the sum on 2026-07-19, when the fee stopped accumulating inside the shard and
-    // started being forwarded to FeeAccumulator on every publish. [OWNER: the publisher pays the transport, so
-    // the pool books the fee WHOLE — "естественно платит публикатор".] This guard is why that change was loud.
+    // started being forwarded to FeeAccumulator on every publish. [decided] This guard is why that change was loud.
     // RS_EVICT_BOUNTY left this sum on 2026-07-19, when per-record eviction was deleted. Retiring a shard costs
     // a flat amount whatever it holds, so an O(N) per-record levy was the wrong shape; the funding moved into the
     // per-shard RS_BASE_ENDOWMENT and every publish got 0.0008 GRAM cheaper. A FIRST publish pays

@@ -38,7 +38,7 @@ describe('INTRO capsule build/open round-trip (clean-16 hybrid first contact)', 
     // This is the fix that makes INTRO RECEIVE possible. IntroPublish stores only ^header_0 ^body — header1 is NOT
     // published, to keep the stealth first-contact entry minimal. The recipient reconstructs the CANONICAL header1
     // (introCanonicalHeader1) and opens from just those two cells; if header1 were per-message it could never be
-    // recovered and receive would be dead. [OWNER 2026-07-22: the "do it right" fix, canonicalise not publish.]
+    // recovered and receive would be dead. [decided 2026-07-22]
     const sender: any = await createMessagingIdentity();
     const recipient: any = await createMessagingIdentity();
     const built = await createEncryptedIntroCapsule(exportPublicKeyBundle(recipient.encryptionKeyPair), sender, { firstMessageBytes: utf8('через цепь') });

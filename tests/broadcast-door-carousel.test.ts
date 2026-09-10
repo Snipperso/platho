@@ -143,8 +143,7 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
   });
 
   it('DOORS-07: EVERY lane that re-sends signed bytes rotates — not just the one I happened to wire first', () => {
-    // Owner, 2026-08-06: "проверь, что это у нас теперь используется везде. И в публичной ленте и при публикации
-    // аватара." Three retry paths were still knocking on the door that had already failed to deliver: the INTRO
+    // Owner, 2026-08-06: Three retry paths were still knocking on the door that had already failed to deliver: the INTRO
     // idempotent retry, the CONV captured-external retry, and the public lane's retained-external re-broadcast.
     //
     // The gate is on the COMPLETENESS of the set, not on the four call sites I know about: any transport.sendBoc of
@@ -154,12 +153,31 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const wallet = readFileSync('web/platho-wallet.mjs', 'utf8');
 
+    // THE DETECTOR USED TO REQUIRE `sendBoc({ boc` ON ONE LINE, and platho-wallet.mjs writes both of its calls
+    // across two — so the wallet half of this loop ran ZERO assertions and the gate, written after a shipped
+    // outage, guarded app.js alone [audit 2026-09-02, adversarial agent facet]. MEASURED by reproducing this
+    // loop's own logic: 2 assertions from app.js, 0 from the wallet; planting a NON-rotating re-send of a
+    // captured external into the wallet in that file's own multi-line style left the gate GREEN, and the same
+    // regression written on one line turned it red. The tell was already in the source: the `boc: built.boc`
+    // skip below exists solely for platho-wallet.mjs:1052, the only such line in the tree — a line the old
+    // detector could never reach.
+    //
+    // So the call is found on its OPENING line and the argument is read from the CALL, not from that one line.
+    const doorAssertions: string[] = [];
     for (const [name, source] of [['app.js', app], ['platho-wallet.mjs', wallet]] as const) {
       const lines = source.split('\n');
       lines.forEach((line, index) => {
-        if (!/transport\??\.sendBoc\(\{ boc/.test(line)) return;
+        if (!/transport\??\.sendBoc\(\{/.test(line)) return;
+        // The argument object may open on this line and close several lines down; read the whole call.
+        const call = lines.slice(index, index + 6).join(' ');
+        // SHORTHAND COUNTS [audit 2026-09-02, round 2]. The first rewrite tested `/\bboc\s*:/`, which cannot see
+        // `sendBoc({ boc, walletAddress… })` — and web/app.js uses exactly that at the re-send inside
+        // rebroadcastSignedExternal, the very helper this gate protects. MEASURED: a non-rotating re-send written
+        // in shorthand left the gate GREEN. Either spelling is the same argument.
+        if (!/\bboc\s*[:,}]/.test(call)) return;
         // `built.boc` is the freshly signed chunk — the FIRST attempt, deliberately straight to the primary.
-        if (line.includes('boc: built.boc')) return;
+        if (/boc:\s*built\.boc/.test(call)) return;
+        doorAssertions.push(`${name}:${index + 1}`);
         // The rotation must sit ABOVE the fallback POST inside the same function: the line before it (the wallet's
         // pending re-offer), or — since the design integration (2026-08-23) — the shared rebroadcastSignedExternal,
         // whose carousel call is a few lines up and whose primary sendBoc is reached only when `rotated` is null
@@ -177,6 +195,24 @@ describe('DOORS — a broadcast retry rotates entry points', () => {
         ).toBe(true);
       });
     }
+    // AND THE LOOP MUST HAVE LOOKED AT BOTH FILES. A completeness gate whose scan silently covers one of the two
+    // sources it names is the defect this rewrite exists to close, so the coverage is asserted rather than assumed.
+    expect(doorAssertions.some((where) => where.startsWith('app.js:')),
+      `the scan found no captured-external re-send in app.js — it examined ${doorAssertions.join(', ') || 'nothing'}`)
+      .toBe(true);
+    expect(doorAssertions.some((where) => where.startsWith('platho-wallet.mjs:')),
+      `the scan found none in platho-wallet.mjs — it examined ${doorAssertions.join(', ') || 'nothing'}`)
+      .toBe(true);
+    // AND THE DETECTOR PROVES ITSELF ON BOTH SPELLINGS before it is trusted about their absence. A completeness
+    // gate whose argument test cannot see one of the two ways the argument is written is a gate with a hole the
+    // size of that spelling.
+    const argTest = /\bboc\s*[:,}]/;
+    expect(argTest.test('await transport.sendBoc({ boc: pending.boc, walletAddress: a });'),
+      'the detector must see the explicit form').toBe(true);
+    expect(argTest.test('await transport.sendBoc({ boc, walletAddress: a, seqno });'),
+      'and the ES6 shorthand form').toBe(true);
+    expect(argTest.test('await transport.sendBoc({ walletAddress: a, seqno });'),
+      'and must not fire on a call that carries no boc at all').toBe(false);
 
     // And the rotation is reachable from both files that need it.
     expect(app).toContain('broadcastThroughNextDoor,');

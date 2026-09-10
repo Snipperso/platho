@@ -96,7 +96,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const payload = await createPublicPostPayloadV2({ type: 'post', text, streamId: 'cd'.repeat(16), createdAtSec: CLOCK });
     const built = await buildPublicPublishWalletMessage({
       kind: 0, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell,
-      value: publicPublishValueForKind(0), partitionKey, epochTag,
+      value: publicPublishValueForKind(0), partitionKey, epochTag, nowUnix: CLOCK,
     });
     const dest = await sendBuilt(channel, built);
 
@@ -126,7 +126,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const post = await createPublicPostPayloadV2({ type: 'post', text: 'a post that gets a reply', streamId: '01'.repeat(16), createdAtSec: CLOCK });
     await sendBuilt(channel, await buildPublicPublishWalletMessage({
       kind: 0, keyArg: 0n, header: post.headerCell, body: post.bodyCell,
-      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag,
+      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag, nowUnix: CLOCK,
     }));
 
     // The comment: THREAD shard = f(post_uid), post_uid folds (channel_pk, channel epoch_tag, entry_id=0).
@@ -137,7 +137,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const comment = await createPublicPostPayloadV2({ type: 'comment', text: commentText, streamId: '02'.repeat(16), createdAtSec: CLOCK });
     const builtComment = await buildPublicPublishWalletMessage({
       kind: 1, keyArg: postUid, header: comment.headerCell, body: comment.bodyCell,
-      value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag,
+      value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag, nowUnix: CLOCK,
     });
     const threadDest = await sendBuilt(commenter, builtComment);
 
@@ -166,7 +166,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const post = await createPublicPostPayloadV2({ type: 'post', text: 'an old post', streamId: '03'.repeat(16), createdAtSec: CLOCK });
     await sendBuilt(channel, await buildPublicPublishWalletMessage({
       kind: 0, keyArg: 0n, header: post.headerCell, body: post.bodyCell,
-      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag,
+      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag, nowUnix: CLOCK,
     }));
 
     // Comment published NOW, into THIS thread era.
@@ -176,7 +176,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const comment = await createPublicPostPayloadV2({ type: 'comment', text: 'written last era', streamId: '04'.repeat(16), createdAtSec: CLOCK });
     const builtComment = await buildPublicPublishWalletMessage({
       kind: 1, keyArg: postUid, header: comment.headerCell, body: comment.bodyCell,
-      value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag,
+      value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag, nowUnix: CLOCK,
     });
     const threadDest = await sendBuilt(commenter, builtComment);
     const threadShard = bc.openContract(PublicShard.fromAddress(threadDest));
@@ -208,7 +208,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const post = await createPublicPostPayloadV2({ type: 'post', text: 'a post read across eras', streamId: '05'.repeat(16), createdAtSec: CLOCK });
     await sendBuilt(channel, await buildPublicPublishWalletMessage({
       kind: 0, keyArg: 0n, header: post.headerCell, body: post.bodyCell,
-      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag,
+      value: publicPublishValueForKind(0), partitionKey: channelPk, epochTag: channelEpochTag, nowUnix: CLOCK,
     }));
     const postUid = await publicPostUid(channelPk, channelEpochTag, 0n);
     const threadPk = await publicThreadPartitionKey(postUid, 0);
@@ -221,7 +221,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
       const comment = await createPublicPostPayloadV2({ type: 'comment', text, streamId: streamSeed.repeat(16), createdAtSec: at });
       const built = await buildPublicPublishWalletMessage({
         kind: 1, keyArg: postUid, header: comment.headerCell, body: comment.bodyCell,
-        value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag,
+        value: publicPublishValueForKind(1), partitionKey: threadPk, epochTag: threadEpochTag, nowUnix: CLOCK,
       });
       const dest = await sendBuilt(commenter, built);
       shards.set(addrKey(dest.toString()), { shard: bc.openContract(PublicShard.fromAddress(dest)), messages: [{ body: built.body, source: commenter.address.toString() }] });
@@ -264,7 +264,7 @@ describe('PUBLIC-LANE END-TO-END (sandbox, no genesis)', () => {
     const card = await createPublicPostPayloadV2({ type: 'document', bytes: new Uint8Array(64).fill(0x7a), streamId: '05'.repeat(16), createdAtSec: CLOCK });
     const built = await buildPublicPublishWalletMessage({
       kind: 2, keyArg: BigInt(bucket), header: card.headerCell, body: card.bodyCell,
-      value: publicPublishValueForKind(2), partitionKey: beaconPk, epochTag: beaconEpochTag,
+      value: publicPublishValueForKind(2), partitionKey: beaconPk, epochTag: beaconEpochTag, nowUnix: CLOCK,
     });
     const dest = await sendBuilt(channel, built);
     const beaconShard = bc.openContract(PublicShard.fromAddress(dest));

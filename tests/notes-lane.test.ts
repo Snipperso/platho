@@ -214,11 +214,15 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
     expect(app).toMatch(/RECOVERY_PUBLISH_VALUE \* BigInt\(built\.publishes\.length\)/);
     expect(app).toMatch(/walletSendFeeReserveNanotons\(built\.publishes\.map\(/);
     // A snapshot identical to what is already stored writes nothing and still reports the note delivered — the
-    // publish helper returns 0 slots written, which is a SUCCESS, and the send path marks the note published anyway.
-    expect(app).toMatch(/if \(built\.publishes\.length === 0\) return 0;/);
-    // The note is marked with awaitsConfirm:false — RecoveryShard slots are never read back, so leaving it in the
-    // 'sending' bucket (which promises a confirm will resolve it) would hang the note forever. See PWA-HONESTGREEN-03.
-    expect(app).toMatch(/const wrote = await publishSelfNotesSnapshotForThread\(thread\);[\s\S]{0,200}?markDirectSendBroadcast\(thread, message, \{ awaitsConfirm: false \}\);/);
+    // publish helper answers zero writes, which is a SUCCESS proven by the h1 match, and the send path paints the
+    // note published at once [round 3: the helper answers the writes and the reader, never a bare count].
+    expect(app).toMatch(/if \(built\.publishes\.length === 0\) return \{ wrote: 0, readView, writes: \[\] \};/);
+    // THE SLOTS ARE READ BACK NOW [audit 2026-09-05 round 2, moved out of the lane in round 3]: the note says 'sending'
+    // until the receipt shows each slot's seq and h1, then 'published'; a miss goes to the private retry ladder. The
+    // receipt is armed in the background, never awaited inside the outgoing lane (a ladder of up to 110 s there held
+    // every later send behind a note).
+    expect(app).toMatch(/const outcome = await publishSelfNotesSnapshotForThread\(thread\);[\s\S]{0,700}?markDirectSendBroadcast\(thread, message\);[^\n]*\n\s*armSelfNoteReceipt\(context, outcome\);/);
+    expect(app).toMatch(/function armSelfNoteReceipt\(context, outcome\) \{[\s\S]{0,900}?markSelfNotePublished\(thread, message\)/);
     // Every user-facing notes string is localized (no developer text reaching the composer status).
     for (const key of ['notes.walletLocked', 'notes.rpcUnavailable', 'notes.full', 'notes.restoreIncomplete']) {
       expect(app.includes(`t('${key}')`), `${key} must be surfaced through the localizer`).toBe(true);
@@ -256,6 +260,7 @@ describe('self-notes lane (named RecoveryShard slots)', () => {
     // The send path and the delete path publish through the SAME snapshot function — that is what keeps the funds
     // check, the packing and the overflow refusal identical on both.
     expect(app).toMatch(/async function publishSelfNotesSnapshotForThread\(thread\)/);
-    expect((app.match(/await publishSelfNotesSnapshotForThread\(thread\)/g) ?? []).length).toBe(2);
+    // three: the send, the delete, and the delete's one background re-publish when the slots never showed the write [round 3]
+    expect((app.match(/await publishSelfNotesSnapshotForThread\(thread\)/g) ?? []).length).toBe(3);
   });
 });

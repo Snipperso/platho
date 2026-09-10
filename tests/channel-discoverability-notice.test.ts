@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PUBLISHING INTO A CHANNEL NOBODY CAN FIND.
 //
-// Owner, 2026-08-13: "Пользователь может писать публичные посты, но их не видно, пока он не напишет описание
-// канала. Пользователь может публиковать сообщения и не понимать, почему его сообщения никто не видит."
+// decided 2026-08-13
 //
 // The mechanism, checked rather than assumed: discovery sweeps the beacon directory and SKIPS any channel whose
 // profile card has neither a description nor tags — it only suggests channels that describe themselves. So an
@@ -96,7 +95,7 @@ describe('channel discoverability notice', () => {
   });
 
   it('CHDISC-05: the labelled dismiss is opt-in and never leaks into the next dialog', () => {
-    // Two named buttons here (the owner asked for "ОК" plus one that opens the editor), but every OTHER dialog
+    // Two named buttons here (the owner asked for  plus one that opens the editor), but every OTHER dialog
     // keeps its ✕-only shape — so the button is hidden unless a caller names it, and re-hidden on close.
     expect(html).toContain('id="actionDismissButton"');
     expect(html).toMatch(/id="actionDismissButton"[^>]*\shidden/);

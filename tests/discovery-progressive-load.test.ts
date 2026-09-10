@@ -47,17 +47,27 @@ describe('DISCOVERSTREAM — beacons are reported as they are read', () => {
     expect(body.slice(0, loopAt)).not.toContain('readShardPosts(');
     expect(body.slice(0, loopAt)).toContain('const ltOf = (state) =>');
     expect(body.slice(0, loopAt)).toContain(".filter((state) => state.status === 'active')");
-    // Every live bucket by default — the cap is opt-in, never the default.
-    expect(body).toMatch(/async sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = null, onProgress = null \} = \{\}\)/);
-    expect(body).toContain(': ordered.length;');
+    // A FINITE CAP BY DEFAULT [changed 2026-08-29]. This used to require `topBuckets = null` and
+    // `: ordered.length;` — every live bucket, always — which was right when the wall this file exists to
+    // prevent was a RANKING pass in front of the first read. It is not right as a scaling property: reading
+    // every bucket makes the sweep grow with the number of channels in the network, and MEASURED against the
+    // 30 MiB/day budget one cold sweep is 10.6 MiB at 10,000 channels and 89.7 MiB at 91,000 — past the whole
+    // day. The no-ranking-wall property this test is named for is unchanged and still asserted above: the order
+    // comes from the free `lastLt` in the batch already read, and nothing is fetched before the loop starts.
+    // The cap itself is gated in tests/discover-sweep-ceiling.test.ts, which owns that number.
+    expect(body).toMatch(/async sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = [A-Za-z_][A-Za-z0-9_]*, onProgress = null \} = \{\}\)/);
+    expect(body).toContain('ordered.slice(0, limit)');
     // And a bucket whose marker has not moved is served from the snapshot cache — the same gate the channel read
     // uses; a bucket whose rows came back WITHOUT bodies is not cached as empty (the pump may have declined them).
     expect(body.slice(loopAt)).toContain('readShardSnapshot(key, marker)');
     expect(body.slice(loopAt)).toContain('if (posts.length > 0 || BigInt(first.entry_count ?? 0n) === 0n) {');
     expect(body.slice(loopAt)).toContain('writeShardSnapshot(key, marker, { posts, from: 0n, entryCount: first.entry_count });');
-    // The app asks for everything: topBuckets: Infinity at the call site (the lane reads that as "all of them").
-    const call = app.slice(app.indexOf('catalog = await lane.sweepChannelCatalog({'), app.indexOf('catalog = await lane.sweepChannelCatalog({') + 200);
-    expect(call).toContain('topBuckets: Infinity');
+    // The app takes the lane's cap rather than overriding it. It used to pass `topBuckets: Infinity`, which
+    // defeated any default and is what made the screen's cost grow with the network; DSC-02 now refuses that at
+    // every call site.
+    const call = app.slice(app.indexOf('catalog = await lane.sweepChannelCatalog({'), app.indexOf('catalog = await lane.sweepChannelCatalog({') + 400);
+    expect(call).not.toContain('topBuckets: Infinity');
+    expect(call).not.toContain('topBuckets: null');
   });
 
   it('DISCOVERSTREAM-02: a throwing consumer cannot stop the sweep', () => {

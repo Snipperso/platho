@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { Address } from '@ton/core';
+import { WRITES_GENERATION } from '../web/cutover-epoch.mjs';
 import { describe, expect, it } from 'vitest';
 
 // EVERY CHAIN ADDRESS THE APP TALKS TO MUST BELONG TO THE LIVE GENESIS. Nothing checked this, and the hole is not
@@ -23,6 +24,18 @@ import { describe, expect, it } from 'vitest';
 // the verification, the sha stops matching and this fails rather than blessing an unverified manifest.
 
 const config = readFileSync('web/platho-config.mjs', 'utf8');
+
+// EVERY CHAIN CONTRACT THE CLIENT NAMES: the config key, the manifest key it must equal, and the.tact file whose
+// presence says the contract still belongs to the generation this build writes. One table, so CFGGEN-02 and
+// CFGGEN-05 can never disagree about what the client is supposed to know.
+const CONFIGURED: Array<[string, string, string]> = [
+  ['ath', 'ath_master', 'ATHMaster'],
+  ['feeAccumulator', 'fee_accumulator', 'FeeAccumulator'],
+  ['airdropPool', 'airdrop_pool', 'AirdropPool'],
+  ['usernameRegistry', 'username_registry', 'UsernameRegistry'],
+  ['profileRegistry', 'profile_registry', 'ProfileRegistry'],
+  ['marketStabilitySeller', 'market_stability_seller', 'MarketStabilitySeller'],
+];
 const INPUT_PATH = 'artifacts/mainnet_genesis_verify_input.json';
 const input = JSON.parse(readFileSync(INPUT_PATH, 'utf8'));
 const report = JSON.parse(readFileSync('artifacts/mainnet_genesis_verify_report.json', 'utf8'));
@@ -46,14 +59,7 @@ describe('client config names the LIVE generation', () => {
 
   it('CFGGEN-02: every configured contract address is the one the verified manifest names', () => {
     const addresses = input.manifest.addresses;
-    const pairs: Array<[string, string]> = [
-      ['ath', addresses.ath_master],
-      ['feeAccumulator', addresses.fee_accumulator],
-      ['airdropPool', addresses.airdrop_pool],
-      ['usernameRegistry', addresses.username_registry],
-      ['profileRegistry', addresses.profile_registry],
-      ['marketStabilitySeller', addresses.market_stability_seller],
-    ];
+    const pairs: Array<[string, string]> = CONFIGURED.map(([key, manifestKey]) => [key, addresses[manifestKey]]);
     for (const [key, expected] of pairs) {
       expect(expected, `the verified manifest has no address for ${key}`).toBeTruthy();
       expect(
@@ -61,6 +67,29 @@ describe('client config names the LIVE generation', () => {
         `${key}: client config says ${configAddress(key)}, verified genesis says ${expected}`,
       ).toBe(true);
     }
+  });
+
+  it('CFGGEN-05: every configured contract still EXISTS in the generation this build writes', () => {
+    // [decided 2026-09-02]
+    //
+    // He is right, and three contracts leave: AirdropPool, AirdropTicket and FeeAccumulator are in contracts/ and
+    // absent from contracts18/. What was wrong was not the rows but the LIST — six entries maintained by hand,
+    // where the flip release must remember to delete three. This project spent a whole day on that class: a gate
+    // aimed at a repealed ruling, a document promising the opposite of its own guard, a supplier list that could
+    // not answer the generation asking it. A list that must be edited in step with a decision taken in another
+    // file is a reminder, and reminders are what get missed.
+    //
+    // So the removal is not scheduled — it is ANNOUNCED. Today WRITES_GENERATION is 17, all six exist in
+    // contracts/, and this is green. The flip sets it to 18, and the two that no longer exist turn this red at
+    // exactly the moment they should be removed, naming themselves. Nothing has to be remembered.
+    const dir = WRITES_GENERATION === 17 ? 'contracts' : 'contracts18/contracts';
+    const missing = CONFIGURED
+      .filter(([, , contract]) => !existsSync(`${dir}/${contract}.tact`))
+      .map(([key, , contract]) => `${key} -> ${contract}.tact`);
+    expect(missing, `this build writes generation ${WRITES_GENERATION}, whose contracts live in ${dir}/, and the `
+      + `client config still names ${missing.join(', ')}. That contract is not part of this generation: drop the `
+      + 'entry from platho-config and its row from CONFIGURED, and say so in the journal.')
+      .toEqual([]);
   });
 
   it('CFGGEN-03: the genesis manifest hash in the config is the verified one', () => {

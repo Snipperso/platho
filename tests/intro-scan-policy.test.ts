@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { planIntroScan, liveBucketsFor, passCostBytes, DEFAULT_POLICY, INTRO_SAFE_CAP } from '../web/intro-scan-policy.mjs';
+import { planIntroScan, liveBucketsFor, passCostBytes, DEFAULT_POLICY, INTRO_SAFE_CAP, BYTES_PER_RECORD } from '../web/intro-scan-policy.mjs';
 import { INTRO_READ_SPACE } from '../web/shard-discovery.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -58,11 +58,55 @@ describe('INTRO-SCAN-POLICY — cost in bytes, not in requests', () => {
     expect(huge.intervalMs, 'at the ceiling it slows further still').toBeGreaterThan(medium.intervalMs);
     expect(huge.intervalMs).toBeLessThanOrEqual(DEFAULT_POLICY.maxIntervalMs);
 
-    // and the whole point: the daily spend stays inside the budget at every scale
-    for (const plan of [small, medium, huge]) {
+    // THE DAILY FIGURE NOW COUNTS THE SWEEP IT IS AMORTISED AGAINST, and that changed what this assertion can
+    // honestly claim. `estimatedDailyBytes` used to report the polls alone while the interval was derived from a
+    // budget the sweeps had already been subtracted from — so it read as "inside budget" at every scale, including
+    // scales where it is not. MEASURED with the current constants: at 8,000/day the day is 5.23 MB; at 1,000,000
+    // it is 30.00 MB against a 30 MiB budget; at the 8.2M/day write ceiling the SWEEP ALONE is 4.85 MB x 4 =
+    // 19.39 MB and the interval is already pinned at its 60-minute ceiling, so the day is 32.66 MB and cannot be
+    // brought lower by any interval. Saying so is the point: a model that reports a met budget while the client
+    // spends more is the failure this file exists to prevent.
+    for (const plan of [small, medium]) {
       expect(plan.estimatedDailyBytes, `budget respected (interval ${plan.intervalMs}ms)`)
         .toBeLessThanOrEqual(DEFAULT_POLICY.budgetBytesPerDay + 1 * MB);
     }
+    expect(huge.intervalMs, 'at the ceiling there is no slower poll to reach for').toBe(DEFAULT_POLICY.maxIntervalMs);
+    expect(huge.estimatedDailyBytes, 'and the overrun is REPORTED rather than hidden')
+      .toBeGreaterThan(DEFAULT_POLICY.budgetBytesPerDay);
+  });
+
+  it('POLICY-08: the records the scan downloads are IN the model, and they are what binds', () => {
+    // THE TERM THAT WAS MISSING. A leak-free scan downloads every (r, view_tag) pair of every live bucket and
+    // trial-decrypts it locally — that is the privacy property — so the bytes that move are proportional to the
+    // NETWORK'S volume, not to this client's. The model counted addresses asked and account rows returned, and
+    // nothing else, then derived the poll interval from that: the client believed it was inside its 30 MiB day
+    // while spending multiples of it.
+    //
+    // 47 B per record is MEASURED: tests/intro-scan-page SCAN-03 puts a scan page at 35.07 B per pair as BOC (32
+    // of them are `r` itself), and the getter hands that BOC over base64, which is 4/3 of it.
+    expect(BYTES_PER_RECORD).toBe(47);
+    const withRecords = passCostBytes({ asked: 10, live: 5, epochs: 3, records: 1_000 });
+    const without = passCostBytes({ asked: 10, live: 5, epochs: 3 });
+    expect(withRecords - without).toBe(1_000 * BYTES_PER_RECORD);
+
+    const live = liveBucketsFor(1_000_000);
+    const blind = planIntroScan({ distinctLiveBuckets: live, liveBuckets: live * 10, readSpace: INTRO_READ_SPACE, msSinceFullSweep: 0 });
+    const honest = planIntroScan({
+      distinctLiveBuckets: live, liveBuckets: live * 10, readSpace: INTRO_READ_SPACE, msSinceFullSweep: 0,
+      recordsPerDay: 1_000_000,
+    });
+    // At a million first contacts a day the records alone are 44.8 MB — above the whole budget, so no interval can
+    // meet it. The plan says so instead of pricing a 30 MB day and polling every four minutes over it.
+    expect(honest.records.bytesPerDay).toBe(1_000_000 * BYTES_PER_RECORD);
+    expect(honest.records.overBudget).toBe(true);
+    expect(honest.estimatedDailyBytes).toBeGreaterThan(blind.estimatedDailyBytes);
+    expect(honest.intervalMs, 'nothing is left for the pollable part').toBe(DEFAULT_POLICY.maxIntervalMs);
+    // At today's measured volume it is a rounding error and nothing changes — the term is honest, not alarmist.
+    const today = planIntroScan({
+      distinctLiveBuckets: 1, liveBuckets: 10, readSpace: INTRO_READ_SPACE, msSinceFullSweep: 0, recordsPerDay: 8_000,
+    });
+    expect(today.records.overBudget).toBe(false);
+    expect(today.intervalMs).toBe(DEFAULT_POLICY.minIntervalMs);
   });
 
   it('POLICY-04: the safety sweep covers the whole space, and only when it is due', () => {

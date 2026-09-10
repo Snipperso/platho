@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from '../web/recovery-lane.mjs';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot, confirmRecoverySlotWrite, confirmRecoverySlotWrites, RECOVERY_CONFIRM_DELAYS_MS } from '../web/recovery-lane.mjs';
 import { selfRecoveryShardSpace, selfRecoveryShard } from '../web/conv-discovery.mjs';
 import { sealRecoveryBlob, sealPrefsBlob } from '../web/recovery-blob.mjs';
 import { PREFS_NAMED_SLOT_INDEX } from '../web/shard-discovery.mjs';
 import { createMemoryConvKeyStore } from '../web/conv-key-store.mjs';
+import { tonCell } from '../web/pwa-contract-transactions.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // RECOVERY-LANE — the restore + backup orchestration, over stub readers. Restore must probe the WHOLE slot range
@@ -169,5 +170,74 @@ describe('RECOVERY-LANE', () => {
     // a fresh (never-written) prefs slot restores cleanly to null (no prefs yet), not an error.
     const empty = await restorePrefsSnapshot({ seed: SEED, readView: async () => ({ bound: false }), readBody: async () => null });
     expect(empty).toEqual({ prefsBytes: null, clean: true });
+  });
+  it('RL-UNREADABLE-01: a bound slot this build cannot open makes the restore UNCLEAN, so backups stay locked', async () => {
+    // [audit 2026-09-01, round 9.] openRecoveryBlob answered an unreadable blob with an EMPTY MAP and the restore
+    // skipped the throw path without touching `clean`. Either way the pass came back clean, which is what unlocks
+    // the backup (convRecoveryBackupAllowed) — and the next dirty slot then published OVER that slot at seq+1,
+    // destroying every conversation in it. The live trigger is a version skew: SEAL_VERSION is 2 and version 1
+    // existed, so two devices on different builds during a PWA rollout is the whole story. Nothing foreign can
+    // be at the slot — the address is seed-derived and the contract makes the slot commit to the owner key — so
+    // an unopenable blob there is THIS seed's own, from a build whose format this one does not read.
+    const slots = (await selfRecoveryShardSpace(SEED)).slots;
+    const target = slots[7];
+    const unreadable = tonCell.snakeCellFromBytes(
+      new TextEncoder().encode(JSON.stringify({ version: 1, alg: 'AES-256-GCM', nonce: 'AA', ciphertext: 'BB' })),
+      'recovery blob',
+    );
+    const result: any = await restoreConvKeysFromRecovery({
+      seed: SEED,
+      readView: async (address: string) => (address === target.address ? { bound: true, seq: 3 } : { bound: false }),
+      readBody: async (address: string) => (address === target.address ? unreadable : null),
+    });
+    expect(result.clean, 'a slot that could not be opened must not read as a clean pass').toBe(false);
+    expect(result.map.size, 'and nothing may be claimed as restored from it').toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// THE RECEIPT [audit 2026-09-05, round 2]: a self-lane write is saved when the slot's seq shows it, not when the
+// external is queued at a door. These gates hold the poller that every self lane now waits on.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+describe('recovery slot receipt', () => {
+  const slot = '0:' + 'aa'.repeat(32);
+  it('RL-RECEIPT-01: the write is confirmed the moment a slot shows the claimed seq, and not before', async () => {
+    const seqs = [3n, 3n, 4n];   // two reads still show the old seq, the third the claimed one
+    let reads = 0;
+    const slept: number[] = [];
+    const readView = async () => ({ bound: true, seq: seqs[Math.min(reads++, seqs.length - 1)] });
+    const receipt = await confirmRecoverySlotWrites({ readView, writes: [{ address: slot, seq: 4 }], sleep: async (ms: number) => { slept.push(ms); } });
+    expect(receipt.landed).toBe(true);
+    expect(receipt.pending).toEqual([]);
+    expect(reads, 'stopped reading once the seq showed').toBe(3);
+    expect(slept, 'one rung of the ladder per read').toEqual([...RECOVERY_CONFIRM_DELAYS_MS.slice(0, 3)]);
+    // a seq PAST the claimed one is a landed write only when the caller cannot name its content...
+    expect(await confirmRecoverySlotWrite({ readView: async () => ({ bound: true, seq: 9n }), address: slot, seq: 4, sleep: async () => {} })).toBe(true);
+    // ...WITH the content named, the slot must hold THIS blob [round 3]: a sibling's write that took the seq is not ours
+    const h1 = 0xabcn;
+    expect(await confirmRecoverySlotWrite({ readView: async () => ({ bound: true, seq: 4n, h1 }), address: slot, seq: 4, h1, sleep: async () => {} }), 'seq and h1 shown').toBe(true);
+    expect(await confirmRecoverySlotWrite({ readView: async () => ({ bound: true, seq: 4n, h1: 0xdefn }), address: slot, seq: 4, h1, delaysMs: [1, 1], sleep: async () => {} }), 'the seq is there, the content is not ours').toBe(false);
+    expect(await confirmRecoverySlotWrite({ readView: async () => ({ bound: true, seq: 9n, h1: 0xdefn }), address: slot, seq: 4, h1, delaysMs: [1, 1], sleep: async () => {} }), 'a later write of another content does not vouch for this one').toBe(false);
+  });
+
+  it('RL-RECEIPT-02: a slot that never shows the seq, an unbound slot and a read that throws all leave the write pending', async () => {
+    let reads = 0;
+    const never = await confirmRecoverySlotWrites({ readView: async () => { reads++; return { bound: true, seq: 3n }; }, writes: [{ address: slot, seq: 4 }], sleep: async () => {} });
+    expect(never.landed).toBe(false);
+    expect(never.pending).toEqual([{ address: slot, seq: 4n }]);
+    expect(reads, 'every rung of the ladder was used').toBe(RECOVERY_CONFIRM_DELAYS_MS.length);
+    expect(await confirmRecoverySlotWrite({ readView: async () => null, address: slot, seq: 1, sleep: async () => {} }), 'unbound').toBe(false);
+    let throws = 0;
+    const thrown = await confirmRecoverySlotWrite({ readView: async () => { throws++; throw new Error('429'); }, address: slot, seq: 1, delaysMs: [1, 1, 1], sleep: async () => {} });
+    expect(thrown).toBe(false);
+    expect(throws, 'a read that throws is asked again on the next rung').toBe(3);
+    // several writes: the ones that landed leave the ladder, the one that did not is named
+    const other = '0:' + 'bb'.repeat(32);
+    const two = await confirmRecoverySlotWrites({
+      readView: async (address: string) => (address === slot ? { bound: true, seq: 7n } : { bound: true, seq: 1n }),
+      writes: [{ address: slot, seq: 7 }, { address: other, seq: 2 }], delaysMs: [1, 1], sleep: async () => {},
+    });
+    expect(two.landed).toBe(false);
+    expect(two.pending).toEqual([{ address: other, seq: 2n }]);
   });
 });

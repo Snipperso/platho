@@ -5,7 +5,7 @@ import { sha256 as nobleSha256 } from '../web/vendor/@noble/hashes/sha2.js';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PERMALINKS — platho.app/<username|wallet>/<epochTag.shardSeq.entryId>
 //
-// Owner, 2026-08-13: "давай ссылку сделай так platho.app/юзернейм или адресс кошелька/пост".
+// decided 2026-08-13.
 //
 // The link is the only way a post leaves Platho to someone who is not here yet, so the whole chain has to hold
 // at once: the server must answer a two-segment path with the app shell, the shell must still find its assets from
@@ -234,15 +234,13 @@ describe('public post permalinks', () => {
 });
 
 describe('a post link survives its author renaming, and refuses rather than substitutes', () => {
-  // [OWNER 2026-08-24: "if someone shares a link with a username and then passes the username to another person,
-  // the link can be substituted for a post by the NEW owner". Confirmed in the source: the name resolves to a
+  // [decided 2026-08-24 Confirmed in the source: the name resolves to a
   // wallet AT OPEN TIME. Two outcomes, and the second is the dangerous one — either the new holder has no entry
   // with this id and the link breaks, or they HAVE one (an entry id is unique within a channel, not across the
   // chain, and early ids are small numbers that collide readily) and a different person's post opens with nothing
   // to show it was swapped.]
   //
-  // A CHANNEL link deliberately keeps the old behaviour [OWNER: "a channel link should lead to the channel of
-  // whoever owns the username, that's normal"] — it names an IDENTITY, and the identity is the name. A post link
+  // A CHANNEL link deliberately keeps the old behaviour [decided] — it names an IDENTITY, and the identity is the name. A post link
   // names CONTENT, which belongs to whoever wrote it.
   it('PERMA-11: a post link carries a fingerprint of the author wallet; a channel link does not', () => {
     expect(app).toMatch(/const PERMALINK_FINGERPRINT_CHARS = 8;/);
@@ -281,7 +279,15 @@ describe('a post link survives its author renaming, and refuses rather than subs
     expect(app).toMatch(/fingerprint: cut < 0 \? null : segment\.slice\(cut \+ 1\),/);
     expect(app, 'a missing fingerprint is not a mismatch').toMatch(/if \(!wallet \|\| !fingerprint\) return wallet;/);
     // The separator cannot be confused with either half: a username is [a-z0-9_-] and an address is base64url.
-    expect(app).toContain('const PUBLIC_POST_PERMALINK_RE = /^\\/([A-Za-z0-9_.:~-]{4,90})\\/(\\d+\\.\\d+\\.\\d+)\\/?$/;');
+    // THREE GROUPS OR FOUR [round 6]: round 5 made the generation a post id's fourth coordinate and this regex —
+    // the ONE consumer with a parser of its own — was missed, so the app minted links its own router refused.
+    // Pinned as BEHAVIOUR, not as literal text: the shapes that must parse and the shapes that must not.
+    expect(app).toContain('const PUBLIC_POST_PERMALINK_RE = /^\\/([A-Za-z0-9_.:~-]{4,90})\\/(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)\\/?$/;');
+    const re = new RegExp(app.match(/const PUBLIC_POST_PERMALINK_RE = (\/.*\/);/)![1].slice(1, -1));
+    expect(re.test('/alice~9ez6npsm/441.0.5'), 'a generation-17 link keeps working').toBe(true);
+    expect(re.test('/alice~9ez6npsm/441.0.5.18'), 'and a post published after the flip is routable').toBe(true);
+    expect(re.test('/alice/441.0.5.18.3'), 'but not a fifth coordinate').toBe(false);
+    expect(re.test('/alice/12345'), 'nor a pre-shard v1 id, which has no addressable row').toBe(false);
   });
 
   it('PERMA-14: every locale can say that the name changed hands', async () => {

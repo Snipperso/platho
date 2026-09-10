@@ -7,17 +7,34 @@
 // message history. This module parses one such body — the exact inverse of conv-publish-browser.buildConvPublishBody —
 // into the three snake cells + seq + write signature, then shapes the chain-entry privateCapsuleFromChainEntry opens.
 //
-// AUTHENTICATION IS THE CRYPTO, NOT THE SHARD. A parsed capsule is authenticated downstream: openPrivateCapsuleChainEntry
-// decrypts to the recipient's keys and verifies the sender's in-body signature, so a junk message sent to the shard
-// address that is not encrypted to the recipient (or not signed by the sender) simply fails to open and is dropped.
+// AUTHENTICATION IS THE CRYPTO, NOT THE SHARD — BUT IT AUTHENTICATES THE CONVERSATION, NOT THE AUTHOR.
+// [CORRECTED 2026-08-31, round 8 — the crypto's first audit. This paragraph used to say the open path "verifies the
+// sender's in-body signature". IT DOES NOT, and platho-crypto.mjs's own note at openPrivateCapsuleChainEntry says so
+// plainly: the sender signature covers the body HASH, so it cannot ride inside the body, and the three-cell wire
+// carries no slot for it — privateCapsulePublishDraft emits header0/header1/body and three hashes, nothing else.
+// A chain-sourced capsule therefore has NO senderSignature to verify.]
+//
+// What openPrivateCapsuleChainEntry actually proves: the capsule was sealed TO this recipient (only their static
+// x25519 + ML-KEM secrets open it), and the in-body identity section is AEAD-bound to header0Hash + sender_key_id.
+// What it does NOT prove is WHO sealed it — the recipient's bundle is public, so anyone can seal to them, and the
+// signing key inside the identity section is whatever the sealer chose to put there. The only thing binding a
+// capsule to the conversation is the WRITE signature below, under a key BOTH parties derive for BOTH directions.
+//
+// CONSEQUENCE, stated so nobody has to rediscover it: a holder of K_root — the two participants, or anyone who
+// obtains a stale recovery blob or an unlocked device — can author a message in either direction under any claimed
+// identity, and it opens as an ordinary message. CONV traffic is DENIABLE, not attributable. The INTRO lane is the
+// opposite: its first-contact binding (keyId == H(enc, mlkemHash) plus the K_root confirm tag) is genuinely strong.
+// Whether CONV should gain per-message sender attribution is a product decision, not an oversight to patch quietly.
 // verifyConvWriteSignature ADDITIONALLY re-checks the ed25519 signature over (seq ‖ frameCommit) under the
 // conversation-direction WRITE public key — the same gate RecordShard enforces (gate 13653) — so a client can reject
 // forged/replayed bodies BEFORE spending a decrypt attempt on them. The write key is public knowledge to both parties
 // (derived from the shared K_root), so this authenticates the transport, not the message content.
 
-import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=37';
-import { toWireAddress } from './shard-reader.mjs?v=26';
+import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=47';
+import { toWireAddress } from './shard-reader.mjs?v=61';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=1';
+import { parseVaultPublishEnvelope } from './m21c-envelope.mjs?v=3';
+import { convWriteDigestCell } from './conv-publish-browser.mjs?v=30';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 // MUST equal conv-publish-browser + RecordShard.tact — mirrored (not imported) so a drift is caught by the round-trip
@@ -87,8 +104,17 @@ const cellToBocBase64 = (cell) => tonCell.bytesToBase64(serializeBoc(cell));
  */
 export function parseCapsulePublishBody(bodyCell) {
   if (!bodyCell) return null;
+  // A DISCOUNTED PUBLISH ARRIVES WRAPPED. The user's FeeVault sends it as an M21C VaultPublish and the shard
+  // unwraps `record` before storing, so the entry on chain is identical — but the shard's message HISTORY, which
+  // is what this reader walks, holds the envelope. Matching the direct opcode alone returned null on every
+  // discounted message: paid for, on chain, and read by nobody. See web/m21c-envelope.mjs.
+  // Nothing else changes on this lane: a CONV record is authenticated by the ed25519 write signature OVER THE
+  // RECORD (verifyConvWriteSignature), never by the sender, so once the record is in hand the check is the same
+  // one it always was.
+  const envelope = parseVaultPublishEnvelope(bodyCell, cellReader);
+  const inner = envelope ? envelope.record : bodyCell;
   try {
-    const r = cellReader(bodyCell);
+    const r = cellReader(inner);
     if (r.remaining() < 32 + 64) return null;
     if (r.loadUint(32) !== CAPSULE_PUBLISH_OPCODE) return null;
     const seq = r.loadUint(64);
@@ -101,6 +127,14 @@ export function parseCapsulePublishBody(bodyCell) {
     const body = rb.loadRef();
     const sig = sigBytesFromCell(rb.loadRef());
     if (!header0 || !header1 || !body || !sig) return null;
+    // A SEQ THIS CLIENT CANNOT COUNT WITH IS NOT A RECORD [audit 2026-09-01, round 9]. On chain the field is
+    // `Int as uint64` with only `seq > last_seq` enforced (RecordShard gate 13653) — no upper bound — and the
+    // peer derives BOTH directions' write keys from K_root, so it can publish into the shard this device writes
+    // its OWN outgoing messages into. Every seq on this path becomes a JS Number, and past 2^53 that arithmetic
+    // stops being arithmetic: MEASURED, a record at 9007199254740992 makes the next honest record at ...93 read
+    // back as the SAME number, so the pre-decrypt gate skips it unseen. Refusing the row here keeps the poison
+    // out of the seq high-water entirely; the shard's own last_seq is a separate matter (see nextOutgoingSeq).
+    if (!Number.isSafeInteger(Number(seq))) return null;
     return { seq, header0, header1, body, sig };
   } catch {
     return null;
@@ -317,19 +351,25 @@ export function createRecordShardLastSeqReader(runGetMethod) {
 }
 
 /**
- * Verify the transport-level write signature of a parsed CapsulePublish: ed25519 over H(RS_WRITE_DOMAIN ‖ seq ‖
- * frameCommit) under the conversation-direction write public key (the value incomingRecordShards returns per bucket).
- * Same computation RecordShard verifies before storing. Returns true/false; safe to call on any parsed body.
+ * Verify the transport-level write signature of a parsed CapsulePublish, exactly as RecordShard verifies it
+ * before storing. Returns true/false; safe to call on any parsed body.
+ *
+ * THE DIGEST HAS TWO SHAPES AND THE EPOCH PICKS ONE [audit 2026-09-01, round 11]. clean-17 signs
+ * H(domain ‖ seq ‖ frameCommit); clean-18 appends the shard's own `epoch`, because without it one signature was
+ * accepted by two different accounts — MEASURED on the real contracts: the same signed bytes stored a record in
+ * RecordShard(pk, E) AND in RecordShard(pk, E+1), exit 0 at both. So this reader must ask the same question the
+ * shard did, and the epoch is the thing that names the generation. Passing no epoch is refused rather than
+ * defaulted: a wrong shape here does not accept junk (the shard is the authority) but it DROPS real messages,
+ * which is silent loss on the read side.
  */
-export async function verifyConvWriteSignature(parsed, writePublicKey) {
+export async function verifyConvWriteSignature(parsed, writePublicKey, epoch, { boundary } = {}) {
   if (!parsed?.sig || !writePublicKey) return false;
   try {
     const commit = await convFrameCommit(parsed.header0, parsed.header1, parsed.body);
-    const digestCell = tonCell.beginCell()
-      .uint(RS_WRITE_DOMAIN, 32, 'RS_WRITE_DOMAIN')
-      .uint(BigInt(parsed.seq), 64, 'seq')
-      .uint(commit, 256, 'frameCommit')
-      .endCell();
+    // `boundary` is the writer's own test seam (convWriteDigestCell), and the verifier needs it for the same
+    // reason: the digest has two shapes, the epoch names the generation, and until CUTOVER_EPOCH stops being
+    // null only a caller that says so can rehearse the four-field one. Production passes nothing.
+    const digestCell = convWriteDigestCell({ seq: parsed.seq, commit, epoch, ...(boundary === undefined ? {} : { boundary }) });
     const { hash: digest } = await computeCellHashAndDepth(digestCell);
     const pub = writePublicKey instanceof Uint8Array ? writePublicKey : Uint8Array.from(writePublicKey);
     return ed25519.verify(parsed.sig, digest, pub);

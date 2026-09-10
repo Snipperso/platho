@@ -137,9 +137,7 @@ export function plathoUsernameTier(name) {
 }
 
 /**
- * The tone a name is painted in. A .ath name splits by tier [OWNER 2026-08-24: "we have ordinary usernames (6+
- * letters), rare (5) and epic (4). On the NFT picture we mark that with colours — gold, silver. Maybe we should
- * mark 4-5 letter usernames with gold and silver in the app too?"] — so the scarcity a holder paid for is visible
+ * The tone a name is painted in. A .ath name splits by tier [decided 2026-08-24] — so the scarcity a holder paid for is visible
  * where their name actually appears, not only on the token's art.
  *
  * COMMON keeps the existing tone unchanged: it is the default case, and colouring it too would say nothing.

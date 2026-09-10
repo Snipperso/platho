@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 
 // HOW WIDE IS A DIALOG? ONE ANSWER.
 //
-// Owner, 2026-08-07, looking at a freshly added modal: "есть ощущение, что эта модалка шире, чем остальные" — and
-// then, once the numbers were on the table, "сделай стандарт ширины для модалок, а то смотрю куча разных цифр".
+// decided 2026-08-07, looking at a freshly added modal— and
+// then, once the numbers were on the table,.
 // MEASURED across all eight modals that day: 440 for the forms, 460 for the quick start, 520 for the install sheet,
 // 980 for the docs reader, and the new one had copied the 520. Nothing enforced any of it; the widths agreed only
 // where somebody had remembered to type the same digits.
@@ -72,7 +72,7 @@ describe('MODALGEO — every dialog is the same width because it reads the same 
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
   it('MODALGEO-04: every disabled control dims by the SAME token', () => {
-    // [OWNER 2026-08-10] "все неактивные кнопки должны гаснуть одинаково — единый источник истины." They did not:
+    // [decided 2026-08-10] They did not:
     // 0.46, 0.55, 0.58 and 0.62 had drifted in across five rule blocks, plus three different cursors, so how
     // "disabled" looked depended on which button you happened to be looking at. The measured trigger was the New
     // chat submit — genuinely disabled during the lookup, but dimmed too little for anyone to notice.

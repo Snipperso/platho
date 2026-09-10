@@ -160,26 +160,16 @@ export const PLATHO_APP_CONFIG = deepFreeze({
     rootAddress: '-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c',
     provider: {
       globalName: 'plathoTonDnsProvider',
-      moduleUrl: './ton-dns-provider.mjs?v=58',
+      moduleUrl: './ton-dns-provider.mjs?v=71',
       exportName: 'default',
       unavailableStatus: 'TON DNS provider required',
       requiredInProduction: true,
     },
   },
-  // clean-17 public/avatar lane. DIRECT-PAY is the shipping path: public posts publish straight from the wallet into
-  // the author's CHANNEL PublicShard (PPH2, StateInit-lazy-deploy) and the feed reads those shards via public-lane.
-  // [CUTOVER 2026-07-24] clean-15 has zero live users and balances are withdrawn — the Vault/CapsuleHub batch path is
-  // being removed (capsulehub-vault-removal-plan phase 3), so this defaults ON. On-chain correctness is validated by a
-  // live run against the clean-17 PublicShard genesis; the sandbox proves the message + deploy figures.
-  publicLane: {
-    directPay: true,
-  },
-  // clean-17 private lane (CONV messages / INTRO first contact / RECOVERY durability). DIRECT-PAY is the shipping path:
-  // messages publish straight from the wallet into the shards, first contact is scanned stealthily off IntroShard, and
-  // the pairwise K_root is adopted into the local conv key store. [CUTOVER 2026-07-24] see publicLane — Vault path removed.
-  privateLane: {
-    directPay: true,
-  },
+  // [RETIRED 2026-08-29] publicLane/privateLane directPay flags lived here from the 2026-07-24 cutover until the
+  // Vault fallback branches they gated were deleted outright. Direct pay is not a mode any more — it is the only
+  // protocol the client speaks, and tests/client-speaks-clean17-protocol.test.ts now pins the ABSENCE of the flag
+  // and of every Vault builder instead of pinning the flag's one legal value.
   // The genesis this client build claims. It is the DOMAIN SEPARATOR for signed publishes and the value the release
   // guard binds to the verified-genesis evidence (artifacts/mainnet_genesis_verify_input.json): a production bundle
   // that names a different genesis than the one that was verified must not ship. It used to live under `vault` —
@@ -216,6 +206,13 @@ export const PLATHO_APP_CONFIG = deepFreeze({
   },
   profileRegistry: {
     address: 'UQD6tZwZRgWhKv0jzTSN2qyq00ANGR29LVInsFkXwALRKL31',
+  },
+  // The moderation GATE (clean-18, CUTOVER item 15): the one address the content shards trust, deployed once by the
+  // owner's console wallet before the seal. Null until then; every moderation surface answers 'unavailable' by name
+  // while it is null. The ledger is not a config constant — clients read it from the gate (get_ledger), so the
+  // council can hand over to a successor ledger without a release.
+  moderationGate: {
+    address: null,
   },
   crypto: {
     signedBundlePurpose: 'pwa-production',
@@ -503,6 +500,10 @@ export function validatePlathoAppConfig(config = PLATHO_APP_CONFIG) {
     if (!config?.feeAccumulator?.address) {
       addFinding(
         findings,
+        // 🔴 CUTOVER: contracts18/docs/CUTOVER.md item 8. clean-18 has no FeeAccumulator singleton — the fee
+        // fleet is 64 sinks derived from FS_SINK_COUNT — and nothing in the live tree reads the configured value
+        // anyway (measured: zero readers). On the day, this requirement blocks a production config or forces a
+        // lie into one.
         'PWA_FEE_ACCUMULATOR_ADDRESS_REQUIRED',
         'Production PWA config must set FeeAccumulator address — every direct-pay publish routes its fee through it.',
       );

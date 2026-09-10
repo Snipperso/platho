@@ -2,8 +2,7 @@
 // ported from web-about/main.js. Pure and context-based so it runs on EITHER the main thread (HTMLCanvas ctx)
 // OR inside a worker (OffscreenCanvas ctx) — the caller drives the loop and resize. No requestAnimationFrame
 // here (workers don't have it): tick(now) self-gates to ~33fps. English-only (OPSEC): no user-facing text.
-// EVERY KNOB DEFAULTS TO THE BOOT SCREEN AS IT SHIPS [OWNER 2026-08-23: "for the nodes, set the defaults to exactly
-// what we have on the loading screen now"], so a caller that passes nothing gets today's field, byte for byte. The
+// EVERY KNOB DEFAULTS TO THE BOOT SCREEN AS IT SHIPS [decided 2026-08-23], so a caller that passes nothing gets today's field, byte for byte. The
 // app's Appearance settings pass multipliers around 1: brightness (the dots), runners (how many routes travel at
 // once), speed (the hop tempo) and lights (how strongly the two roaming flashlights lift the lattice).
 export function createBootSignalField(ctx, {
@@ -12,8 +11,26 @@ export function createBootSignalField(ctx, {
   runners = 1,
   speed = 1,
   lights: lightLevel = 1,
+  // WHAT SITS AT EACH LATTICE POINT. Null is the dot this field has always drawn; anything drawable (a canvas, an
+  // ImageBitmap) replaces it without touching the geometry, the flashlights or the alpha ramp — a lattice point
+  // still brightens and swells exactly as much as it did, it just wears a different mark. The boot screen and the
+  // worker pass nothing and are unaffected; a worker could only ever take an ImageBitmap anyway.
+  mark = null,
+  markSize = 16,
+  // WHAT THE FIELD IS PAINTED IN, as the `r, g, b` of an rgba(). The default is the app's own accent, which is what
+  // this field was born with and what every caller that knows nothing about gifts still gets. A worn gift hands
+  // over its backdrop colour instead, so the lattice, the routes between its points and the mark on them are all
+  // the one colour — the same one the plasma uses on the other background.
+  ink = '48, 213, 176',
 } = {}) {
-  const TEAL = '48, 213, 176';
+  // The mark can arrive LATE. The boot screen starts its field before the gift's artwork has been decoded (and,
+  // on the worker path, before an ImageBitmap can be handed across the boundary), so it is a variable rather than
+  // a constant and `setMark` below swaps it in without rebuilding the lattice.
+  let markImage = mark;
+  const INK = typeof ink === 'string' && ink.trim() ? ink.trim() : '48, 213, 176';
+  // How much brighter a picture must be drawn than the dot it replaces, and how much sparser. See drawMarks.
+  const MARK_ALPHA_SCALE = 2.2;
+  const MARK_STRIDE = 1;
   const TWO_PI = Math.PI * 2;
   const GAP = 38;
   const clamp = (value, min, max) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : 1));
@@ -86,6 +103,9 @@ export function createBootSignalField(ctx, {
     return b;
   }
   function drawDots() {
+    // ONE BRANCH, HOISTED OUT OF THE LOOP. This runs over every lattice point of a full-screen field on every
+    // frame — a few hundred of them — so the mark test belongs here and not inside the inner loop.
+    if (markImage) { drawMarks(); return; }
     for (let c = 0; c < cols; c += 1) {
       for (let r = 0; r < rows; r += 1) {
         const x = nx(c); const y = ny(r);
@@ -93,10 +113,44 @@ export function createBootSignalField(ctx, {
         const a = (AMBIENT + BOOST * lb) * edgeFade(x, y);
         ctx.beginPath();
         ctx.arc(x, y, 1.3 + 1.1 * lb, 0, TWO_PI);
-        ctx.fillStyle = `rgba(${TEAL},${a.toFixed(3)})`;
+        ctx.fillStyle = `rgba(${INK},${a.toFixed(3)})`;
         ctx.fill();
       }
     }
+  }
+
+  /**
+   * The same lattice, wearing the caller's mark.
+   *
+   * The alpha and the swell come from the SAME two numbers as the dot (`lightAt` and `edgeFade`), so the field
+   * breathes identically — a flashlight passing still lifts a point by exactly the ratio it always did. The cost
+   * per point is one drawImage of an already-rasterised bitmap against one path fill, which is a wash; the field
+   * was always this many operations per frame.
+   */
+  function drawMarks() {
+    const prev = ctx.globalAlpha;
+    // NO AMBIENT AT ALL [decided 2026-09-06]: an unlit tile must be completely invisible.
+    // The dot kept a faint floor so the lattice always read as a lattice; a PATTERN should not — unlit, it is the
+    // plain backdrop, and the symbol exists only where something is shining on it. The boost keeps its own scale,
+    // because a picture at the dot's strength is invisible on a page painted in that gift's own backdrop.
+    const boost = BOOST * MARK_ALPHA_SCALE;
+    // …and its own spacing, which follows the size. At twenty-odd pixels a mark nearly filled the 38px lattice cell
+    // and had to skip every other point to breathe; halved [decided 2026-09-06, it read too large] it
+    // sits at every point again, which keeps the ink per area about where it was while each symbol reads finer —
+    // and puts the draw count back to what the dot field always spent.
+    for (let c = 0; c < cols; c += MARK_STRIDE) {
+      for (let r = 0; r < rows; r += MARK_STRIDE) {
+        const x = nx(c); const y = ny(r);
+        const lb = lightAt(x, y);
+        const a = boost * lb * edgeFade(x, y);
+        if (a <= 0.004) continue;   // unlit, or as good as: nothing to paint, and no call to pay for
+        const size = markSize * (0.82 + 0.30 * lb);
+        const half = size / 2;
+        ctx.globalAlpha = a > 1 ? 1 : a;
+        ctx.drawImage(markImage, x - half, y - half, size, size);
+      }
+    }
+    ctx.globalAlpha = prev;
   }
   function updateLights(dt) {
     const s = dt / 1000;
@@ -135,17 +189,34 @@ export function createBootSignalField(ctx, {
     ctx.beginPath();
     ctx.moveTo(x0, y0);
     ctx.lineTo(x1, y1);
-    ctx.strokeStyle = `rgba(${TEAL},${a.toFixed(3)})`;
+    ctx.strokeStyle = `rgba(${INK},${a.toFixed(3)})`;
     ctx.lineWidth = 1.1;
     ctx.stroke();
   }
   function litNode(x, y, inten, v) {
+    // THE RUNNER WEARS THE MARK TOO. Its head is the same lattice point, lit — leaving it a dot while the lattice
+    // around it wore the gift is exactly the seam the owner spotted. It is drawn larger and at full opacity because
+    // that is what "lit" has always meant here; the dot did it with a brighter fill, a picture does it with size.
+    if (markImage) {
+      // ALPHA FOLLOWS THE DECAY, and that is the fix for a trail that "cut off" [owner, 2026-09-06]. It used to be
+      // `0.55 + 0.45 * inten`, so a node still sat above half opacity at `inten` 0.02 — where drawSignals stops
+      // drawing it — and the symbol did not fade out, it was switched off. Proportional, like the dot always was,
+      // it is already invisible by the time the cutoff arrives.
+      const size = markSize * (1.05 + 0.45 * inten);
+      const half = size / 2;
+      const prev = ctx.globalAlpha;
+      const a = inten * v;
+      ctx.globalAlpha = a > 1 ? 1 : a;
+      ctx.drawImage(markImage, x - half, y - half, size, size);
+      ctx.globalAlpha = prev;
+      return;
+    }
     // No shadowBlur — the single most expensive per-frame op; a brighter cyan fill reads the same.
     ctx.beginPath();
     ctx.arc(x, y, 1.4 + 2.2 * inten, 0, TWO_PI);
     ctx.fillStyle = inten > 0.55
       ? `rgba(210, 255, 244,${(0.9 * inten * v).toFixed(3)})`
-      : `rgba(${TEAL},${(0.85 * inten * v).toFixed(3)})`;
+      : `rgba(${INK},${(0.85 * inten * v).toFixed(3)})`;
     ctx.fill();
   }
   function drawSignals(dt) {
@@ -201,5 +272,8 @@ export function createBootSignalField(ctx, {
     gate = 0;
   }
 
-  return { resize, start, tick, paintOnce };
+  /** Hand the field its mark once it exists — see markImage above. Null puts the dots back. */
+  function setMark(next) { markImage = next ?? null; }
+
+  return { resize, start, tick, paintOnce, setMark };
 }

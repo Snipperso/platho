@@ -35,6 +35,6 @@ describe('publish double-spend gate — direct pay', () => {
     // ...but ONLY when the failure was ambiguous. A chain verdict (exit code 133) proves the bytes dead, and
     // handing a corpse to the re-broadcast path is what kept the owner's image on "sending" for 6.5 minutes.
     expect(wallet).toMatch(/if \(!definitivelyRejected && error && typeof error === 'object' && built\?\.boc/);
-    expect(wallet).toMatch(/if \(definitivelyRejected\) resetWalletSeqnoFloor\(wallet\)/);
+    expect(wallet).toMatch(/if \(seqnoMismatch\) resetWalletSeqnoFloor\(wallet\)/);   // round 3: the floor resets on every 133; the bytes are withheld only when no earlier door's answer was lost
   });
 });

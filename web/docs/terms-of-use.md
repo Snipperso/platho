@@ -51,11 +51,16 @@ Platho to publish content that is unlawful where you are, that infringes
 someone's rights, that depicts the abuse of children, or that is intended to
 threaten, defraud or harass.
 
-Understand what this means in practice: **the protocol has no moderation and no
-delete function.** We cannot remove a post, block an author or take a channel
-down, and neither can anyone else. This is a property of the system, not a
-policy choice, and it is the reason the rule above matters more here than it
-would elsewhere.
+Understand what this means in practice: **the protocol has no delete
+function.** We cannot remove a post from the chain, and neither can anyone
+else. What exists is moderation of visibility: readers can report a public
+post or comment, and moderators seated by the project's council can mark it
+hidden, warn its author, or restrict the author's wallet from public
+publishing. A hidden post stays on the chain and stays visible to its own
+author; other clients that follow the moderation ledger stop showing it. A
+report is a public transaction from the reporting wallet. This is a property
+of the system, not a policy choice, and it is the reason the rule above matters
+more here than it would elsewhere.
 
 ## 5. Availability
 

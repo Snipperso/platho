@@ -231,6 +231,21 @@ export async function establishConvKRootResponder({
 
 // ---- ratchet & bucket ----
 
+/**
+ * PER-EPOCH KEY SEPARATION — NOT A RATCHET, whatever the domain constants are called [audit 2026-08-31, round 8].
+ *
+ * This is HKDF(K_root, salt, info‖epoch): a pure function of the root and the day. A real ratchet derives K(n+1)
+ * from K(n) and DESTROYS K(n), which is what buys forward secrecy; from K_root here you can derive any epoch, past
+ * or future, forever. MEASURED: given only K_root, both directions' bucket keys AND write signing secrets were
+ * derived at epoch −3650, −1, 0, +1 and +3650.
+ *
+ * What it DOES buy is real and worth keeping: one epoch's key exposes only that epoch's bucket, so a key recovered
+ * from one day's traffic does not open the neighbouring days. Nothing more should be claimed for it.
+ *
+ * ⚠️ THE CONSTANT NAMES ARE FROZEN, misleading or not: CONV_RATCHET_SALT_DOMAIN and CONV_RATCHET_INFO_DOMAIN are
+ * INSIDE the KDF. Renaming them re-derives every K_epoch and orphans every conversation on chain. The words stay;
+ * this note is the correction.
+ */
 export async function computeKEpoch(kRoot, epoch) {
   const info = concatBytes(utf8(CONV_RATCHET_INFO_DOMAIN), u32be(epoch));
   return hkdf256(assertBytes('kRoot', kRoot, CONV_KEY_BYTES), utf8(CONV_RATCHET_SALT_DOMAIN), info, CONV_KEY_BYTES);
@@ -343,7 +358,7 @@ export async function selfRecoveryBucketKey(seed) {
 // bind — any of the slots, even after a 3-year eviction frees one. Deterministic from the seed so a reinstalled
 // client re-derives the same signing key; the recovery publish signs owner_sig with recoveryOwnerSecret.
 //
-// PER-SLOT OWNER KEY [W1-015 fix, owner re-approved 2026-07-24 — reverses "ONE OWNER KEY [owner decision 2026-07-19]"].
+// PER-SLOT decided 2026-07-24].
 // The slotIndex is folded into the HKDF info, so every slot gets an INDEPENDENT owner key. WHY: the old shared key was
 // public (RecoveryStore body + get_view), so from ONE observed slot an attacker computed H(RS_SLOT_DOMAIN ‖ owner_pubkey
 // ‖ i) for every i and enumerated the user's WHOLE recovery trail — slot count and per-slot write timing — and the key

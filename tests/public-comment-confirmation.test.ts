@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // A PUBLISHED COMMENT MUST STOP SAYING "CONFIRMING".
 //
-// Owner, 2026-08-13: "коммент отправляется. Но по моему статус отправки замерзает на конфирминг. В консоли
-// тишина."
+// decided 2026-08-13
 //
 // Two independent holes, both specific to COMMENTS:
 //
@@ -20,6 +19,9 @@ import { readFileSync } from 'node:fs';
 //
 // Posts do not share either hole: the channel walk returns them, so their pending twin retires normally.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+import { parseTonAddress } from '../web/crypto/platho-crypto.mjs';
+import { formatTonUserFriendlyAddress } from '../web/platho-wallet.mjs';
 
 const app = readFileSync('web/app.js', 'utf8');
 
@@ -38,18 +40,40 @@ function loadRetire(cache: Record<string, unknown>) {
       return Boolean(a && b && a === b);
     };
     const sameCachedPublicPost = (p, i) => String(p?.entryId ?? p?.id) === String(i?.entryId ?? i?.id);
+    // The retirement now also requires the AUTHOR to match [audit 2026-09-01, round 9]: matching on body hash
+    // alone let a STRANGER's identical comment retire this device's pending one as confirmed — the pending record
+    // vanished, the UI turned green, and the entry it stood for was never published. Two people writing "ok" was
+    // all it took, because a comment's PPH2 body cell carries only the document bytes while the publisher lives
+    // in the header. Lifted verbatim from app.js rather than restated, so this stub cannot describe a comparison
+    // the product does not make.
+    ${(() => {
+      const at = app.indexOf('function sameWalletAddress(');
+      let depth = 0;
+      for (let i = app.indexOf('{', at); i < app.length; i += 1) {
+        if (app[i] === '{') depth += 1;
+        else if (app[i] === '}') { depth -= 1; if (depth === 0) return app.slice(at, i + 1); }
+      }
+      throw new Error('sameWalletAddress braces do not balance');
+    })()}
   `;
   // eslint-disable-next-line no-new-func
-  return new Function(`${prelude}\n${app.slice(start, end)}
-    return { retire: retireConfirmedLocalPublicComments, cache: () => publicChannelFeedCache, commits: () => committed };`)();
+  return new Function('parseTonAddress', `${prelude}\n${app.slice(start, end)}
+    return { retire: retireConfirmedLocalPublicComments, cache: () => publicChannelFeedCache, commits: () => committed };`)(parseTonAddress);
 }
 
 const POST = { entryId: '441.0.3', channelId: 'lace.ath', bodyHash: '0xaa' };
 const cacheWith = (comments: unknown[]) => ({
   'lace.ath': { syncedAt: 'X', feed: { version: 1, channelId: 'lace.ath', posts: [{ id: 'p1', entryId: '441.0.3', bodyHash: '0xaa', comments }] } },
 });
-const PENDING = { id: 'local-comment-1', entryId: null, bodyHash: '0xbeef', publishStatus: 'comment published, confirming' };
-const CHAIN = { id: 'c1', entryId: 'c-beef', bodyHash: '0xBEEF' };
+// The author rides on both halves in production — rememberLocalPublicComment stamps `authorWallet` from the
+// wallet that composed it, and the chain mapper stamps it from the row's `publisher` — so the fixtures carry it
+// too. Deliberately in DIFFERENT address forms: sameWalletAddress normalises through parseTonAddress(...).raw,
+// and a comparison that only matched identical strings would silently stop retiring anything.
+const ME = `0:${'11'.repeat(32)}`;
+const ME_FRIENDLY = formatTonUserFriendlyAddress(ME);   // the same wallet, written the other way
+const STRANGER = `0:${'22'.repeat(32)}`;
+const PENDING = { id: 'local-comment-1', entryId: null, bodyHash: '0xbeef', authorWallet: ME, publishStatus: 'comment published, confirming' };
+const CHAIN = { id: 'c1', entryId: 'c-beef', bodyHash: '0xBEEF', authorWallet: ME_FRIENDLY };
 
 describe('public comment confirmation', () => {
   it('CONF-01: a chain twin retires the local "confirming" copy — and the cache is persisted', () => {
@@ -58,6 +82,23 @@ describe('public comment confirmation', () => {
     expect(cache()['lace.ath'].feed.posts[0].comments).toEqual([]);
     expect(commits()).toBe(1);              // survives the reload, or the badge is back on next boot
     expect(cache()['lace.ath'].syncedAt).toBe('X');  // the entry is patched, not rebuilt
+  });
+
+  it('CONF-03: a STRANGER writing the same words does not retire my pending comment', () => {
+    // [audit 2026-09-01, round 9.] The retirement matched on body hash alone. A comment's PPH2 body cell carries
+    // only the document bytes — the timestamp, the streamId and the publisher all live in the header — so two
+    // people commenting "ok" under one post produce the SAME hash. MEASURED: the stranger's chain row retired
+    // this device's pending record as confirmed, the badge turned green, and the comment it stood for was never
+    // published. "ok", "+1" and an emoji make that routine rather than exotic.
+    const theirs = { id: 'c2', entryId: 'c-beef', bodyHash: '0xBEEF', authorWallet: STRANGER };
+    const mine = loadRetire(cacheWith([PENDING]));
+    expect(mine.retire(POST, [theirs]), 'nothing of mine was confirmed').toBe(false);
+    expect(mine.cache()['lace.ath'].feed.posts[0].comments, 'my pending comment must survive').toEqual([PENDING]);
+    expect(mine.commits(), 'and nothing is written').toBe(0);
+    // …and my own twin still retires it, so the guard did not simply switch retirement off.
+    const ours = loadRetire(cacheWith([PENDING]));
+    expect(ours.retire(POST, [theirs, CHAIN])).toBe(true);
+    expect(ours.cache()['lace.ath'].feed.posts[0].comments).toEqual([]);
   });
 
   it('CONF-02: nothing else is touched — a confirmed comment, a different body, an empty read', () => {

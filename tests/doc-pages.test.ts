@@ -42,9 +42,28 @@ describe('standalone document pages', () => {
     // The two disclosures that make the policy honest rather than flattering.
     expect(privacy).toContain('toncenter.com');
     expect(privacy).toMatch(/IP address/i);
+    // WHAT PROTECTS WHAT, ITEM BY ITEM. [CORRECTED 2026-08-29.] The policy used to say, of the recovery phrase,
+    // the message history AND the settings together, that they are "encrypted with a password you choose
+    // (AES-GCM-256 with PBKDF2-SHA-256)". True of the first only: the message history is sealed with a
+    // non-exportable key the browser generates on the device (encrypted-message-store: generateKey, extractable
+    // false, kept in IndexedDB beside the ciphertext), and the node API key is written to localStorage as plain
+    // text (TONCENTER_API_KEY_STORAGE_KEY). A privacy policy that overstates its own encryption is the one kind of
+    // inaccuracy a reader cannot check, so each claim is pinned to the mechanism that backs it.
+    expect(privacy, 'the password claim may not be made over all stored data at once')
+      .not.toMatch(/This data is stored in your browser's local storage and is encrypted with a\s+password/);
+    expect(privacy, 'the phrase and its keys ARE password-encrypted, and that stays said')
+      .toMatch(/recovery phrase and the keys derived from it[\s\S]{0,120}PBKDF2-SHA-256/);
+    expect(privacy, 'the history is sealed by a device key, not by the password')
+      .toMatch(/Message history and drafts[\s\S]{0,200}not with your\s+password/);
+    expect(privacy, 'the node API key is SEALED now, and the policy must say which mechanism')
+      .toMatch(/optional API key for a node provider, is sealed with the same kind[\s\S]{0,80}device key/);
+
     const terms = readFileSync('web/terms.html', 'utf8');
     // The warning a moderator checks for, and the one a user most needs.
-    expect(terms).toMatch(/no moderation and no\s+delete function/i);
+    expect(terms).toMatch(/no delete function/i);
+    // moderation exists since CUTOVER item 15: hide, warn, restrict — and the chain keeps everything
+    expect(terms).toMatch(/moderators[^.]*hidden/i);
+    expect(terms).toMatch(/hidden post stays on the chain/i);
     expect(terms).toMatch(/lose the phrase/i);
   });
 });

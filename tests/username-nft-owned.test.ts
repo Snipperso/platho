@@ -215,7 +215,7 @@ describe('username NFT — the owned list', () => {
   });
 
   it('UNFT-11: a name is reported TRANSFERRED only on proof — authoritative, another owner, the label proven by hash', async () => {
-    // [OWNER 2026-08-22: "sometimes at unlock the linked username does not load".] The reconcile used to forget (and
+    // [decided 2026-08-22] The reconcile used to forget (and
     // unlink) a remembered name on mere ABSENCE from a complete list, and absence has transient causes. It now acts
     // on `transferred`: the chain showed the item authoritative and owned by someone else, and the label reproduces
     // the item's name_hash. Anything weaker is neither owned nor transferred — it is simply not in either list.

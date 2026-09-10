@@ -15,7 +15,7 @@
  *   npm run admin                     (same thing, where npm itself runs)
  *
  * The node form is the one the page suggests, deliberately: on Windows npm ships as a PowerShell script, and a
- * default execution policy refuses to run it — "выполнение сценариев отключено в этой системе". That is a machine
+ * default execution policy refuses to run it —. That is a machine
  * security setting and not something a tool should ask anyone to change to see a balance.
  */
 import { spawn } from 'node:child_process';

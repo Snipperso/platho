@@ -5,7 +5,7 @@ import { I18N_LOCALES, I18N_STRINGS } from '../web/i18n-strings.mjs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // DISCOVER-LATEST — the channel's latest post on its Discover card.
 //
-// [OWNER 2026-08-21: "the description is not quite it — good to see the last post"; "yes, alongside".]
+// [decided 2026-08-21; "yes, alongside".]
 // Re-pinned 2026-08-23 to the redesign's implementation (the same contract, the designer's shape): the answer lives
 // in a wallet-keyed map outside the card, the block is patched in place, the read is lazy and two abreast.
 //
@@ -136,9 +136,12 @@ describe('DISCOVER-LATEST — the latest post on a Discover card', () => {
     expect(refresh).toMatch(/resetPublicDiscoveryLatestPosts\(\);/);
     const open = slice(app, 'async function openPublicDiscovery()', 'function closePublicDiscovery()');
     expect(open).toMatch(/if \(!publicDiscoverySweepInFlight\s*&& \(!publicDiscoveryCache \|\| \(Date\.now\(\) - publicDiscoveryCache\.at\) >= PUBLIC_DISCOVERY_CACHE_TTL_MS\)\) \{\s*resetPublicDiscoveryLatestPosts\(\);/);
-    // The pump does nothing for a closed panel.
+    // The pump does nothing when nobody is looking. Its AUDIENCE grew on 2026-09-07: the profile card shows a
+    // contact's latest post through the same lane, so a closed panel with an open card is still an audience —
+    // and a closed panel with no card is still nobody.
     const pump = slice(app, 'function pumpDiscoveryLatestPosts()', 'async function loadDiscoveryLatestPost(');
-    expect(pump).toMatch(/if \(!publicDiscoveryOpen\) return;/);
+    expect(pump).toMatch(/if \(!discoveryLatestHasAnAudience\(\)\) return;/);
+    expect(app).toMatch(/function discoveryLatestHasAnAudience\(\) \{[\s\S]{0,400}?publicDiscoveryOpen/);
   });
 
   it('DLATEST-05: the words exist in every locale and the CSS gives the block its plate and clamp', () => {

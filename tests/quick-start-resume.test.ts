@@ -33,7 +33,7 @@ describe('quick-start resume + activation gate guard', () => {
     //   funded -> ONE full-width Activate plate, footer Continue.
     //   short  -> no action plate at all, a sentence saying where to activate later, footer Done.
     // A button that is going to refuse is worse than no button: it reads as broken, which is the complaint that
-    // started this whole pass ("кнопка не работает").
+    // started this whole pass.
     expect(app).toMatch(/function buildQuickStartActivateBody\(\)/);
     expect(app).toMatch(/function quickStartActivationUnderfunded\(\)/);
     const activateBody = app.slice(
@@ -78,8 +78,10 @@ describe('quick-start resume + activation gate guard', () => {
     expect(activateBody, 'Check balance restated an automatic refresh').not.toMatch(/quickstart\.checkBalance/);
     expect(app, 'the step-jump helper existed only for Back-to-top-up').not.toMatch(/quickStartGoToStepByKey/);
     expect(I18N_STRINGS.en['quickstart.backToTopUp'], 'its label must go too').toBeUndefined();
-    // The underfunded copy names where to finish the job, and that place must be the tab the row now lives on.
-    expect(I18N_STRINGS.en['quickstart.notEnoughGramHint']).toMatch(/Profile tab/);
+    // The underfunded copy names where to finish the job, and that place must be the tab the row now lives on —
+    // the WALLET tab since 2026-09-07 [owner: "new users will wear themselves out looking for it"], after the
+    // profile stopped being a tab at all and its settings became a dialog behind the app's corner.
+    expect(I18N_STRINGS.en['quickstart.notEnoughGramHint']).toMatch(/Wallet tab/);
     expect(I18N_STRINGS.en['quickstart.notEnoughGramHint']).toMatch(/Activate Platho account/);
     // The footer only moves on, and never blocks — nothing here can fail any more.
     const activateStep = app.slice(app.indexOf("key: 'activate'"), app.indexOf("key: 'install'"));
@@ -121,7 +123,7 @@ describe('quick-start resume + activation gate guard', () => {
       // point: a new step that forgets a lazy field would otherwise ship a label frozen in the boot language.
       expect(lazy, `every step must supply ${field} lazily`).toBe(6);
     }
-    // (c) [OWNER 2026-08-10] "a modal on top of a modal". Step 1 IS the password form now — no dialog opens over
+    // (c) [decided 2026-08-10] Step 1 IS the password form now — no dialog opens over
     // the wizard at all. Two earlier attempts moved the stack around instead of removing it: auto-firing the prompt
     // after rendering step 1 flashed that screen on both sides of the dialog, and firing it before revealing the
     // stepper just put the dialog over the WELCOME card instead. The fields come from the SHARED spec, so the
@@ -239,9 +241,7 @@ describe('quick-start resume + activation gate guard', () => {
   });
 
   it('QS-ACTIVATE-CHAIN: the wizard says "done" only when the CHAIN says so', () => {
-    // [OWNER 2026-08-13] "Я нажал, потом увидел 'Готово'. Но когда в итоге завершил квикстарт, то на балансе был
-    // 1 грам и предложение активировать аккаунт в профиле." — and then, minutes later, "мне сообщает приложение,
-    // что акк активирован и баланс уменьшился."
+    // [decided 2026-08-13] — and then, minutes later,
     //
     // So the external was NOT lost: it landed. What was wrong is that the step reported a settled fact it had never
     // read, while the Profile tab — which does read the shard — went on offering activation. Two surfaces
@@ -323,9 +323,7 @@ describe('quick-start resume + activation gate guard', () => {
   });
 
   it('QS-INSTALL-STEP: installing is a STEP, in the wizard\'s own clothes, and it can be absent', () => {
-    // [OWNER 2026-08-13] "последним шагом мне предложили установить приложение. Тут всё оке, но сам последний шаг —
-    // модалка не в стиле квикстарта. Надо бы её включить в шаги квикстарта и оформить как положено. Ну и предыдущий
-    // шаг получается не 'завершить', а 'Далее'."
+    // [decided 2026-08-13]
     const installStep = app.slice(app.indexOf("key: 'install'"), app.indexOf('let quickStartStepIndex = 0;'));
     expect(installStep.length, 'the install step slice must not collapse').toBeGreaterThan(200);
     expect(installStep).toMatch(/action: \(\) => t\('common\.done'\),/);
@@ -425,17 +423,24 @@ describe('quick-start resume + activation gate guard', () => {
   it('QS-RESUME-07: Back actually goes back, and the key step has ONE way forward', () => {
     // [OWNER 2026-08-10, from a TG Mini App screenshot of step 2] Four complaints, one of them a real bug.
     //
-    // (1) "Кнопка Назад не работает". It fired every time and the index really did decrement — onto step 1, whose
+    // (1). It fired every time and the index really did decrement — onto step 1, whose
     // autoDone() (a wallet exists by then) made the renderer advance straight forward again. The auto-skip is a
     // FORWARD rule: it exists so a returning user is not asked to redo finished work. Applied to a deliberate Back
     // it becomes a trap with no exit and no feedback.
     expect(app).toMatch(/function renderQuickStartStep\(\{ skipCompleted = true \} = \{\}\)/);
     expect(app).toMatch(/if \(skipCompleted && !step\.optional && step\.autoDone\(\)\) \{ quickStartAdvance\(\); return; \}/);
+    // THE END ANCHOR NAMED A BUTTON THAT NO LONGER EXISTS [audit 2026-09-02]. `quickStartSkipButton` is gone
+    // from web/app.js, so indexOf returned -1 and `slice(start, -1)` cut to the END OF THE FILE: the "back
+    // handler" was 11,461 characters where the real one is 340. The length guard below could not say so — a
+    // lower bound detects a collapsed slice and is blind to a runaway one, which is the half that happened.
+    // Both bounds now, and the end anchor is the next declaration that really follows the handler.
     const backHandler = app.slice(
       app.indexOf("quickStartBackButton?.addEventListener('click'"),
-      app.indexOf("quickStartSkipButton?.addEventListener('click'"),
+      app.indexOf('async function runQuickStartPrimaryAction()'),
     );
-    expect(backHandler.length, 'the slice must not collapse or run away').toBeGreaterThan(120);
+    expect(backHandler.length, 'the slice must not collapse').toBeGreaterThan(120);
+    expect(backHandler.length, 'and it must not run away — a dead end anchor slices to the end of the file')
+      .toBeLessThan(2000);
     expect(backHandler).toMatch(/renderQuickStartStep\(\{ skipCompleted: false \}\)/);
     // Counter-case: forward motion must STILL skip finished steps, or a returning user is walked through work they
     // already did. quickStartAdvance is the forward door and it takes the default.
@@ -528,7 +533,7 @@ describe('quick-start resume + activation gate guard', () => {
     // floor was the only thing keeping the shell full-screen tall on iOS — which ignores that hint and shrinks
     // only the VISIBLE area. With the floor gone the shell became short, Safari kept sliding the visible area
     // under it, and two attempts to compensate each shipped something worse:
-    //   1.0.28 — undo the scroll (window.scrollTo(0,0)). Owner: "I drag it and it jumps back when I let go."
+    //   1.0.28 — undo the scroll (window.scrollTo(0,0)); the owner reported the page jumping back on release
     //   1.0.29 — drive `top` from visualViewport.offsetTop. offsetTop changes every scroll frame while `top` is
     //            recomputed from an event handler, so the interface shook and the maximized composer came apart.
     //
@@ -624,7 +629,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(app, 'the height must not be derived from the latch').not.toMatch(/window\.innerHeight - keyboardGapLatched/);
     expect(app).toMatch(/setProperty\('--app-viewport-height', `\$\{rounded\}px`\)/);
     // NO FLOOR either. A 320px minimum built the shell TALLER than the screen whenever the visible area fell
-    // below it, putting its bottom row off the edge. [OWNER: "do not add anything to the height"]
+    // below it, putting its bottom row off the edge. [decided]
     expect(app, 'no floor may be reintroduced').not.toMatch(/Math\.max\(320, rounded\)/);
     // ...and the loop recomputes them only when the latch moved, so an open, unchanged keyboard writes nothing.
     expect(app).toMatch(/if \(writeVisibleBottomGap\(\)\) syncViewportCssVars\(\);/);
@@ -682,9 +687,7 @@ describe('quick-start resume + activation gate guard', () => {
     const rootRule = css.slice(rootStart, css.indexOf('\n}', rootStart))
       .split('\n').filter((line) => /^\s*[a-z-]+\s*:/.test(line)).join('\n');
     // THE PAGE IS AS TALL AS WHAT CAN BE SEEN — the one thing that removes the slack.
-    // [OWNER 2026-08-14, who diagnosed it before any measurement did] "The page size does not change when the
-    // keyboard appears, the interface redraws into the smaller area, and underneath is a black band I can scroll
-    // out from behind the keyboard." Exactly: screen 894, visible 508, and 386px of page left over — the
+    // [decided 2026-08-14] Exactly: screen 894, visible 508, and 386px of page left over — the
     // keyboard's height, which is why his drag measured it to the pixel.
     // Two earlier shapes failed to close it: `min-height: 100%` + `overflow: hidden` left the page the height of
     // the SCREEN (and overflow cannot help — a focused field makes iOS scroll regardless), and `position: fixed`
@@ -701,7 +704,7 @@ describe('quick-start resume + activation gate guard', () => {
   it('IOS-KEYBOARD-02: the page height is never measured through the root element, and the refusal costs one decision per gesture', () => {
     // THE MEASUREMENT THAT SENT THE WHOLE HUNT SIDEWAYS.
     //
-    // [OWNER 2026-08-15] "I don't believe Safari ignores the page height if you physically shrink it." The reading
+    // [decided 2026-08-15] The reading
     // offered against him was `doc 894/894` from document.documentElement.scrollHeight/clientHeight, and it could
     // not have said anything else: CSSOM View defines both to report the VIEWPORT when the element is the root.
     // MDN: "When clientHeight is used on the root element (the <html> element) ... the viewport's height
@@ -732,7 +735,7 @@ describe('quick-start resume + activation gate guard', () => {
     expect(armer.length, 'the armer must not collapse').toBeGreaterThan(200);
     expect(armer, 'the keyboard is the gate: no keyboard, no lock').toContain('KEYBOARD_PRESENT_PX');
     expect(armer, 'a real scroller keeps its gesture').toMatch(/node\.scrollHeight > node\.clientHeight\) return;/);
-    // NO EXEMPTION FOR EDITABLES. [OWNER 2026-08-15] "You can still pull the page out by the text field." That is
+    // NO EXEMPTION FOR EDITABLES. [decided 2026-08-15] That is
     // the WebKit defect exactly — iOS escalates the gesture to the page when the element under the finger has
     // nothing to scroll, and a composer holding one line of text is that element.
     expect(armer, 'the editable exemption was the hole').not.toMatch(/isContentEditable|closest\('input/);

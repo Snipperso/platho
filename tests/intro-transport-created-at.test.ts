@@ -54,8 +54,7 @@ describe('FETCH-INTRO-CAPSULE surfaces the contract created_at', () => {
   });
 
   it('FIC-04: a body that fell out of the newest window is fetched by the entry\'s own time', async () => {
-    // OWNER'S CONSOLE 2026-08-21, once the runner started saying what it could not do: "entry 20685:0:375 is on chain
-    // but no message in its shard window reproduces the stored body_commit" — entries 375 and 376 of a bucket that
+    // decided 2026-08-21 — entries 375 and 376 of a bucket that
     // took 648 first contacts that day. The reader served the newest 128 publishes, so a recipient away for more than
     // ~5 hours came back to contacts that were paid for, stored, and unreadable. The contract stamps created_at on
     // the entry; the body is now asked for from the minutes around it.

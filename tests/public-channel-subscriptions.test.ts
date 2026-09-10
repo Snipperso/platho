@@ -6,17 +6,17 @@ import {
   DEFAULT_PUBLIC_CHANNEL_ID,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
   createDefaultPublicChannelSubscriptions,
+  normalizeChannelProfile,
   normalizePublicChannelFeed,
   normalizePublicChannelSubscriptions,
   publicChannelThreadsToFeedItems,
   sortPublicFeedItemsByTime,
   publicChannelSubscriptionsToThreads,
   readPublicChannelFeedCache,
+  readPublicChannelProfileCache,
   publicChannelThreadId,
   subscribedPublicChannels,
   writePublicChannelFeedCache,
-  publicEvictionFloor,
-  prunePublicPostsBelowFloor,
 } from '../web/public-channel-subscriptions.mjs';
 
 describe('PWA public channel subscriptions', () => {
@@ -157,8 +157,7 @@ describe('PWA public channel subscriptions', () => {
   });
 
   it('PUBLIC-SUB-ORDER-01: the feed is ONE list by post time — a late follow\'s new post outranks an early follow\'s old one', () => {
-    // OWNER 2026-08-21: "I follow many people; one of them posted, and the new post appeared at the BOTTOM next to
-    // his old one, while silent channels stayed on top." The feed items came out grouped by channel in thread order.
+    // decided 2026-08-21 The feed items came out grouped by channel in thread order.
     // The order now belongs to the posts: oldest first here (the renderer reverses), ties by entryId then position,
     // and a post without a parseable time sinks to the OLD end — unknown is not new.
     const mk = (channelId: string, id: string, createdAt: string | null, entryId: string) => ({ id, channelId, createdAt, entryId });
@@ -367,42 +366,172 @@ describe('PWA public channel subscriptions', () => {
   });
 });
 
-describe('Public eviction floor + prune (Phase 3)', () => {
-  // entryIds are 0-indexed; public_latest_id (latest) is the NEXT id, so the highest live id is latest-1 and the
-  // live id range is [latest - live_count, latest - 1]. The floor (oldest-live id) is EXACTLY latest - live_count.
-  // An off-by-one here would silently drop the OLDEST LIVE post every cycle — so this is checked NUMERICALLY.
-  it('PUBLIC-EVICT-FLOOR-01: floor = latest - live_count (the oldest-live id), keeping the oldest live entry', () => {
-    // Fresh chain, 3 posts (ids 0,1,2), nothing evicted: latest=3, live=3 -> floor 0 (keep all).
-    expect(publicEvictionFloor(3n, 3n)).toBe(0n);
-    // After evicting ids 0..4 (O=5): ids 5..9 live, latest=10, live=5 -> floor 5 (the oldest LIVE id, kept).
-    expect(publicEvictionFloor(10n, 5n)).toBe(5n);
-    // One post, none evicted: latest=1, live=1 -> floor 0.
-    expect(publicEvictionFloor(1n, 1n)).toBe(0n);
-    // Everything evicted: live=0 -> floor = latest (prune all ids 0..latest-1).
-    expect(publicEvictionFloor(10n, 0n)).toBe(10n);
-    // Empty chain.
-    expect(publicEvictionFloor(0n, 0n)).toBe(0n);
-    // Coerces non-BigInt inputs.
-    expect(publicEvictionFloor(10, 5)).toBe(5n);
+describe('The feed cache bounds itself', () => {
+  // [REPLACED 2026-09-01, audit round 9.] What stood here tested publicEvictionFloor and
+  // prunePublicPostsBelowFloor — the CapsuleHub-era FIFO eviction model. Its call sites went with the CapsuleHub
+  // readers in 38bc0727 and only the imports were left behind, so nothing had pruned this cache for over a month;
+  // and the functions could not have worked if revived, because `BigInt(post.entryId)` throws on the shard
+  // composite ("epochTag.shardSeq.entryId[.generation]") that has been a post's identity since the PublicShard
+  // cutover — every id threw, was swallowed, and counted as un-prunable. Testing a mechanism nobody runs, against
+  // an identity that no longer exists, is a gate aimed at a deleted thing.
+  //
+  // What replaces it is the property the cache actually needs: it must FIT. MEASURED against the production
+  // replacer, a channel of 4,000-character posts filled a 5 MB localStorage budget at 292 posts — and past that
+  // the write threw, answered false, and its caller discarded the answer, so the old snapshot stayed on disk and
+  // a reload showed 1 post of the 400 in memory. That budget is shared with the wallet record, so an unpruned
+  // feed could also turn wallet creation into "cannot store a wallet".
+
+  /** A storage that refuses anything past `limit` characters — what a full localStorage does. */
+  function boundedStorage(limit: number) {
+    const data = new Map<string, string>();
+    return {
+      storage: {
+        getItem: (key: string) => data.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          if (value.length > limit) {
+            const error: any = new Error('QuotaExceededError');
+            error.name = 'QuotaExceededError';
+            throw error;
+          }
+          data.set(key, value);
+        },
+        removeItem: (key: string) => { data.delete(key); },
+      },
+      stored: () => data.get(PUBLIC_CHANNEL_FEED_CACHE_KEY) ?? null,
+    };
+  }
+
+  /**
+   * THE SHAPE THE APP ACTUALLY WRITES [audit 2026-09-01, round 10].
+   *
+   * The first version of this fixture used a flat `{ channelId: [post, …] }` array — a shape NOTHING in the app
+   * produces. app.js writes `{ channelId: { feed: { version, channelId, updatedAt, posts }, syncedAt } }` at
+   * every site, and every reader unwraps it as `record?.feed ?? record`. The trim under test required
+   * `Array.isArray(record)`, so against the real cache it skipped every channel and returned false having
+   * dropped nothing — MEASURED at a 5 MB quota with 2,000 long posts: one attempt, zero bytes stored — while
+   * this test stayed green, because the fixture had been written to match the fix instead of the product.
+   *
+   * That is the circular-gate failure this repo has already been bitten by (WSF-07 derived its probe payloads
+   * from the table it was validating). A fixture is a claim about the product; it has to be checked like one.
+   */
+  const postsOf = (count: number) => Array.from({ length: count }, (_, i) => ({
+    id: `p${i}`,
+    entryId: `20800.0.${i}`,
+    text: 'x'.repeat(200),
+    createdAt: new Date(1_790_000_000_000 + i * 60_000).toISOString(),
+    comments: [],
+  }));
+  const cacheOf = (count: number) => ({
+    'a.ath': { syncedAt: 'S', feed: { version: 1, channelId: 'a.ath', updatedAt: 'S', posts: postsOf(count) } },
+  });
+  const postsIn = (stored: any) => stored?.['a.ath']?.feed?.posts ?? stored?.['a.ath'] ?? [];
+
+  it('PUBLIC-CACHE-01: an oversized cache is TRIMMED until it fits, newest kept', () => {
+    const big = cacheOf(200);
+    const room = boundedStorage(20_000);
+    expect(writePublicChannelFeedCache(room.storage as any, big), 'it must find a size that fits').toBe(true);
+    const stored = JSON.parse(String(room.stored()));
+    const kept = postsIn(stored);
+    // …and the record it wrote back is still the record the app reads: the wrapper survives the trim.
+    expect(stored['a.ath'].feed?.version, 'the feed wrapper must survive').toBe(1);
+    expect(stored['a.ath'].syncedAt, 'and the fields beside it').toBe('S');
+    expect(kept.length, 'something was kept').toBeGreaterThan(0);
+    expect(kept.length, 'and it is smaller than what was handed in').toBeLessThan(200);
+    // The OLDEST go first: whatever survived must end at the newest post.
+    expect(kept[kept.length - 1].id).toBe('p199');
+    const oldestKept = Math.min(...kept.map((post: any) => Number(String(post.id).slice(1))));
+    expect(oldestKept, 'the survivors are a suffix of the timeline, not a random subset')
+      .toBe(200 - kept.length);
   });
 
-  it('PUBLIC-EVICT-PRUNE-01: prune drops entries strictly below the floor, KEEPS the oldest-live entry + comments', () => {
-    const post = (entryId: bigint | string, comments: any[] = []) => ({ entryId: String(entryId), comments });
-    // floor 5: ids < 5 are evicted, id 5 is the oldest LIVE and must survive.
-    const posts = [post(3n), post(5n, [post(4n), post(6n)]), post(9n)];
-    const kept = prunePublicPostsBelowFloor(posts, 5n);
-    expect(kept.map((p: any) => p.entryId)).toEqual(['5', '9']); // id 3 dropped; id 5 (oldest live) kept
-    // The kept post's comments: id 4 (< floor) dropped, id 6 kept.
-    expect(kept[0].comments.map((c: any) => c.entryId)).toEqual(['6']);
+  it('PUBLIC-CACHE-02: a cache that already fits is written whole, untouched', () => {
+    const small = cacheOf(3);
+    const room = boundedStorage(1_000_000);
+    expect(writePublicChannelFeedCache(room.storage as any, small)).toBe(true);
+    expect(postsIn(JSON.parse(String(room.stored())))).toHaveLength(3);
   });
 
-  it('PUBLIC-EVICT-PRUNE-02: floor 0 (no eviction) returns posts unchanged; local-pending (no entryId) is never pruned', () => {
-    const posts = [{ entryId: '0', comments: [] }, { id: 'pending', comments: [] }];
-    expect(prunePublicPostsBelowFloor(posts, 0n)).toBe(posts); // floor <= 0 -> unchanged
-    // With a real floor, a numeric-id post below it drops but a pending (no entryId) post is kept.
-    const mixed = [{ entryId: '2', comments: [] }, { id: 'pending-no-entryid', comments: [] }];
-    const kept = prunePublicPostsBelowFloor(mixed, 5n);
-    expect(kept).toHaveLength(1);
-    expect(kept[0].id).toBe('pending-no-entryid');
+  it('PUBLIC-CACHE-03: a storage that refuses everything answers FALSE — never a silent stale snapshot', () => {
+    // The half the caller now reports. A false here means site data is blocked outright, not that the cache is
+    // large: the trim above already handles large. Leaving the previous value on disk while memory moves on is
+    // what made a reload lose 399 of 400 posts with nothing said.
+    const room = boundedStorage(0);
+    expect(writePublicChannelFeedCache(room.storage as any, cacheOf(5))).toBe(false);
+    expect(room.stored(), 'nothing may be claimed as stored').toBeNull();
+    // And a storage with no setItem at all is refused rather than crashed on.
+    expect(writePublicChannelFeedCache({} as any, cacheOf(1))).toBe(false);
+  });
+  it('PUBLIC-CACHE-04: the fixture is the shape app.js writes — checked against app.js, not assumed', () => {
+    // The check that would have caught round 9's defect at the moment it was written. A trim that runs on a shape
+    // the product never produces is worse than no trim: it reports success while doing nothing.
+    const app = readFileSync('web/app.js', 'utf8');
+    // Every site that writes a channel record into the cache writes the FEED WRAPPER.
+    const writes = [...app.matchAll(/\[channel(?:Id|\.id)\]: \{ feed: \{/g)].length
+      + [...app.matchAll(/feed: \{ version: 1, channelId/g)].length;
+    expect(writes, 'app.js must still write the wrapper this fixture models').toBeGreaterThan(0);
+    // …and no site writes a bare array, which is what the first fixture assumed.
+    expect(app, 'a bare post array is not a shape this app produces')
+      .not.toMatch(/publicChannelFeedCache\[[^\]]+\] = \[/);
+    // The trim must therefore unwrap, exactly as every reader in the tree does.
+    const subs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    expect(subs, 'the trim must read through the wrapper').toContain('const feed = record?.feed ?? record;');
+    expect(subs, 'and write it back intact').toContain('return record?.feed ? { ...record, feed: nextFeed } : nextFeed;');
+  });
+});
+
+describe('The channel profile cache survives a record without every field', () => {
+  // [2026-09-10] The worn-gift claim joined the profile record, and its normalizer lower-cased the answer of a
+  // helper that returns NULL for an empty string. Every record from before the field — that is, every record —
+  // threw inside normalizeChannelProfile; readPublicChannelProfileCache swallowed the throw and answered an EMPTY
+  // cache. Measured on stage: two cached profiles on disk, zero loaded; the owner's own card offered to "show
+  // others" a gift and a name the chain already carried, and every walked profile threw the same way.
+  const record = {
+    description: 'about', tags: ['a'], entryId: '2', createdAtSec: 1, fetchedAt: 1,
+    ownerUsername: 'inkling', verifiedUsername: 'inkling',
+  };
+  const gift = '0:59f6c102af7bf86bb35a34cab0e720b27dc27e7ce76ebddb702e54e8f5f4b2f2';
+
+  it('PROFILE-CACHE-01: a record from before the worn-gift field normalizes, with the claim absent', () => {
+    const profile = normalizeChannelProfile(record);
+    expect(profile).not.toBeNull();
+    expect(profile?.description).toBe('about');
+    expect(profile?.wornGift).toBeNull();
+    expect(normalizeChannelProfile({ ...record, wornGift: null })?.wornGift).toBeNull();
+    expect(normalizeChannelProfile({ ...record, wornGift: '' })?.wornGift).toBeNull();
+    expect(normalizeChannelProfile({ ...record, wornGift: gift.toUpperCase() })?.wornGift).toBe(gift);
+    expect(normalizeChannelProfile({ ...record, wornGift: 'not an address' })?.wornGift).toBeNull();
+  });
+
+  it('PROFILE-CACHE-02: a look without a gift, and a gift record without an address, do not throw either', () => {
+    const look = normalizeChannelProfile({
+      ...record,
+      appearance: { kind: 'look', theme: 'light', background: 'plasma', settings: [90, 6, 3, 4], itemAddress: null },
+    });
+    expect(look?.appearance).toEqual({ kind: 'look', theme: 'light', background: 'plasma', settings: [90, 6, 3, 4], itemAddress: null });
+    expect(normalizeChannelProfile({ ...record, appearance: { kind: 'look' } })?.appearance?.kind).toBe('look');
+    expect(normalizeChannelProfile({ ...record, appearance: { kind: 'telegram-gift' } })?.appearance).toBeNull();
+    expect(normalizeChannelProfile({ ...record, verifiedGift: { slug: 'starnotepad', number: 1 } })?.verifiedGift).toBeNull();
+    expect(normalizeChannelProfile({ ...record, verifiedGift: { itemAddress: gift, slug: 'starnotepad', number: 14609, verifiedAt: 5 } })?.verifiedGift)
+      .toEqual({ itemAddress: gift, slug: 'starnotepad', number: 14609, verifiedAt: 5 });
+  });
+
+  it('PROFILE-CACHE-03: the cache on disk loads whole — one odd record must not empty it', () => {
+    const stored = {
+      '0:aa': record,
+      '0:bb': { ...record, appearance: { kind: 'look', theme: 'dark', background: 'nodes', settings: [1, 2, 3, 4], itemAddress: null } },
+      '0:cc': { ...record, wornGift: gift, verifiedGift: { itemAddress: gift, slug: 'starnotepad', number: 14609, verifiedAt: 5 } },
+    };
+    const storage = { getItem: () => JSON.stringify(stored), setItem: () => undefined };
+    const cache = readPublicChannelProfileCache(storage as any);
+    expect(Object.keys(cache).sort()).toEqual(['0:aa', '0:bb', '0:cc']);
+    expect(cache['0:cc'].wornGift).toBe(gift);
+    expect(cache['0:bb'].appearance?.background).toBe('nodes');
+  });
+
+  it('PROFILE-CACHE-04: no normalizer in the module lower-cases the answer of nonEmptyString', () => {
+    // The shape of the defect, pinned at its source: nonEmptyString answers null, and null has no toLowerCase.
+    const subs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    expect(subs).not.toMatch(/nonEmptyString\([^\n]*\)\.toLowerCase\(\)/);
+    expect(subs, 'the profile address fields go through one throw-free helper').toContain('function rawAddressOrNull(value)');
   });
 });

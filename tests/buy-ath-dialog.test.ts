@@ -35,10 +35,16 @@ describe('buy ATH from the reserve', () => {
   });
 
   it('BUYATH-02B: the CONTROLS come first and the prose sits under the button', () => {
-    // OWNER 2026-08-09: "не нравится стена текста над кнопками". The dialog opened with four paragraphs and buried
+    // decided 2026-08-09 The dialog opened with four paragraphs and buried
     // the inputs below them. Nothing was cut — the prose became footnotes below the button —
     // but the order is now load-bearing and easy to undo by adding one more explanatory `note` field.
-    const start = app.indexOf('const fields = [');
+    // ANCHORED ON THE BUY DIALOG ITSELF [audit 2026-09-05, round 1]. This sliced from the FIRST `const fields = [` in
+    // the whole file — the unlock dialog's — to the next openActionDialog call, and passed only because the stake
+    // dialog between them happens to reuse the buy dialog's input class. A new dialog inserted anywhere before the
+    // stake dialog cut the slice short and turned this gate red for a reason unrelated to what it polices.
+    const dialog = app.indexOf('async function openBuyAthDialog(');
+    expect(dialog, 'the buy dialog exists').toBeGreaterThan(0);
+    const start = app.indexOf('const fields = [', dialog);
     const fields = app.slice(start, app.indexOf('const proceed = await openActionDialog({', start));
     expect(fields, 'the fields list must hold the inputs and nothing else').toMatch(/type: 'custom',[\s\S]{0,80}buy-ath-inputs/);
     expect(fields, 'no prose above the controls').not.toMatch(/type: 'note'/);
@@ -79,15 +85,14 @@ describe('buy ATH from the reserve', () => {
   });
 
   it('BUYATH-06B: a completed buy re-reads the BALANCE, not just the protocol figures', () => {
-    // [OWNER 2026-08-13] "я купил себе 200 атх. Был статус отправляется... типа купил, но в балансе ничего не
-    // обновилось."
+    // [decided 2026-08-13]
     //
     // The CLAIM lane was cured of exactly this on 2026-08-03 and queueAthPostTransactionRefresh was written for it.
     // The BUY lane kept a one-shot of its own: a single 8s call to refreshAthProtocolStats, which reads PROTOCOL
     // figures (supply, multiplier) and never touches the wallet's ATH balance — the number the user is watching is
     // fed by refreshVaultNavBalanceInBackground. So the balance waited for a background tick up to three minutes
     // away. One lane fixed, its twin missed: both now queue the same ladder.
-    const submit = app.slice(app.indexOf('async function submitBuyAth(amountAtomic)'), app.indexOf('async function refreshAthProtocolStatsRun()'));
+    const submit = app.slice(app.indexOf('async function submitBuyAth(amountAtomic, quotedMultiplier = null)'), app.indexOf('async function refreshAthProtocolStatsRun()'));
     expect(submit.length, 'the submit slice must not collapse').toBeGreaterThan(400);
     expect(submit).toMatch(/setText\(buyAthStatus, t\('profile\.buyAthSent'\)\);[\s\S]{0,700}?queueAthPostTransactionRefresh\(\);/);
     expect(submit, 'the private one-shot that only refreshed protocol stats must be gone')
@@ -98,12 +103,21 @@ describe('buy ATH from the reserve', () => {
     expect(queue).toContain('refreshVaultNavBalanceInBackground().catch(() => {});');
     expect(queue).toMatch(/for \(const delayMs of ATH_POST_TRANSACTION_REFRESH_DELAYS_MS\) setTimeout\(tick, delayMs\);/);
     // Counter-case: both money lanes must go through it, or the next one drifts the same way.
-    // The claim lane left with the spent airdrop (2026-08-27): definition + the BUY sender remain, and pinning
-    // the exact count is what makes a silently-dropped sender (or a resurrected one) visible.
+    // COUNTED BY WHAT MATTERS, NOT BY OCCURRENCE [widened 2026-09-02]. This pinned the total at exactly 2 — the
+    // definition and the BUY sender — which was right while BUY was the only lane that moved ATH. The staking
+    // screen added two more callers that need it for the identical reason (the balance card is fed by a
+    // different path and would otherwise wait for a background tick), so an exact total would now forbid a
+    // second CORRECT caller. What must stay true is that the refresh is defined once and that the buy sender
+    // reaches it — a silently-dropped sender still shows, because submitBuyAth is checked by name.
     expect(
-      (app.match(/queueAthPostTransactionRefresh\(\)/g) ?? []).length,
-      'the shared refresh has exactly its definition and the BUY sender',
-    ).toBe(2);
+      (app.match(/function queueAthPostTransactionRefresh/g) ?? []).length,
+      'the shared refresh is defined exactly once',
+    ).toBe(1);
+    const buySender = app.slice(app.indexOf('async function submitBuyAth'));
+    expect(
+      buySender.slice(0, buySender.indexOf('\nasync function ')),
+      'and the BUY sender is one of its callers',
+    ).toContain('queueAthPostTransactionRefresh()');
   });
 
   it('BUYATH-07: every user-visible string goes through t(), in all ten locales', async () => {

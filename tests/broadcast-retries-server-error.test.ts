@@ -7,10 +7,10 @@ import { scheduleToncenterHttpRequest, toncenterBroadcastExitCode } from '../web
 // MEASURED 2026-08-04, straight from the owner's console while sending a burst:
 //   POST https://toncenter.com/api/v3/message 500 (Internal Server Error)   ×8
 //   [platho] wallet external broadcast failed
-// The send queue had already fixed the pile-up ("гораздо лучше стало"), but a couple of messages still hung — and
+// The send queue had already fixed the pile-up, but a couple of messages still hung — and
 // this is why: scheduleToncenterHttpRequest retried ONLY on 429 (`if (response?.status !== 429) return response;`),
 // so a 500 came straight back after a single POST. The message then fell into the app-level retry ladder with its
-// multi-second backoff, which is exactly what "зависло" looks like from the outside.
+// multi-second backoff, which is exactly what  looks like from the outside.
 //
 // Re-POSTing is safe, and that is the only reason a retry is allowed here: the external is already SIGNED and bound
 // to one wallet seqno, so the chain runs it AT MOST ONCE however many copies arrive.

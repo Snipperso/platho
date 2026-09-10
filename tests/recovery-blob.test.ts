@@ -90,7 +90,12 @@ describe('RECOVERY-BLOB', () => {
     expect(opened, 'the prefs bytes survive seal → open under the same seed').toEqual(prefs);
     // a wrong seed cannot open it (GCM tag fails) → null, never a throw into the restore path.
     expect(await openPrefsBlob(new Uint8Array(32).fill(0x99), body)).toBeNull();
-    // domain separation: the prefs blob is NOT a recovery-map blob — opening it as one yields an empty map, not the prefs.
-    expect((await openRecoveryBlob(SEED, body)).size, 'a prefs blob is not a conversation-map blob').toBe(0);
+    // Domain separation: the prefs blob is NOT a conversation-map blob. It now REFUSES rather than answering with
+    // an empty map [audit 2026-09-01, round 9] — the restore counted an empty map as a clean read of a slot
+    // holding nothing, and the next backup published over it at seq+1, destroying every conversation it held.
+    // The live case for that was a version skew (SEAL_VERSION is 2, version 1 existed), i.e. two devices on
+    // different builds during a rollout; this assertion covers the same refusal from the other direction.
+    await expect(openRecoveryBlob(SEED, body), 'a prefs blob is not a conversation-map blob')
+      .rejects.toMatchObject({ code: 'RECOVERY_BLOB_UNREADABLE' });
   });
 });

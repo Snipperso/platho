@@ -3,11 +3,11 @@
 // message) + recovery-transport (get_view seq / get_body) + conv-discovery (the slot addresses). app.js supplies the
 // wallet send and the get-method transport; this stays a testable seam against stub readers, like the other lanes.
 
-import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=22';
-import { sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob } from './recovery-blob.mjs?v=6';
-import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=22';
-import { RECOVERY_MAX_SLOTS, PREFS_NAMED_SLOT_INDEX, addrKey } from './shard-discovery.mjs?v=23';
-import { probeActiveAddresses } from './shard-reader.mjs?v=26';
+import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=58';
+import { sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob } from './recovery-blob.mjs?v=16';
+import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=57';
+import { RECOVERY_MAX_SLOTS, PREFS_NAMED_SLOT_INDEX, addrKey } from './shard-discovery.mjs?v=58';
+import { probeActiveAddresses } from './shard-reader.mjs?v=61';
 
 // MUST equal RecoveryShard.tact RS_MAX_BLOB_CELLS — the immutable on-chain cap on the blob's cell tree (gate 13560).
 // Mirrored (not imported) so an over-cap backup is refused CLIENT-SIDE before it bounces on chain and is mis-recorded.
@@ -88,7 +88,16 @@ export async function restoreConvKeysFromRecovery({ seed, readView, readBody, re
     try { body = await readBody(slot.address); } catch { clean = false; continue; }
     if (!body) { clean = false; continue; }        // a bound slot with no body = failed/incomplete read, not empty
     let map;
-    try { map = await openRecoveryBlob(seed, body); } catch { continue; }   // foreign/corrupt blob -> skip (not our loss)
+    // A BOUND SLOT WHOSE BLOB WILL NOT OPEN IS EXACTLY OUR LOSS [audit 2026-09-01, round 9]. The old comment
+    // called it "foreign/corrupt -> skip (not our loss)", but a slot address is seed-derived and the contract
+    // makes the slot commit to the owner key, so nothing foreign can be here: it is THIS seed's blob, sealed by a
+    // build whose format this one does not read. Skipping quietly left `clean` true, and a clean restore unlocks
+    // the backup — which then published over that slot at seq+1 and destroyed every conversation in it.
+    try { map = await openRecoveryBlob(seed, body); } catch (error) {
+      clean = false;
+      console.warn('[recovery] slot', slot.slotIndex, 'holds a blob this build cannot read — backups stay locked', error);
+      continue;
+    }
     for (const [convId, rec] of map) merged.set(convId, rec);
     found.push({ slotIndex: slot.slotIndex, seq: Number(view.seq), count: map.size });
   }
@@ -160,7 +169,8 @@ export async function prepareRecoveryBackup({ seed, slotIndex, map, readView, va
     throw error;
   }
   const built = await buildRecoveryPublishBrowser({ seed, slotIndex, seq: nextSeq, h0, h1, body, value });
-  return { ...built, seq: nextSeq, cells };
+  // `h1` rides out so the receipt can match CONTENT, not only a seq another device may have raised [round 3]
+  return { ...built, seq: nextSeq, cells, h1 };
 }
 
 /**
@@ -183,7 +193,7 @@ export async function preparePrefsBackup({ seed, prefsBytes, readView, value }) 
     throw error;
   }
   const built = await buildRecoveryPublishBrowser({ seed, slotIndex: PREFS_NAMED_SLOT_INDEX, seq: nextSeq, h0, h1, body, value });
-  return { ...built, seq: nextSeq, cells };
+  return { ...built, seq: nextSeq, cells, h1 };
 }
 
 /**
@@ -204,4 +214,54 @@ export async function restorePrefsSnapshot({ seed, readView, readBody }) {
   try { body = await readBody(slot.address); } catch { return { prefsBytes: null, clean: false }; }
   if (!body) return { prefsBytes: null, clean: false };           // bound but no body = incomplete read, not empty
   return { prefsBytes: await openPrefsBlob(seed, body), clean: true };   // null if foreign/wrong-seed (not our loss)
+}
+
+// ── THE RECEIPT [audit 2026-09-05, round 2] ────────────────────────────────────────────────────────────────────
+// A wallet send resolves when the external is QUEUED at a door (toncenter's 200), not when the slot holds the blob.
+// Every self lane (prefs, the K_root backup, notes) used to call itself saved on that alone. The slot's own
+// anti-rollback `seq` is the receipt the lane can read back: once it shows the seq a write claimed, the blob is
+// stored. The ladder covers the measured hop (p50 27 s, max 39 s through a shard split, 2026-09-04) with room.
+export const RECOVERY_CONFIRM_DELAYS_MS = Object.freeze([8_000, 12_000, 15_000, 20_000, 25_000, 30_000]);
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Wait for every slot in `writes` ([{ address, seq, h1? }]) to show the write. Returns { landed, pending } —
+ * `pending` lists the writes the slots did not show within the ladder. A read that throws is asked again on the next
+ * rung; nothing here decides what an unconfirmed write means — the lane does (prefs keeps its dirty flag, the backup
+ * keeps its slot dirty, notes hand the send to the retry ladder).
+ *
+ * THE CONTENT IS THE RECEIPT, NOT THE SEQ ALONE [audit 2026-09-06, round 3]. A seq at or past the claimed one only
+ * says the slot took SOME write: a sibling device (or this device's next run, a moment later) can have taken the
+ * very seq this write claimed, leaving this write bounced and its content nowhere on chain — the K_root only this
+ * map held has no copy, and the flag that would retry it is cleared. The slot publishes the `h1` of the blob it
+ * holds and the writer knows the `h1` it sealed, so when a write names its `h1` the receipt requires the slot to
+ * show THAT blob. A write without an `h1` falls back to the seq (the caller does not know the content).
+ */
+export async function confirmRecoverySlotWrites({ readView, writes, delaysMs = RECOVERY_CONFIRM_DELAYS_MS, sleep = defaultSleep }) {
+  if (typeof readView !== 'function') throw new Error('confirmRecoverySlotWrites requires readView');
+  let pending = (writes ?? []).map((w) => ({ address: w.address, seq: BigInt(w.seq), ...(w.h1 === undefined || w.h1 === null ? {} : { h1: BigInt(w.h1) }) }));
+  for (const delay of delaysMs) {
+    if (pending.length === 0) break;
+    await sleep(delay);
+    const still = [];
+    for (const write of pending) {
+      let shown = false;
+      try {
+        const view = await readView(write.address);
+        const seqShown = Boolean(view?.bound) && BigInt(view.seq) >= write.seq;
+        shown = write.h1 === undefined
+          ? seqShown
+          : seqShown && view.h1 !== undefined && view.h1 !== null && BigInt(view.h1) === write.h1;
+      } catch { /* asked again on the next rung */ }
+      if (!shown) still.push(write);
+    }
+    pending = still;
+  }
+  return { landed: pending.length === 0, pending };
+}
+
+/** One write's receipt: true once the slot shows the claimed write, false when the ladder runs out. */
+export async function confirmRecoverySlotWrite({ readView, address, seq, h1 = null, delaysMs, sleep }) {
+  const receipt = await confirmRecoverySlotWrites({ readView, writes: [{ address, seq, h1 }], ...(delaysMs ? { delaysMs } : {}), ...(sleep ? { sleep } : {}) });
+  return receipt.landed;
 }

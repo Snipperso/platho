@@ -21,8 +21,8 @@
 // the inbound value cannot cover execution plus the forward-fee allowance, and the allowance SCALES with the network
 // fee schedule (`max(10M, readForwardFee() * 2)`), so a figure computed to the nanoton today would start bouncing the
 // day fees rise. Over-provide and take the change back.
-import { beginCell } from './pwa-contract-transactions.mjs?v=37';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
+import { beginCell } from './pwa-contract-transactions.mjs?v=47';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=21';
 
 /** TEP-62 transfer. Mirrored from UsernameNFTItem's `message(0x5FCC3D14) NftTransfer`. */
 export const USERNAME_NFT_TRANSFER_OPCODE = 0x5FCC3D14n;

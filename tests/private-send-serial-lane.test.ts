@@ -3,8 +3,7 @@ import { readFileSync } from 'node:fs';
 
 // PRIVATE SENDS MUST LEAVE ONE AFTER ANOTHER.
 //
-// OBSERVED 2026-08-03 on the owner's phone, build v813: "по одному сообщения улетают быстро, но если запостить
-// пачку, то сразу виснут. Потом какой-то резервный путь минут через 5 их подхватывает и отправляет."
+// OBSERVED 2026-08-03 on the owner's phone, build v813
 //
 // The composer's submit handler is `async` and nothing serialised it, so N taps started N independent publishes at
 // once. One publish costs several chain reads before it broadcasts (peer bundle from the KeyShard, the shard's
@@ -81,7 +80,7 @@ describe('SENDLANE — private sends are serialised', () => {
   });
 
   it('SENDLANE-06: there is ONE serial-lane implementation and every lane uses it', async () => {
-    // [OWNER 2026-08-03] "Дубли, которые стали мёртвым кодом убирай, нам не нужен мусорный легаси код."
+    // [decided 2026-08-03]
     // The same eight lines had been written by hand three times (avatar reads, username hygiene, then sends).
     expect((APP.match(/function createSerialLane\(\)/g) ?? []).length).toBe(1);
     expect(APP).toContain('const enqueueAvatarChainRead = createSerialLane();');

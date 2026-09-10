@@ -1,8 +1,7 @@
 // Keyed row reconciliation — the one way every long list in this app updates itself.
 // English-only (OPSEC); no user-facing text.
 //
-// WHY THIS EXISTS [OWNER 2026-08-23, relaying user reports: "big dialogs and opening posts with lots of comments
-// load the system heavily … the phone gets hot"]. A list that wipes itself and rebuilds every row costs O(rows) per
+// WHY THIS EXISTS [decided 2026-08-23]. A list that wipes itself and rebuilds every row costs O(rows) per
 // render, and the lists here re-render WHILE THEY GROW: a comment thread pages itself in as the reader scrolls,
 // twice per page (once to show "loading", once when the page lands). Measured on a desktop with the real markup —
 // 50 rows 9 ms, 500 rows 134 ms, 1000 rows 268 ms — so a 960-comment post rebuilt 2 x 96 x (1+2+...+10) = 10,560

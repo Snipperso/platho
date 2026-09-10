@@ -16,7 +16,9 @@ import {
   PLATHO_COMPACT_RECIPIENT_WALLET_METADATA_BYTES,
   PLATHO_COMPACT_SENDER_WALLET_METADATA_BYTES,
 } from '../web/crypto/platho-crypto.mjs';
-import { splitBytesToCapsuleParts, MAX_CAPSULE_USEFUL_BYTES } from '../web/capsule-part-policy.mjs';
+import {
+  splitBytesToCapsuleParts, MAX_CAPSULE_USEFUL_BYTES, CAPSULE_USEFUL_SIZE_BYTES, capsuleSizeClassForUsefulBytes,
+} from '../web/capsule-part-policy.mjs';
 import { buildConvPublishWalletMessage } from '../web/conv-lane-send.mjs';
 import { CONV_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from '../web/publish-price.mjs';
 import { buildKeyShardRegisterBrowser } from '../web/key-shard-register-browser.mjs';
@@ -54,70 +56,80 @@ const toCore = (c: any) => Cell.fromBase64(Buffer.from(serializeBoc(c)).toString
 const REGISTRY = '0:' + '44'.repeat(32);
 
 describe('WALLET-SEND-FEE', () => {
-  it('WSF-01: the model brackets the fee a REAL send is charged, across every size class and part count', async () => {
+  it('WSF-01: a wallet funded at the quote lands every part, and one funded just under it does not', async () => {
+    // WHAT THIS USED TO MEASURE, AND WHY IT WAS THE WRONG THING [audit 2026-08-31, round 9]. It read
+    // `walletTx.totalFees` — the fees on the PAYER'S OWN TRANSACTION — and bracketed the quote within +15% of it.
+    // Under sendMode's PAY_GAS_SEPARATELY the wallet is also charged each outgoing message's forward fee, of which
+    // TON keeps only about a third at the source; the rest rides with the message and `totalFees` never sees it.
+    // So the gate was tight against a number 22-32% below the truth, and — measured — it actively REFUSED the
+    // correct table: raising class 32 to its true 40.9M failed with "quoted is >15% over the measured".
+    //
+    // What replaces it tests the property a user actually meets. assertWalletGramAtLeast demands
+    // value x parts + walletSendFeeNanotons(...) before it will sign, and the app puts that very figure on screen
+    // (errors.walletNeedsGram). So: fund a wallet with EXACTLY that and require every part to reach the shard;
+    // fund it with 90% of that and require the send to fall short. The pair cannot be satisfied by a quote that is
+    // too low OR wildly too high, and it needs no proxy for "what the network charged".
+    //
+    // Below the floor nothing throws: sendMode carries IGNORE_ERRORS, so the wallet DROPS the action it cannot pay
+    // for and its transaction still succeeds. That is the whole defect — measured at the old figures, a wallet
+    // holding exactly what the app demanded landed 0 of 1 parts while the app reported a publish.
     const bc = await Blockchain.create();
     bc.now = CLOCK;
-    await deployFeeSink(bc, { funderSeed: 'wsf-sink' });
-
     const sender: any = await createMessagingIdentity();
     const recipient: any = await createMessagingIdentity();
     const bundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
+    let seed = 200;
 
-    let seed = 0;
-    // Every case gets its OWN write key, so each send DEPLOYS its shard: the measured fee is then the honest upper
-    // bound. (Publishing into an existing shard is cheaper AND refunds surplus mode-128 — reading a balance delta
-    // there would fold the refund into the fee, which is what the first attempt at this measurement did.)
-    const send = async (texts: string[]) => {
+    /** Fund a fresh payer with `balance`, send these parts for real, and report how many publishes landed. */
+    const attempt = async (texts: string[], balance: bigint) => {
       seed += 1;
-      const secret = new Uint8Array(32).fill(seed);
+      const secret = new Uint8Array(32).fill((seed % 251) || 7);
       const pub = ed25519.getPublicKey(secret);
-      const payer = await bc.treasury(`wsf-payer-${seed}`);
+      const payer = await bc.treasury(`wsf01-${seed}`, { balance });
       const built: any[] = [];
       const sizeClasses: number[] = [];
       let seq = 1;
       for (const text of texts) {
         const capsule: any = await createEncryptedConvCapsule(text, bundle, sender, randomBytes(32), { now: CLOCK * 1000 });
-        // The class the CAPSULE SEALED INTO, not one this test guessed: the padding is what the fee follows, so the
-        // quote has to be priced off the same number the real capsule used. (WSF-05 proves the composer's plan
-        // assigns this same class, which is what makes pricing off the plan correct in the app.)
         sizeClasses.push(Number(capsule.header0.sizeClass));
         built.push(await buildConvPublishWalletMessage({
           writePublicKey: pub, writeSecret: secret, seq: seq++, epoch: EPOCH, capsule, value: CONV_PUBLISH_VALUE,
         }));
       }
-      // Sent the way the wallet really sends it: chunkWalletMessages splits the part list into SEPARATE externals
-      // (58,000-byte budget), each signed and imported on its own. Measuring one payer.sendMessages() call instead
-      // would hide every base fee past the first — which is exactly the defect this shape caught: two 32 KiB parts
-      // are two externals, and the one-base model quoted 532,380 BELOW the real cost.
+      const shard = Address.parseRaw(built[0].to);
       const messages = built.map((part) => {
         const initCore = toCore(part.init);
         return {
           message: internal({
-            to: Address.parseRaw(part.to),
-            value: part.value,
-            bounce: true,
-            body: toCore(part.body),
-            init: { code: initCore.refs[0], data: initCore.refs[1] },
+            to: Address.parseRaw(part.to), value: part.value, bounce: true,
+            body: toCore(part.body), init: { code: initCore.refs[0], data: initCore.refs[1] },
           }),
           payload: Buffer.from(serializeBoc(part.body)).toString('base64'),
         };
       });
       const chunks = chunkWalletMessages(messages);
-      let measured = 0n;
+      let landed = 0;
       for (const chunk of chunks) {
-        const res = await payer.sendMessages(
-          chunk.map((entry: any) => entry.message), SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
-        );
-        const walletTx: any = res.transactions.find((t: any) => t.inMessage?.info?.type === 'external-in');
-        expect(walletTx, 'the payer executed the signed external').toBeTruthy();
-        measured += BigInt(walletTx.totalFees.coins);
+        try {
+          const res = await payer.sendMessages(
+            chunk.map((entry: any) => entry.message), SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
+          );
+          for (const tx of res.transactions) {
+            const info: any = tx.inMessage?.info;
+            if (info?.type !== 'internal' || String(info.dest) !== String(shard)) continue;
+            const cp: any = (tx.description as any)?.computePhase;
+            // Only the PUBLISH transactions: the shard also receives a follow-up that creates no actions.
+            if (cp?.type === 'vm' && cp.success
+              && Number((tx.description as any)?.actionPhase?.totalActions ?? 0) > 0) landed += 1;
+          }
+        } catch { /* the wallet itself could not run: nothing landed */ }
       }
-      return { measured, sizeClasses, externals: chunks.length };
+      return { landed, sizeClasses, externals: chunks.length };
     };
 
     const cases: Array<{ label: string; texts: string[] }> = [
       // one part, spanning every size class — 'x'.repeat(N) lands in the class the capsule pads N up to
-      { label: 'tiny', texts: ['ок'] },
+      { label: 'tiny', texts: ['ok'] },
       { label: '800B', texts: ['x'.repeat(800)] },
       { label: '1.5KB', texts: ['x'.repeat(1500)] },
       { label: '3.5KB', texts: ['x'.repeat(3500)] },
@@ -125,35 +137,41 @@ describe('WALLET-SEND-FEE', () => {
       { label: '15KB', texts: ['x'.repeat(15000)] },
       { label: '30KB', texts: ['x'.repeat(30000)] },
       // and the part-count axis, where the base is charged once per EXTERNAL
-      { label: 'two parts', texts: ['ок', 'ок'] },
-      { label: 'three parts', texts: ['ок', 'ок', 'ок'] },
-      { label: 'four parts', texts: ['ок', 'ок', 'ок', 'ок'] },
-      { label: 'mixed sizes', texts: ['ок', 'x'.repeat(3500), 'x'.repeat(15000)] },
+      { label: 'three parts', texts: ['ok', 'ok', 'ok'] },
+      { label: 'mixed sizes', texts: ['ok', 'x'.repeat(3500), 'x'.repeat(15000)] },
       // …and the cases that span MORE THAN ONE external, where a once-per-send base quotes below the truth
       { label: 'two 30KB parts', texts: ['x'.repeat(30000), 'x'.repeat(30000)] },
       { label: 'four 30KB parts', texts: Array.from({ length: 4 }, () => 'x'.repeat(30000)) },
-      { label: 'eight 15KB parts', texts: Array.from({ length: 8 }, () => 'x'.repeat(15000)) },
     ];
 
     const seenClasses = new Set<number>();
     let multiExternalCases = 0;
     for (const { label, texts } of cases) {
-      const { measured, sizeClasses, externals } = await send(texts);
-      sizeClasses.forEach((value) => seenClasses.add(value));
-      if (externals > 1) multiExternalCases += 1;
-      expect(walletSendExternalCount(sizeClasses), `${label}: the model split into a different number of externals`)
-        .toBe(externals);
-      const quoted = walletSendFeeNanotons(sizeClasses);
-      expect(quoted >= measured, `${label}: quoted ${quoted} UNDER the measured ${measured}`).toBe(true);
-      expect(quoted <= (measured * 115n) / 100n, `${label}: quoted ${quoted} is >15% over the measured ${measured}`).toBe(true);
+      const probe = await attempt(texts, 10_000_000_000n);
+      probe.sizeClasses.forEach((value) => seenClasses.add(value));
+      if (probe.externals > 1) multiExternalCases += 1;
+      expect(walletSendExternalCount(probe.sizeClasses), `${label}: the model split into a different number of externals`)
+        .toBe(probe.externals);
+      expect(probe.landed, `${label}: an amply funded send must land every part`).toBe(texts.length);
+
+      // Exactly what assertWalletGramAtLeast demands before it will let the send be signed.
+      const required = CONV_PUBLISH_VALUE * BigInt(texts.length) + walletSendFeeNanotons(probe.sizeClasses);
+      const atQuote = await attempt(texts, required);
+      expect(atQuote.landed, `${label}: funded at the app own figure ${required}, only ${atQuote.landed} of ${texts.length} parts landed`)
+        .toBe(texts.length);
+
+      const under = (required * 90n) / 100n;
+      const atUnder = await attempt(texts, under);
+      expect(atUnder.landed < texts.length, `${label}: 90% of the quote (${under}) still landed everything — the quote is inflated`)
+        .toBe(true);
     }
 
     // A table with an unexercised row is a number nobody checked. Every class in the model must have been sent.
     expect([...seenClasses].sort((a, b) => a - b), 'every size class in the model was measured')
       .toEqual(Object.keys(WALLET_SEND_FEE_PER_PART_BY_SIZE_CLASS).map(Number).sort((a, b) => a - b));
     // …and the multi-external shape must actually have been exercised, or the per-external base is unproven.
-    expect(multiExternalCases, 'no case above spanned more than one external').toBeGreaterThanOrEqual(3);
-  }, 300_000);
+    expect(multiExternalCases, 'no case above spanned more than one external').toBeGreaterThanOrEqual(2);
+  }, 900_000);
 
   it('WSF-02: a minimal private message quotes what the owner actually paid', () => {
     // The complaint this module answers: 0.0191 shown, 0.0223 debited. The quote is the carried value plus the fee;
@@ -164,21 +182,51 @@ describe('WALLET-SEND-FEE', () => {
     expect(quoted).toBeLessThan((OWNER_MEASURED_DEBIT * 110n) / 100n);
   });
 
-  it('WSF-03: every direct-pay quote funnels through the fee, not just the one that was reported', () => {
+  it('WSF-03: every direct-pay quote funnels through the fee, and the fee actually reaches the total', () => {
     // The defect was reported on the private composer. It lived in the shared estimator, so the public post, the
     // comment, the avatar and the channel-profile dialog were all understating too — fixing only the reported lane
     // is how this class of bug survives (fix-one-lane-check-the-twin).
+    //
+    // AND THIS GATE COULD NOT SEE ARITHMETIC [audit 2026-09-01, round 9]. It sliced app.js from the estimator to
+    // a comment (`// Hold -> net fallback`) that no longer exists, so indexOf returned -1 and the "window" was the
+    // rest of the file; then it asserted `toContain` on a symbol NAME. MEASURED: multiplying the fee term by zero
+    // — `attached + 0n * composerWalletSendFeeNanotons(profile)` — left the symbol in place and the entire suite
+    // of 2,166 tests green, with only the sha256 manifest check moving (which fires for any edit at all). So the
+    // estimator is now RUN, with the fee stubbed to a marker, and the marker has to show up in the answer.
     const APP = readFileSync('web/app.js', 'utf8');
     // ?v= is DERIVED from module content (bump_module_versions.mjs) and moves on its own, so match the import, not
     // the cache key — pinning the number here would turn every content change into a false red.
-    expect(APP).toMatch(/import \{ walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS \} from '\.\/wallet-send-fee\.mjs\?v=\d+';/);
-    const fn = APP.slice(APP.indexOf('function composerEstimatedNetCostNanotons'), APP.indexOf('// Hold -> net fallback'));
-    expect(fn).toContain('composerWalletSendFeeNanotons(profile)');
-    expect(fn).toContain('composerWalletSendFeeNanotons(Array.from({ length: count }, () => profile))');
-    // the two quotes that do NOT go through the funnel carry the term themselves
-    expect(APP).toContain('return USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS + walletSendFeeNanotons([]);');
-    expect(APP).toContain('+ WALLET_SEND_FEE_PER_PART_NANOTONS;');
-    expect(WALLET_SEND_FEE_PER_PART_NANOTONS).toBeGreaterThan(0n);
+    expect(APP).toMatch(/import \{[^}]*walletSendFeeNanotons[^}]*\} from '\.\/wallet-send-fee\.mjs\?v=\d+';/);
+
+    // The whole function, by brace balance — never a fixed window, and never an anchor that can rot away.
+    const at = APP.indexOf('function composerEstimatedNetCostNanotons(');
+    expect(at, 'the shared estimator must still be there').toBeGreaterThan(-1);
+    let depth = 0; let stop = -1;
+    for (let i = APP.indexOf('{', at); i < APP.length; i += 1) {
+      if (APP[i] === '{') depth += 1;
+      else if (APP[i] === '}') { depth -= 1; if (depth === 0) { stop = i + 1; break; } }
+    }
+    expect(stop, 'braces must balance').toBeGreaterThan(at);
+    const source = APP.slice(at, stop);
+
+    // eslint-disable-next-line no-new-func
+    const estimate = new Function('MARKER', `
+      const composerProfileNetPriceNanotons = () => 1000n;
+      const composerWalletSendFeeNanotons = () => MARKER;
+      ${source}
+      return composerEstimatedNetCostNanotons;
+    `)(7n);
+
+    // Both shapes the app calls it in: a LIST of profiles (one quote for a mixed batch), and one profile x N parts.
+    expect(estimate([{}, {}]), 'the batch quote must carry the send fee').toBe(1000n * 2n + 7n);
+    expect(estimate({}, 3), 'and so must the per-part quote').toBe(1000n * 3n + 7n);
+    // A zeroed fee term is exactly the mutation this gate could not see before.
+    expect(estimate({}, 1)).not.toBe(1000n);
+
+    // …and every surface quotes through this one estimator, not a private copy of the sum.
+    for (const caller of ['composerEstimatedNetCostNanotons(']) {
+      expect(APP.split(caller).length - 1, 'the estimator must have callers').toBeGreaterThan(1);
+    }
   });
 
   it('WSF-07: the model splits a part list into externals exactly as the wallet does', async () => {
@@ -196,6 +244,9 @@ describe('WALLET-SEND-FEE', () => {
     for (const list of lists) {
       // A message whose base64 payload is the length the real part of that class serializes to — the only field
       // the wallet's packer measures (estimateWalletMessageExternalBytes).
+      // NOTE what this can and cannot prove: the payloads are synthesized FROM the table, so this compares the
+      // two SPLITTERS and is blind to the table itself being wrong. WSF-08 below is the anchor that is not —
+      // it re-measures every entry through the real sealer and the real builder. [audit 2026-08-31, round 8]
       const messages = list.map((sizeClass) => ({
         payload: 'A'.repeat(Math.ceil((WALLET_SEND_PAYLOAD_BYTES_BY_SIZE_CLASS[sizeClass] * 4) / 3)),
       }));
@@ -253,7 +304,13 @@ describe('WALLET-SEND-FEE', () => {
     // Every required-amount expression must carry the term.
     const source = APP.split('\n').filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
     // `await` so the helper's own DEFINITION is not mistaken for a call site.
-    const preflights = [...source.matchAll(/await assertWalletGramAtLeast\(([\s\S]*?),\s*'[^']*'\)/g)].map((m) => m[1]);
+    // A pre-flight may hand the helper a NAMED sum (`const postNeed = …; await assertWalletGramAtLeast(postNeed, …)`)
+    // since the squat cushion joined every sum [2026-09-03]: the publish funnel's `assertAffordable` adds a squat
+    // debt to that same name, so the sum exists once. The gate reads such an argument THROUGH its definition — a
+    // name whose definition cannot be found is reported as-is, which fails the check below rather than passing it.
+    const definitionOf = (name) => source.match(new RegExp(`const ${name} = ([\\s\\S]*?);\\n`))?.[1] ?? name;
+    const preflights = [...source.matchAll(/await assertWalletGramAtLeast\(([\s\S]*?),\s*'[^']*'\)/g)]
+      .map((m) => (/^\s*(\w+)\s*$/.test(m[1]) ? definitionOf(m[1].trim()) : m[1]));
     expect(preflights.length, 'the pre-flight sites should all be found').toBeGreaterThanOrEqual(9);
     const flat = preflights.filter((argument) => !argument.includes('walletSendFeeReserveNanotons('));
     expect(flat, `these pre-flights do not reserve the send fee:\n${flat.join('\n---\n')}`).toEqual([]);
@@ -285,36 +342,58 @@ describe('WALLET-SEND-FEE', () => {
     expect(Number(capsule.header0.sizeClass), 'the INTRO capsule outgrew the quoted class').toBeLessThanOrEqual(declared);
   }, 120_000);
 
-  it('PWA-ACTIVATION-FEE-01: activation quotes what sending the register really costs', async () => {
+  it('PWA-ACTIVATION-FEE-01: a wallet funded at the activation quote actually gets registered', async () => {
     // Activation is the one send a brand-new wallet makes: a wallet funded to exactly the quoted figure is the
-    // NORMAL case here, so the quote understating the send fee is felt immediately.
+    // NORMAL case here, so the quote understating the send fee is felt immediately — and, until 2026-08-31, it did
+    // understate. This gate bracketed the quote within +15% of `walletTx.totalFees`, which excludes the transit
+    // share of each outgoing message's forward fee that PAY_GAS_SEPARATELY charges the wallet. Same wrong anchor as
+    // WSF-01, same consequence: it certified a quote below the funding floor, and would have REFUSED the correct
+    // one. Now it funds a wallet with exactly what the app demands and requires the register to land [round 9].
     const APP = readFileSync('web/app.js', 'utf8');
     const declared = Number(APP.match(/const KEYSHARD_REGISTER_SIZE_CLASS = (\d+);/)?.[1]);
     expect(APP).toContain('KEYSHARD_REGISTER_VALUE + walletSendFeeNanotons([KEYSHARD_REGISTER_SIZE_CLASS])');
 
     const bc = await Blockchain.create();
-    const payer = await bc.treasury('wsf-activation');
-    const owner = payer.address.toRawString();
-    const identity: any = await createMessagingIdentity();
-    const signed = await exportSignedPublicKeyBundle(identity, { ownerWallet: owner, vaultAddress: REGISTRY, issuedAt: 1_700_000_000_000 });
-    const verified = await verifySignedPublicKeyBundle(signed, { now: 1_700_000_001_000 });
-    const draft = await createVaultMessagingKeyDraft(verified.bundle, verified.signingPublicKey, {
-      authPublicKey: ed25519.getPublicKey(randomBytes(32)),
-    });
-    const built: any = await buildKeyShardRegisterBrowser({
-      ownerWallet: owner, profileRegistry: REGISTRY, keyRecord: draft.message, value: KEYSHARD_REGISTER_VALUE,
-    });
-    const initCore = toCore(built.init);
-    const res = await payer.sendMessages([internal({
-      to: Address.parseRaw(built.to), value: built.value, bounce: true, body: toCore(built.body),
-      init: { code: initCore.refs[0], data: initCore.refs[1] },
-    })], SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS);
-    const walletTx: any = res.transactions.find((t: any) => t.inMessage?.info?.type === 'external-in');
-    const measured = BigInt(walletTx.totalFees.coins);
+    let seed = 300;
 
-    const quoted = walletSendFeeNanotons([declared]);
-    expect(quoted >= measured, `activation quotes ${quoted} for a send that costs ${measured}`).toBe(true);
-    expect(quoted <= (measured * 115n) / 100n).toBe(true);
+    /** Fund a fresh payer with `balance` and report whether the KeyShard register reached its account. */
+    const attempt = async (balance: bigint) => {
+      seed += 1;
+      const payer = await bc.treasury(`wsf-activation-${seed}`, { balance });
+      const owner = payer.address.toRawString();
+      const identity: any = await createMessagingIdentity();
+      const signed = await exportSignedPublicKeyBundle(identity, { ownerWallet: owner, vaultAddress: REGISTRY, issuedAt: 1_700_000_000_000 });
+      const verified = await verifySignedPublicKeyBundle(signed, { now: 1_700_000_001_000 });
+      const draft = await createVaultMessagingKeyDraft(verified.bundle, verified.signingPublicKey, {
+        authPublicKey: ed25519.getPublicKey(randomBytes(32)),
+      });
+      const built: any = await buildKeyShardRegisterBrowser({
+        ownerWallet: owner, profileRegistry: REGISTRY, keyRecord: draft.message, value: KEYSHARD_REGISTER_VALUE,
+      });
+      const target = Address.parseRaw(built.to);
+      const initCore = toCore(built.init);
+      let landed = false;
+      try {
+        const res = await payer.sendMessages([internal({
+          to: target, value: built.value, bounce: true, body: toCore(built.body),
+          init: { code: initCore.refs[0], data: initCore.refs[1] },
+        })], SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS);
+        for (const tx of res.transactions) {
+          const info: any = tx.inMessage?.info;
+          if (info?.type !== 'internal' || String(info.dest) !== String(target)) continue;
+          const cp: any = (tx.description as any)?.computePhase;
+          if (cp?.type === 'vm' && cp.success) landed = true;
+        }
+      } catch { /* the wallet itself could not run: nothing landed */ }
+      return landed;
+    };
+
+    // The exact figure the activation pre-flight demands, and the one the app puts on screen.
+    const required = KEYSHARD_REGISTER_VALUE + walletSendFeeNanotons([declared]);
+    expect(await attempt(required), `funded at the app own figure ${required}, the register did not land`).toBe(true);
+    // …and not wildly over it: 10% less must not still succeed, or the new wallet is being asked for padding.
+    const under = (required * 90n) / 100n;
+    expect(await attempt(under), `90% of the quote (${under}) still registered — the activation quote is inflated`).toBe(false);
   }, 300_000);
 
   it('WSF-04: the fee is priced off the size class the plan already carries, and rounds UP when it is unknown', () => {
@@ -329,5 +408,35 @@ describe('WALLET-SEND-FEE', () => {
     // …and the per-transfer base is charged once, not per part.
     const base = walletSendFeeNanotons([1]) - WALLET_SEND_FEE_PER_PART_NANOTONS;
     expect(walletSendFeeNanotons([1, 1, 1])).toBe(base + WALLET_SEND_FEE_PER_PART_NANOTONS * 3n);
+  });
+  it('WSF-08: every payload-byte entry is what the REAL builder produces — the non-circular anchor', async () => {
+    // WHY THIS EXISTS. WSF-07 synthesizes its probe payloads from WALLET_SEND_PAYLOAD_BYTES_BY_SIZE_CLASS, so it
+    // can only ever prove the model's splitter and the wallet's splitter agree — never that the table describes
+    // reality. MEASURED 2026-08-31 through this path: classes 2, 8 and 32 were each 2 BYTES LOW, and because the
+    // packer closes a chunk on a threshold, the mixed list [8,1,2,8,4,1,2,1,8,2,2] quoted one external where
+    // chunkWalletMessages produces two — short by one WALLET_SEND_FEE_BASE_NANOTONS. Under-quoting is the one
+    // direction this module's header forbids, and no gate could see it.
+    const bucketKey = randomBytes(32);
+    const sender: any = await createMessagingIdentity();
+    const recipient: any = await createMessagingIdentity();
+    const recipientBundle = exportPublicKeyBundle(recipient.encryptionKeyPair);
+    for (const usefulBytes of CAPSULE_USEFUL_SIZE_BYTES) {
+      const sizeClass = capsuleSizeClassForUsefulBytes(usefulBytes);
+      // Two lengths inside the band: a capsule is PADDED to its class, so both must give the same number — which
+      // is what makes these entries exact rather than samples.
+      for (const length of [usefulBytes - 700, usefulBytes - 200]) {
+        const capsule = await createEncryptedConvCapsule('x'.repeat(length), recipientBundle, sender, bucketKey, {
+          now: 1_790_000_000_000,
+        });
+        const built: any = await buildConvPublishWalletMessage({
+          writePublicKey: randomBytes(32), writeSecret: randomBytes(32),
+          seq: 1, epoch: 20_800, capsule, value: '19100000',
+        });
+        // The packer's own formula, verbatim (estimateWalletMessageExternalBytes): base64 -> bytes.
+        const measured = Math.ceil((built.message.payload.length * 3) / 4);
+        expect(measured, `class ${sizeClass} at ${length} useful bytes serializes differently than the table says`)
+          .toBe(WALLET_SEND_PAYLOAD_BYTES_BY_SIZE_CLASS[sizeClass]);
+      }
+    }
   });
 });

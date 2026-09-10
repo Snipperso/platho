@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { I18N_STRINGS } from '../web/i18n-strings.mjs';
 
 // The Vault tab became the WALLET tab (owner request 2026-07-28), and the gate went with it.
 //
@@ -7,8 +8,9 @@ import { readFileSync } from 'node:fs';
 // needed the registered auth key), so the tab was inert and dark-grey until activation, which lived in Profile.
 // Neither half of that survives. There is no Vault contract to strand funds in, and the Wallet tab holds create /
 // import / unlock wallet — the first things a new user touches. Gating it would lock the way in, so it is
-// deliberately ungated and that is what this pins. (Activation itself moved to Profile > Messages on 2026-08-10;
-// it never was a wallet operation, and the gate it used to justify was already gone by then.)
+// deliberately ungated and that is what this pins. (Activation went to Profile > Messages on 2026-08-10 and came
+// BACK here on 2026-09-07: it is the one row every new account must find, and the settings became a dialog behind
+// the app's corner.)
 describe('wallet tab + durable comment cache guard', () => {
   const app = readFileSync('web/app.js', 'utf8');
   const html = readFileSync('web/index.html', 'utf8');
@@ -22,7 +24,7 @@ describe('wallet tab + durable comment cache guard', () => {
     expect(app).not.toMatch(/view === 'vault'/);
 
     // Everything a brand-new user needs is IN this tab, which is why it cannot be gated on having an account.
-    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
+    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('id="profileSettingsDialog"'));
     expect(walletPanel.length, 'the panel slice is real').toBeGreaterThan(1000);
     for (const id of ['createWalletButton', 'importWalletButton', 'unlockWalletButton']) {
       expect(walletPanel, `${id} is what a new user comes here for`).toContain(`id="${id}"`);
@@ -36,15 +38,13 @@ describe('wallet tab + durable comment cache guard', () => {
 
   it('WALLET-TAB-02: the wallet surface moved OUT of Profile, and nothing was dropped on the way', () => {
     // The point of the move was to unload Profile, so these must be in exactly one place — the Wallet tab.
-    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
-    const profilePanel = html.slice(html.indexOf('data-panel="profile"'));
+    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('id="profileSettingsDialog"'));
+    const profilePanel = html.slice(html.indexOf('id="profileSettingsDialog"'));
     const moved = [
       'walletBackupWarning', 'createWalletButton', 'importWalletButton', 'unlockWalletButton',
       'changeWalletPasswordButton', 'receiveWalletTonButton', 'sendWalletTonButton',
       'exportWalletKeyButton', 'importWalletKeyButton', 'exportWalletSeedButton',
-      // registerVaultKeysButton was here until 2026-08-10 and now lives in Profile > Messages: activation
-      // registers MESSAGING keys, and the row that replaces those same keys sits directly under it. See the
-      // dedicated placement assertion below — moving it must not mean losing track of it.
+      'registerVaultKeysButton',
       // flushAthButton was in this list until v890, when the row was deleted outright — see the absence gate
       // in tests/pwa-runtime-config.test.ts PWA-CONFIG-07C.
       // athDropIssuedStatus (and the claim row) left with the spent airdrop on 2026-08-27 — the absence gate is
@@ -56,43 +56,45 @@ describe('wallet tab + durable comment cache guard', () => {
       expect(profilePanel, `${id} no longer duplicates in Profile`).not.toContain(`id="${id}"`);
     }
 
-    // [OWNER 2026-08-10] Account activation went the OTHER way — out of Wallet and into Profile > Messages. It
-    // registers MESSAGING keys on-chain, which is what that section is for, and "Replace message keys" (whose own
-    // status reads "activate account first") sits directly under it, so the two read in the order you do them.
-    // The quick-start step had been telling users to find it "on the Profile tab" the whole time.
-    expect(walletPanel, 'activation is not a wallet operation').not.toContain('id="registerVaultKeysButton"');
+    // [owner, 2026-09-07: "new users will wear themselves out looking for it"] Activation came BACK to the Wallet
+    // tab. It went to Profile > Messages on 2026-08-10 because it registers MESSAGING keys and "Replace message
+    // keys" reads under it — still true, and still the wrong trade for the one row every new account must find,
+    // now that the settings are a dialog behind the app's corner. It reads in the order a newcomer walks the
+    // column: create or import the wallet, unlock it, activate the account.
+    expect(walletPanel.indexOf('id="registerVaultKeysButton"'), 'activation comes after Unlock')
+      .toBeGreaterThan(walletPanel.indexOf('id="unlockWalletButton"'));
+    // The key ROTATION stays in the settings: a once-in-a-lifetime maintenance action, not a first-run step.
     const messages = profilePanel.slice(profilePanel.indexOf('aria-label="Messages"'), profilePanel.indexOf('aria-label="Public channels"'));
     expect(messages.length, 'the Messages section slice must be real').toBeGreaterThan(200);
-    expect(messages, 'activation lives in Profile > Messages').toContain('id="registerVaultKeysButton"');
-    expect(messages.indexOf('id="registerVaultKeysButton"'), 'activate comes BEFORE replace-keys')
-      .toBeLessThan(messages.indexOf('id="replaceVaultKeysButton"'));
+    expect(messages, 'replace-keys stays in the settings').toContain('id="replaceVaultKeysButton"');
     expect((html.match(/id="registerVaultKeysButton"/g) ?? []).length, 'moved, not copied').toBe(1);
+    // …and every sentence that tells a user where to find it says the same tab.
+    for (const key of ['quickstart.activateWhy', 'quickstart.notEnoughGramHint', 'quickstart.unlockToActivate',
+      'quickstart.activationStillConfirming', 'quickstart.foot']) {
+      expect(I18N_STRINGS.en[key], `${key} must not send users to a screen the row has left`)
+        .not.toMatch(/Profile tab|in Settings|from Settings|use Settings|Settings shows/);
+    }
 
     // Saving subscriptions came along for the ride in the old Wallet block but is a PUBLIC-CHANNELS action that
     // merely costs gas. It belongs where a user goes looking for it, not in the wallet.
     expect(profilePanel).toContain('id="savePrefsButton"');
     expect(walletPanel).not.toContain('id="savePrefsButton"');
 
-    // [OWNER 2026-08-03] "Display as" went the OTHER way — out of Wallet and into Profile. It picks whether other
-    // people see an address or a .ath name, which is identity, not money; it now sits beside the names it chooses
-    // between, in the Usernames and Avatars section.
-    expect(profilePanel).toContain('id="walletDisplayModeSelect"');
-    expect(walletPanel).not.toContain('id="walletDisplayModeSelect"');
+    // The "Display as" select is gone [owner, 2026-09-08]: what other people see is the name worn on the profile
+    // card, and taking it off shows the address.
+    expect(html).not.toContain('id="walletDisplayModeSelect"');
 
-    // [OWNER 2026-08-04] "Clear local data" went the same way. Wiping this device touches no keys and no money, so
+    // [decided 2026-08-04] went the same way. Wiping this device touches no keys and no money, so
     // it is not a wallet operation; it sits LAST on the profile because a destructive one-way action does not belong
     // above the things people use every day.
     expect(profilePanel).toContain('id="clearLocalDataButton"');
     expect(walletPanel).not.toContain('id="clearLocalDataButton"');
     expect(profilePanel.indexOf('aria-label="Device"'))
       .toBeGreaterThan(profilePanel.indexOf('aria-label="RPC access"'));
-    const usernames = profilePanel.slice(profilePanel.indexOf('aria-label="Usernames and avatars"'));
-    expect(usernames.indexOf('id="walletDisplayModeSelect"')).toBeGreaterThan(-1);
-    expect(usernames.indexOf('id="walletDisplayModeSelect"')).toBeLessThan(usernames.indexOf('aria-label="RPC access"'));
 
     // Every id must survive the move exactly once — a lost id is a control app.js can no longer find, and a
     // duplicated one makes querySelector pick the wrong node.
-    for (const id of [...moved, 'savePrefsButton', 'walletDisplayModeSelect', 'clearLocalDataButton']) {
+    for (const id of [...moved, 'savePrefsButton', 'clearLocalDataButton']) {
       expect((html.match(new RegExp(`id="${id}"`, 'g')) ?? []).length, `${id} appears exactly once`).toBe(1);
     }
   });
@@ -101,7 +103,7 @@ describe('wallet tab + durable comment cache guard', () => {
     // [OWNER 2026-08-03] Receive/Send are what the tab is opened for; everything below them is one-time setup. And
     // with no wallet they are hidden outright rather than greyed: offering "Receive GRAM" with nothing to receive
     // into is a promise the app cannot keep, and the section leads with "Create wallet" in that state instead.
-    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
+    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('id="profileSettingsDialog"'));
     const group = walletPanel.indexOf('id="walletTonGroup"');
     expect(group, 'the GRAM row lost its id — app.js can no longer hide it').toBeGreaterThan(-1);
     for (const later of ['id="createWalletButton"', 'id="importWalletButton"', 'id="unlockWalletButton"',

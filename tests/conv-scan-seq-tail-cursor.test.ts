@@ -16,9 +16,12 @@ const APP = readFileSync('web/app.js', 'utf8');
 const CONV_LANE = readFileSync('web/conv-lane.mjs', 'utf8');
 
 /** The scan body, so ordering assertions cannot accidentally match some other loop. */
+// The end anchor is the cursor advance that closes the scan. It carries a third condition since round 7 — the
+// pass must also have been able to ADDRESS the newest epoch it claims — so the needle is the stable prefix
+// rather than the whole line, which is what a source-scope anchor should have been all along.
 const SCAN = APP.slice(
   APP.indexOf('const bucketMaxSeq = new Map();'),
-  APP.indexOf('if (convClean && !tornDown()) await store.advanceConvScanCursor('),
+  APP.indexOf('if (convClean && !tornDown()'),
 );
 
 describe('SEQTAIL — the CONV scan skips already-decrypted entries before decrypting them', () => {
@@ -46,7 +49,8 @@ describe('SEQTAIL — the CONV scan skips already-decrypted entries before decry
     const transient = SCAN.slice(SCAN.indexOf('// TRANSIENT. The mark must NOT move past'));
     expect(transient.length, 'the transient-failure branch lost its marker comment').toBeGreaterThan(100);
     expect(transient.slice(0, 400)).toContain('bucketBlocked.add(bucket)');
-    expect(SCAN).toContain('if (!bucketBlocked.has(bucket)) advanceConvBucketSeqHighWater(bucket, seq);');
+    expect(SCAN).toContain('if (bucketBlocked.has(bucket)) continue;');
+    expect(SCAN).toContain('advanceConvBucketSeqHighWater(bucket, capped);');
     // A PERMANENTLY unreadable capsule (someone else's, in a shared bucket) DOES advance — retrying it forever is
     // exactly the waste being removed.
     const permanent = SCAN.slice(SCAN.indexOf('if (isPrivateUnreadableCapsuleError(error)) {'));
@@ -56,9 +60,41 @@ describe('SEQTAIL — the CONV scan skips already-decrypted entries before decry
   it('SEQTAIL-04: marks advance only AFTER the append stored the messages', () => {
     // Advancing before the append would lose the whole collected batch if the append threw.
     const appendAt = SCAN.indexOf('await appendConvOpenedCapsules(collected, targetThread)');
-    const advanceAt = SCAN.indexOf('advanceConvBucketSeqHighWater(bucket, seq)');
+    const advanceAt = SCAN.indexOf('advanceConvBucketSeqHighWater(bucket, capped)');
     expect(appendAt).toBeGreaterThan(-1);
     expect(advanceAt, 'the mark moves before the messages are stored').toBeGreaterThan(appendAt);
+  });
+
+  it('SEQTAIL-08: the mark stops BELOW a multipart part the append could not store yet', () => {
+    // THE LOSS THIS CLOSES. A multipart message whose remaining parts are not on chain yet is deliberately not
+    // rendered as fragments — appendConvOpenedCapsules skips the group and waits for a later tick. But the mark
+    // advanced to the highest seq OPENED, held parts included, and the scan skips everything at or below the mark
+    // BEFORE decrypting: the parts in hand were never opened again, the group could never complete, and the paid
+    // message was gone. Nothing healed it either — a reload rebuilds the mark from stored history, and a message
+    // that was never stored contributes nothing while any LATER message in the same shard puts the mark back above
+    // the lost parts. Only a manual full rescan could recover it, and only if the shard still held the bodies.
+    //
+    // The split is the ordinary case, not an exotic one: the parts of one message are separate externals seconds
+    // apart and the receive pass runs every 12s.
+    const append = APP.slice(APP.indexOf('async function appendConvOpenedCapsules('), APP.indexOf('// clean-17 CONV receive (gated)'));
+    expect(append).toContain('if (parts.length < partCount) {');
+    expect(append, 'an incomplete group still holds the mark below the parts in hand').toContain('if (!abandoned) hold(parts);');
+    // …BUT NOT FOREVER [audit 2026-09-01, round 9]. `partCount` is a peer-controlled uint16 inside the encrypted
+    // payload, so `partIndex: 0, partCount: 2` with no sibling ever published pinned the shard's mark at floor-1
+    // permanently — every capsule above it re-decrypted on every 12-second pass for the life of the account, for
+    // one publish per epoch-day. Reachable without malice too: the confirm path's own note says a middle part can
+    // bounce while a later one lands, which leaves the RECIPIENT here. The floor is released at the point the
+    // SENDER stops retrying, because past that no sibling is coming from anyone; the parts stay in hand, so a
+    // late arrival still assembles.
+    expect(append).toContain('(Date.now() - sealedAt) > PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS');
+    // An append that THREW stored nothing either — the same one line closes the gap seedConvSeqMarksFromHistory
+    // documents as "known and unchanged".
+    expect(append).toContain("      hold(parts);   // stored nothing, so the mark may not pass it either");
+    expect(append).toContain('return { appended, held };');
+    // And the caller keeps its mark under the lowest held part of each shard, rather than barring the shard whole:
+    // everything below that part really was stored.
+    expect(SCAN).toContain('const capped = floor === undefined ? seq : Math.min(seq, floor - 1);');
+    expect(SCAN).toContain('if (previous === undefined || entry.seq < previous) heldFloor.set(entry.address, entry.seq);');
   });
 
   it('SEQTAIL-05: the mark store is bounded, and eviction can only cost a re-read', () => {

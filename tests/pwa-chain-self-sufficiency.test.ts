@@ -101,8 +101,11 @@ describe('PWA on-chain self-sufficiency', () => {
     const transport = read('web/ton-rpc-transport.mjs');
     const html = read('web/index.html');
 
-    // Boot: the saved key is injected into globalThis BEFORE the transport is built (so it is captured).
-    expect(app).toMatch(/globalThis\.plathoToncenterApiKey = savedToncenterKey/);
+    // Boot: the saved key reaches globalThis and the transport is rebuilt around it. It is no longer read
+    // synchronously here — it is SEALED under the device key since 2026-08-29 (DEVSECRET-01..07), so the boot
+    // builds keyless and the load re-resolves the transport through applyToncenterApiKey's own rebuild path.
+    expect(app).toMatch(/queueMicrotask\(\(\) => \{ void loadSealedToncenterApiKey\(\); \}\);/);
+    expect(app).toMatch(/globalThis\.plathoToncenterApiKey = key \|\| null;/);
     expect(app).toMatch(/'platho\.toncenter\.apiKey\.v1'/);
     expect(app).toMatch(/globalThis\.plathoTonRpcConfig = rpc/);
     // Changing the key drops + rebuilds the transport so it takes effect immediately.

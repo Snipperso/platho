@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 //   (1) a channel opened from channel SEARCH showed its posts, its description and its name — and a letter tile
 //       where the avatar belongs. The sync walks feedSourcePublicChannels() (subscribed + own + a channel open in
 //       the channel view but not followed); the hydrator walked subscribedPublicChannels() alone.
-//   (2) "в окне «Найти каналы» не грузятся аватары. Если зайти в канал, то грузятся." A discovery RESULT is not a
+//   (2)  A discovery RESULT is not a
 //       feed source at all — it is a wallet the beacon sweep just named, with no registry channel and no posts —
 //       so widening the set in (1) did nothing for the screen where a face carries the most information.
 //

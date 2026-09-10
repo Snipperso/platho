@@ -27,7 +27,15 @@ const slash = (p: string) => p.split('\\').join('/');
 function reachableFromApp(): string[] {
   const seen = new Set<string>();
   const stack = ['app.js'];
-  const importRe = /(?:^|\n)\s*(?:import|export)[^'"\n]*from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  // MULTI-LINE IMPORTS COUNT. [MEASURED 2026-08-29, audit 7.] The class was `[^'"\n]*`, which forbids a newline
+  // between `import` and `from` — so every `import {\n  a,\n  b,\n} from './x.mjs'` was invisible. This walk
+  // reached 81 modules where the looser one in web-bundle-graph-complete reaches 96, and FIVE of the fifteen it
+  // could not see were absent from the precache: intro-send-state, message-plain-text, username-nft-owned,
+  // username-nft-transfer and shard-code. All five are top-level static imports on the boot path, so the first
+  // offline launch after a release missed them, `cachedIgnoringVersion` missed them too, and the whole app.js
+  // graph failed — verbatim the scenario this file's header says it exists to prevent. Five cache guards were
+  // green over it. Newlines are allowed in the specifier clause now; the terminating `from` still anchors it.
+  const importRe = /(?:^|\n)\s*(?:import|export)[^'"]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
   while (stack.length > 0) {
     const rel = stack.pop() as string;
     if (seen.has(rel)) continue;
@@ -70,6 +78,39 @@ describe('service worker precache covers the runtime', () => {
     // precacheEntries throws when the worker warms a URL nothing can answer — a warm that 404s is a cache miss
     // on every load, silently.
     expect(() => precacheEntries()).not.toThrow();
+  });
+
+  it('SWCOVER-04: every document the app can open is precached', () => {
+    // The documents dialog reads markdown from web/docs at runtime. Three of the five were precached and two were
+    // not — the PRIVACY POLICY and the TERMS, which are the two a first-time reader and an app-store reviewer are
+    // most likely to open, and the two the app is legally expected to be able to show. The runtime handler caches
+    // what it fetches, so the gap was invisible after the first online view and total before it.
+    // Translations are deliberately NOT precached: fifty documents is an install cost for a reader who wants one,
+    // and the first view of a translation stores it. The English set is the offline floor.
+    const app = readFileSync('web/app.js', 'utf8');
+    const paths = [...app.matchAll(/path: '\.\/(docs\/[^']+)'/g)].map((match) => match[1]);
+    expect(paths.length, 'the documents list should not be empty — did its shape change?').toBeGreaterThanOrEqual(5);
+    const missing = paths.filter((path) => !precachedPaths.has(path));
+    expect(missing, 'listed in the app, absent from the precache: offline these open on nothing').toEqual([]);
+  });
+
+  it('SWCOVER-05: every asset the STYLESHEET fetches is precached', () => {
+    // The module graph and the documents list were covered; the stylesheet's own assets were not, and nothing
+    // else could see them — MEASURED [audit 2026-09-01, round 9], dropping an icon from the precache left every
+    // coverage gate in this file green, while dropping a module or a document turned several red. Two icons were
+    // missing in fact: assets/icons/wallet.svg and assets/icons/close.svg, both referenced from styles.css and
+    // fetched on every cold boot. On the first offline (or server-down) launch after each release the wallet tab
+    // icon and every close-button glyph rendered blank — including the control an offline reader needs to
+    // dismiss a dialog.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const referenced = [...new Set([...css.matchAll(/assets\/[A-Za-z0-9._/-]+/g)].map((match) => match[0]))];
+    expect(referenced.length, 'the stylesheet should reference assets — did its shape change?')
+      .toBeGreaterThanOrEqual(20);
+    const missing = referenced.filter((asset) => !precachedPaths.has(asset));
+    expect(missing, `referenced by styles.css, absent from the precache:\n${missing.join('\n')}`).toEqual([]);
+    // …and each one must actually exist, or the precache install would fail on it (allSettled hides that).
+    const absent = referenced.filter((asset) => !existsSync(`web/${asset}`));
+    expect(absent, `referenced by styles.css, missing from disk:\n${absent.join('\n')}`).toEqual([]);
   });
 
   it('SWCOVER-03: the precached URL carries the SAME ?v= token the importer uses', () => {

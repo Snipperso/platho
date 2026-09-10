@@ -18,6 +18,8 @@ function currentCodeHashes(): Record<string, string> {
 }
 
 describe('UsernameRegistry storage economics', () => {
+  // A sandbox economics run: about 19 s alone, and past the 30 s default under full-suite load (measured
+  // 2026-09-10: 31 s, the only red in an otherwise green run). The time it needs, not the default.
   it('USERNAME-STORAGE-01: mint/refund/item paths retain the modeled permanent endowments', async () => {
     const report = await runUsernameRegistryStorageEconomics(false);
 
@@ -50,7 +52,7 @@ describe('UsernameRegistry storage economics', () => {
           .toBeGreaterThanOrEqual(0n);
       }
     }
-  }, 30000);
+  }, 120_000);
 
   it('USERNAME-STORAGE-02: checked artifact is tied to current UsernameRegistry and UsernameNFTItem code hashes', () => {
     const report = readJson('artifacts/username_registry_storage_economics_report.json');

@@ -12,7 +12,7 @@ import { publicChannelPartitionKey, publicWalletHash, publicEpochTag, publicEraO
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // FOLLOWING THE POINTER A REPOST CARRIES.
 //
-// Owner, 2026-08-07: "а почему репост публичного поста отправляется не полностью и без картинок?"
+// decided 2026-08-07
 //
 // It is a REFERENCE by design — entry id, body hash, author wallet, a 4KB text snapshot and a "has image" flag —
 // and copying the picture would republish it on chain at full price. What was missing is the other half: nothing
@@ -100,7 +100,7 @@ describe('PL-POSTAT — one shared post, read by the coordinates the repost carr
     const publish = async (payload: any) => {
       const built = await buildPublicPublishWalletMessage({
         kind: 0, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell,
-        value: publicPublishValueForKind(0), partitionKey, epochTag,
+        value: publicPublishValueForKind(0), partitionKey, epochTag, nowUnix: CLOCK,
       });
       dest = await sendBuilt(channel, built);
       messages.push({ body: built.body, source: channel.address.toString() });
@@ -165,7 +165,7 @@ describe('PL-POSTAT — one shared post, read by the coordinates the repost carr
       const payload = await createPublicPostPayloadV2({ type: 'post', text: `p#${i}`, streamId: `0${i}`.repeat(16), createdAtSec: CLOCK + i });
       const built = await buildPublicPublishWalletMessage({
         kind: 0, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell,
-        value: publicPublishValueForKind(0), partitionKey, epochTag,
+        value: publicPublishValueForKind(0), partitionKey, epochTag, nowUnix: CLOCK,
       });
       dest = await sendBuilt(channel, built);
       messages.push({ body: built.body, source: channel.address.toString() });

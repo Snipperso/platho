@@ -1,4 +1,4 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=21';
 
 
 export class TonRpcTransportError extends Error {
@@ -38,6 +38,21 @@ const TONCENTER_MESSAGES_CACHE_MAX_ENTRIES = 128;
 // Exported: app.js's size-scaled sendBoc ceiling (vaultSendBocRequestTimeoutMs) uses this as its base
 // for callers that pass no explicit ceiling — importing it keeps the two from silently diverging.
 export const TON_RPC_REQUEST_TIMEOUT_MS = 15_000;
+/**
+ * THE LONGEST A REQUEST MAY LEGITIMATELY SIT IN THE SHARED PUMP before it is fair to call the wait itself a
+ * failure — and therefore the allowance a caller must give `callSend` so a busy pump does not eat the upload
+ * budget. Two terms, both from constants above: the ladder's last rung (the pump can be parked that long after a
+ * sustained 429) plus one in-flight request (bounded by its own fetch timeout).
+ *
+ * [audit 2026-09-01, round 9.] Round 8 passed TON_RPC_REQUEST_TIMEOUT_MS alone here, on the reasoning that a
+ * 'critical' send is taken next off the queue so only the one request already in flight can precede it. Both
+ * halves were wrong: equal-weight tasks are FIFO by sequence, so arbitrarily many criticals can be ahead, and a
+ * rate-limit park delays every one of them. MEASURED: under a 40 s park the broadcast was rejected QUEUE_TIMEOUT
+ * at 15,008 ms, where the pre-round-8 posture waited an 18 s park out and LANDED. The fetch's own AbortController
+ * still bounds wire time at TON_RPC_REQUEST_TIMEOUT_MS, so widening this cannot make a hung door hold longer — it
+ * only stops the client abandoning a send while the pump is legitimately busy.
+ */
+export const TON_RPC_MAX_QUEUE_WAIT_MS = TONCENTER_RATE_LIMIT_BACKOFF_MS + TON_RPC_REQUEST_TIMEOUT_MS;
 // TON aborts a get-method run against an account that has no code (e.g. a
 // never-deployed wallet) with this exit code. It is a definitive on-chain
 // answer that every node agrees on — not a transport failure — so a caller that
@@ -138,8 +153,12 @@ function isTonRpcHardTransportError(error) {
   return /failed to fetch|network|dns|connection|load failed/i.test(String(error?.message ?? error ?? ''));
 }
 
+// -13 is production TVM; -256 is what the sandbox emulator reports for the same "no code" abort. The app's own
+// classifier (isUninitializedAccountError) counts both; a transport that only knew one never short-circuited in tests.
+const TON_GET_METHOD_UNINITIALIZED_EXIT_CODES = new Set([TON_GET_METHOD_UNINITIALIZED_EXIT_CODE, -256]);
 function tonRpcErrorIsUninitializedAccount(error) {
-  return Number(error?.exitCode) === TON_GET_METHOD_UNINITIALIZED_EXIT_CODE;
+  const code = error?.exitCode;
+  return code !== undefined && code !== null && TON_GET_METHOD_UNINITIALIZED_EXIT_CODES.has(Number(code));
 }
 
 function noteTonRpcTransportFailure(transport, error, deadRetryMs = TON_RPC_TRANSPORT_DEAD_RETRY_MS) {
@@ -1152,7 +1171,8 @@ export function createTonCenterV3Transport(options = {}) {
     kind: 'toncenter-v3',
     supportsMessageHistory: Boolean(messagesEndpoint),
     supportsSendBoc: Boolean(sendBocEndpoint),
-    async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, verify, allowUnverifiedCriticalRead, requestTimeoutMs, timeoutMs, queueTimeoutMs }) {
+    async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, verify, allowUnverifiedCriticalRead,
+      requestTimeoutMs, timeoutMs, queueTimeoutMs, skipIfRateLimited }) {
       const call = {
         address: assertString(address, 'TON RPC address'),
         method: assertString(method, 'TON RPC method'),
@@ -1200,7 +1220,13 @@ export function createTonCenterV3Transport(options = {}) {
               requestSpacingMs,
               rateLimitBackoffMs,
               rateLimitRetries,
-              skipIfRateLimited: options.skipRateLimitedGetMethods ?? true,
+              // PER-CALL OVERRIDE [audit 2026-08-31, round 8]. Dropping a read during a 429 park is right
+              // for a background sweep — it is cheap to repeat next tick — and wrong for a read a SEND is
+              // blocked on: the wallet seqno is a signing input, and dropping it fails the send outright.
+              // getAccountState has taken this per call all along (walletAccountIsUninitialized passes
+              // false); the get-method path had only the transport-wide switch, so the seqno read could
+              // not opt out. Default unchanged, so every existing caller keeps its behaviour.
+              skipIfRateLimited: skipIfRateLimited ?? options.skipRateLimitedGetMethods ?? true,
               priority: resolvedPriority,
               queueTimeoutMs,
             },
@@ -1285,17 +1311,31 @@ export function createTonCenterV3Transport(options = {}) {
       // before: the fallback is the exact request that used to be the first one.
       const alternate = firstBroadcastDoorForBytes(approximateBocBytes(boc), options.config ?? null);
       let response = null;
+      let priorDeliveryAmbiguous = false;
       if (alternate && alternate.sendBocEndpoint !== endpointForSend) {
         try {
           const viaAlternate = await postThrough(alternate.sendBocEndpoint, true);
           if (viaAlternate?.ok) response = viaAlternate;
-        } catch {
-          // Swallowed: an alternate that will not take the message proves nothing, and the primary is next.
+        } catch (error) {
+          // Swallowed: an alternate that will not take the message proves nothing, and the primary is next — but an
+          // answer that never came (no HTTP status: a timeout, a dropped connection) leaves the alternate's DELIVERY
+          // unknown, and the primary's verdict below must not be read as if nothing had left the device [audit
+          // 2026-09-06, round 3]. The flag rides on whatever the primary then throws.
+          const status = Number(error?.status ?? error?.response?.status ?? 0);
+          if (!(status >= 400) && String(error?.code ?? '') !== 'QUEUE_TIMEOUT') priorDeliveryAmbiguous = true;
         }
       }
-      if (!response) response = await postThrough(endpointForSend);
+      if (!response) {
+        try {
+          response = await postThrough(endpointForSend);
+        } catch (error) {
+          if (priorDeliveryAmbiguous && error && typeof error === 'object') { try { error.tonRpcPriorDeliveryAmbiguous = true; } catch { /* frozen error */ } }
+          throw error;
+        }
+      }
       if (!response.ok) {
         const error = await toncenterHttpErrorWithBody('TON RPC sendBoc', response, rateLimitBackoffMs);
+        if (priorDeliveryAmbiguous) { try { error.tonRpcPriorDeliveryAmbiguous = true; } catch { /* frozen error */ } }
         // The CLASSIFICATION travels with the error (the fallback wrapper rethrows it untouched), so a caller can
         // tell "the chain rejected these bytes" from "the door is broken" without re-parsing the body.
         error.broadcastVerdict = classifyBroadcastDoorAnswer({
@@ -2006,7 +2046,11 @@ export function createFallbackTonRpcTransport(options = {}) {
         primaryTransport = transport;
         break;
       } catch (error) {
-        lastError = error;
+        // A -13 IS THE MOST INFORMATIVE ANSWER THIS LOOP CAN GET, so it must not be overwritten by whatever the
+        // NEXT door says: every node agrees a code-less account has no code, while a fallback that then 500s or
+        // times out would surface as the failure and strip the exit code the callers classify on. MEASURED
+        // 2026-09-09: an unactivated wallet's own reads printed as generic errors plus a lone HTTP 500.
+        if (!tonRpcErrorIsUninitializedAccount(lastError) || tonRpcErrorIsUninitializedAccount(error)) lastError = error;
         // A get-method abort on a code-less account (TON exit_code -13) is a
         // definitive on-chain answer, not a transport miss — every node agrees
         // the account has no code. When the caller opts in (the wallet seqno

@@ -12,8 +12,7 @@ const TREASURY_SHARE_BPS: Int = 5000;
 // in large amounts, where 2 TON of slack is noise. The clean-17 shards deposit PER CAPSULE — 1.5M times over the
 // airdrop — and at that rate the reserve is not slack, it is 18% of the fee. That is the only reason the shards
 // were built to ACCUMULATE the fee and remit it once per shard: the accumulation existed purely to pay this
-// constant once instead of a million times. [OWNER 2026-07-19: the fee must not sit in a shard at all — "в шарде
-// должна быть только его рента, а моя комиссия это моя комиссия".] Fixing the constant removes the reason.
+// constant once instead of a million times. [decided 2026-07-19] Fixing the constant removes the reason.
 //
 // MEASURED 2026-07-19 against the LIVE mainnet config, not from memory (a recalled "400 nanoton per gas unit"
 // nearly caused the correct measurement to be discarded — see below):
@@ -23,9 +22,8 @@ const TREASURY_SHARE_BPS: Int = 5000;
 // Agreement to one nanoton, which also proves @ton/sandbox prices gas at the live mainnet rate.
 //
 // SIZED HIGH, WITH THE SURPLUS MADE RECOVERABLE. I first reasoned the opposite — err low, because a shortfall
-// only drains this contract gradually while a surplus strands forever — and the owner corrected the premise:
-//   [OWNER 2026-07-19] "Если мы ошибаемся вниз, то пользователь просто меньше платит за сообщение, а потом мне
-//   из своего кармана надо оплачивать ошибку? Если так, то пусть лучше пользователь платит с запасом."
+// only drains this contract gradually while a surplus strands forever — and the decidedcorrected the premise
+//   [decided 2026-07-19]
 // That is right, and my version had the payer wrong. The publisher's cost is the deposit message's value, so a
 // smaller reserve means the USER pays less while accumulated_ton is still credited in full — the shortfall
 // lands on the owner at flush time. Erring low spends the owner's money to save the user a rounding error.
@@ -580,7 +578,7 @@ contract FeeAccumulator {
     // all — FlushTreasuryDue can only send what SplitAccumulated moved into treasury_due_ton, which only ever
     // comes from a declared deposit amount. Across the airdrop's 1.5M capsules that would have immured a few
     // hundred GRAM of the owner's own money.
-    // [OWNER 2026-07-19, on the surplus: "разве нельзя вывести и излишки, если они будут?"] Now it can: this
+    // [decided 2026-07-19] Now it can: this
     // credits it to accumulated_ton, from which it splits and flushes like any other protocol fee.
     //
     // PERMISSIONLESS ON PURPOSE, and safe because it cannot move value ANYWHERE. It only relabels balance this

@@ -82,7 +82,7 @@ const IS_PUBLISH_GAS: Int = 2500000;
 
 // PROTOCOL FEE — 0.01 GRAM per published capsule, the SAME fee RecordShard charges (RS_PROTOCOL_FEE), because the
 // owner's economics are stated per MESSAGE and an intro is a message: 1.5M capsules -> 15k GRAM of liquidity.
-// [OWNER 2026-07-18: "комиссию берём и с интро".] Charging it here was previously omitted with no reasoning in the
+// [decided 2026-07-18] Charging it here was previously omitted with no reasoning in the
 // code, which made a first contact a quarter the price of a reply.
 // It also does defensive work that CONV does not need. This lane is OPEN by design — anyone may write to any
 // bucket, and the recipient must SCAN every live intro — so the cost of publishing junk IS the cost of degrading

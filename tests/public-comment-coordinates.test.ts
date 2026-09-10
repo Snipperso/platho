@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // A COMMENT NEEDS THE PARENT POST'S CHAIN COORDINATES, AND THE FEED ITEM DID NOT HAVE THEM.
 //
-// Owner, 2026-08-13: "Написал комментарий на пост, нажал отправить. Из композера текст исчез, в посте не
-// появился... Я не подписан на этот канал, просто нашёл через поиск каналов." Console:
+// Owner, 2026-08-13: Console:
 // "Public comment parent is missing its channel coordinates".
 //
 // Both the comment READ and the comment WRITE fold (author wallet, channel epoch tag, channel shard seq, raw
@@ -24,7 +23,11 @@ const app = readFileSync('web/app.js', 'utf8');
 const subs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
 
 function loadCoordinateFunctions() {
-  const start = app.indexOf('/** epochTag.shardSeq.entryId -> the three coordinates');
+  // ANCHORED ON THE DECLARATION, NOT ON THE PROSE ABOVE IT [2026-08-31]. This used to slice from the doc
+  // comment's first line, so rewording that comment — which round 5 did, when the generation became a fourth
+  // coordinate — silently made the slice EMPTY and every assertion below failed on an undefined function.
+  // A signature is the thing this test is actually about; a sentence is not.
+  const start = app.indexOf('function sharedPostShardCoordinates(');
   const end = app.indexOf('async function fetchPublicPostFromChain(');
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
@@ -44,7 +47,23 @@ describe('public comment coordinates', () => {
       epochTag: 441n,
       shardSeq: 2,
       shardEntryId: 7n,
+      // THE FOURTH COORDINATE [round 5]. A three-part id says nothing about the generation, and 17 is what that
+      // means — it is the generation every post written so far was published by. Its thread address is therefore
+      // byte-identical to what it has always been (publicPostUid folds nothing extra for 17).
+      generation: 17,
     });
+  });
+
+  it('COORDS-01G: a FOUR-part id names its generation — the straddle-era twin is a different post', () => {
+    // The flip gives one (epoch_tag, seq, entry_id) two shards, and both number entries from 0 — so without this
+    // fourth coordinate the gen-17 and gen-18 posts at the same index share a feed id AND a comment thread.
+    const { publicPostChainCoordinates } = loadCoordinateFunctions();
+    expect(publicPostChainCoordinates({ entryId: '441.2.7.18', authorWallet: WALLET })).toEqual({
+      authorWallet: WALLET, epochTag: 441n, shardSeq: 2, shardEntryId: 7n, generation: 18,
+    });
+    // A post carried straight from the walk states it on the item itself; that wins over the parsed id.
+    expect(publicPostChainCoordinates({ entryId: '441.2.7', authorWallet: WALLET, generation: 18 }).generation)
+      .toBe(18);
   });
 
   it('COORDS-02: the raw per-shard entry id is NOT the composite, and the shard seq is NOT assumed to be 0', () => {
@@ -54,7 +73,7 @@ describe('public comment coordinates', () => {
     expect(overflow.shardEntryId).toBe(7n);
     expect(overflow.shardSeq).toBe(2);
     expect(publicPostChainCoordinates({ entryId: '441.0.0', authorWallet: WALLET }))
-      .toEqual({ authorWallet: WALLET, epochTag: 441n, shardSeq: 0, shardEntryId: 0n });
+      .toEqual({ authorWallet: WALLET, epochTag: 441n, shardSeq: 0, shardEntryId: 0n, generation: 17 });
   });
 
   it('COORDS-03: an explicitly-carried coordinate still wins, so a freshly-walked post is unaffected', () => {
@@ -64,7 +83,7 @@ describe('public comment coordinates', () => {
       channelEpochTag: '441', channelShardSeq: 2, shardEntryId: '7',
     };
     expect(publicPostChainCoordinates(walked))
-      .toEqual({ authorWallet: WALLET, epochTag: 441n, shardSeq: 2, shardEntryId: 7n });
+      .toEqual({ authorWallet: WALLET, epochTag: 441n, shardSeq: 2, shardEntryId: 7n, generation: 17 });
   });
 
   it('COORDS-04: no address at all when there is nothing to address', () => {
@@ -134,5 +153,83 @@ describe('public comment coordinates', () => {
       const body = app.slice(app.indexOf(fn), app.indexOf(fn) + 400);
       expect(body, fn).toContain('publicOptimisticRecordsPlaced += 1;');
     }
+  });
+  it('CMTSEAT-01: two people writing the same words are two comments, not one', async () => {
+    // [audit 2026-09-01, round 9.] A comment's feed identity was the hash of its BODY cell alone — and the PPH2
+    // body carries only the document bytes, while the timestamp, the streamId and the publisher live in the
+    // header. MEASURED: Alice and Bob each commenting "ok" under one post produced ONE key from two chain rows.
+    // assemblePublicParts groups by `single:${channelId}:${entryId}`, so the later one was dropped as a duplicate
+    // and no reader ever saw it — after paying ~0.022 GRAM for it. "ok", "+1" and an emoji make that routine.
+    const app = readFileSync('web/app.js', 'utf8');
+    const at = app.indexOf('async function publicThreadPostsToComments(');
+    expect(at, 'the comment mapper must still be there').toBeGreaterThan(-1);
+    let depth = 0; let stop = -1;
+    for (let i = app.indexOf('{', at); i < app.length; i += 1) {
+      if (app[i] === '{') depth += 1;
+      else if (app[i] === '}') { depth -= 1; if (depth === 0) { stop = i + 1; break; } }
+    }
+    const mapper = app.slice(at, stop);
+
+    // The identity is the chain SEAT — the shard the row lives in plus its row number, which is exactly the
+    // coordinate a post already uses and which the comment object was already carrying, unused.
+    expect(mapper).toContain('const commentSeat = tp.shard_key !== undefined && tp.shard_key !== null');
+    expect(mapper).toContain('`${String(tp.shard_key)}.${Number(tp.entry_id)}`');
+    expect(mapper, 'the feed id must be built from the seat').toContain('entryId: `c-${commentUid}`');
+    expect(mapper, 'and so must the short id and the uid the reading position stores')
+      .toContain('id: `pshard-c-${commentUid.slice(0, 16)}`');
+    expect(mapper).toContain('entryUid: commentUid,');
+    // The body hash survives only as the fallback for a row with no seat — a LOCAL-PENDING comment, which is
+    // exactly the case that has no chain row yet.
+    expect(mapper).toContain('const commentUid = commentSeat ? await publicCommentSeatUid(commentSeat) : bodyHashHex.slice(2);');
+  });
+
+  it('CMTSEAT-02: only the author of a pending comment can retire it', async () => {
+    // The other half. The retire matched on body hash alone, so a STRANGER's identical comment retired this
+    // device's pending one as confirmed: the pending record vanished, the UI turned green, and the entry it
+    // stood for was never published.
+    const app = readFileSync('web/app.js', 'utf8');
+    const at = app.indexOf('function retireConfirmedLocalPublicComments(');
+    expect(at, 'the retire path must still be there').toBeGreaterThan(-1);
+    const body = app.slice(at, app.indexOf('\n}', at));
+    expect(body).toContain('samePublicBodyHash(comment, chainComment)');
+    expect(body, 'the author must match too').toContain('sameWalletAddress(comment.authorWallet, chainComment.authorWallet)');
+  });
+  it('CMTSEAT-03: a comment cached under the OLD id does not double up beside its re-read twin', () => {
+    // THE CONSUMER I ALMOST MISSED [audit 2026-09-01, round 9]. Changing a comment's identity is not a local
+    // edit: comments are PERSISTED, mergePublicComments dedups by entryId, and normalizeFeedComment does not keep
+    // the chain seat — so a comment cached by an older build cannot have its new id recomputed, and the merge
+    // would have shown the SAME comment twice in every thread the reader already had cached. Caught by tracing
+    // the changed line to its consumers rather than by a test going red.
+    const app = readFileSync('web/app.js', 'utf8');
+    const at = app.indexOf('function mergePublicComments(');
+    expect(at, 'the merge must still be there').toBeGreaterThan(-1);
+    let depth = 0; let stop = -1;
+    for (let i = app.indexOf('{', at); i < app.length; i += 1) {
+      if (app[i] === '{') depth += 1;
+      else if (app[i] === '}') { depth -= 1; if (depth === 0) { stop = i + 1; break; } }
+    }
+    const merge = app.slice(at, stop);
+    // eslint-disable-next-line no-new-func
+    const run = new Function('rawWalletAddress', `
+      ${app.slice(app.indexOf('function isLegacyBodyHashCommentId('), app.indexOf('function mergePublicComments('))}
+      ${merge}
+      return mergePublicComments;
+    `)((a: any) => (a == null ? null : String(a).toLowerCase()));
+
+    const HASH = '0xbeef';
+    const ME = '0:AAA';
+    const cachedLegacy = { entryId: `c-beef`, bodyHash: HASH, authorWallet: ME, createdAt: '2026-09-01T10:00:00.000Z', text: 'ok' };
+    const freshSeated = { entryId: 'c-9f2c', bodyHash: HASH, authorWallet: ME, createdAt: '2026-09-01T10:00:00.000Z', text: 'ok' };
+    const merged = run([cachedLegacy], [freshSeated]);
+    expect(merged, 'one comment, not two').toHaveLength(1);
+    expect(merged[0].entryId, 'and it is the one with a chain seat').toBe('c-9f2c');
+
+    // A DIFFERENT author's identical words are still their own comment — the whole point of the seat identity.
+    const theirs = { entryId: 'c-77aa', bodyHash: HASH, authorWallet: '0:BBB', createdAt: '2026-09-01T10:01:00.000Z', text: 'ok' };
+    expect(run([cachedLegacy], [freshSeated, theirs]), 'two people, two comments').toHaveLength(2);
+
+    // And a legacy comment with no seated twin yet is kept: it is a real comment the reader can still see.
+    const orphan = { entryId: 'c-dead', bodyHash: '0xdead', authorWallet: ME, createdAt: '2026-09-01T09:00:00.000Z', text: 'hi' };
+    expect(run([orphan], []), 'nothing is dropped for having an old id alone').toHaveLength(1);
   });
 });

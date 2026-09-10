@@ -2,7 +2,7 @@
 // hoped over. Importing the i18n engine into a data module is safe in both runtimes: it holds the active locale in
 // a module variable, touches the DOM only inside try/catch, and falls back to English when initI18n never ran —
 // which is exactly what the Node tests get, unchanged.
-import { t, tPlural } from './i18n.mjs?v=93';
+import { t, tPlural } from './i18n.mjs?v=131';
 import { messagePreviewText } from './message-plain-text.mjs?v=1';
 
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
@@ -32,6 +32,15 @@ function isObject(value) {
 
 function nonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+// A raw TON address as the profile records carry it, or null — NEVER a throw. nonEmptyString answers null for an
+// empty string, and `.toLowerCase()` on that null threw inside normalizeChannelProfile for every record without
+// the field: readPublicChannelProfileCache swallowed the throw and answered an EMPTY cache, so every reload forgot
+// every channel's description, proven name and proven gift until the chain was walked again [2026-09-10].
+function rawAddressOrNull(value) {
+  const address = String(value ?? '').trim().toLowerCase();
+  return /^-?\d{1,3}:[0-9a-f]{64}$/.test(address) ? address : null;
 }
 
 function safeClone(value) {
@@ -170,14 +179,82 @@ function omitHeavyFeedMediaForPersist(key, value) {
   return value;
 }
 
+/**
+ * WRITE THE FEED CACHE, AND MAKE IT FIT.
+ *
+ * [audit 2026-09-01, round 9.] Nothing bounded this. The merge that replaced the deleted pruner
+ * (upsertPublicChainPosts) keeps every post ever synced, and MEASURED against the production replacer a channel
+ * of 4,000-character posts fills a 5 MB localStorage budget at 292 posts — one prolific channel, against a
+ * product whose own note says a book goes into the feed and a channel hangs for a year. Past that the write threw
+ * QuotaExceededError, this function answered `false`, and its only caller discarded the answer: the OLD value
+ * stayed on disk, memory and storage silently diverged, and a reload showed 1 post of the 400 held in memory.
+ * Worse, that budget is shared with the wallet record, so an unpruned feed could turn wallet creation into
+ * "cannot store a wallet".
+ *
+ * The bound is the storage itself rather than an invented post count: on a refusal, drop the OLDEST posts across
+ * every channel and try again. That keeps exactly as much history as the device will hold, needs no constant that
+ * could drift from what a browser actually grants, and cannot silently keep a stale snapshot — a write that never
+ * fits still answers false, and the caller now says so.
+ */
 export function writePublicChannelFeedCache(storage, cache) {
   if (!storage?.setItem) return false;
-  try {
-    storage.setItem(PUBLIC_CHANNEL_FEED_CACHE_KEY, JSON.stringify(isObject(cache) ? cache : {}, omitHeavyFeedMediaForPersist));
-    return true;
-  } catch {
-    return false;
+  const serialize = (value) => JSON.stringify(isObject(value) ? value : {}, omitHeavyFeedMediaForPersist);
+  const attempt = (value) => {
+    try {
+      storage.setItem(PUBLIC_CHANNEL_FEED_CACHE_KEY, serialize(value));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (attempt(cache)) return true;
+  // Trim and retry. Each round drops the oldest quarter of what is left, so a cache too large by any factor
+  // converges in a handful of serializations rather than one per post.
+  // THE SHAPE THE APP ACTUALLY WRITES [audit 2026-09-01, round 10 — a defect this trim introduced hours
+  // earlier]. A cached channel is `{ feed: { version, channelId, updatedAt, posts } }`, sometimes the feed object
+  // directly, and every reader in the tree unwraps it as `record?.feed ?? record`. The first version of this trim
+  // required `Array.isArray(record)` — a shape nothing in the app produces — so it skipped every channel, found
+  // nothing to drop, and returned false on round 0 having trimmed exactly zero posts. MEASURED against the
+  // production shape at a 5 MB quota with 2,000 long posts: 1 attempt, 0 bytes stored. The gate could not see it
+  // because its fixture used the flat shape too: a test written against the fix rather than against the product.
+  const postsOf = (record) => {
+    const feed = record?.feed ?? record;
+    return Array.isArray(feed?.posts) ? feed.posts : (Array.isArray(feed) ? feed : null);
+  };
+  const withPosts = (record, posts) => {
+    const feed = record?.feed ?? record;
+    if (Array.isArray(feed)) return posts;
+    const nextFeed = { ...feed, posts };
+    return record?.feed ? { ...record, feed: nextFeed } : nextFeed;
+  };
+
+  // HOW MANY ROUNDS ARE ENOUGH. Each round drops a quarter of what is left, so a cache of N posts is empty
+  // after log(N)/log(4/3) rounds: 26 for a thousand posts, 48 for a million. 64 therefore reaches EMPTY from any
+  // cache this app can hold, which is what makes `false` mean "storage refuses everything" rather than "I gave up
+  // early" — the round-9 bound of 12 stopped at 3.2% of the input and reported failure with the cache still large.
+  let trimmed = isObject(cache) ? cache : {};
+  for (let round = 0; round < 64; round += 1) {
+    const dated = [];
+    for (const [channelId, record] of Object.entries(trimmed)) {
+      const posts = postsOf(record);
+      if (!posts) continue;
+      for (const post of posts) dated.push({ channelId, post, at: Date.parse(post?.createdAt ?? '') || 0 });
+    }
+    if (dated.length === 0) return false;
+    dated.sort((a, b) => a.at - b.at);
+    const drop = Math.max(1, Math.floor(dated.length / 4));
+    const doomed = new Set(dated.slice(0, drop).map((entry) => entry.post));
+    const next = {};
+    for (const [channelId, record] of Object.entries(trimmed)) {
+      const posts = postsOf(record);
+      if (!posts) continue;
+      const kept = posts.filter((post) => !doomed.has(post));
+      if (kept.length > 0) next[channelId] = withPosts(record, kept);
+    }
+    trimmed = next;
+    if (attempt(trimmed)) return true;
   }
+  return false;
 }
 
 function normalizeFeedPost(post) {
@@ -191,6 +268,7 @@ function normalizeFeedPost(post) {
     id,
     entryId: nonEmptyString(post.entryId),
     readEntryId: nonEmptyString(post.readEntryId),
+    hidden: post.hidden === true,   // the moderation bit the shard row carries (CUTOVER item 15); a cached hide stays a hide
     title: nonEmptyString(post.title),
     text,
     blocks,
@@ -244,6 +322,15 @@ function normalizeFeedComment(comment) {
     chainVerified: comment.chainVerified === true,
     publishStatus: nonEmptyString(comment.publishStatus),
     publishState: isObject(comment.publishState) ? safeClone(comment.publishState) : null,
+    // THE COMMENT'S CHAIN COORDINATES AND ITS HIDDEN BIT SURVIVE THE CACHE [audit 2026-09-05, round 2]. Without them a
+    // comment restored from here had no report target, no reaction bar and no hidden badge until its thread was read
+    // again — and a hidden comment came back visible.
+    hidden: comment.hidden === true,
+    partitionKey: nonEmptyString(comment.partitionKey),
+    epochTag: nonEmptyString(comment.epochTag),
+    threadShardSeq: Number.isSafeInteger(Number(comment.threadShardSeq)) ? Number(comment.threadShardSeq) : undefined,
+    generation: Number.isSafeInteger(Number(comment.generation)) ? Number(comment.generation) : undefined,
+    shardEntryId: nonEmptyString(comment.shardEntryId),
   };
 }
 
@@ -363,9 +450,7 @@ function shortTime(value) {
  * The feed's ORDER: every followed channel's posts in one list, by the post's own time, oldest first — the renderer
  * reverses it, so the newest post of ANY channel sits at the top.
  *
- * OWNER 2026-08-21: "I follow many people; one of them posted, and the new post appeared at the BOTTOM next to his
- * old one, while silent channels I follow stayed on top. I want the new post on top, then other people's older posts,
- * then his old post." The feed items used to come out grouped by channel in thread order — the newest post of a
+ * decided 2026-08-21 The feed items used to come out grouped by channel in thread order — the newest post of a
  * channel that was followed late could never rise above a silent channel that was followed early.
  *
  * Ties (same millisecond) break by entryId, then by position, so the order is stable across renders. A post with no
@@ -432,6 +517,7 @@ export function publicChannelFeedToThread(channel, feed) {
       publicReadEntryId: post.readEntryId,
       publicBodyHash: post.bodyHash,
       publicChainVerified: post.chainVerified === true,
+      publicHidden: post.hidden === true,   // the moderation bit rides the thread message (CUTOVER item 15, round 2: it did not, and the feed never saw a hide)
       publicPublishStatus: post.publishStatus,
       publicPublishState: post.publishState,
       publicCommentsAllowed: post.commentsAllowed !== false,
@@ -481,6 +567,7 @@ export function publicChannelThreadsToFeedItems(threads) {
         readEntryId: message.publicReadEntryId,
         bodyHash: message.publicBodyHash,
         chainVerified: message.publicChainVerified === true,
+        hidden: message.publicHidden === true,
         publishStatus: message.publicPublishStatus,
         publishState: message.publicPublishState,
         authorWallet: message.publicAuthorWallet,
@@ -530,7 +617,46 @@ export function normalizeChannelProfile(value) {
     // verifiedUsername = the claim AFTER on-chain registry proof (owner == author wallet) — the only one shown.
     ownerUsername: typeof value.ownerUsername === 'string' ? value.ownerUsername : '',
     verifiedUsername: typeof value.verifiedUsername === 'string' ? value.verifiedUsername : '',
+    // appearance = the self-declared LOOK from the profile block (a gift item address; never drawn on its own).
+    // verifiedGift = that claim AFTER on-chain proof (collection anchor, item content, owner == author wallet) —
+    // the chain's own slug and number, and the only thing a channel is ever dressed in. Same two-field contract
+    // as the name above [2026-09-07].
+    appearance: normalizeProfileAppearanceRecord(value.appearance),
+    verifiedGift: normalizeVerifiedGiftRecord(value.verifiedGift),
+    // wornGift = the gift the wallet WEARS (its profile card), a raw item address — its own claim, apart from the
+    // channel's look above [2026-09-09]; proven on the reader's side by the wallet's own proven gift list.
+    wornGift: normalizeWornGiftAddress(value.wornGift),
   };
+}
+
+function normalizeWornGiftAddress(value) {
+  return rawAddressOrNull(value);
+}
+
+function normalizeProfileAppearanceRecord(value) {
+  if (!isObject(value)) return null;
+  const itemAddress = rawAddressOrNull(value.itemAddress);
+  if (value.kind === 'telegram-gift') return itemAddress ? { kind: 'telegram-gift', itemAddress } : null;
+  if (value.kind !== 'look') return null;
+  // A look [2026-09-09]: the guests' theme, the background and its settings (already clamped by the codec that
+  // read them from the chain — kept as integers here), and the gift if any. Same shape the codec hands out.
+  const theme = value.theme === 'light' ? 'light' : 'dark';
+  const background = ['none', 'plasma', 'nodes'].includes(value.background) ? value.background : null;
+  const settings = (Array.isArray(value.settings) ? value.settings : [])
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isSafeInteger(entry) && entry >= 0 && entry <= 65535)
+    .slice(0, 8);
+  return { kind: 'look', theme, background, settings, itemAddress };
+}
+
+function normalizeVerifiedGiftRecord(value) {
+  if (!isObject(value)) return null;
+  const itemAddress = String(value.itemAddress ?? '').trim().toLowerCase();
+  const slug = nonEmptyString(String(value.slug ?? ''));
+  const number = Number(value.number);
+  const verifiedAt = Number(value.verifiedAt);
+  if (!itemAddress || !slug || !Number.isSafeInteger(number) || number < 0) return null;
+  return { itemAddress, slug, number, verifiedAt: Number.isSafeInteger(verifiedAt) ? verifiedAt : 0 };
 }
 
 export function readPublicChannelProfileCache(storage) {
@@ -563,27 +689,11 @@ export function writePublicChannelProfileCache(storage, cache) {
 // entryIds are 0-INDEXED while public_latest_id is the NEXT id (highest live id = latest - 1; total ever = latest).
 // So the live id range is [latest - live_count, latest - 1] and the oldest-live id (the floor) is EXACTLY
 // latest - live_count (= the contract's public_oldest_live_id). live_count 0 → nothing live (floor = latest).
-export function publicEvictionFloor(latestId, liveCount) {
-  const latest = BigInt(latestId ?? 0n);
-  const live = BigInt(liveCount ?? 0n);
-  return live > 0n ? (latest - live) : latest;
-}
+// [REMOVED 2026-09-01, audit round 9] publicEvictionFloor / prunePublicPostsBelowFloor. Dead AND obsolete:
+// app.js imported both and called neither (the call sites went with the CapsuleHub readers in 38bc0727, the gate
+// that pinned them went in the same commit, and only the imports were left behind). They were also built for an
+// identity that no longer exists — `BigInt(post.entryId)` against a feed id that has been the shard composite
+// "epochTag.shardSeq.entryId[.generation]" since the PublicShard cutover, so every id threw, was swallowed, and
+// counted as un-prunable. Reviving them would have pruned nothing. What the cache actually needed is a bound it
+// can enforce without knowing the chain's eviction model at all — see the trim inside writePublicChannelFeedCache.
 
-// Drop cache posts/comments evicted on-chain (entryId STRICTLY below the FIFO floor). A post below the floor is
-// evicted → dropped with its comments; a live post keeps only its still-live comments. A local-pending post
-// (non-numeric/absent entryId) is NOT on-chain → never pruned. floor <= 0 → nothing evicted → returned unchanged.
-export function prunePublicPostsBelowFloor(posts, floor) {
-  if (!(floor > 0n)) return posts;
-  const kept = [];
-  for (const post of posts ?? []) {
-    let id = null;
-    try { id = post?.entryId === undefined || post?.entryId === null ? null : BigInt(post.entryId); } catch { id = null; }
-    if (id !== null && id < floor) continue;
-    const comments = post.comments ?? [];
-    const liveComments = comments.filter((comment) => {
-      try { return comment?.entryId === undefined || comment?.entryId === null ? true : BigInt(comment.entryId) >= floor; } catch { return true; }
-    });
-    kept.push(liveComments.length === comments.length ? post : { ...post, comments: liveComments });
-  }
-  return kept;
-}

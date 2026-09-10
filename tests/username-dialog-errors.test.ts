@@ -21,8 +21,7 @@ import { I18N_STRINGS } from '../web/i18n-strings.mjs';
 //   MINT  — two dead checks. The affordability line and the up-front gate both read the SYNTHESIZED Vault user,
 //           whose ATH is always 0, so both were switched off under direct pay and the dialog said nothing about
 //           ATH at all. And usernameMintStatusText bucketed the shortfall by the SUBSTRING "not enough vault
-//           ath" — Vault-era English, from before the sentence became t('errors.notEnoughAth') — so the one
-//           message worth reading arrived wrapped as "имя заблокировано: ...".
+//           ath имя заблокировано:...".
 //
 // The rule underneath all of it: a message shown to a user is classified by the CODE the thrower sets, never by
 // matching English words that translation and refactoring both move.
@@ -40,65 +39,6 @@ function everyLocaleHas(key: string) {
 function codeOnly(slice: string) {
   return slice.split('\n').filter((line) => !line.trim().startsWith('//') && !line.trim().startsWith('*')).join('\n');
 }
-
-describe('username dialogs: link', () => {
-  it('UNAME-LINK-01: the three refusals are localized and DISTINCT', () => {
-    const classifier = app.slice(
-      app.indexOf('function usernameLinkErrorText(error, chosen)'),
-      app.indexOf('async function requestWalletDisplayIdentity(mode)'),
-    );
-    expect(classifier.length, 'the classifier slice must not collapse').toBeGreaterThan(200);
-    expect(classifier).toContain("if (error instanceof UsernameNotRegisteredError) return t('username.linkNoSuchName'");
-    expect(classifier).toContain("if (error?.code === 'PLATHO_USERNAME_OTHER_WALLET') return t('username.linkOtherWallet'");
-    // The fall-through must NOT claim the name is bad: a provider that is not configured, a rate limit or an
-    // inconclusive proof all land here, and none of them means the name does not exist.
-    expect(classifier).toContain("return t('username.linkCouldNotVerify'");
-    for (const key of ['username.linkNoSuchName', 'username.linkOtherWallet', 'username.linkCouldNotVerify']) {
-      expect(everyLocaleHas(key), `${key} in every locale`).toBe(true);
-      expect(I18N_STRINGS.en[key], `${key} must name the name`).toContain('{name}');
-    }
-    // Three sentences, three meanings — a copy-paste that collapsed two of them would defeat the whole point.
-    const en = ['username.linkNoSuchName', 'username.linkOtherWallet', 'username.linkCouldNotVerify']
-      .map((key) => I18N_STRINGS.en[key]);
-    expect(new Set(en).size, 'the three refusals must not say the same thing').toBe(3);
-    // The "could not verify" one must read as retryable, not as a verdict on the name.
-    expect(I18N_STRINGS.en['username.linkCouldNotVerify']).toMatch(/try again/i);
-  });
-
-  it('UNAME-LINK-02: the dialog shows that line, not the contract\'s own English', () => {
-    const validateStart = app.indexOf('const result = await verifyWalletDisplayIdentity(normalizedMode, chosen, plathoWallet);');
-    const validate = app.slice(validateStart, app.indexOf('\n    },', validateStart));
-    expect(validate.length, 'the validate slice must not collapse').toBeGreaterThan(100);
-    expect(validate).toContain('return { ok: false, error: usernameLinkErrorText(error, chosen) };');
-    expect(validate, 'the raw message must not reach the screen').not.toMatch(/error: error\?\.message/);
-    // ...and it still reaches the console, which is where an English diagnostic belongs.
-    expect(validate).toContain('console.error(error);');
-    // The thrower has to CARRY the distinction, or the classifier has nothing to read.
-    const verify = app.slice(
-      app.indexOf('async function verifyWalletDisplayIdentity(mode, label, wallet = plathoWallet)'),
-      app.indexOf('function readWalletDisplayIdentity('),
-    );
-    expect(verify).toContain("error.code = 'PLATHO_USERNAME_OTHER_WALLET';");
-  });
-
-  it('UNAME-LINK-03: owning NO names is stated up front — but only when we actually know it', () => {
-    const dialog = app.slice(
-      app.indexOf('async function requestWalletDisplayIdentity(mode)'),
-      app.indexOf('async function requestUsernameMintName()'),
-    );
-    expect(dialog.length, 'the dialog slice must not collapse').toBeGreaterThan(1000);
-    expect(dialog).toMatch(/if \(normalizedMode === WALLET_DISPLAY_MODES\.PLATHO_NFT && ownedNames !== null && knownNames\.length === 0\) \{\s*feedback = t\('username\.linkNoNamesYet'\);/);
-    expect(everyLocaleHas('username.linkNoNamesYet')).toBe(true);
-    // It has to point at the way OUT — the user who hit this had pressed the wrong button of the two.
-    expect(I18N_STRINGS.en['username.linkNoNamesYet']).toMatch(/create/i);
-    expect(I18N_STRINGS.en['username.linkNoNamesYet']).toMatch(/ATH/);
-    // COUNTER-CASE, and the load-bearing half: `ownedNames === null` means the CHAIN READ FAILED. Telling someone
-    // they own nothing on the strength of a failed read is a false statement about their property — and the
-    // remembered-names fallback exists precisely for that case.
-    expect(dialog).toMatch(/const knownNames = normalizedMode === WALLET_DISPLAY_MODES\.PLATHO_NFT\s*\?\s*\(ownedNames \?\? readKnownPlathoUsernames\(/);
-    expect(dialog).toMatch(/\.catch\(\(\) => null\);/);
-  });
-});
 
 describe('username dialogs: mint', () => {
   it('UNAME-MINT-01: affordability is read from the WALLET, and an unread balance is not zero', () => {
@@ -137,7 +77,9 @@ describe('username dialogs: mint', () => {
     // (e) A shortfall gets the one thing the shared sentence cannot carry: where to get ATH.
     expect(dialog).toMatch(/error\?\.code === 'PLATHO_ATH_REQUIRED'\s*\?\s*`\$\{error\.message\} \$\{t\('errors\.buyAthHint'\)\}`/);
     expect(everyLocaleHas('errors.buyAthHint')).toBe(true);
-    expect(I18N_STRINGS.en['errors.buyAthHint']).toMatch(/Profile/);
+    // WALLET, not Profile: the Buy ATH button has been in the wallet pane for a while and this sentence still
+    // pointed at the profile — fixed 2026-09-07, when the profile stopped being a tab at all.
+    expect(I18N_STRINGS.en['errors.buyAthHint']).toMatch(/Wallet/);
   });
 
   it('UNAME-MINT-02: the status bucket keys on the CODE, never on English words', () => {

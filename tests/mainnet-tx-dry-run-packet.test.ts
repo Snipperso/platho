@@ -175,7 +175,11 @@ describe('mainnet transaction dry-run packet', () => {
   it('H-DEP-DRYRUN-08: the runbook seals exactly the contracts the packet seals, and none that no longer exist', () => {
     if (!existsSync('artifacts/local/mainnet_tx_dry_run_packet.json')) return;
     const packet = readJson('artifacts/local/mainnet_tx_dry_run_packet.json');
-    const runbook = readFileSync('DEPLOYMENT_RUNBOOK.md', 'utf8');
+    // NEWLINES NORMALISED, and that is load-bearing here. DEPLOYMENT_RUNBOOK.md is pure CRLF (559 of them, zero
+    // bare LF), so the blank-line bound below — a search for two consecutive newlines — never matched and slice(start, -1) handed this
+    // test the whole rest of the document. The comment two lines down says the opposite is required, so the guard
+    // was reading exactly the "historical prose" it promises to exclude. [MEASURED 2026-08-29 by ANCHOR-01.]
+    const runbook = readFileSync('DEPLOYMENT_RUNBOOK.md', 'utf8').replace(/\r\n/g, '\n');
 
     const packetSeals = (packet.control_messages ?? [])
       .filter((m: any) => m.phase === 'seal')

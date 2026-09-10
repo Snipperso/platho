@@ -212,6 +212,65 @@ describe('profile block content codec', () => {
     expect(m.decodeProfileBlockContent(truncated)).toBe(null);
   });
 
+  it('PWA-PROFILE-CODEC-04: the channel look is a trailer after the username — round-trips, adds nothing when absent, and old blocks decode to null', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    const address = '0:' + 'ab'.repeat(32);
+    // Round-trip, with a name in front of it.
+    const dressed = m.decodeProfileBlockContent(m.encodeProfileBlockContent({
+      description: 'hi', tags: ['a'], ownerUsername: 'glasnost', appearance: { kind: 'telegram-gift', itemAddress: address.toUpperCase() },
+    }));
+    expect(dressed!.ownerUsername).toBe('glasnost');
+    expect(dressed!.appearance).toEqual({ kind: 'telegram-gift', itemAddress: address });
+    // …and without a name: the username trailer is a zero-length field, and the look still follows it.
+    const nameless = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'hi', tags: [], ownerUsername: '', appearance: { kind: 'telegram-gift', itemAddress: address } }));
+    expect(nameless!.ownerUsername).toBe('');
+    expect(nameless!.appearance).toEqual({ kind: 'telegram-gift', itemAddress: address });
+    // NOT A BYTE for a profile without one — every profile on chain today encodes exactly as it did.
+    const plain = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost' });
+    const explicitNone = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost', appearance: null });
+    expect(Array.from(explicitNone)).toEqual(Array.from(plain));
+    expect(m.decodeProfileBlockContent(plain)!.appearance).toBe(null);
+    // A malformed claim is refused at the encoder and at the decoder: no address, no look.
+    expect(m.normalizeProfileAppearance({ kind: 'telegram-gift', itemAddress: 'EQnot-raw' })).toBe(null);
+    expect(m.normalizeProfileAppearance({ kind: 'sticker', itemAddress: address })).toBe(null);
+
+    // THE LOOK, kind 2 [decided 2026-09-09]: theme + background + its settings + an optional gift, round-tripped.
+    const look = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost', appearance: {
+      kind: 'look', theme: 'light', background: 'plasma', settings: [45, 7, 300, 120], itemAddress: address.toUpperCase(),
+    } });
+    expect(m.decodeProfileBlockContent(look)!.appearance).toEqual({ kind: 'look', theme: 'light', background: 'plasma', settings: [45, 7, 300, 120], itemAddress: address });
+    // Without a gift: plasma alone is a look. Nodes carry their own four settings.
+    const bare = m.encodeProfileBlockContent({ description: '', tags: [], ownerUsername: '', appearance: { kind: 'look', theme: 'dark', background: 'nodes', settings: [200, 50, 150, 0], itemAddress: null } });
+    expect(m.decodeProfileBlockContent(bare)!.appearance).toEqual({ kind: 'look', theme: 'dark', background: 'nodes', settings: [200, 50, 150, 0], itemAddress: null });
+    // CLAMPED TO THE SLIDERS' OWN BOUNDS, missing values to their defaults: a profile cannot ask a guest's device
+    // for more than the Appearance dialog allows.
+    expect(m.normalizeProfileAppearance({ kind: 'look', theme: 'light', background: 'plasma', settings: [9999, 0, -1], itemAddress: null }))
+      .toEqual({ kind: 'look', theme: 'light', background: 'plasma', settings: [100, 1, 25, 50], itemAddress: null });
+    expect(m.normalizeProfileAppearance({ kind: 'look', theme: 'neon', background: 'none', settings: [], itemAddress: 'EQnot-raw' }))
+      .toEqual({ kind: 'look', theme: 'dark', background: 'none', settings: [], itemAddress: null });
+    // A BACKGROUND THIS BUILD DOES NOT KNOW decodes as "not carried" — the guest keeps their own — and the rest of
+    // the look (theme, gift) still lands.
+    const futureLook = m.encodeProfileBlockContent({ description: '', tags: [], ownerUsername: '', appearance: { kind: 'look', theme: 'light', background: 'plasma', settings: [30, 5, 175, 50], itemAddress: address } });
+    const tampered = new Uint8Array(futureLook);
+    const kindAt = tampered.length - (1 + 1 + 1 + 1 + 8 + 1 + address.length);   // where kind 2 sits in this block
+    expect(tampered[kindAt]).toBe(m.PROFILE_APPEARANCE_KIND_LOOK);
+    tampered[kindAt + 2] = 9;   // a mode from a later build
+    expect(m.decodeProfileBlockContent(tampered)!.appearance).toEqual({ kind: 'look', theme: 'light', background: null, settings: [], itemAddress: address });
+    // The old gift-only trailer still reads, unchanged.
+    expect(m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'hi', tags: [], ownerUsername: '', appearance: { kind: 'telegram-gift', itemAddress: address } }))!.appearance)
+      .toEqual({ kind: 'telegram-gift', itemAddress: address });
+    // APPENDED AFTER THE NAME: a reader that stops at the username trailer reads the same bytes it always read.
+    const withLook = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost', appearance: { kind: 'telegram-gift', itemAddress: address } });
+    expect(Array.from(withLook.subarray(0, plain.length))).toEqual(Array.from(plain));
+    expect(withLook.length).toBe(plain.length + 1 + 1 + address.length);
+    // A truncated look never nulls the profile — the channel is simply undressed.
+    const cut = withLook.subarray(0, withLook.length - 5);
+    const decodedCut = m.decodeProfileBlockContent(cut);
+    expect(decodedCut!.description).toBe('hi');
+    expect(decodedCut!.ownerUsername).toBe('glasnost');
+    expect(decodedCut!.appearance).toBe(null);
+  });
+
   it('PWA-PROFILE-CODEC-03: owner-username round-trips, is byte-capped, and old-format blocks decode to "" (no crash)', async () => {
     const m = await import('../web/capsule-part-policy.mjs');
     // Round-trip WITH a username (bare name, no ".ath").
@@ -320,5 +379,33 @@ describe('profile block content codec', () => {
     const badEntryIdLen = good.slice();
     badEntryIdLen[2] = 0xff; // the entry id length points past the buffer
     expect(m.decodeShareBlockContent(badEntryIdLen)).toBe(null);
+  });
+});
+
+describe('profile block worn gift', () => {
+  it('PWA-PROFILE-CODEC-05: the worn gift is its own trailer behind the appearance — round-trips, rides an empty appearance, and old blocks decode to null', async () => {
+    const m = await import('../web/capsule-part-policy.mjs');
+    const worn = '0:' + 'cd'.repeat(32);
+    const channel = '0:' + 'ab'.repeat(32);
+    // With a look on the channel AND a worn gift: two claims, two fields.
+    const both = m.decodeProfileBlockContent(m.encodeProfileBlockContent({
+      description: 'hi', tags: ['a'], ownerUsername: 'glasnost',
+      appearance: { kind: 'look', theme: 'dark', background: 'plasma', settings: [1, 2, 3, 4], itemAddress: channel },
+      wornGift: worn.toUpperCase(),
+    }));
+    expect(both!.appearance!.itemAddress).toBe(channel);
+    expect(both!.wornGift).toBe(worn);
+    // A worn gift and NO appearance: the empty appearance trailer keeps the trailers in order.
+    const cardOnly = m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'hi', tags: [], ownerUsername: '', appearance: null, wornGift: worn }));
+    expect(cardOnly!.appearance).toBe(null);
+    expect(cardOnly!.wornGift).toBe(worn);
+    // NOT A BYTE for a profile without one — every profile on chain today encodes exactly as it did.
+    const plain = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost' });
+    const explicitNone = m.encodeProfileBlockContent({ description: 'hi', tags: ['a'], ownerUsername: 'glasnost', wornGift: null });
+    expect(Array.from(explicitNone)).toEqual(Array.from(plain));
+    expect(m.decodeProfileBlockContent(plain)!.wornGift).toBe(null);
+    // A malformed claim is refused at the encoder and the decoder: no address, no claim.
+    expect(m.normalizeProfileWornGift('EQnot-raw')).toBe(null);
+    expect(m.decodeProfileBlockContent(m.encodeProfileBlockContent({ description: 'hi', tags: [], wornGift: 'EQnot-raw' }))!.wornGift).toBe(null);
   });
 });

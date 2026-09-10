@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { I18N_STRINGS, I18N_LOCALES } from '../web/i18n-strings.mjs';
 
 // The i18n engine (web/i18n.mjs) touches document/localStorage at import time only inside functions,
@@ -18,6 +18,59 @@ describe('i18n dictionaries', () => {
     for (const locale of I18N_LOCALES) {
       expect(locale.native, `endonym for ${locale.code}`).toBeTruthy();
     }
+  });
+
+  it('PWA-I18N-12: every key the app CALLS exists, and every key it ships is called', () => {
+    // PARITY IS NOT EXISTENCE. PWA-I18N-02 proves the ten dictionaries carry the SAME keys — which stays true
+    // when a key is missing from ALL of them. Add `t('composer.newThing')` and forget the dictionary and every
+    // i18n gate here stays green while the user reads the raw key back off the screen; the engine has no way to
+    // know a key was meant to exist. MEASURED 2026-09-01 before this gate was written: 925 literal call sites
+    // across 706 distinct keys in app.js alone, 931 distinct keys shipped, and the two sets agreed exactly in
+    // both directions — so this is a ratchet over a property that holds today, not a repair.
+    //
+    // THE SCAN IS DELIBERATELY WIDE. Keys are reached four ways and a gate that knew only the first would be a
+    // false alarm factory: `t('key')` in a module, `data-i18n="key"` (and its -placeholder / -title /
+    // -aria-label / -alt variants) in markup, a ternary of two literals, and a bare literal handed to a helper.
+    // The last is why a plain quoted string that HAPPENS to name a shipped key counts as a reference: matching
+    // the call shape instead would make every indirection look dead.
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          if (!['vendor', 'docs'].includes(entry.name)) walk(`${dir}/${entry.name}`);
+          continue;
+        }
+        if (/\.(js|mjs|html)$/.test(entry.name)) files.push(`${dir}/${entry.name}`);
+      }
+    };
+    walk('web');
+    expect(files.length, 'the scan found no files — did web/ move?').toBeGreaterThan(50);
+
+    const base = (key: string) => (key.includes('#') ? key.split('#')[0] : key);
+    const shipped = new Set(Object.keys(I18N_STRINGS.en).map(base));
+    const called = new Set<string>();
+    const literalCalls = new Set<string>();
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/\bt\(\s*(['"`])([^'"`$\n]+)\1/g)) {
+        literalCalls.add(m[2]);
+        called.add(m[2]);
+      }
+      for (const m of src.matchAll(/data-i18n(?:-[a-z-]+)?="([^"]+)"/g)) called.add(m[1]);
+      for (const m of src.matchAll(/(['"`])([a-z][\w.]*\.[\w.]+)\1/gi)) {
+        if (shipped.has(m[2])) called.add(m[2]);
+      }
+    }
+
+    // (1) NOTHING THE APP CALLS MAY BE ABSENT — this is the half a user sees, as a raw key on screen.
+    const undefinedKeys = [...literalCalls].filter((key) => !shipped.has(key)).sort();
+    expect(undefinedKeys,
+      'called with t() but shipped by no dictionary — the user reads the key itself').toEqual([]);
+
+    // (2) AND NOTHING SHIPPED MAY BE DEAD, because a dead key is dead in TEN dictionaries and every one of them
+    // has to be translated, reviewed and carried forever.
+    const deadKeys = [...shipped].filter((key) => !called.has(key)).sort();
+    expect(deadKeys, 'shipped in every locale and referenced nowhere in web/').toEqual([]);
   });
 
   it('PWA-I18N-02: OPSEC key parity — every locale ships the IDENTICAL non-plural key set', () => {
@@ -161,7 +214,7 @@ describe('i18n app integration', () => {
   });
 
   it('PWA-I18N-11: every plural key carries every category its locale actually uses', () => {
-    // [OWNER 2026-08-24: screenshot reading "2 имён"] Russian has FOUR plural categories and Intl picks `few` for 2;
+    // [decided 2026-08-24] Russian has FOUR plural categories and Intl picks `few` for 2;
     // username.knownNames shipped with only `one` and `other`, so 2 fell back to the `other` form — the one that
     // belongs to 5 and up. Ten of the eleven plural keys already had all four, which is exactly why nobody looked.
     // Checked by ASKING Intl which categories a locale uses, so the same hole cannot open in another key or locale.

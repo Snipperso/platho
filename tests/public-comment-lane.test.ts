@@ -62,12 +62,24 @@ describe('CMT — a busy post can be read further back than one page', () => {
   });
 
   it('CMT-07: comments STREAM — the lane reports after every live shard, the app merges and never removes', () => {
-    // OWNER 2026-08-21: "make comments load progressively, like the channel search and the feed." A post a year
+    // decided 2026-08-21 A post a year
     // old has up to 14 thread-era shards behind one screen, read newest first, and the screen used to wait for the
     // last one. The shape is the channel-search one: report after each shard, merge on the screen, the final
     // result stays the authoritative whole.
     const reader = functionBody(LANE, 'async readThreadComments(');
-    expect(reader).toMatch(/async readThreadComments\([^)]*\{ channelShardSeq = 0, threadShardSeq = 0, olderThan = null, onProgress = null \} = \{\}\)/);
+    // `generation` joined the options [round 5]: the parent's generation folds into its post_uid, so the
+    // straddle-era twins at the same (epoch_tag, seq, entry_id) get separate threads instead of one shared pile.
+    // THE READER PROBES SEQS, IT DOES NOT TAKE ONE [audit 2026-09-02]. This line used to pin `threadShardSeq = 0`
+    // — a single shard, defaulted to the first, which the only caller never overrode. The comment WRITE rolls to
+    // the next seq when a thread shard fills at PS_SAFE_CAP, so past 4096 comments in an era every further comment
+    // landed on chain, was charged for, and was read by nobody. No attacker needed; a popular post gets there.
+    expect(reader).toMatch(/async readThreadComments\([^)]*\{ channelShardSeq = 0, seqProbe = PUBLIC_SEQ_PROBE, olderThan = null, onProgress = null, generation = 17 \} = \{\}\)/);
+    // …and the probe must reach the ADDRESS BUILDER, not merely sit in the signature: one partition key per seq,
+    // every one of them folded into the coordinates the batch asks about.
+    expect(reader, 'the thread reader must build one partition key per seq')
+      .toMatch(/for \(let seq = 0; seq < seqProbe; seq \+= 1\) threadPks\.push\(await publicThreadPartitionKey\(postUid, seq\)\)/);
+    expect(reader, 'and every one of them must enter the coordinate list')
+      .toMatch(/for \(let seq = 0; seq < threadPks\.length; seq \+= 1\)/);   // every seq's key enters the list, and its coordinates ride the rows [CUTOVER item 15]
     // Every path out of a shard reports: exhausted, served from the snapshot, and read from the chain.
     expect(reader.match(/report\(\);/g)?.length, 'three exits, three reports').toBe(3);
     // The report is a COPY and computes hasMore the way the final answer does.
@@ -115,8 +127,13 @@ describe('CMT — a busy post can be read further back than one page', () => {
     // ...and a newest window whose bodies the paced pump declined (rows, no bodies) is NOT remembered as "no
     // comments" until the marker moves — only a window with bodies, or a genuinely empty shard, is cached.
     expect(reader).toContain('if (!paged && (shardPosts.length > 0 || count === 0)) writeShardSnapshot(key, marker,');
-    // One value shape across both readers of the shared cache.
-    expect(LANE).toContain('writeShardSnapshot(key, marker, { posts: shardPosts, from: null, entryCount: null });');
+    // ONE VALUE SHAPE across both readers of the shared cache — and the same rule holds for the channel reader,
+    // which walks BACKWARDS since 2026-08-29 (PL-WINDOW-03 measures it): the rows it takes below the newest window
+    // are handed to the caller and never written here, or the next open would serve a deep slice of a channel as
+    // if it were the head. `walked` is how far down this shard has been asked for, `walkedLt` the body anchor that
+    // depth was matched with — coordinates, not rows.
+    expect(LANE).toContain('const kept = windowFrom === null ? merged : merged.filter((row) => Number(row.entry_id) >= windowFrom);');
+    expect(LANE).toContain('writeShardSnapshot(key, marker, { posts: kept, from: windowFrom, entryCount: count, oldestLt, walked, walkedLt });');
   });
 
   it('CMT-05: the "earlier" sentinel appears only when there IS more, and adds rather than replaces', () => {
@@ -141,7 +158,7 @@ describe('CMT — a busy post can be read further back than one page', () => {
   });
 
   it('CMT-06: cursors are session state — an open starts at the newest page', () => {
-    const open = functionBody(APP, 'function openPublicPostDetail(');
+    const open = functionBody(APP, 'function openPublicPostDetailUnfiltered(');   // the guarded opener delegates here [CUTOVER item 15]
     expect(open).toContain('publicPostDetailCommentCursors = null;');
     expect(open).toContain('publicPostDetailHasMoreComments = false;');
     // They describe a READ, not the post, so they must never come back from the cached snapshot.

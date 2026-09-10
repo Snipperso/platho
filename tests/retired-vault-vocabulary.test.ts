@@ -4,8 +4,7 @@ import { I18N_LOCALES, I18N_STRINGS } from '../web/i18n-strings.mjs';
 
 // THE VAULT IS GONE FROM THE PRODUCT AND WAS STILL IN THE COPY.
 //
-// Owner, 2026-08-07, asking for a review of the quick start: "квикстарт был написан в дошардовую эпоху, там был шаг
-// с переводом денег в волт". The STEP had gone with the code — but eight visible strings had not, and one of them
+// decided 2026-08-07, asking for a review of the quick start. The STEP had gone with the code — but eight visible strings had not, and one of them
 // sat in the activation confirmation itself, promising that activation "unlocks the Vault tab". A user reading that
 // looks for a tab that cannot exist, and the one place they are certain to read carefully was telling them a story
 // about an architecture that was deleted.

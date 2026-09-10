@@ -111,8 +111,22 @@ describe('KEY-SHARD ROTATION SAFETY — a throw after commit() must be unreachab
     const accept = src.indexOf('acceptMessage();', src.indexOf('external(msg: KeyShardReplaceKeys)'));
     expect(idx, 'the floor gate must be present').toBeGreaterThan(0);
     expect(idx, 'and must come BEFORE acceptMessage').toBeLessThan(accept);
-    expect(src, 'the deleted CDATASIZE must not come back into the Bool path')
-      .not.toMatch(/isValidPqPubkeyCell[\s\S]{0,400}computeDataSize/);
+    // BOUNDED BY THE FUNCTION, NOT BY 400 CHARACTERS [audit 2026-09-02]. `fun isValidPqPubkeyCell` is 1,060
+    // characters, so the old `[\s\S]{0,400}` window covered 38% of the Bool path it claims to guard. MEASURED:
+    // the same `computeDataSize` planted 1,051 characters into the function left the gate GREEN, while the
+    // identical plant at the top turned it red — so the defect this exists for (a non-quiet CDATASIZE throwing
+    // exit 8 BELOW the commit, leaving the rotation nonce unburned and the public external replayable by anyone)
+    // was hidden anywhere past the first third.
+    const bodyStart = src.indexOf('fun isValidPqPubkeyCell');
+    expect(bodyStart, 'the function this gate names must exist').toBeGreaterThan(-1);
+    const rest = src.slice(bodyStart + 1);
+    const nextFun = rest.search(/^\s{4}fun /m);
+    const pqBody = nextFun >= 0 ? src.slice(bodyStart, bodyStart + 1 + nextFun) : src.slice(bodyStart);
+    expect(pqBody.length, 'and the slice must be that function, not a fixed distance into it')
+      .toBeGreaterThan(600);
+    expect(pqBody.length).toBeLessThan(4000);
+    expect(pqBody, 'the deleted CDATASIZE must not come back into the Bool path')
+      .not.toContain('computeDataSize');
   });
 
   it('KS-COMMIT-01: an oversized ML-KEM tree is REFUSED silently — no throw, and the nonce really burns', async () => {

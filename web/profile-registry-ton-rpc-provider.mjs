@@ -1,5 +1,5 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=80';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=21';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=89';
 
 export class ProfileRegistryTonRpcProviderError extends Error {
   constructor(message) {
@@ -89,7 +89,10 @@ function stackAddress(address) {
 
 function criticalCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
+  // stopOnUninitializedAccount lets an OWN-account read stop at the first door's -13 instead of walking every
+  // fallback on a settled question; queueTimeoutMs carries the critical read's queue budget (criticalChainReadOptions
+  // sets it — this whitelist used to drop it silently).
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead', 'stopOnUninitializedAccount', 'queueTimeoutMs']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;

@@ -388,10 +388,16 @@ ${EN_COPY}`;
 
   it('SPEC-MSG-SOURCE-03D: public comments warning is immutable-but-not-forever retention copy', () => {
     const app = read('web/app.js');
+    // THE END ANCHOR NAMED A DELETED FUNCTION [audit 2026-09-02]. `renderVaultCards` left web/app.js with the
+    // custodial Vault, so indexOf returned -1 and this sliced 1,116,464 characters — 61.4% of the file — for a
+    // 783-character function. The five key assertions below still landed inside the real function, so nothing
+    // was masked; but the scope claimed one function and covered two thirds of the app, and the meta-gate could
+    // not see it because this file reads through a `read` helper the anchor collector did not understand.
     const fn = app.slice(
       app.indexOf('async function confirmPublicCommentsRisk'),
-      app.indexOf('function renderVaultCards'),
+      app.indexOf('function renderConfiguredShell'),
     );
+    expect(fn.length, 'the slice must be the function, not the rest of the file').toBeLessThan(3000);
 
     // The confirmPublicCommentsRisk dialog copy moved out of inline literals; the function now wires
     // the exact public.openCommentsRisk* keys and the shipped English lives in the en dictionary.

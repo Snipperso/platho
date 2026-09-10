@@ -61,7 +61,7 @@ describe('CONV-DISCOVERY — A publishes where B reads', () => {
   });
 
   it('CONV-DISC-05: A\'s OUTGOING window is exactly B\'s INCOMING window — a restore reads its own side from the same shards it wrote', async () => {
-    // [OWNER 2026-08-22, restored device: "only the peer's replies synced, mine did not".] The private sync now reads
+    // [decided 2026-08-22] The private sync now reads
     // both sides of a conversation. Its own side is the OUTGOING window: per epoch, the shard outgoingRecordShard
     // wrote into — which is, bucket for bucket, what the peer scans as incoming. Address, epoch and write key agree.
     const mine = await outgoingRecordShards({ kRoot, selfKeyId: keyIdA, peerKeyId: keyIdB, epochNow: EPOCH, windowW: 2 });

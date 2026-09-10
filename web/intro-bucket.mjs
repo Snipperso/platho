@@ -33,8 +33,8 @@
 // the stealth view_tag. intro-scan-policy.mjs has recommended this in prose since it was written; this is the
 // code that finally does it.
 
-import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=23';
-import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=1';
+import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=58';
+import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=2';
 
 /**
  * How much room a bucket must still have before we will write into it.

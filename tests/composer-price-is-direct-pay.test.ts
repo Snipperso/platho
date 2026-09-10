@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { CONV_PUBLISH_VALUE, publicPublishValueForKind } from '../web/publish-price.mjs';
-import { PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS } from '../web/message-pricing-policy.mjs';
 import { walletSendFeeNanotons } from '../web/wallet-send-fee.mjs';
 import { I18N_STRINGS } from '../web/i18n-strings.mjs';
 
@@ -20,7 +19,9 @@ const I18N = readFileSync('web/i18n-strings.mjs', 'utf8');
 describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => {
   it('PRICE-01: the direct-pay quote is the attached publish value, not the Vault settlement table', () => {
     const fn = APP.slice(APP.indexOf('function composerProfileNetPriceNanotons'), APP.indexOf('function composerEstimatedNetCostNanotons'));
-    expect(fn).toContain('if (privateLaneDirectPayEnabled()) {');
+    // [2026-08-29] The quote is no longer BRANCHED on a protocol flag: the Vault fallback arm was deleted with
+    // the rest of that freight, so the direct figure is the only code path there is.
+    expect(fn).not.toContain('privateLaneDirectPayEnabled');
     // The KIND decides the value and they differ ~2x (channel post 20,300,000 vs avatar part 39,500,000), so the
     // quote reads the part's own kind. Hard-wiring 0 here made the avatar modal quote a channel post's price for an
     // avatar write. [caught in review 2026-08-16]
@@ -33,7 +34,9 @@ describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => 
     expect(CONV_PUBLISH_VALUE).toBe(19_100_000n);
     expect(publicPublishValueForKind(0)).toBe(20_300_000n);
     // And they are materially different from what was being shown, which is the whole reason this changed.
-    const old = BigInt(PRIVATE_CAPSULE_NET_PRICE_NANOTONS_BY_SIZE_CLASS[1]);
+    // The Vault settlement table this used to read was deleted with the batch freight (2026-08-29); the class-1
+    // figure it published — the one the composer wrongly quoted — is kept as the recorded literal.
+    const old = 33_900_000n;
     expect(old).not.toBe(CONV_PUBLISH_VALUE);
     expect(old > CONV_PUBLISH_VALUE).toBe(true);
   });
@@ -84,6 +87,7 @@ describe('COMPOSER-PRICE — quote what the send attaches, name no hold', () => 
       // so a percentage here would be a figure the wallet is never charged.
       expect(line, `${line} still names a discount`).not.toContain('{discount}');
     }
-    expect(APP).toContain("? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText })");
+    // "Up to" is printed rounded UP: a truncated ceiling sat below the real charge (0.0444 quoted, 0.044595 taken).
+    expect(APP).toContain("text: t('composer.costStatus', { cost: formatTonNanotonsUp(price), surcharge: surchargeText }),");
   });
 });

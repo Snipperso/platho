@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 18 August 2026
+Last updated: 29 August 2026
 
 Platho is a messenger with no backend. This document is short because there is
 very little to disclose — and specific where something genuinely leaves your
@@ -23,10 +23,24 @@ We do not ask for an email address, a phone number or a name.
 - Your message history and drafts.
 - Your settings, including an optional API key for a public GRAM node provider.
 
-This data is stored in your browser's local storage and is encrypted with a
-password you choose (AES-GCM-256 with PBKDF2-SHA-256 key derivation). We never
-receive it. Clearing your browser data deletes it, and without your recovery
-phrase it cannot be restored by us or by anyone else.
+None of it reaches us, and what protects each of them is not the same — so this
+names them one by one rather than making a single claim for all three:
+
+- **The recovery phrase and the keys derived from it** are encrypted with a
+  password you choose (AES-GCM-256, key derivation PBKDF2-SHA-256). Without that
+  password they cannot be read, by us or by anyone holding the device.
+- **Message history and drafts** are encrypted with a key your browser generates
+  on this device and keeps in a form that cannot be exported — not with your
+  password. Copying the stored data to another machine therefore yields nothing
+  readable; it is not a defence against someone already using your unlocked
+  browser.
+- **Settings** — a theme, a language, what you follow — are stored as ordinary
+  text; nothing among them is secret, and none of it reaches us. The one value
+  that is, the optional API key for a node provider, is sealed with the same kind
+  of device key as the message history rather than written in the clear.
+
+Clearing your browser data deletes all of it, and without your recovery phrase it
+cannot be restored by us or by anyone else.
 
 ## What is public by design
 
@@ -51,6 +65,7 @@ infrastructure directly. When you use Platho, your browser sends requests to:
 - `toncenter.com`
 - `tonapi.io`
 - `mainnet-v4.tonhubapi.com`
+- `nft.fragment.com`
 
 These providers necessarily see your IP address and the requests your device
 makes, and they operate under their own privacy policies, which we do not

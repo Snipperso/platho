@@ -12,8 +12,8 @@
 // you get a well-formed address that simply holds nothing: reads return "no such user" and nothing errors. That is
 // why web/shard-address.mjs pins this derivation against @ton/core rather than trusting it.
 
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
-import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=7';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=21';
+import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=29';
 
 export class KeyShardTonRpcProviderError extends Error {
   constructor(message) {
@@ -173,7 +173,10 @@ function resolveRegistryAddress(configured, callOptions) {
 
 function criticalCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
+  // stopOnUninitializedAccount lets an OWN-account read stop at the first door's -13 instead of walking every
+  // fallback on a settled question; queueTimeoutMs carries the critical read's queue budget (criticalChainReadOptions
+  // sets it — this whitelist used to drop it silently).
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead', 'stopOnUninitializedAccount', 'queueTimeoutMs']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;

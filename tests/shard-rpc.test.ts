@@ -87,7 +87,7 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
   });
 
   it('RPC-04C: a 422 is bisected — one refused address costs one UNKNOWN row, never the whole probe', async () => {
-    // OWNER'S CONSOLE 2026-08-21: "accountStates failed with HTTP 422" on the probe over every conversation's
+    // decided 2026-08-21 on the probe over every conversation's
     // shards, then "reading every shard" — the whole batch abandoned for whatever the endpoint refused, and the
     // reason thrown away with the body. MEASURED the same hour: 1024, 1025 and 1100 well-formed addresses in one
     // request all answer 200, so a 422 is about SOMETHING in the batch, not its size. Bisect it: the rest of the
@@ -191,8 +191,7 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
   });
 
   it('RPC-04E: a 422 that is the endpoint\'s DEADLINE splits the batch, refuses nothing, and makes the next batches smaller', async () => {
-    // OWNER'S CONSOLE 2026-08-22: "[states] HTTP 422 on a batch of 342 addresses … the endpoint said:
-    // {"error":"context deadline exceeded"}". toncenter wears its own timeout as a 422. That is about the batch
+    // decided 2026-08-22error":"context deadline exceeded"}". toncenter wears its own timeout as a 422. That is about the batch
     // against their clock, not about any address, so: split it (the halves fit), memoise NOTHING as refused, and
     // build the next batches under a lowered ceiling so the deadline is not paid again every pass — then double
     // the ceiling back after a clean run. A single address that times out is UNKNOWN this pass, unrefused, and
@@ -288,7 +287,7 @@ describe('SHARD-RPC — batched state reads and history reads, on the shared pum
   });
 
   it('RPC-04G: a deadline that recurs at every size splits down to the floor and no further — bounded, not 2N requests', async () => {
-    // OWNER 2026-08-22: "maybe after that 422 everything stops". A deadline about the endpoint's LOAD recurs at
+    // decided 2026-08-22 A deadline about the endpoint's LOAD recurs at
     // every batch size; halving to single addresses would then cost 2N requests, each waiting out the endpoint's
     // deadline, with the one serial pump held for all of it. So the split stops at the floor (32): a batch at or
     // below it that still times out has its addresses marked UNANSWERED this pass, and the next pass starts small

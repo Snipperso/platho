@@ -60,17 +60,25 @@
   --accent: #30d5b0;
   --accent-hi: #4ce4c3;
   --on-accent: #04211a;
+  /* WHAT A PILL IS MADE OF: fill, the glow layer on it, the ink written on it. Bare :root says "the accent", so
+     without a gift nothing here changes; the gift theme below re-derives all three from the hero's own stops. */
+  --cta-fill: var(--accent);
+  --cta-glow: linear-gradient(135deg, var(--accent-hi), transparent 60%);
+  --cta-ink: var(--on-accent);
   --accent-2: #4da3ff;
   --amber: #e0b45e;
   --rose: #ef7a7a;
   --danger: #ff6b6b;
   --green: var(--accent);
   --surface: rgba(255, 255, 255, 0.03);
-  --a06: rgba(48, 213, 176, 0.07);
-  --a10: rgba(48, 213, 176, 0.11);
-  --a16: rgba(48, 213, 176, 0.16);
-  --a25: rgba(48, 213, 176, 0.25);
-  --a40: rgba(48, 213, 176, 0.4);
+  /* THE ACCENT'S CHANNELS, ONCE. The five alphas below carried them as literals, so the accent lived in six places
+     per theme and could only be replaced in all six at a time — which is what a worn gift now does. */
+  --accent-rgb: 48, 213, 176;
+  --a06: rgba(var(--accent-rgb), 0.07);
+  --a10: rgba(var(--accent-rgb), 0.11);
+  --a16: rgba(var(--accent-rgb), 0.16);
+  --a25: rgba(var(--accent-rgb), 0.25);
+  --a40: rgba(var(--accent-rgb), 0.4);
   --id-ton: #9fd3f2;
   --id-platho: #8fdcc8;
   /* TIER COLOURS FOR .ath NAMES (owner): four characters is EPIC, five is RARE — gold and silver, the same two
@@ -97,12 +105,13 @@
   --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.35);
   --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.55);
   --shadow-lift: rgba(0, 0, 0, 0.5);          /* the maximized composer's edge, fading in with its plate */
-  --modal-outline: rgba(48, 213, 176, 0.32);
+  --modal-outline: rgba(var(--accent-rgb), 0.32);
   --shared-post-embed-bg: #121b21;
   --scrollbar: rgba(148, 165, 162, 0.38);
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
   --mute-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a7b4bd' d='M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z'/%3E%3Cpath stroke='%23a7b4bd' stroke-width='2.4' d='M3 3l18 18'/%3E%3C/svg%3E");
   --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2330d5b0' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
+  --group-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a7b4bd' d='M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM9 12.8c-3.1 0-5.8 1.6-5.8 3.6V19h11.6v-2.6c0-2-2.7-3.6-5.8-3.6Zm7.5.2c-.6 0-1.2.05-1.7.16 1.1.85 1.8 2 1.8 3.44V19h5.2v-2.3c0-1.85-2.4-3.7-5.3-3.7Z'/%3E%3C/svg%3E");
   --badge-ring: #12564a;               /* the unread pill's outline: deep brand green, never the panel's black */
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -139,11 +148,12 @@
     --rose: #c94f4f;
     --danger: #d64545;
     --surface: rgba(10, 60, 50, 0.04);
-    --a06: rgba(15, 157, 129, 0.07);
-    --a10: rgba(15, 157, 129, 0.12);
-    --a16: rgba(15, 157, 129, 0.16);
-    --a25: rgba(15, 157, 129, 0.28);
-    --a40: rgba(15, 157, 129, 0.45);
+    --accent-rgb: 15, 157, 129;
+    --a06: rgba(var(--accent-rgb), 0.07);
+    --a10: rgba(var(--accent-rgb), 0.12);
+    --a16: rgba(var(--accent-rgb), 0.16);
+    --a25: rgba(var(--accent-rgb), 0.28);
+    --a40: rgba(var(--accent-rgb), 0.45);
     --id-ton: #2b7ab8;
     --id-platho: #0e8a72;
     --id-platho-epic: #8a6b12;
@@ -158,12 +168,13 @@
     --shadow-2: 0 8px 28px rgba(23, 49, 44, 0.14);
     --shadow-pop: 0 24px 60px rgba(23, 49, 44, 0.25);
     --shadow-lift: rgba(23, 49, 44, 0.22);
-    --modal-outline: rgba(15, 157, 129, 0.3);
+    --modal-outline: rgba(var(--accent-rgb), 0.3);
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
     --mute-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7785' d='M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z'/%3E%3Cpath stroke='%236b7785' stroke-width='2.4' d='M3 3l18 18'/%3E%3C/svg%3E");
     --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
+    --group-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7785' d='M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM9 12.8c-3.1 0-5.8 1.6-5.8 3.6V19h11.6v-2.6c0-2-2.7-3.6-5.8-3.6Zm7.5.2c-.6 0-1.2.05-1.7.16 1.1.85 1.8 2 1.8 3.44V19h5.2v-2.3c0-1.85-2.4-3.7-5.3-3.7Z'/%3E%3C/svg%3E");
     --badge-ring: #0b6a58;
     }
 }
@@ -201,11 +212,12 @@
     --rose: #c94f4f;
     --danger: #d64545;
     --surface: rgba(10, 60, 50, 0.04);
-    --a06: rgba(15, 157, 129, 0.07);
-    --a10: rgba(15, 157, 129, 0.12);
-    --a16: rgba(15, 157, 129, 0.16);
-    --a25: rgba(15, 157, 129, 0.28);
-    --a40: rgba(15, 157, 129, 0.45);
+    --accent-rgb: 15, 157, 129;
+    --a06: rgba(var(--accent-rgb), 0.07);
+    --a10: rgba(var(--accent-rgb), 0.12);
+    --a16: rgba(var(--accent-rgb), 0.16);
+    --a25: rgba(var(--accent-rgb), 0.28);
+    --a40: rgba(var(--accent-rgb), 0.45);
     --id-ton: #2b7ab8;
     --id-platho: #0e8a72;
     --id-platho-epic: #8a6b12;
@@ -220,12 +232,13 @@
     --shadow-2: 0 8px 28px rgba(23, 49, 44, 0.14);
     --shadow-pop: 0 24px 60px rgba(23, 49, 44, 0.25);
     --shadow-lift: rgba(23, 49, 44, 0.22);
-    --modal-outline: rgba(15, 157, 129, 0.3);
+    --modal-outline: rgba(var(--accent-rgb), 0.3);
     --shared-post-embed-bg: #eef4f2;
     --scrollbar: rgba(94, 113, 109, 0.4);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='m12 15.8-6.4-6.4L7 8l5 5 5-5 1.4 1.4L12 15.8Z'/%3E%3C/svg%3E");
     --mute-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7785' d='M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2Zm6-6v-5a6 6 0 0 0-4.5-5.8V4.5a1.5 1.5 0 0 0-3 0v.7A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z'/%3E%3Cpath stroke='%236b7785' stroke-width='2.4' d='M3 3l18 18'/%3E%3C/svg%3E");
     --pin-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%230f9d81' d='M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3Z'/%3E%3C/svg%3E");
+    --group-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%236b7785' d='M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.5 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM9 12.8c-3.1 0-5.8 1.6-5.8 3.6V19h11.6v-2.6c0-2-2.7-3.6-5.8-3.6Zm7.5.2c-.6 0-1.2.05-1.7.16 1.1.85 1.8 2 1.8 3.44V19h5.2v-2.3c0-1.85-2.4-3.7-5.3-3.7Z'/%3E%3C/svg%3E");
     --badge-ring: #0b6a58;
     }
 /* ── Base ───────────────────────────────────────────────────────────────── */
@@ -438,7 +451,10 @@ select,
 .sidebar {
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 22px;
+  /* 22px was measured under a TALL corner: a 36px logo, then a two-line badge whose last line was small muted
+     text, which needs air under it. The corner is now a single 58px tile, and the same gap under a solid block
+     reads as a hole between the app's mark and the balance. */
+  gap: 12px;
   padding: 16px 12px;
   border-right: 1px solid var(--line-soft);
   background: transparent;
@@ -450,11 +466,28 @@ select,
   gap: 9px;
 }
 
+/* ONE SIZE, GIFT OR NO GIFT [owner, 2026-09-06]. The logo used to be 36px and a worn gift 58px, so the corner
+   changed shape depending on what was in it and the rail below shifted with it. */
 .brand-mark {
-  width: 36px;
-  height: 36px;
+  width: 58px;
+  height: 58px;
   object-fit: contain;
-  border-radius: 10px;
+  border-radius: 16px;
+}
+
+/* The motion canvas shares .brand-mark with the still picture and is swapped for it by `hidden` (app.js). */
+.brand-mark[hidden] {
+  display: none;
+}
+
+/* THE LETTER IS HALF THE CORNER [owner, 2026-09-10, from a phone: "the logo looks gigantic"]. The button keeps its
+   58px — the hit area, and the geometry the rail is built on (.brand-mark-button below) — and a worn gift keeps its
+   58px too; only the logo is drawn at half, in the middle of the same button. Keyed on the NO-gift state, so the
+   one-size rule above still governs the gift. */
+.brand[data-brand-gift="false"] .brand-mark {
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
 }
 
 .brand-name {
@@ -764,8 +797,8 @@ select,
 
 .icon-button.accent,
 .send-button {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--cta-fill);
+  color: var(--cta-ink);
   border-color: transparent;
 }
 
@@ -1427,7 +1460,7 @@ html[data-platho-telegram="true"] .install-header-button {
 
 /* Long-press copy flash (contract keyframe name). */
 @keyframes copy-flash {
-  0% { background-color: rgba(48, 213, 176, 0); }
+  0% { background-color: rgba(var(--accent-rgb), 0); }
   18% { background-color: var(--a40); }
   100% { background-color: transparent; }
 }
@@ -2671,6 +2704,29 @@ a .avatar.has-image,
   padding-bottom: 0;
 }
 
+/* ── Settings: the same pane, mounted in a modal instead of a tab [decided 2026-09-07].
+   Everything above still applies to it — this only gives it the chrome a dialog needs and takes back the header
+   offset, which exists to clear a pane's own top edge and has nothing to clear inside a centred card. */
+.profile-settings-dialog {
+  /* .content-pane is display:none until a tab activates it — there is no tab any more, so the dialog says it is
+     shown the way every other modal does: the backdrop's `hidden` attribute is the only switch. */
+  display: grid;
+  width: min(var(--modal-card-width), 100%);
+  height: auto;
+  max-height: calc(var(--app-viewport-height, 100dvh) - 40px);
+  padding: 18px;
+  border: 1px solid var(--modal-outline);
+  border-radius: var(--r-xl);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+}
+
+/* The layout comes from the shared modal-header rule above; what is left is the PANE header's own reserved
+   height, which exists to line a pane's title up with the app bar and has nothing to line up with in a card. */
+.profile-settings-dialog header {
+  min-height: 0;
+}
+
 .wallet-scroll-content,
 .profile-scroll-content {
   display: grid;
@@ -2976,6 +3032,29 @@ button.feed-item:hover {
   font-size: 12px;
 }
 
+/* AN UNVERIFIED SHARE SAYS SO [audit 2026-08-31, round 8]. A share card wears the referenced author's name and
+   avatar, so text that has NOT been matched against the chain must not read as theirs. Quiet, not alarming — a
+   failed resolve is usually an old post or a bad minute, not an attack — but present, because the reader cannot
+   tell those apart and the attribution is doing the talking. */
+/* …AND WHILE IT IS STILL BEING CHECKED, IT SAYS THAT TOO [audit 2026-09-01, round 9]. buildSharedPostEmbed adds
+   this class to every snapshot that claims a chain row and removes it only when the real post replaces the node,
+   so it is the "attributed, not yet verified" state — and it had no rule at all, which made that state look
+   exactly like a verified one for the whole round trip (measured at 3-10 requests on the shared pump, and
+   permanently for a card whose original cannot be resolved). A left rule rather than a colour change: it must
+   read as provisional without accusing an honest repost of anything. */
+.shared-post-embed-unverified {
+  border-left: 2px solid var(--border, rgba(255, 255, 255, 0.14));
+  padding-left: 8px;
+}
+
+.shared-post-embed-unverified-note {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--muted-2, var(--muted));
+  font-size: 12px;
+  font-style: italic;
+}
+
 .public-detail-earlier-comments {
   display: block;
   width: 100%;
@@ -3072,6 +3151,35 @@ button.feed-item:hover {
 
 .share-target-row:hover {
   background: var(--a10);
+}
+
+/* MODERATION [2026-09-03]: the notice above the public feed and a queue row's action cluster. */
+.public-moderation-notice {
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-m);
+  background: var(--a10);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.moderation-queue-preview {
+  flex-basis: 100%;
+  font-size: 0.85em;
+  opacity: 0.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.public-detail-actions {
+  margin-top: 0.5rem;
+}
+.moderation-queue-row {
+  flex-wrap: wrap;
+  cursor: default;
+}
+
+.moderation-queue-row .share-target-text {
+  flex: 1 1 100%;
 }
 
 .share-target-avatar {
@@ -3495,14 +3603,30 @@ button.feed-item:hover {
   align-items: center;
   padding: 10px 18px;
   border-radius: var(--r-pill);
-  background: var(--accent);
+  background: var(--cta-fill);
   border: 1px solid transparent;
-  color: var(--on-accent);
+  color: var(--cta-ink);
   font: inherit;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   box-shadow: 0 4px 14px var(--a25);
+}
+
+/* TWO LINES IN ONE PILL [owner, 2026-09-08: "the price looks sloppy — put it in the button"]. The pill is a flex
+   row, so a stacked pair goes in as ONE child laid out as a grid; the second line is the fee, or the mint's
+   progress or refusal while one runs, in the pill's own ink a shade quieter. */
+.discovery-cta-action-stack {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.discovery-cta-action-note {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0.82;
 }
 
 .discovery-cta-action:not(:disabled):hover,
@@ -3762,6 +3886,9 @@ button.feed-item:hover {
 .discovery-cta-action[hidden],
 .appearance-group[hidden],
 .aurora-canvas[hidden],
+.profile-card-section[hidden],
+.profile-card-wallet[hidden],
+.discovery-cta-actions[hidden],
 .nft-card-art[hidden] {
   display: none;
 }
@@ -3824,42 +3951,6 @@ button.feed-item:hover {
 
 .ledger-icon.amber {
   background: var(--amber);
-}
-
-.identity-block {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 6px 0 4px;
-}
-
-.identity-copy-layout {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.identity-title-row {
-  display: grid;
-  grid-template-columns: minmax(0, auto) 38px;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.identity-title-row h2 {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.identity-copy-button {
-  justify-self: start;
-}
-
-.identity-copy-button:disabled {
-  opacity: var(--disabled-opacity);
-  cursor: not-allowed;
 }
 
 .profile-sections {
@@ -3926,11 +4017,13 @@ button.feed-item:hover {
   line-height: 1.25;
 }
 
-.settings-list strong.profile-action-status[data-state="error"] {
+.settings-list strong.profile-action-status[data-state="error"],
+.discovery-cta-action-note[data-state="error"] {
   color: var(--danger);
 }
 
-.settings-list strong.profile-action-status[data-state="busy"] {
+.settings-list strong.profile-action-status[data-state="busy"],
+.discovery-cta-action-note[data-state="busy"] {
   color: var(--green);
 }
 
@@ -4116,6 +4209,19 @@ button.feed-item:hover {
   z-index: 60;
 }
 
+/* A LOOK BEING PREVIEWED [owner, 2026-09-10]. The app around the description dialog is the preview — the very code
+   that dresses a visitor dresses the author while the dialog is open — so for the dialog's life the backdrop thins
+   to a veil and the card turns to glass: the theme, the background animation and the gift's light show through. */
+html[data-look-preview] .modal-backdrop {
+  background: rgba(4, 10, 12, 0.14);
+  backdrop-filter: none;
+}
+
+html[data-look-preview] .action-dialog {
+  background: color-mix(in srgb, var(--panel) 76%, transparent);
+  backdrop-filter: blur(14px);
+}
+
 .recipient-dialog,
 .action-dialog,
 .docs-dialog,
@@ -4168,6 +4274,31 @@ button.feed-item:hover {
 .activation-welcome-actions {
   display: grid;
   margin-top: 4px;
+}
+
+/* The wallet-key step's "did the file arrive?" row. The explicit [hidden] guard: this rule and [hidden] tie on
+   specificity and source order would otherwise decide, which is the regression PWA-CONFIG already records for the
+   backup warning row. */
+.quick-start-key-confirm {
+  display: grid;
+  gap: 8px;
+}
+
+.quick-start-key-confirm[hidden] {
+  display: none;
+}
+
+/* THE PRIMARY ACTION NEVER HIDES BELOW THE FOLD. A dialog taller than the viewport scrolls inside its own box
+   (max-height below), and at 1280x720 the welcome's "Start" sat at 911 px and the avatar dialog's submit at 820 px
+   with nothing hinting that the box scrolls [owner-run test, 2026-09-09]. The actions row sticks to the bottom of
+   the scroll box on the panel's own background, extended over the padding so the content passes underneath it. */
+.action-dialog > .action-dialog-actions,
+.activation-welcome-dialog > .activation-welcome-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -20px -20px;
+  padding: 12px 20px 20px;
+  background: var(--panel);
 }
 
 .action-dialog {
@@ -4391,6 +4522,7 @@ button.feed-item:hover {
 .action-dialog header,
 .docs-dialog header,
 .install-dialog header,
+.profile-settings-dialog header,
 .activation-welcome-dialog header {
   display: flex;
   align-items: flex-start;
@@ -4738,7 +4870,7 @@ button.feed-item:hover {
   height: 44px;
   border: 0;
   border-radius: var(--r-pill);
-  color: var(--on-accent);
+  color: var(--cta-ink);
   background: linear-gradient(135deg, var(--accent-hi), var(--accent));
   font-weight: 800;
   cursor: pointer;
@@ -5204,8 +5336,10 @@ button.feed-item:hover {
   .sidebar {
     grid-column: 1;
     grid-row: 2;
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto;
+    align-items: center;
+    gap: 8px;
     width: 100%;
     max-width: 100vw;
     min-width: 0;
@@ -5226,15 +5360,32 @@ button.feed-item:hover {
     overflow: hidden;
   }
 
+  /* THE CORNER IS ON THE BAR HERE [owner, 2026-09-07: it becomes visible on mobile too, and first]. It was hidden
+     on this breakpoint, which is precisely why the profile needed a tab of its own — the only door to the card and
+     to the settings was off screen. It is the first cell, where the desktop rail also puts it. */
   .brand {
+    display: grid;
+    grid-column: 1;
+    align-content: center;
+    gap: 0;
+  }
+
+  /* THE SAME 58 PX AS THE DESKTOP CORNER [owner, 2026-09-08: "there is room to make it the same"]. It was 42 on
+     the theory that the bar had no air for more — the tabs beside it are 58 tall on a 71 bar, so it did. No
+     override: the desktop rule stands, one size, gift or no gift. */
+
+  .brand-meta {
     display: none;
   }
 
   .rail {
-    /* STATE-AWARE (owner): no wallet -> the plate cell is gone and the four tabs center across the
-       full width; with a known balance app.js sets .has-vault-balance on the sidebar and the plate
-       cell returns (5 columns, no phantom gap). */
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-column: 2;
+    /* THE PLATE CELL IS ALWAYS THERE [owner, 2026-09-10, from a phone with no wallet yet: "reserve the room for
+       the balance from the start, so nothing moves later"]. It used to be dropped with no wallet (three tabs
+       across the full width) and put back by app.js when a balance landed — which is exactly the move the owner
+       saw. Four cells at all times; the plate stays empty (is-pending) until a balance is known, as on the
+       desktop rail. */
+    grid-template-columns: minmax(58px, 0.72fr) repeat(3, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
     min-width: 0;
@@ -5246,7 +5397,7 @@ button.feed-item:hover {
   }
 
   .rail-vault-balance {
-    display: none;
+    display: grid;
     min-width: 0;
     min-height: 54px;
     padding: 5px 2px;
@@ -5541,6 +5692,75 @@ button.feed-item:hover {
 }
 
 /* ── Boot screen (phases + z-order are contracts) ───────────────────────── */
+/* CUTOVER UPDATE SCREEN [CUTOVER.md items 6/7] — the full-viewport block a build shows once the baked boundary
+   epoch has passed and its generation can no longer write. Topmost on purpose (80 > unlock 60 > boot 55): a
+   blocked build must not look usable behind any dialog. Hidden by default; app.js flips `hidden` off. */
+.cutover-screen {
+  position: fixed;
+  inset: 0;
+  /* Above every body-level overlay. It lives OUTSIDE .app-shell (see index.html) precisely so this number is
+     compared in the ROOT stacking context — inside, `isolation: isolate` capped it below the body-level
+     dialogs whatever it said. 90 clears the external-link backdrop's 80. */
+  z-index: 90;
+  display: flex;
+  /* CENTRED WHEN IT FITS, SCROLLABLE FROM THE TOP WHEN IT DOES NOT [audit 2026-08-31, round 8]. `align-items:
+     center` and `overflow-y: auto` are not composable: a centred flex item taller than its line overflows BOTH
+     edges, and the start edge of a scroll container is unreachable — exactly half the content is dropped out of
+     the scrollable region. MEASURED in Chromium at 390x553 against this stylesheet and the real markup: at a
+     175% OS text setting 131px of the screen (the <h2> and the first body lines) sat above the scrollable area
+     with no way to reach it, and 194px at 200% — on the one screen whose entire job is to explain itself. With
+     the start edge honoured and the card centred by `margin: auto` instead, the same measurement is 0px hidden
+     at every scale, and scrollHeight rises from 822 to 1100 because the whole card becomes scrollable.
+     `margin: auto` still consumes the free space when there IS free space, so nothing changes below ~150%. */
+  align-items: flex-start;
+  justify-content: center;
+  /* SCROLLABLE, and measured against the VISIBLE viewport [round 7]. At a ~150% OS text setting the German
+     copy is 655px tall: with `overflow: visible` the "Reload and update" button sat off-screen with nothing to
+     scroll — the one control on a screen whose entire purpose is to be actionable. Every other dialog in this
+     file already carries this pair; --app-viewport-height is what makes it right inside the Telegram mini-app,
+     where `inset: 0` is the layout viewport rather than the visible one. */
+  overflow-y: auto;
+  padding: 20px;
+  max-height: var(--app-viewport-height, 100dvh);
+  background:
+    radial-gradient(125% 95% at 50% 20%, var(--a10), transparent 55%),
+    var(--bg);
+}
+
+.cutover-screen[hidden] {
+  display: none;
+}
+
+.cutover-screen-inner {
+  margin: auto;   /* centres it in the free space, and yields the start edge when there is none (see above) */
+  max-width: 26rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: var(--text);
+}
+
+.cutover-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
+}
+
+.cutover-body {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.cutover-reload-button {
+  padding: 0.65rem 1.4rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .boot-screen {
   position: fixed;
   inset: 0;
@@ -5750,40 +5970,6 @@ button.feed-item:hover {
 }
 
 /* ── .ath name NFT cards ────────────────────────────────────────────────── */
-/* THE LIST DOES NOT SCROLL ITSELF — THE DIALOG DOES, like every other modal here [OWNER 2026-08-24: "just fix this
-   stupid bug with the usernames already", and, reading it correctly: "this modal of yours doesn't scroll like our
-   other modals"].
-   It had `max-height: 58vh; overflow-y: auto`, which gave the grid a DEFINITE height — and that is what broke the
-   cards. A grid sizes its rows from their intrinsic contribution, and the art frame's square comes from
-   `padding-bottom: 100%`, whose percentage contributes ZERO to intrinsic height. So the rows measured as just the
-   foot (~40px), the leftover space was shared out among them (measured: six rows of exactly 68.5px, filling the
-   box), and the frame then painted its real 298px and was clipped by the card's overflow:hidden. That is the strip
-   in the owner's screenshots — the art was never missing, it was cut to a sliver by a row sized without it.
-   With no height of its own the rows size in normal flow, where the percentage resolves: card 338px, art 298px
-   whole, and the dialog scrolls the way the rest do. MEASURED before / after: card 66 -> 338, dialog scrollable
-   590/574 -> 2267/749. */
-.nft-card-list {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 420px) {
-  .nft-card-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.nft-card {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-l);
-  background: var(--panel-2);
-  overflow: hidden;
-  box-shadow: var(--shadow-1);
-}
-
 /* A SQUARE ART BOX ON EVERY ENGINE, aspect-ratio or not. The on-chain SVG has a viewBox but no width/height, so on a
    WebView that ignores `aspect-ratio` on an <img> (Chrome < 88 / the WebView many Telegram clients ship) `width:100%`
    gave it ZERO height and the art collapsed to a strip [OWNER 2026-08-22]. padding-bottom:100% has forced a square
@@ -5807,38 +5993,6 @@ button.feed-item:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.nft-card-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  min-width: 0;
-}
-
-.nft-card-name {
-  font-size: 14px;
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-
-.nft-card-send {
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.nft-card-send:hover {
-  border-color: var(--a40);
-  color: var(--accent);
 }
 
 .quick-start-address-row {
@@ -5909,6 +6063,7 @@ button.feed-item:hover {
   .theme-anim .icon-button,
   .theme-anim .rail-item,
   .theme-anim .send-button,
+  .theme-anim .profile-card-hero,
   .theme-anim .avatar,
   .theme-anim .identity-popover,
   .theme-anim .emoji-picker,
@@ -6001,12 +6156,16 @@ button.feed-item:hover {
   }
 }
 
+/* THE PILL IS THE HERO under a gift [owner, 2026-09-07] — --cta-fill / --cta-glow / --cta-ink are set inline on
+   the root by applyGiftAppearance, beside --accent, from the hero's own stops; see the tokens on :root and the note
+   there. No rule here keys on the gift theme: the gift crosses over as tokens, never as a selector. */
+
 /* Flat underlays for gradient surfaces, so the theme cross-fade has an animatable color to ride while the
    gradient layer is suppressed. */
 .send-button,
 .recipient-submit,
 .discovery-cta-action {
-  background-color: var(--accent);
+  background-color: var(--cta-fill);
 }
 
 .message.out .bubble {
@@ -6106,7 +6265,8 @@ button.feed-item:hover {
   .theme-anim .avatar::before,
   .theme-anim .send-button::before,
   .theme-anim .recipient-submit::before,
-  .theme-anim .discovery-cta-action::before {
+  .theme-anim .discovery-cta-action::before,
+  .theme-anim .profile-card-hero::before {
     opacity: 0;
     transition: opacity 0.12s ease;
   }
@@ -6166,17 +6326,7 @@ button.feed-item:hover {
   border-radius: inherit;
   opacity: 1;
   transition: opacity 1s ease;
-  background: linear-gradient(135deg, var(--accent-hi), transparent 60%);
-}
-
-/* Bottom bar with a live balance: plate cell + four tabs, no phantom slot. */
-@media (max-width: 900px) {
-  .sidebar.has-vault-balance .rail {
-    grid-template-columns: minmax(58px, 0.72fr) repeat(4, minmax(0, 1fr));
-  }
-  .sidebar.has-vault-balance .rail-vault-balance {
-    display: grid;
-  }
+  background: var(--cta-glow);
 }
 
 /* A REAL avatar image gets no glow layer (owner): transparent-background avatars let the accent gradient
@@ -6240,6 +6390,160 @@ button.feed-item:hover {
   z-index: 1;
 }
 
+/* THE GROUP MARK takes the corner the pin and the mute leave free (top-left), because it is not a setting the
+   user switched on — it says what the conversation IS, and a row can be a pinned, muted group all at once. Same
+   plate + themed glyph + ring as the other two, so the three read as one family; a child node, because ::before
+   is the avatar's glow layer and ::after is the pin's. */
+.avatar > .avatar-group-badge {
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--panel-2) var(--group-badge-icon) center / 11px 11px no-repeat;
+  box-shadow: 0 0 0 1.5px var(--panel);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* THE INVITE CARD stands where a message's text would be, because that is what it replaces: the token is
+   machine-readable by design and must never reach a bubble as words. */
+.group-invite-card {
+  display: grid;
+  gap: 6px;
+}
+
+.group-invite-title {
+  font-weight: 600;
+}
+
+.group-invite-note {
+  color: var(--muted-2);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.group-invite-join {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+/* The members list reuses the share sheet's rows; a pending invite is dimmed because that person is not in the
+   room yet — the roster cannot name them until they announce the key only they can derive. */
+/* THE ROOM'S FACE, above the people in it. A 56px tile so a picture reads as a picture rather than as a row
+   ornament, and the button beside it rather than under it — the dialog is already a column of rows. */
+.group-face-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.group-face-avatar {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  font-size: 22px;
+}
+
+.group-face-action {
+  flex: 0 0 auto;
+}
+
+.reaction-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.reaction-chip,
+.reaction-add {
+  border: 1px solid var(--line-soft);
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.reaction-chip.is-mine {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.reaction-chip:disabled,
+.reaction-add:disabled {
+  cursor: default;
+  opacity: var(--disabled-opacity);
+}
+
+/* A chip this device already pressed is not a disabled control: it stays enabled, marked aria-pressed, and the
+   press handler refuses a second press. Dimming would read as "unavailable" on the one chip that is the user's. */
+.reaction-chip[aria-pressed="true"] {
+  cursor: default;
+}
+
+.reaction-add {
+  border-style: dashed;
+  color: var(--muted-2);
+}
+
+/* Sixteen in two rows of eight: the picker is a grid, not a strip, so nothing scrolls on a phone. */
+.reaction-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.reaction-picker-cell {
+  border: 1px solid var(--line-soft);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 0;
+  font-size: 22px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.reaction-picker-cell.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.reaction-picker-cell.is-mine {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.group-member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.group-member-row.is-pending {
+  opacity: 0.62;
+}
+
+/* Someone who answered with a key this device did not invite: not faded like a pending invite (they are HERE,
+   waiting on a person), marked by the accent hairline so an admin's eye finds the row that needs a decision. */
+.group-member-row.is-candidate {
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+}
+
+.group-member-row .share-target-text {
+  min-width: 0;
+}
+
 /* The share sheet's avatars are smaller (34px) — the badge follows, or it eats the face. */
 .share-target-avatar[data-pinned="true"]::after {
   right: -1px;
@@ -6247,6 +6551,14 @@ button.feed-item:hover {
   width: 14px;
   height: 14px;
   background-size: 9px 9px;
+}
+
+.share-target-avatar > .avatar-group-badge {
+  left: -1px;
+  top: -1px;
+  width: 14px;
+  height: 14px;
+  background-size: 10px 10px;
 }
 
 /* The add-contact plate in the private list: a small breather before the chat rows, and its action button
@@ -6315,35 +6627,6 @@ button.feed-item:hover {
   .app-version-label {
     animation: none;
   }
-}
-
-/* Profile identity [OWNER 2026-08-23: "this stands in a column and takes too much room — better the avatar on
-   the left and the platho name on the right"]. The redesign stacked avatar-over-name and centred it; with an 86px
-   avatar that block measured 176px tall before the first setting, against 98px for a row at 375px wide (124px at
-   320px, where the wallet line wraps). Back to a ROW: the avatar keeps its size, the name
-   and wallet line ride beside it, and the block costs only the avatar's own height. Left-aligned, not centred —
-   a centred name beside a left avatar would drift with the name's length. */
-.identity-block {
-  flex-direction: row;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-  padding: 6px 0 4px;
-}
-
-/* The avatar is a flex ITEM again, so it must be told not to shrink: `width` is only a starting basis and the
-   name/wallet column beside it was squeezing an 86px square down to 77px wide (measured). The column layout hid
-   this — nothing competed for the row's width there. */
-.identity-block > .avatar.large {
-  flex: 0 0 auto;
-}
-
-.identity-copy-layout {
-  justify-items: start;
-}
-
-.identity-title-row {
-  justify-content: start;
 }
 
 /* Balance cards (owner): flat, no corner gradient; ticker and amount centered in the box. */
@@ -6539,11 +6822,11 @@ button.feed-item:hover {
 .discovery-cta-action,
 .recipient-submit,
 .secondary-button,
+.profile-card-action,
 .feed-actions button,
 .message-actions button,
 .conversation-earlier-button,
 .settings-rpc-row .rpc-key-get,
-.nft-card-send,
 .external-link-open,
 .mini-action-button {
   border-radius: 12px;
@@ -7099,6 +7382,36 @@ button.feed-item:hover {
   height: 100%;
 }
 
+/* ── THE GIFT'S PATTERN, WHICH ONLY THE PLASMA CAN REACH [decided 2026-09-06].
+   Owner: the background comes from the theme, dark or light; the plasma is the colour of the gift's backdrop; and
+   the patterns must not be visible on the background — they become visible when the plasma runs over them.
+
+   So there is no wallpaper and no ambient wash. This canvas carries the SAME suns as the plasma, in the same gift
+   colour, at four times the strength, cut to the gift's own pattern. Where no sun has reached, it is transparent
+   and the theme's background is all there is; inside a glow, the gift's symbols surface out of it.
+
+   The mask is what makes it cheap: the canvas holds nothing but soft blobs at the plasma's own low resolution, and
+   the compositor cuts them into crisp symbols at the device's — no full-screen composite runs per frame.
+
+   It belongs to the plasma. The lattice already draws these symbols at its own nodes, so under "nodes" they would
+   double; "none" is a request for a quiet app, not for a different picture. */
+
+/* OFF UNLESS THERE IS A TILE TO SHOW. `mask-image: var(--gift-pattern)` with the property unset is INVALID, not
+   absent — the mask is dropped and the element keeps painting, which for this one is a full-screen plate of ink. */
+.aurora-pattern {
+  display: none;
+}
+
+:root[data-gift-pattern="true"][data-background="plasma"] .aurora-pattern:not([hidden]) {
+  display: block;
+  -webkit-mask-image: var(--gift-pattern);
+  mask-image: var(--gift-pattern);
+  -webkit-mask-size: var(--gift-pattern-size) var(--gift-pattern-size);
+  mask-size: var(--gift-pattern-size) var(--gift-pattern-size);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+
 /* Profile → "Background glow": the aurora brightness slider (app.js AURORA_LEVEL_KEY), native range in the brand colour. */
 .settings-range-row input[type="range"] {
   width: 100%;
@@ -7284,4 +7597,584 @@ button.feed-item:hover {
   .conversation-header.is-chat-switching .conversation-title {
     animation: none;
   }
+}
+
+/* ── The scrollers dissolve into the composer rather than being cut by it.
+   A post used to end at a hard horizontal edge right above the composer, mid-sentence. The obvious fix — a plate
+   painted in the background colour — cannot work here: the composer is transparent on purpose so the background
+   shows through it, and behind it the plasma is moving, so a painted fade would have to guess a colour that moves.
+   A mask fades the CONTENT instead, and whatever is behind it stays visible.
+   The scroll padding below matches the fade, so the last line can always be scrolled clear of it — a fade with no
+   room to scroll past would mean the final line of a conversation could never be read at full contrast. */
+.public-feed,
+.message-strip {
+  --scroll-fade: 44px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--scroll-fade)), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--scroll-fade)), transparent 100%);
+  padding-bottom: var(--scroll-fade);
+}
+
+/* ── The corner: a door to the profile card, and the stand for a worn Telegram gift.
+   With no gift worn this is exactly the old brand block — the button adds a hit area and nothing else. With one
+   worn, the mark grows into the space the network pill was using (the pill's two facts move into the card, which is
+   where "which network, which version" is actually asked). */
+.brand-mark-button {
+  display: grid;
+  place-items: center;
+  /* Its own 58px, not the picture's: the logo inside is half that now, and the corner must not shrink with it. */
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.brand-mark-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Locked or no wallet: the corner is the app's own mark again and says so — no hand cursor promising a card that
+   has no account behind it. Not dimmed: it is a logo in that state, not a disabled control. */
+.brand-mark-button:disabled {
+  cursor: default;
+}
+
+/* THE BADGE IS ABOUT THE DEPLOYMENT, NOT ABOUT THE GIFT. It used to disappear when a gift was worn, which made the
+   corner two different heights for no reason the user could see. Now it is hidden wherever it has nothing to warn
+   about — mainnet — and shown wherever it does, in both states, so the two match within any one build.
+   `display: grid` is on the element itself, and that beats the `hidden` attribute unless this says otherwise. */
+.brand-meta[hidden],
+.network-pill[hidden] {
+  display: none;
+}
+
+/* ── Profile card. One dialog, two subjects (own wallet / a contact's). Chrome is the shared .action-dialog. */
+.profile-card-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* Bigger than the row it used to sit in: in the hero the face IS the subject, not a bullet beside a name. Square,
+   not Telegram's circle — the app's own squircle is what the owner wants kept. */
+.profile-card-avatar {
+  width: 76px;
+  height: 76px;
+  border-radius: 20px;
+  font-size: 26px;
+}
+
+.profile-card-identity-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-card-identity-text strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.profile-card-identity-text span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.profile-card-wallet {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md, 12px);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ── THE PROFILE CARD'S HERO [owner, 2026-09-07, with a Telegram profile beside it]: the worn gift's backdrop, its
+   pattern over that, a frame in the worn name's rarity, and the face centred on it. The headings that used to sit
+   here said "Profile" above a dialog already titled Profile, and a sentence nobody reads twice.
+
+   EVERY COLOUR IS THE GIFT'S OWN, and both of its backdrop stops are used the way the artwork uses them: the
+   lighter middle in the centre, the darker rim at the edges, and the pattern in the rim tone ON the middle — which
+   is exactly the tone-on-tone the gift itself is drawn with, rather than a contrast invented here. With no gift
+   worn the two variables are unset and the fallbacks make it the card's own surface. */
+.profile-card-hero {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: -18px -18px 0;
+  padding: 26px 18px 18px;
+  border-bottom: 2px solid var(--line-soft);
+  border-radius: var(--r-lg, 16px) var(--r-lg, 16px) 0 0;
+  /* THE SAME TWO LAYERS THE PILLS HAVE [owner, 2026-09-07: "the button's new gradient glows in gradually — on the
+     hero it is somehow not noticeable; check"]. It was not noticeable because it was not happening: the hero's
+     radial sat in its own `background`, and background-image cannot animate, so a change of gift SNAPPED it while
+     the pills' glow layer faded out and washed back in. Now the rim is the flat underlay the theme cross-fade
+     rides, and the radial lives on ::before, whose opacity the same choreography drives. */
+  background-color: rgb(var(--gift-hero-edge, 255 255 255 / 0));
+  isolation: isolate;
+  /* CLIPPED BY A PATH, NOT BY overflow: hidden [owner, 2026-09-08: "the header just collapses instead of the whole
+     modal scrolling"]. The card's panel is a grid, and a grid item whose overflow is not visible is a scroll
+     container, whose automatic minimum height is ZERO — so once the names and the latest post made the panel
+     taller than the screen, the grid took the missing height out of the one row allowed to shrink: this one. The
+     avatar was cut to a sliver and the name was gone, exactly when the list finished loading. A clip-path keeps
+     the pattern plate inside the rounded corners and leaves the hero's minimum height its content's. */
+  clip-path: inset(0 round var(--r-lg, 16px) var(--r-lg, 16px) 0 0);
+}
+
+/* A RADIAL, because the gift's backdrop is one — its lighter middle in the centre, its rim at the edges. The
+   first cut faded to transparent at 70% and read as a flat fill, which is what the owner saw. */
+/* THE FALLOFF HAS TO HAPPEN WHERE IT CAN BE SEEN. A gift's two stops are close by design — measured on Vice
+   Cream, 1.50 apart — so a radial that only reaches its rim colour in the far corners spends the whole visible
+   band near one colour and reads as a flat fill. Sized to the hero instead: the middle at the face, the rim
+   reached by 88%, so the same two colours travel across the panel rather than past it. */
+.profile-card-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 1;
+  transition: opacity 1s ease;
+  background:
+    radial-gradient(ellipse 58% 96% at 50% 38%,
+      rgb(var(--gift-hero-inner, 255 255 255 / 0)) 0%,
+      rgb(var(--gift-hero-edge, 255 255 255 / 0)) 88%);
+}
+
+/* THE RARITY IS THE FRAME. plathoUsernameTier decides it — four characters epic, five rare — and the tones are the
+   ones a .ath name is already painted in wherever it appears, so the card cannot invent a second scale. */
+.profile-card-hero[data-tier="epic"] { border-bottom-color: var(--id-platho-epic); }
+.profile-card-hero[data-tier="rare"] { border-bottom-color: var(--id-platho-rare); }
+.profile-card-hero[data-tier="common"] { border-bottom-color: var(--id-platho); }
+
+/* The pattern is a MASK, so it is painted here rather than carried as a picture — and painted in the rim tone,
+   which is what the gift's own artwork draws it in. */
+.profile-card-hero-pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* NOT one of the two stops — they can be the same colour (measured on Chill Flame: 1.13 apart), and the pattern
+     vanished. The artwork draws its own pattern as a tone shift of its backdrop, so this is black or white,
+     whichever the backdrop is not, chosen from the middle stop's luminance in applyGiftAppearance. */
+  background: rgb(var(--gift-hero-ink, 255 255 255) / 0.14);
+  opacity: 1;
+  /* ITS OWN TOKENS AND ITS OWN GATE [owner, 2026-09-08]: the hero wears the gift whenever one is worn, while the
+     plasma field's tile (--gift-pattern, data-gift-pattern) is a matter of the theme choice. */
+  -webkit-mask-image: var(--gift-hero-pattern);
+  mask-image: var(--gift-hero-pattern);
+  -webkit-mask-size: var(--gift-hero-pattern-size) var(--gift-hero-pattern-size);
+  mask-size: var(--gift-hero-pattern-size) var(--gift-hero-pattern-size);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+
+/* The gate reads off the CARD's hero, not the document: the hero tokens are written per card (applyGiftHeroTokens),
+   so a contact without a gift has no tile and no plate, whatever the reader wears. */
+.profile-card-hero:not([data-gift-hero-pattern="true"]) .profile-card-hero-pattern {
+  display: none;   /* no tile: an unmasked plate would be a flat wash over the whole hero */
+}
+
+/* ITS OWN SCRIM. This is the app's icon button, which expects a panel behind it; over a gift's backdrop it had
+   nothing to sit on and disappeared. The plate is the backdrop's own opposite tone, so it works on a pale gift
+   and a dark one without a second rule. */
+.profile-card-hero-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  border: 0;
+  background: rgb(var(--gift-hero-ink, 0 0 0) / 0.22);
+  color: rgb(var(--gift-hero-ink, 255 255 255) / 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.profile-card-hero-close:hover {
+  background: rgb(var(--gift-hero-ink, 0 0 0) / 0.34);
+}
+
+
+/* The face and the gift standing on it. NOT a circle — the avatar keeps the app's own squircle [owner]. */
+.profile-card-hero-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* AN OPAQUE PLATE, AND A RING THAT SAYS THE TIER. The avatar's own fill is the accent at 25%/6% alpha — over a
+   gift's backdrop that is nothing at all, which is why the rectangle was not visible. It sits on the backdrop's
+   opposite tone here, the same one the close button uses, and the ring carries the worn name's rarity in the
+   tones a .ath name is painted in everywhere else. */
+.profile-card-hero .profile-card-avatar {
+  /* THE LONGHANDS, NEVER THE SHORTHAND [owner, 2026-09-08: "no avatar in the hero, there is one in the settings"].
+     `background:` here reset background-size and background-position — the base .avatar rule's `cover` and
+     `center` — and the photo, set inline by setAvatarNode, was painted at its natural size from the top-left
+     corner: a 76px window onto the dark corner of a large picture, with the start of its lettering showing.
+     Every other face is the base rule's; only this plate is not, so only this plate must say what it changes. */
+  background-image: none;
+  background-color: rgb(var(--gift-hero-ink, 255 255 255) / 0.16);
+  /* Two rings: the tier's tone, and a hairline of the backdrop's opposite tone around it — so a gold frame on a
+     gold gift, or a green one on a green gift, still has an edge. */
+  box-shadow:
+    0 0 0 3px var(--hero-ring, rgb(var(--gift-hero-ink, 255 255 255) / 0.32)),
+    0 0 0 4px rgb(var(--gift-hero-ink, 0 0 0) / 0.28);
+}
+
+.profile-card-hero .profile-card-avatar.has-image {
+  background-color: var(--panel-3);
+}
+
+/* ONE RING ON THE HERO, WHATEVER THE TIER [owner, 2026-09-08: "the outline is sometimes inside, sometimes
+   outside"]. The list paints a photo's tier as an INSET ring (.avatar.has-image[data-tier]), and that rule
+   out-specifies the hero's outer one — so a common name wore the hero's ring and an epic one the list's. On the
+   hero the ring is the frame's, outside the plate, in the tier's tone, for every tier alike. */
+.profile-card-hero .profile-card-avatar.has-image[data-tier="epic"],
+.profile-card-hero .profile-card-avatar.has-image[data-tier="rare"] {
+  box-shadow:
+    0 0 0 3px var(--hero-ring, rgb(var(--gift-hero-ink, 255 255 255) / 0.32)),
+    0 0 0 4px rgb(var(--gift-hero-ink, 0 0 0) / 0.28);
+}
+
+/* WHAT IS INSIDE THE RECTANGLE HAD TO CHANGE COLOUR TOO. The mask is drawn in --muted and the monogram in
+   --accent, and the accent is now the GIFT's colour — so both were being painted in the same family as the plate
+   they sit on and came out as nothing. On this one surface they take the backdrop's opposite tone, exactly as the
+   plate and the close button do. Photos keep their own rule: `color: transparent` belongs to .has-image, and this
+   is scoped away from it rather than out-specifying it. */
+.profile-card-hero .profile-card-avatar:not(.has-image) {
+  color: rgb(var(--gift-hero-ink, 255 255 255) / 0.88);
+}
+
+/* And it had to grow: 24px was sized for a 44px row avatar, not for a 76px face. */
+.profile-card-hero .profile-card-avatar.avatar-anonymous svg {
+  width: 40px;
+  height: 40px;
+}
+
+.profile-card-hero[data-tier="epic"] { --hero-ring: var(--id-platho-epic); }
+.profile-card-hero[data-tier="rare"] { --hero-ring: var(--id-platho-rare); }
+.profile-card-hero[data-tier="common"] { --hero-ring: var(--id-platho); }
+
+/* THE SUBJECT, CUT OUT OF ITS OWN BACKDROP — see buildGiftSubjectArt. It floats beside the face the way the gifts
+   around a Telegram profile do, so no rounded corner and no plate: there is no square left to hide. */
+.profile-card-hero-gift {
+  position: absolute;
+  right: -22px;
+  bottom: -6px;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
+}
+
+.profile-card-hero-gift[hidden] {
+  display: none;
+}
+
+/* A NAME'S COLOUR CAN LAND ON ITS OWN COLOUR. The tier tones are gold, silver and green, and a gift's backdrop is
+   any colour at all — a green name on a green gift is invisible. The halo is the backdrop's opposite tone, the
+   same one the plate, the mask and the close button take, so one rule covers every gift. */
+.profile-card-hero-name {
+  margin-top: 4px;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-shadow: 0 1px 3px rgb(var(--gift-hero-ink, 0 0 0) / 0.55);
+}
+
+.profile-card-hero-sub {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.profile-card-hero-sub[hidden] {
+  display: none;
+}
+
+/* The channel's own description, in the words its owner published — the same record the channel popover and the
+   discovery cards show, so the three cannot disagree. Hidden when there is nothing to say. */
+.profile-card-about {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.profile-card-about[hidden] {
+  display: none;
+}
+
+/* The latest post is discovery's own block, dropped into the card's slot — same classes, so it cannot drift into a
+   second look. Only the slot belongs to the card. */
+.profile-card-latest {
+  margin: 0;
+}
+
+.profile-card-latest[hidden] {
+  display: none;
+}
+
+/* ── WHAT YOU CAN DO WITH A CONTACT, on the contact's own card. Three tiles rather than a menu: these are the
+   three actions the chat list's chevron already offers, and a profile is where you look for them.
+   Labelled, not icon-only — an icon alone is a guess about what a control does. */
+/* THE CARD'S ACTIONS ARE THE APP'S BUTTONS [owner, 2026-09-09: the three square plates matched nothing else in the
+   design code, and a first pass at pills went too round — the buttons here are 12 px-cornered, the radius comes
+   from the shared button rule below, never from this block]. One row of four, one word each: the one that starts
+   something (chat) is the filled CTA the discovery plates use, the rest the outlined secondary; a pressed toggle
+   keeps the accent tint and names its state. */
+.profile-card-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-card-actions[hidden] {
+  display: none;
+}
+
+.profile-card-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.profile-card-action--primary {
+  border-color: transparent;
+  background: var(--cta-fill);
+  color: var(--cta-ink);
+  box-shadow: 0 4px 14px var(--a25);
+}
+
+.profile-card-action[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--a10);
+  color: var(--accent);
+}
+
+/* Confirmation, in the same visual language as the identity menu's copy button: a brief accent tint on the
+   control itself. There is no global toast in this app, and a silent copy reads as a dead control. */
+/* THE SAME BUTTON, ACROSS THE WHOLE CARD [owner, 2026-09-07: "now it is good, just stretch it full width"]. Only
+   how it sits in THIS row changes — the pill itself is untouched: everywhere else it is content-wide because it
+   shares its row with a sibling; here it is alone on the row. */
+.profile-card-dialog .discovery-cta-action {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.profile-card-wallet.is-copied {
+  border-color: var(--accent);
+  background: var(--a10);
+}
+
+.profile-card-wallet.is-copied > span {
+  color: var(--accent);
+}
+
+.profile-card-wallet code {
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* INSIDE a section: a heading and the thing it names. The space BETWEEN sections is the dialog's own grid gap and
+   is not repeated here — that double payment is what made the card look like it was eating its own space. */
+.profile-card-section {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-card-section h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profile-card-note {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 12px;
+}
+
+/* The names sit in the SAME grid as the gifts, and their tiles are the same tile — one rule for both, so the two
+   halves of the card cannot drift into two different designs. */
+.profile-card-rows {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  /* The section's 8 px is the gap between a heading and the note that belongs to it. The tiles are a separate
+     thing and get the distance everything else in this card is apart by — the dialog's own 14 px — so note → tiles
+     matches wallet → settings [owner, 2026-09-07: "a normal gap, like between the other items"]. 8 + 6. */
+  margin-top: 6px;
+}
+
+/* A grid rather than a list: a gift is a picture first, and its name is the caption under it. */
+/* THREE TO A ROW, whatever the card is wide [owner, 2026-09-06: bigger, three across]. auto-fill sized the tiles
+   by a floor and then packed as many as fitted, so on a roomy card the gifts stayed small and merely multiplied.
+   A fixed three makes the art as large as the card allows and keeps the rhythm the same on a phone, where three
+   columns still leave a tile wider than the old floor. `minmax(0, …)` because a grid item's automatic minimum is
+   its content, and one long gift name would otherwise widen its column past its share. */
+.profile-card-gifts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 6px;   /* the same 8 + 6 as .profile-card-rows — one card, one distance */
+}
+
+.profile-card-gift,
+.profile-card-name {
+  display: grid;
+  /* START, not stretch: the tiles in a row are as tall as the tallest caption, and a stretched grid row overrides
+     the art's aspect-ratio — the squares came out different sizes depending on how many lines a gift's name took. */
+  align-content: start;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md, 12px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* The tile is a container now: the face wears the gift, the button under it sends the gift away. Everything that
+   made the tile look like a tile stays on the tile; the face only carries the art, the name and the worn mark.
+   THE NAME TILE IS BUILT OF THE SAME PARTS [owner, 2026-09-08] — .profile-card-name holds a face and a send
+   button under these very classes, so there is one tile to style, in two grids. */
+.profile-card-gift-face {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.profile-card-gift-face:not(button) {
+  cursor: default;
+}
+
+/* LABELLED, because this one signs a transaction and hands away an asset — an icon alone would be a guess. */
+.profile-card-gift-send {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.profile-card-gift-send:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* RESERVED, NOT ADDED [owner, 2026-09-07: "reserve its place from the start so the grid does not jump"]. The
+   button is in every tile from the first paint of a remembered list and only becomes VISIBLE once the chain has
+   confirmed the gifts — visibility, not display, so its row is spent before anybody can see it. */
+.profile-card-gifts[data-confirmed="false"] .profile-card-gift-send,
+.profile-card-rows[data-confirmed="false"] .profile-card-gift-send {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.profile-card-gift[data-worn="true"],
+.profile-card-name[data-worn="true"] {
+  border-color: var(--accent);
+}
+
+.profile-card-gift[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* A NAME'S SQUARE COMES FROM padding-bottom, NOT aspect-ratio, and that is not a style preference. Its art is the
+   registry's own SVG — a viewBox with no width/height — so an engine that ignores `aspect-ratio` on an <img> gives
+   it zero height under `width: 100%` and the tile collapses to a strip. The gifts can afford `aspect-ratio`
+   because their artwork is a raster that carries its own dimensions. Same frame the names screen uses. */
+.profile-card-name .nft-card-art-frame {
+  border-radius: 10px;
+}
+
+.profile-card-gift-art {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  background: var(--panel-2) center / cover no-repeat;
+}
+
+.profile-card-gift-name,
+.profile-card-name-label {
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.profile-card-gift-state,
+.profile-card-name-state {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profile-card-meta {
+  margin: 16px 0 0;
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+/* The thread-list avatar is a door too (tap = that contact's profile card), so it needs the affordance the row's
+   own cursor would otherwise impose on it. It stays a plain, unfocusable <div> on purpose: the row IS a <button>,
+   and anything focusable inside it is the nested-interactive violation this codebase has already been bitten by.
+   The keyboard route to the same card is the "Open profile" row in the chevron menu next to the name. */
+.thread-item .avatar[data-profile-door="true"] {
+  cursor: pointer;
+}
+
+/* THE LOOK EDITOR'S ROWS HIDE [2026-09-09]: the channel look editor builds the Appearance dialog's rows in JS and
+   hides the ones a setting does not need (theme/background/gift while the look is off, the sliders of the other
+   background). `hidden` on a block with a display rule needs a rule of its own, or it stays on screen. */
+.composer-attachment-row[hidden],
+.feed-actions[hidden],
+.group-member-row[hidden],
+.identity-variant-localname[hidden],
+.share-target-row[hidden] {
+  display: none;
 }

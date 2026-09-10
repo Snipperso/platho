@@ -4,8 +4,7 @@ import { I18N_LOCALES, I18N_STRINGS } from '../web/i18n-strings.mjs';
 
 // THE STATE LINE UNDER EACH PRIVATE DIALOG SAID THE WRONG THING, IN THE WRONG LANGUAGE.
 //
-// Owner, 2026-08-06, looking at the private list: "смущают надписи LOCAL, SEALED, ROUTE. Как-то неинтуитивно и
-// неоднородно."
+// decided 2026-08-06, looking at the private list
 //
 // `thread.state` is an INTERNAL token and it was printed raw. Read against refreshThreadAfterMessageChange, its three
 // everyday values decode to: `sealed` = the last message is INCOMING (only an opened chain capsule carries
@@ -24,7 +23,7 @@ describe('THREADSTATE — the private list says only what it can back up', () =>
     expect(APP).toContain('state.textContent = stateLabel;');
     // Hidden rather than blank: an empty node still takes its slot on the line and pushes the preview across.
     expect(APP).toContain("state.hidden = stateLabel === '';");
-    // AND IT SHARES THE PREVIEW'S LINE [OWNER 2026-08-23: "the layout shifts when the status appears"]. As a third
+    // AND IT SHARES THE PREVIEW'S LINE [decided 2026-08-23]. As a third
     // row the state added ~18px the moment a send started and took it back when it settled, so every row below
     // jumped twice per send. Side by side, a row is the same height with the status and without it.
     expect(APP).toMatch(/const line = document\.createElement\('div'\);\s*line\.className = 'thread-line';\s*line\.append\(state, preview\);\s*main\.append\(top, line\);/);

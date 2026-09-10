@@ -253,7 +253,7 @@ describe('PWA runtime config guard', () => {
     // faucets, testgivers) may reach the user-facing wallet surface.
     const html = readFileSync('web/index.html', 'utf8');
     const start = html.indexOf('data-panel="wallet"');
-    const walletPanel = html.slice(start, html.indexOf('data-panel="profile"'));
+    const walletPanel = html.slice(start, html.indexOf('id="profileSettingsDialog"'));
     expect(start, 'the wallet panel exists').toBeGreaterThan(-1);
     expect(walletPanel.length, 'and the slice really covers it').toBeGreaterThan(1000);
 
@@ -470,7 +470,7 @@ describe('PWA runtime config guard', () => {
     // Public "Display as" menu reuses the same option builder + popover as Private.
     expect(app).toMatch(/function showPublicChannelDisplayPopover\(channel, anchor\)/);
     expect(app).toMatch(/options: identityDisplayOptions\(context\)/);
-    expect(app).toMatch(/function renderDisplayAsPopover\(\{\s*\n\s*options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName,\s*\n\s*pinned = null, onTogglePin = null, muted = null, onToggleMute = null,\s*\n\}\)/);
+    expect(app).toMatch(/function renderDisplayAsPopover\(\{\s*\n\s*options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName,\s*\n\s*pinned = null, onTogglePin = null, muted = null, onToggleMute = null, onOpenProfile = null, onOpenChannel = null,\s*\n\}\)/);
 
     // The user's OWN wallet channel offers their OWN linked username (.ath) as a "Display as" option too: it
     // never arrives via received posts (you don't receive your own), so contactDisplayContextForWallet injects
@@ -479,9 +479,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/sameWalletAddress\(counterpartyWallet, plathoWallet\.address\)/);
     expect(app).toMatch(/const ownUsername = readLinkedPlathoUsername\(plathoWallet\.address\)/);
     expect(app).toMatch(/if \(ownIdentity\) found\.push\(ownIdentity\)/);
-    // BOTH SURFACES ASK THE SAME QUESTION [OWNER 2026-08-24: "the counterparty's username gets lost in the app —
-    // this contact has one and I don't see it"]. A private dialog learns a peer's .ath only from the senderUsername
-    // stamped on a message; the public side proves the channel's .ath against the chain and remembers it, and when
+    // BOTH SURFACES ASK THE SAME QUESTION [decided 2026-08-24]. A private dialog learns a peer's.ath only from the senderUsername
+    // stamped on a message; the public side proves the channel's.ath against the chain and remembers it, and when
     // it builds a name it already reads the private threads first. The reverse direction did not exist, so the same
     // person was a name on one surface and a bare address on the other, with the name in the app all along.
     expect(app).toMatch(/function walletKnownIdentityVariants\(counterpartyWallet\)/);
@@ -540,7 +539,12 @@ describe('PWA runtime config guard', () => {
     // (newest publicFeedShownCap items) is marked read -- older posts held behind "show older" are not pre-cleared.
     // (v753: additionally overlay-guarded — not marked while the post detail / discovery / channel view covers
     // the feed; the full guard is pinned in PWA-CHANNEL-VIEW-01.)
-    expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\s*&& markVisiblePublicFeedRead\(windowItems\)/);
+    // [audit 2026-08-31, round 8] The render no longer MARKS — it only remembers what it painted, and the cursor
+    // advances at the doors where the reader stops looking. Marking inside the render was invisible by
+    // construction: the clearing pass ran in a requestAnimationFrame callback, which fires BEFORE that frame's
+    // style pass, so no reader ever saw the border it had just cleared. The visibility guard is unchanged and is
+    // what this line pins; UNREAD-04/05 drive the paint/leave cycle itself.
+    expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\)\s*\{\s*holdPublicFeedPainted\(windowItems\)/);
     // The "Display as" chevron + Unfollow live on the feed post cards: renderPublicFeed adds the chevron, and the
     // shared post actions add Unfollow when the post's channel is subscribed (incl. the official platho channel).
     expect(app).toMatch(/const feedIdentityButton = publicItemIdentityButton\(item\)/);
@@ -582,12 +586,6 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/id="walletKeyBackupInput"/);
     expect(html).toMatch(/Export wallet key/);
     expect(html).toMatch(/Import wallet key/);
-    expect(html).toMatch(/id="copyWalletAddressButton"/);
-    expect(html).toMatch(/aria-label="Copy wallet address"/);
-    expect(html).toMatch(/id="walletDisplayModeSelect"/);
-    expect(html).toMatch(/<option value="address" data-i18n="wallet\.optionAddress">Address<\/option>/);
-    expect(html).not.toMatch(/<option value="ton_dns"[^>]*>TON DNS<\/option>/);
-    expect(html).toMatch(/<option value="platho_nft" data-i18n="wallet\.optionPlathoName">Platho name<\/option>/);
     expect(enCopy).toMatch(/Wallet address copied/);
     expect(app).toMatch(/flashWalletIdentityStatus/);
     expect(app).toMatch(/walletIdentityFlashTimer/);
@@ -780,9 +778,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/passwordManagerNetworkGlobalId: wallet\.networkGlobalId/);
     expect(app).toMatch(/passwordManagerNetworkGlobalId: record\?\.networkGlobalId/);
     expect(app).toMatch(/Encrypted wallet self-check failed/);
-    expect(app).toMatch(/storage\?\.setItem\(PLATHO_WALLET_STORAGE_KEY, JSON\.stringify\(record\)\)/);
+    // THE DURABLE WALLET WRITE MUST NOT BE OPTIONAL [audit 2026-08-31, round 8]. This used to pin the
+    // `storage?.setItem(...)` form — an optional-chained write inside a try/catch that swallowed everything, so a
+    // quota error, a null accessor or blocked site data each left the store EMPTY while the app said "wallet
+    // ready" and walked the user through funding an address whose key lived only in RAM. Its twin
+    // (writeEncryptedPlathoWalletRecord) always threw; one lane was right and the other was not.
+    expect(app).toMatch(/const storage = localStorageOrNull\(\);\s*\n\s*if \(!storage\) throw new Error\('Local storage is unavailable'\);\s*\n\s*storage\.setItem\(PLATHO_WALLET_STORAGE_KEY, JSON\.stringify\(record\)\)/);
+    expect(app, 'the wallet write may not be optional-chained away').not.toMatch(/storage\?\.setItem\(PLATHO_WALLET_STORAGE_KEY/);
     expect(app).not.toMatch(/setItem\(PLATHO_WALLET_LEGACY_STORAGE_KEY/);
-    expect(app).toMatch(/verifyWalletDisplayIdentity/);
     expect(app).not.toMatch(/LINKED_TON_DNS_STORAGE_PREFIX/);
     expect(app).not.toMatch(/readLinkedTonDnsName/);
     expect(app).not.toMatch(/writeLinkedTonDnsName/);
@@ -799,14 +802,7 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['username.verifyOwnership'], 'summary row retired').toBeUndefined();
     expect(app).not.toMatch(/No TON DNS linked/);
     expect(app).not.toMatch(/Optional setup', value: 'Link TON DNS in Usernames and Avatars/);
-    expect(enCopy).toMatch(/No \.ath name linked/);
-    expect(app).toMatch(/t\('username\.optionalSetup'\), value: t\('username\.linkAthNameValue'\)/);
-    expect(EN_STRINGS['username.optionalSetup']).toBe('Optional setup');
-    expect(EN_STRINGS['username.linkAthNameValue']).toMatch(/Link \.ath name in Usernames and Avatars/);
     expect(app).not.toMatch(/Copied value/);
-    expect(app).toMatch(/suppressProfileAvatarPicker/);
-    expect(app).toMatch(/isProfileAvatarPickerSuppressed/);
-    expect(app).toMatch(/walletDisplayModeSelect\?\.addEventListener\('pointerdown'/);
     expect(html).toMatch(/id="exportWalletSeedButton"/);
     expect(html).toMatch(/id="clearLocalDataButton"/);
     expect(html).toMatch(/Clear local data[\s\S]*id="clearLocalDataStatus"[\s\S]*device only/);
@@ -842,10 +838,13 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function publicChannelStorage/);
     expect(app).toMatch(/readPublicChannelFeedCache\(publicChannelStorage\(\)\)/);
     expect(app).toMatch(/writePublicChannelSubscriptions\(publicChannelStorage\(\), publicChannelSubscriptions\)/);
-    // Reading positions are deployment-scoped like everything else, through ONE store rather than a copied
-    // try/JSON.parse per map — the feed's per-channel cursors and a thread's per-post comment cursor share it.
-    expect(app).toMatch(/function readScopedJsonMap\(storageKey\) \{[\s\S]{0,300}?scopedStorageKey\(storageKey\)/);
-    expect(app).toMatch(/function writeScopedJsonMap\(storageKey, value\) \{[\s\S]{0,300}?scopedStorageKey\(storageKey\)/);
+    // Reading positions go through ONE store rather than a copied try/JSON.parse per map — the feed's
+    // per-channel cursors and a thread's per-post comment cursor share it — and they are WALLET-scoped, not
+    // merely deployment-scoped [audit 2026-09-01, round 9]. A deployment suffix is the ProfileRegistry address,
+    // so switching wallets on one device changed nothing: wallet B opened onto A's read positions, A's follow
+    // list, A's unsaved-prefs flag, and a channel entry labelled "you" pointing at A's address.
+    expect(app).toMatch(/function readScopedJsonMap\(storageKey\) \{[\s\S]{0,300}?personalPublicStorageKey\(storageKey\)/);
+    expect(app).toMatch(/function writeScopedJsonMap\(storageKey, value\) \{[\s\S]{0,300}?personalPublicStorageKey\(storageKey\)/);
     expect(app).toMatch(/publicReadCursors = readScopedJsonMap\(PUBLIC_READ_CURSORS_STORAGE_KEY\);/);
     expect(app).toMatch(/publicCommentReadCursors = readScopedJsonMap\(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY\);/);
     expect(app).toMatch(/localStorageOrNull\(\)\?\.clear\(\)/);
@@ -863,9 +862,11 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/Activate Platho account[\s\S]*id="vaultDraftStatus"[\s\S]*wallet required/);
     // "Sync messages" removed 2026-08-07 — the header indicator on every tab already does it, and that row also
     // doubled as a state store, so it went with its accessors rather than being left as a dead node.
-    // [OWNER 2026-08-10] Activation moved here from the Wallet tab and leads the section: it registers the
-    // messaging keys that the row below it replaces. Order pinned in tests/wallet-tab.test.ts WALLET-TAB-02.
-    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="registerVaultKeysButton"[\s\S]*id="replaceVaultKeysButton"/);
+    // Activation led this section from 2026-08-10 until 2026-09-07, when it went back to the Wallet tab [owner:
+    // "new users will wear themselves out looking for it"] — the settings had just become a dialog behind the app's
+    // corner, and the one row every new account must find cannot sit behind two doors. Placement pinned in
+    // tests/wallet-tab.test.ts WALLET-TAB-02; what stays here is the key ROTATION.
+    expect(html).toMatch(/<h2 data-i18n="chat\.messages">Messages<\/h2>[\s\S]*id="replaceVaultKeysButton"/);
     expect(html).not.toMatch(/id="syncMessagesButton"|id="messageSyncStatus"/);
     expect(html).toMatch(/Replace message keys[\s\S]*activate account first/);
     expect(enCopy).toMatch(/up to date/);
@@ -907,12 +908,14 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toContain('crypto_suite_mask} / ${localVaultDraft.json.pq_kem_pubkey_len}b');
     expect(html).toMatch(/id="setAvatarButton"/);
     expect(html).toMatch(/id="setAvatarStatus"/);
-    expect(html).toMatch(/id="mintUsernameStatus"/);
+    expect(html).toMatch(/id="profileCardMintNameStatus"/);
     expect(html).toMatch(/id="profileAvatarInput"/);
     expect(html).toMatch(/Set avatar/);
     expect(app).toMatch(/readCurrentProfileAvatarPointerResultFromChain/);
     expect(app).toMatch(/KeyShard provider is required to read current avatar version/);
-    expect(app).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\)/);
+    // NOT A TAB SWITCH ANY MORE [decided 2026-09-07]: the settings are a dialog, so the reads the old tab ran
+    // on entry run when the dialog opens.
+    expect(app).toMatch(/profileSettingsDialog\.hidden = false;[\s\S]{0,400}?if \(plathoWallet\?\.address\) refreshProfilePaneReads\(\);/);
     // Direct pay replaced the Vault avatar leg: the registry address is a config+manifest pin, the price is paid
     // as ATH from the user's own wallet, and there is no Vault route/canStart/registration external any more.
     expect(app).toMatch(/requireProfileRegistryAddress\(\)/);
@@ -920,30 +923,38 @@ describe('PWA runtime config guard', () => {
     expect(app).not.toMatch(/assertVaultProfileAvatarCanStart|submitVaultProfileAvatarRegistration|requireProfileRegistryVaultRoute/);
     // "History sync" removed 2026-08-07; the Public channels section is now the comments default alone.
     expect(html).toMatch(/<h2 data-i18n="public\.channels">Public channels<\/h2>[\s\S]*id="publicCommentsDefaultSelect"/);
-    expect(html).toMatch(/<h2 data-i18n="username\.usernamesAndAvatars">Usernames and Avatars<\/h2>[\s\S]*id="mintUsernameButton"[\s\S]*id="linkUsernameButton"[\s\S]*id="setAvatarButton"/);
-    // The fee rows quote a NUMBER, not a currency (owner, 2026-08-07: "лучше явно написать сколько грам"), and it
+    // MINT AND LINK LEFT THE SETTINGS [owner, 2026-09-08]: minting sits under the names on the profile card, and
+    // linking IS tapping a name there. The avatar row stays.
+    expect(html).toMatch(/<h2 data-i18n="username\.usernamesAndAvatars">Usernames and Avatars<\/h2>[\s\S]*id="setAvatarButton"/);
+    expect(html).not.toMatch(/id="(mintUsernameButton|linkUsernameButton|linkedUsernameStatus|walletDisplayModeSelect)"/);
+    const cardNames = html.slice(html.indexOf('id="profileCardNames"'), html.indexOf('id="profileCardGiftsNote"'));
+    // THE FEE RIDES INSIDE THE PILL [owner, 2026-09-08: "the price looks sloppy — put it in the button"]: one
+    // stacked child in the flex pill, the label above, the fee (or the mint's progress/refusal) below.
+    expect(cardNames).toMatch(/<div class="discovery-cta-actions" id="profileCardMintNameRow" hidden>\s*\n\s*<button class="discovery-cta-action" id="profileCardMintNameButton" type="button">\s*\n\s*<span class="discovery-cta-action-stack">\s*\n\s*<span data-i18n="username\.mintAthName">Mint \.ath name<\/span>\s*\n\s*<small class="discovery-cta-action-note" id="profileCardMintNameStatus">100-10k ATH \+ 1\.1 GRAM<\/small>/);
+    expect(cardNames, 'no loose line under the button any more').not.toContain('class="profile-card-note" id="profileCardMintNameStatus"');
+    expect(css).toMatch(/\.discovery-cta-action-stack \{\s*\n\s*display: grid;\s*\n\s*justify-items: center;/);
+    expect(css).toMatch(/\.discovery-cta-action-note \{\s*\n\s*font-size: 11px;/);
+    expect(css).toMatch(/\.discovery-cta-action-note\[data-state="error"\] \{/);
+    // The fee rows quote a NUMBER, not a currency (owner, 2026-08-07: ), and it
     // is interpolated at runtime from the constants the wallet is asked to sign — see refreshProfileFeeLabels.
     // The markup keeps a matching literal as the pre-script fallback, so both are pinned to the same figures.
     expect(html).toMatch(/Mint \.ath name[\s\S]*100-10k ATH \+ 1\.1 GRAM/);
     expect(html).toMatch(/Set avatar[\s\S]*100 ATH \+ from 0\.2395 GRAM/);
     expect(html, 'these rows are written by refreshProfileFeeLabels, not by the param-less static pass')
-      .not.toMatch(/id="(mintUsernameStatus|setAvatarStatus)"[^>]*data-i18n=/);
+      .not.toMatch(/id="(profileCardMintNameStatus|setAvatarStatus)"[^>]*data-i18n=/);
     const appSource = readFileSync('web/app.js', 'utf8');
     expect(appSource).toMatch(/function profileAvatarFloorNanotons\(\)/);
     expect(appSource).toMatch(/publicPublishValueForKind\(3\) \+ PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS/);
     expect(appSource).toMatch(/t\('username\.mintFee', \{[\s\S]{0,120}estimatedUsernameMintTonFeeNanotons\(\)/);
     expect(html).not.toMatch(/Link TON DNS[\s\S]*id="linkedTonDnsStatus"[\s\S]*verify/);
-    expect(html).toMatch(/Link \.ath name[\s\S]*id="linkedUsernameStatus"[\s\S]*verify/);
     expect(app).not.toMatch(/linkTonDnsButton\?\.addEventListener\('click'/);
     expect(app).not.toMatch(/requestWalletDisplayIdentity\(WALLET_DISPLAY_MODES\.TON_DNS\)/);
-    expect(app).toMatch(/linkUsernameButton\?\.addEventListener\('click'/);
-    expect(app).toMatch(/requestWalletDisplayIdentity\(WALLET_DISPLAY_MODES\.PLATHO_NFT\)/);
+    expect(app, 'the link dialog is dead: linking is tapping a name on the card').not.toMatch(/requestWalletDisplayIdentity|verifyWalletDisplayIdentity|linkUsernameButton/);
     expect(app).toMatch(/setPublicChannelSubscribed/);
     expect(app).toMatch(/Unfollow/);
     expect(app).toMatch(/channel hidden/);
     expect(app).toMatch(/unfollowButton\.title = t\('public\.stopFollowingChannel'\)/);
     expect(EN_STRINGS['public.stopFollowingChannel']).toBe('Stop following this channel');
-    expect(app).toMatch(/const linked = readLinkedPlathoUsername\(plathoWallet\.address\)/);
     expect(app).toMatch(/autoLinkMintedUsername/);
     expect(app).toMatch(/waitForPlathoUsernameOwnership/);
     expect(enCopy).toMatch(/mint submitted; link after sync/);
@@ -955,7 +966,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function setUsernameMintStatus/);
     expect(app).toMatch(/setUsernameMintStatus\(rateLimited \? TON_RPC_CONNECTING_STATUS : usernameMintStatusText\(error\), rateLimited \? 'busy' : 'error'\)/);
     expect(app).toMatch(/estimatedUsernameMintTonFeeNanotons/);
-    expect(app).toMatch(/t\('common\.gramCostValue', \{ amount: formatTonNanotons\(estimatedUsernameMintTonFeeNanotons\(\)\) \}\)/);
+    expect(app).toMatch(/t\('common\.gramCostValue', \{ amount: formatTonNanotonsUp\(estimatedUsernameMintTonFeeNanotons\(\)\) \}\)/);
     expect(EN_STRINGS['common.gramCostValue']).toBe('up to {amount} GRAM from your wallet');
     // The mint dialog's "Route: Vault" line went with the Vault: under direct pay the request goes from the wallet
     // straight to UsernameRegistry, so the line named a hop that no longer exists.
@@ -968,11 +979,11 @@ describe('PWA runtime config guard', () => {
     expect(enCopy).toMatch(/Set profile avatar/);
     expect(app).toMatch(/requestProfileAvatarUploadDetails/);
     expect(app).toMatch(/estimatedProfileAvatarTonFeeNanotons/);
-    expect(app).toMatch(/t\('avatar\.feeUpTo', \{ amount: formatTonNanotons\(estimatedProfileAvatarTonFeeNanotons\(attachment\)\), capsules: capsuleLabel \}\)/);
+    expect(app).toMatch(/t\('avatar\.feeUpTo', \{ amount: formatTonNanotonsUp\(estimatedProfileAvatarTonFeeNanotons\(attachment\)\), capsules: capsuleLabel \}\)/);
     expect(EN_STRINGS['avatar.feeUpTo']).toMatch(/up to \{amount\} GRAM/);
     expect(enCopy).toMatch(/Preview final image/);
     expect(html).toMatch(/id="imageLightboxDialog"/);
-    // "Full size", not "Full-size preview" [OWNER 2026-08-24: "why is it a preview, by the way?"]. A preview is of
+    // "Full size", not "Full-size preview" [decided 2026-08-24]. A preview is of
     // something you are about to send; the same window also opens pictures somebody else already sent, and there
     // is nothing to preview about those.
     expect(html).toMatch(/Full size/);
@@ -1000,8 +1011,7 @@ describe('PWA runtime config guard', () => {
     // dialog (dialog max-height:none) so a focused textarea keeps its height instead of collapsing behind the
     // keyboard. MUST come after the max-width:900px block so it wins by source order.
     //
-    // DRIVEN BY THE HEIGHT WE MEASURE, not by @media (max-height) [OWNER 2026-08-24: "when I hide the keyboard the
-    // dialog sometimes stays at the top, though it should come back down"]. The lift worked and the return did
+    // DRIVEN BY THE HEIGHT WE MEASURE, not by @media (max-height) [decided 2026-08-24]. The lift worked and the return did
     // not, only sometimes — two sources of truth disagreeing. A media query asks the LAYOUT viewport while
     // everything else here follows the VISUAL one, and on iOS the layout viewport is restored lazily after a
     // keyboard dismiss, so the query stayed matched while the height we write was already right.
@@ -1041,7 +1051,7 @@ describe('PWA runtime config guard', () => {
     // is the buy action and the supply figure now.
     expect(html).toMatch(/<h2>ATH<\/h2>[\s\S]*id="buyAthButton"[\s\S]*id="athSupplyStatus"/);
     expect(html).not.toMatch(/claimAirdropButton|athDropIssuedStatus/);
-    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('data-panel="profile"'));
+    const walletPanel = html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('id="profileSettingsDialog"'));
     expect(walletPanel, 'the ATH block lives in the Wallet tab now').toMatch(/id="athSupplyStatus"/);
     expect(html).toMatch(/id="replaceVaultKeysButton"/);
     expect(html).not.toMatch(/id="keySuiteStatus"/);
@@ -1082,7 +1092,7 @@ describe('PWA runtime config guard', () => {
     expect(html).toMatch(/>Allowed - not recommended</);
     expect(html).toMatch(/<option value="disabled" data-i18n="public\.commentsClosed">Closed<\/option>[\s\S]*<option value="enabled" data-i18n="public\.commentsAllowedNotRecommended">Allowed - not recommended<\/option>/);
     expect(html).toMatch(/id="walletAddressStatus"/);
-    expect(html).toMatch(/id="mintUsernameButton"/);
+    expect(html).toMatch(/id="profileCardMintNameButton"/);
     expect(html).not.toMatch(/id="flushUsernameRefundButton"/);
     expect(html).not.toMatch(/Claim failed mint refund/);
     expect(html).not.toMatch(/Claim username refund/);
@@ -1182,11 +1192,39 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/Private chat/);
     expect(app).toMatch(/openPrivateThreadForWallet/);
     expect(enCopy).toMatch(/Add public channel/);
-    // NO DISCOUNT IN THE COMPOSER [OWNER 2026-08-25: "remove the discount line from the composer"]. It priced a
+    // NO DISCOUNT IN THE COMPOSER [decided 2026-08-25]. It priced a
     // reduction the protocol does not give: the shards charge a FLAT protocol fee (IntroShard:91, PublicShard:121,
     // RecordShard:80), no contract reads an ATH balance, and a client attaching less is refused by the shard.
     // The mechanism belonged to the Vault, which clean-17 deleted.
-    expect(enCopy, "the composer must not price a reduction that does not exist").not.toMatch(/discount|Rabatt|descuento|desconto|remise|diskon/i);
+    // SCOPED TO THE COMPOSER'S OWN COPY, which is what the owner's ruling was about [narrowed 2026-09-02]. It
+    // scanned the WHOLE dictionary, which cost nothing while no discount existed anywhere — and clean-18 grants a
+    // real one: a stake of 100..10,000 ATH takes 1%..100% off the protocol fee, held by FeeVault and now offered
+    // in the WALLET tab. A gate aimed at "no such thing exists" would have forbidden the app from ever naming the
+    // thing once it did, which is not the ruling; the ruling is that the COMPOSER does not price a reduction, and
+    // it does not: composerCostStatusText renders exactly these keys and no other.
+    const composerCopy = Object.entries(EN_STRINGS)
+      .filter(([key]) => key.startsWith('composer.') || key === 'common.walletRequired'
+        || key === 'common.updateReadyReload')
+      .map(([, value]) => value).join(' | ');
+    expect(composerCopy.length, 'the composer copy must be found, or this gate passes on an empty string')
+      .toBeGreaterThan(200);
+    expect(composerCopy, "the composer must not price a reduction it does not apply")
+      .not.toMatch(/discount|Rabatt|descuento|desconto|remise|diskon/i);
+    // AND THE PRICE LINE ITSELF NEVER LEARNS ABOUT THE VAULT: the composer prices what the wallet attaches, and
+    // the discount is booked at the vault, not deducted from the composer's figure.
+    const fromComposer = app.slice(app.indexOf('function composerCostStatusText'));
+    // END AT THE NEXT TOP-LEVEL DECLARATION, searched from ONE character in — searching from zero matches this
+    // function's own `function` keyword at index 0, and `0 || length` then hands the whole rest of the file to
+    // the assertion below. It read the entire file and failed on an unrelated comment; a gate that scans more
+    // than its subject fails for reasons its message cannot explain.
+    const after = fromComposer.slice(1).search(/^function /m);
+    const composerSource = after >= 0 ? fromComposer.slice(0, after + 1) : fromComposer;
+    expect(composerSource.includes('composerCostStatusText'), 'the slice must contain the function it names')
+      .toBe(true);
+    expect(composerSource.length, 'and it must be the function, not the rest of the file')
+      .toBeLessThan(6000);
+    expect(composerSource, 'the composer price line must not read a stake or a vault')
+      .not.toMatch(/feeDue|stake|vault/i);
     expect(app).not.toMatch(/formatAthDiscountLabel|athDiscountBps|messageDiscountUnlocked/);
     expect(app).not.toMatch(/ATH discount \$\{percent\}/);
     expect(app).not.toMatch(/locked until 15%/);
@@ -1220,7 +1258,7 @@ describe('PWA runtime config guard', () => {
     // line, so an English template was a status only English readers could act on — on the one screen where the
     // number is the whole point. The action is no longer in the sentence; it rides on the error for the console.
     expect(app).toMatch(/new Error\(t\('errors\.notEnoughAth', \{ need: formatAthAtomic\(required\), have: formatAthAtomic\(balance\) \}\)\)/);
-    expect(app).toMatch(/new Error\(t\('errors\.walletNeedsGram', \{ amount: formatTonNanotons\(required\) \}\)\)/);
+    expect(app).toMatch(/new Error\(t\('errors\.walletNeedsGram', \{ amount: formatTonNanotonsUp\(required\) \}\)\)/);
     expect(app, 'no English shortfall template survives').not.toMatch(/Not enough ATH to |Wallet needs ~/);
     expect(app, 'which flow refused stays available to the console').toMatch(/error\.action = action;/);
     expect(app).not.toMatch(/Checking Vault balance/);
@@ -1246,7 +1284,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/markThreadRead\(thread\)/);
     expect(app).toMatch(/thread-unread-badge/);
     expect(css).toMatch(/\.thread-unread-badge/);
-    // v732: the unread badge is a COUNT-ONLY pill ("3", "99+") — the localized word ("непрочитанное") wrapped it
+    // v732: the unread badge is a COUNT-ONLY pill ("3", "99+") — the localized word wrapped it
     // onto two lines in the narrow side column. The localized phrase stays for screen readers (aria-label).
     expect(app).toMatch(/badge\.textContent = unread > 99 \? '99\+' : String\(unread\);/);
     expect(app).toMatch(/badge\.setAttribute\('aria-label', unread > 99 \? t\('chat\.unreadOverflow'\) : tPlural\('chat\.unreadCount', unread\)\);/);
@@ -1267,11 +1305,12 @@ describe('PWA runtime config guard', () => {
     expect(mobileBlock).toMatch(/\.composer\s*{[\s\S]{0,900}?padding: 8px \d+px 8px;/);
     expect(mobileBlock).toMatch(/\.public-composer\s*{[\s\S]{0,300}?padding: 8px \d+px 8px;/);
     expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,700}?padding-bottom: max\(var\(--mobile-nav-bottom-reserve\), var\(--app-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\);/);
-    // …AND THE BAR IS TRANSPARENT HERE TOO [OWNER 2026-08-23: "the tabs go opaque on mobile, transparent on desktop"].
+    // …AND THE BAR IS TRANSPARENT HERE TOO [decided 2026-08-23].
     // It was the last surface with a panel plate, so the shell's plasma stopped dead at the composer. It can afford
     // to be transparent: on this breakpoint the bar is its own grid row, not an overlay — nothing scrolls under it.
-    expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,1400}?background: transparent;/);
-    expect(css, 'and the desktop rail it now matches').toMatch(/\.sidebar \{[\s\S]{0,220}?background: transparent;/);
+    // The window is a distance, not a fact: the rule gained align-items and a gap when the corner joined the bar.
+    expect(mobileBlock).toMatch(/\.sidebar\s*{[\s\S]{0,1600}?background: transparent;/);
+    expect(css, 'and the desktop rail it now matches').toMatch(/\.sidebar \{[\s\S]{0,600}?background: transparent;/);
     expect(css).toMatch(/\.message\[data-status="sending"\] \.bubble/);
     expect(app).toMatch(/function identityDisplayKey/);
     expect(app).toMatch(/function uniqueDisplayIdentityVariants/);
@@ -1822,8 +1861,14 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
     const renderSource = app.slice(
-      app.indexOf('function renderConversation'),
-      app.indexOf('async function openImageLightbox'),
+      // BOTH anchors were wrong and covered for each other. 'function renderConversation' prefix-matches
+      // renderConversationIdentity (app.js:6456), and 'openImageLightbox' (6895) sits BEFORE the real
+      // renderConversation (22228) — so the scope was a 439-line region that holds none of what these tests
+      // assert. It passed only because the end anchor spent months dead as 'async function openImageLightbox',
+      // which made slice run to the end of the file and find the matches anywhere. Naming the paren pins the
+      // right function, and showNewChatHint is the next declaration after it. [ANCHOR-01, 2026-08-29]
+      app.indexOf('function renderConversation()'),
+      app.indexOf('function showNewChatHint'),
     );
     const manualSource = app.slice(
       app.indexOf('function clearPrivateMessageManualRecovery'),
@@ -2022,10 +2067,24 @@ describe('PWA runtime config guard', () => {
     expect(css).toMatch(/#actionDialog \{\s*z-index: 60;\s*\}/);
     // MEDIUM fix: in Telegram the export is a manual-copy dialog (no file download). Make the whole chain
     // awaitable so the MANDATORY export step only completes once the user acknowledges the copy dialog.
-    expect(app).toMatch(/function showTelegramManualExportDialog\(filename, content\) \{\s*return openActionDialog\(/);
-    expect(app).toMatch(/async function downloadJsonFile\(filename, value\)[\s\S]*await showTelegramManualExportDialog\(filename, json\)/);
+    // THE FALLBACK FOLLOWS THE CAPABILITY, NOT THE APP [reported 2026-09-06: the key saves in Safari on an iPhone
+    // and cannot be downloaded in Chrome]. It was gated on `isTelegramEnv()`, so every other WebView that ignores
+    // `<a download>` got a click that fails SILENTLY — no exception, no event — and a backup the app believed it
+    // had written. On iOS every browser is a WKWebView and only Safari saves; there is no feature test worth
+    // having, since `'download' in a` is a property and answers true in all of them.
+    expect(app).toMatch(/function showManualExportDialog\(filename, content\) \{\s*return openActionDialog\(/);
+    expect(app).toMatch(/async function downloadJsonFile\(filename, value\)[\s\S]*await showManualExportDialog\(filename, json\)/);
+    expect(app).toMatch(/if \(!fileDownloadsCanBeSaved\(\)\) \{/);
+    expect(app).toMatch(/const WEBVIEWS_THAT_CANNOT_SAVE_FILES = \/CriOS\|FxiOS\|EdgiOS/);
+    expect(app).toMatch(/function fileDownloadsCanBeSaved\(\) \{[\s\S]{0,200}if \(isTelegramEnv\(\)\) return false;/);
+    expect(app).toMatch(/if \(!isIosDevice\(\)\) return true;[\s\S]{0,120}if \(isStandaloneApp\(\)\) return true;/);
+    // …and the dialog stops naming Telegram, because it now serves every browser that cannot save.
+    const strings = readFileSync('web/i18n-strings.mjs', 'utf8');
+    const hints = strings.match(/"wallet\.exportBackupHint": "[^"]*"/g) ?? [];
+    expect(hints.length, 'one per locale').toBe(10);
+    expect(hints.filter((line) => line.includes('Telegram')), 'the hint is no longer about one app').toEqual([]);
     expect(app).toMatch(/async function downloadEncryptedWalletKeyBackup\([\s\S]*await downloadJsonFile\(/);
-    expect(app).toMatch(/if \(!unlocked\) return false;\s*await downloadEncryptedWalletKeyBackup\(record, unlocked\);/);
+    expect(app).toMatch(/if \(!unlocked\) return false;[^\n]*\n\s*return downloadEncryptedWalletKeyBackup\(record, unlocked\);/);
     // MEDIUM fix: a bare window.open of a t.me/ link is a no-op in the TG WebView; route the @toncenter bot
     // link through the SDK (openTelegramLink) first, fall back to a new tab only outside Telegram.
     expect(app).toMatch(/function openTelegramDeepLink\(href\)[\s\S]*tg\.openTelegramLink\(href\)/);
@@ -2110,8 +2169,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-WALLET-LOCK-CONTENT-01: locking takes the decrypted conversations with the keys', () => {
-    // [OWNER 2026-08-25: "on the desktop, if you do not unlock and just close the window, everything is clean,
-    // there are no conversations. On mobile I can close the window and read conversations."] The teardown dropped
+    // [decided 2026-08-25] The teardown dropped
     // the KEYS and left what they had already decrypted — the dialog list, the loaded messages, the open
     // conversation — in memory and on screen. Closing a desktop window destroys the page, so the leak was
     // invisible there; a phone freezes the page and hands it back intact, and the unlock prompt is dismissable
@@ -2212,15 +2270,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/async function restoreWalletKeyBackupPendingFromTelegramCloud\(\)/);
     // Set pending on EVERY new-wallet creation (manual + quick-start); cleared when the key is actually exported.
     expect(app).toMatch(/await setPlathoWallet\(walletDraft, \{ password \}\);\s*markWalletKeyBackupPending\(walletDraft\.address\)/);
-    expect(app).toMatch(/await downloadJsonFile\([\s\S]*markWalletKeyBackupDone\(storedWalletAddressForCopy\(record\)/);
+    expect(app).toMatch(/const outcome = await downloadJsonFile\([\s\S]*?if \(walletKeyBackupProven\(outcome\)\) confirmWalletKeyBackupArrived\(record\)/);
     // Importing an encrypted wallet-key backup proves the key is already exported (the file IS the export), so the
     // import path clears the pending flag (incl. the cloud mirror) for the imported address -- IMPORT is never a
     // pending state. Regression guard: re-importing a wallet wrongly showed the Profile "back up your key" warning.
     expect(app).toMatch(/async function activateImportedEncryptedWalletRecord\([\s\S]*?markWalletKeyBackupDone\(wallet\.address\)/);
     // Re-surface: a wallet that exists but is unbacked-up re-opens the quick-start jumped to the export step.
     expect(app).toMatch(/if \(walletKeyBackupPendingForStoredWallet\(\)\) \{\s*openQuickStartAtBackup\(\);\s*return true;/);
-    // A PASSWORD CHANGE MAKES THE SAVED FILE A BACKUP OF THE OLD PASSWORD [OWNER 2026-08-24: "if a person changes
-    // the password in the app, they'll have to export the wallet key again, right?"]. The export writes the stored
+    // A PASSWORD CHANGE MAKES THE SAVED FILE A BACKUP OF THE OLD PASSWORD [decided 2026-08-24]. The export writes the stored
     // record as it stands, so the earlier file still opens — under the password that was just replaced. The key
     // inside is unchanged, so nothing is lost except the owner's ability to open their own backup with what they
     // now know, which is exactly what this flag is for. Before the change it was never raised again: pending was
@@ -2279,7 +2336,7 @@ describe('PWA runtime config guard', () => {
     expect(avatarLoadSource).toMatch(/const readOptions = \{ profileRegistryAddress: resolved\.address, \.\.\.criticalChainReadOptions\(\) \}/);
     expect(avatarLoadSource).toMatch(/getAvatarVersion\(ownerWallet, requestedPointer\.profileVersion, readOptions\)/);
     expect(avatarLoadSource).toMatch(/getAvatar\(ownerWallet, readOptions\)/);
-    expect(avatarPointerSource).toMatch(/getAvatar\(ownerWallet, \{\s*profileRegistryAddress: resolved\.address,\s*\.\.\.criticalChainReadOptions\(\),\s*\}\)/);
+    expect(avatarPointerSource).toMatch(/getAvatar\(ownerWallet, \{\s*profileRegistryAddress: resolved\.address,\s*\.\.\.criticalChainReadOptions\(\),[\s\S]{0,240}?stopOnUninitializedAccount: true,\s*\}\)/);
     // 2026-07-20: the registry's name_records map is gone, so the item address is no longer LOOKED UP — it is
     // DERIVED from the name hash. The derivation read is still a critical (fresh + verified) read, because it is
     // the address the ownership proof is checked against; a stale/unverified derivation would let a wrong item
@@ -2302,7 +2359,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function openPrivateThreadForWallet'),
     );
     const recipientSource = app.slice(
-      app.indexOf('async function resolveRecipientWalletForThread'),
+      app.indexOf('async function resolveWalletFromIdentityVariants'),
       app.indexOf('async function submitVaultMessage'),
     );
 
@@ -2319,7 +2376,7 @@ describe('PWA runtime config guard', () => {
     const criticalMethods = PLATHO_APP_CONFIG.network.tonRpc.criticalMethods;
     const source = app.slice(
       app.indexOf('async function loadConnectedAthWalletAddress'),
-      app.indexOf('async function resolveRecipientWalletForThread'),
+      app.indexOf('async function resolveWalletFromIdentityVariants'),
     );
     expect(criticalMethods).toContain('get_wallet_address');
     expect(source).toMatch(/provider\.getWalletAddress\(owner, \{/);
@@ -2331,10 +2388,11 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-USERNAME-TRANSFER-01: a .ath is a movable alias — routing is wallet-first; addressing reconciles + relabels', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // Routing is by the dialog's WALLET, not by re-resolving the username every send: in resolveRecipientWalletForThread
-    // the wallet_address variant is matched BEFORE the platho_nft resolve (reverts the v562 FM-1 band-aid).
+    // Routing is by the dialog's WALLET, not by re-resolving the username every send: the wallet_address variant
+    // is matched BEFORE the platho_nft resolve (reverts the v562 FM-1 band-aid). The branches live in
+    // resolveWalletFromIdentityVariants since 2026-09-07, when the transfer dialogs started taking a name too.
     const routeSource = app.slice(
-      app.indexOf('async function resolveRecipientWalletForThread'),
+      app.indexOf('async function resolveWalletFromIdentityVariants'),
       app.indexOf('async function submitVaultMessage'),
     );
     expect(routeSource.indexOf("type === 'wallet_address'")).toBeLessThan(routeSource.indexOf("type === 'platho_nft'"));
@@ -2395,8 +2453,7 @@ describe('PWA runtime config guard', () => {
     // Cardinal rule: never strip/clear a username off an unverifiable (structurally-degraded / hostile-RPC) read.
     expect(app).toMatch(/if \(tonRpcVerificationStructurallyDegraded\(\)\) \{ backoffOwnLinkedUsernameReconcile/);
 
-    // "NOT REGISTERED" IS NEVER PROOF OF LOSS [OWNER 2026-08-25: "the usernames fall off by themselves again ... the
-    // app asks to link a username again, though we wrote in the changelog that this would no longer be needed"].
+    // "NOT REGISTERED" IS NEVER PROOF OF LOSS [decided 2026-08-25].
     // UsernameNFTItem sets initialized=true at mint and no receiver ever sets it back — there is no burn and no
     // destroy in that contract — so a name this wallet already linked cannot become unregistered. An item answering
     // "not initialised" about it is a bad read, and this branch used to turn that answer into an empty owner and
@@ -2417,8 +2474,7 @@ describe('PWA runtime config guard', () => {
     expect(peerRevalidate, 'a failed read proves nothing about a peer either').not.toMatch(/UsernameNotRegisteredError/);
     expect(peerRevalidate).toMatch(/\} catch \{[\s\S]*?continue;\s*\n\s*\}/);
 
-    // A CLAIMED NAME IS REMEMBERED AND RE-ASKED [OWNER 2026-08-24: "the counterparty's username gets lost in the
-    // app — this contact has one and I don't see it"]. Verifying the peer's claim takes a chain read; when that read
+    // A CLAIMED NAME IS REMEMBERED AND RE-ASKED [decided 2026-08-24]. Verifying the peer's claim takes a chain read; when that read
     // failed, the only retry rode on the NEXT message from that peer, so a contact who went quiet stayed a bare
     // address for ever. The claim is remembered even when nothing is done with it, and it is persisted, because in
     // memory alone it died on every reload — the same hole convPeerKeyId had.
@@ -2426,8 +2482,14 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/claimedSenderUsername: thread\.claimedSenderUsername \?\? null,/);
     expect(app).toMatch(/if \(!thread\.claimedSenderUsername && snapshot\.claimedSenderUsername\) thread\.claimedSenderUsername = snapshot\.claimedSenderUsername;/);
     // Asked for on OPEN — the one moment left when nothing is arriving — and not only for anonymous dialogs.
-    const restored = app.slice(app.indexOf('function queueRestoredConvIdentityResolution('), app.indexOf('function messageStripScrollMetrics'));
+    // THE END ANCHOR IS DEAD — `messageStripScrollMetrics` is not in web/app.js, so this sliced 1,033,751
+    // characters for a 998-character function, and the `> 400` guard below happily agreed [audit 2026-09-02].
+    // A lower bound cannot see a runaway; both bounds now, and an end anchor that exists.
+    const restored = app.slice(app.indexOf('function queueRestoredConvIdentityResolution('),
+                               app.indexOf('function introFirstMessageCapsuleId('));
     expect(restored.length, 'the slice really spans the function').toBeGreaterThan(400);
+    expect(restored.length, 'and does not run away — the previous end anchor was dead and this read 1,033,751')
+      .toBeLessThan(4000);
     expect(restored).toMatch(/if \(!isAnonymousPeerThread\(thread\) && !\(claim && !threadWearsUsername\(thread, claim\)\)\) return;/);
     expect(restored).toMatch(/queueInboundPeerIdentityResolution\(thread, claim\);/);
     expect(app).toMatch(/queueUsernameHygiene\(\(\) => reconcileOwnLinkedUsername\(\)\);\s*\n(\s*\/\/.*\n)*\s*queueRestoredConvIdentityResolution\(thread\);/);
@@ -2442,34 +2504,6 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function addKnownPlathoUsername\(label, owner = plathoWallet\?\.address\)/);
     // Minting a name records it as known.
     expect(app).toMatch(/writeLinkedPlathoUsername\(linked, owner\);\s*\n\s*addKnownPlathoUsername\(identity\.label, owner\);/);
-    // The Link dialog offers the known names as a select, still verifies the chosen/typed name on submit (validation),
-    // and records a successfully-linked name as known.
-    const linkSource = app.slice(
-      app.indexOf('async function requestWalletDisplayIdentity'),
-      app.indexOf('async function requestUsernameMintName'),
-    );
-    expect(linkSource).toMatch(/readKnownPlathoUsernames\(plathoWallet\?\.address\)/);
-    expect(linkSource).toMatch(/id: 'pick',\s*\n\s*type: 'select'/);
-    // Verification now runs in-place via validateSubmit (close only on success — no flicker), see PWA-LINK-NAME-NO-FLICKER-01.
-    expect(linkSource).toMatch(/await verifyWalletDisplayIdentity\(normalizedMode, chosen, plathoWallet\)/);
-    expect(linkSource).toMatch(/addKnownPlathoUsername\(result\.label, plathoWallet\?\.address\)/);
-
-    // OWNING A NAME AND PRESENTING ONE ARE DIFFERENT THINGS [OWNER 2026-08-24: "a person may not want to link a name
-    // and still own the username. Let's put a no-username option in this menu, for when someone just wants to unlink
-    // theirs"]. The row appears only when there IS a linked name to take off, and the picker opens for it even when
-    // the chain read returned no owned names — otherwise the one person who needs the row cannot reach it.
-    expect(app).toMatch(/const WALLET_DISPLAY_UNLINK_OPTION = '__no_name__';/);
-    expect(linkSource).toMatch(/if \(knownNames\.length > 0 \|\| linkedNow\)/);
-    expect(linkSource).toMatch(/\.\.\.\(linkedNow \? \[\{ value: WALLET_DISPLAY_UNLINK_OPTION, label: t\('username\.noNameOption'\) \}\] : \[\]\)/);
-    // Read ONLY from the picked row, and only with the free-text box empty: an empty box is "nothing chosen yet",
-    // and a typed string must never stand in for a choice the user did not make.
-    expect(linkSource).toMatch(/if \(!typed && values\.pick === WALLET_DISPLAY_UNLINK_OPTION\) \{\s*\n\s*return \{ ok: true, result: \{ mode: WALLET_DISPLAY_MODES\.ADDRESS \} \};/);
-    // It asks the chain for NOTHING — there is nothing to verify about not having a name.
-    const unlinkBranch = linkSource.slice(linkSource.indexOf('validateSubmit'), linkSource.indexOf('const chosen ='));
-    expect(unlinkBranch.length, 'the slice really spans the branch').toBeGreaterThan(200);
-    expect(unlinkBranch).not.toMatch(/verifyWalletDisplayIdentity|resolvePlathoUsernameOwner/);
-    // And the caller takes the name off instead of writing an empty one as if it were a name.
-    expect(app).toMatch(/if \(identity\.mode === WALLET_DISPLAY_MODES\.ADDRESS\) \{\s*\n\s*clearLinkedPlathoUsername\(plathoWallet\.address\);/);
     expect(app).toMatch(/flashWalletIdentityStatus\(t\('username\.nameUnlinked'\)\);/);
   });
 
@@ -2523,7 +2557,28 @@ describe('PWA runtime config guard', () => {
     // per deploy, so comparing it would answer "same version, nothing new" about a bundle that HAS changed, and the
     // page would keep running the old code until the user closed it. The build id is the half that moves, so the
     // build id is the half that gets compared — and it is read from the very tag the browser will fetch.
-    expect(swSource).toContain('html.match(/src="\\.\\/app\\.js\\?v=([A-Za-z0-9]+)"/)');
+    // RUN THE REGEX, DO NOT QUOTE IT [audit 2026-09-01, round 9]. This used to pin the pattern as an exact string,
+    // and in doing so it certified a defect for eleven months: the pattern required `./app.js` while the shell has
+    // shipped `/app.js` since 1.0.18, when a CSP that blocked <base> made every path root-absolute. liveAppBuildId
+    // therefore returned null on every real shell, handleServiceWorkerControllerChange always took its
+    // "cannot tell" branch, and pendingServiceWorkerAppShellReload — whose only writer of `true` is that function
+    // — could never become true. The signed-send block, the "update ready, reload" status and the reload at wallet
+    // lock were all unreachable, and clean-18's CUTOVER.md items 6/7 rest on this reload existing.
+    //
+    // So the gate now lifts the pattern out of app.js and runs it against the shell this repo actually ships. It
+    // cannot be satisfied by a pattern that does not match, and it cannot rot when the path spelling changes again.
+    const buildIdPattern = swSource.match(/const match = html\.match\((\/[^\n]*?\/)\);/)?.[1];
+    expect(buildIdPattern, 'liveAppBuildId must still read the build id out of the shell').toBeTruthy();
+    // eslint-disable-next-line no-new-func
+    const extracted: RegExp = new Function(`return ${buildIdPattern};`)();
+    const shell = readFileSync('web/index.html', 'utf8');
+    const shipped = shell.match(/<script src="[^"]*app\.js\?v=(b[0-9a-f]{8})"/)?.[1];
+    expect(shipped, 'the shell must carry a build id at all').toBeTruthy();
+    expect(shell.match(extracted)?.[1], 'the pattern must find the build id the shell actually ships')
+      .toBe(shipped);
+    // …and it must survive either spelling, so neither direction of that 1.0.18 change can break it again.
+    expect(`<script src="./app.js?v=${shipped}" type="module"></script>`.match(extracted)?.[1]).toBe(shipped);
+    expect(`<script src="/app.js?v=${shipped}" type="module"></script>`.match(extracted)?.[1]).toBe(shipped);
     // Sliced to the reader's own end: the surrounding span also holds the badge's click wiring, and the claim here
     // is about what DECIDES a build is new, not about the badge existing.
     const buildIdReader = app.slice(
@@ -2544,12 +2599,11 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['wallet.updateReadyReload']).toBe('Update ready - reload before sending');
     expect(app).toMatch(/signedActionsReady = accountActive && !appShellReloadPending/);
     expect(app).toMatch(/registerVaultKeysButton\.disabled = !plathoWallet \|\| accountActive \|\| appShellReloadPending/);
-    expect(app).toMatch(/mintUsernameButton\.disabled = false/);
-    expect(app).toMatch(/linkUsernameButton\.disabled = false/);
+    expect(app).toMatch(/profileCardMintNameButton\.disabled = false/);
     expect(app).toMatch(/setAvatarButton\.disabled = plathoProfileAvatarPending/);
     expect(app).toMatch(/if \(!plathoWallet\) \{[\s\S]*flashWalletIdentityStatus\(t\('wallet\.createWalletFirst'\)\)/);
     expect(EN_STRINGS['wallet.createWalletFirst']).toBe('create wallet first');
-    expect(app).not.toMatch(/mintUsernameButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
+    expect(app).not.toMatch(/profileCardMintNameButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).not.toMatch(/setAvatarButton\.disabled = !plathoWallet \|\| !signedActionsReady/);
     expect(app).toMatch(/function canAttemptPrivateSend/);
     expect(app).toMatch(/function privateSendBlockReason/);
@@ -2657,7 +2711,7 @@ describe('PWA runtime config guard', () => {
     );
     const importSource = app.slice(
       app.indexOf('async function importEncryptedWalletKeyFile'),
-      app.indexOf('async function requestWalletDisplayIdentity'),
+      app.indexOf('async function requestUsernameMintName'),
     );
     const prepareIndex = helperSource.indexOf("prepareWalletScopedRuntimeForWallet(wallet, 'wallet key imported')");
     const assignIndex = helperSource.indexOf('plathoWallet = wallet');
@@ -2704,7 +2758,9 @@ describe('PWA runtime config guard', () => {
 
     expect(helperSource).toMatch(/return activeRuntimeWalletAddress \?\? plathoWallet\?\.address \?\? null/);
     expect(helperSource).toMatch(/const currentAddress = activeWalletRuntimeAddress\(\)/);
-    expect(helperSource).toMatch(/if \(walletScopedRuntimeChanged\(wallet\)\) \{[\s\S]*clearWalletScopedRuntimeState\(reason\)/);
+    // The comparison is captured once (`changed`) because the prepare re-reads the personal Public state on a
+    // switch as well as on a first unlock — after the new address is recorded [F-22, 2026-09-09].
+    expect(helperSource).toMatch(/const changed = walletScopedRuntimeChanged\(wallet\);\s*\n\s*if \(changed\) \{[\s\S]*clearWalletScopedRuntimeState\(reason\)/);
     expect(helperSource).toMatch(/if \(wallet\?\.address\) activeRuntimeWalletAddress = wallet\.address/);
     expect(lockSource).toMatch(/plathoWallet = null/);
     expect(lockSource).not.toMatch(/activeRuntimeWalletAddress = null/);
@@ -2724,8 +2780,14 @@ describe('PWA runtime config guard', () => {
       app.indexOf('function setView'),
     );
     const render = app.slice(
-      app.indexOf('function renderConversation'),
-      app.indexOf('async function openImageLightbox'),
+      // BOTH anchors were wrong and covered for each other. 'function renderConversation' prefix-matches
+      // renderConversationIdentity (app.js:6456), and 'openImageLightbox' (6895) sits BEFORE the real
+      // renderConversation (22228) — so the scope was a 439-line region that holds none of what these tests
+      // assert. It passed only because the end anchor spent months dead as 'async function openImageLightbox',
+      // which made slice run to the end of the file and find the matches anywhere. Naming the paren pins the
+      // right function, and showNewChatHint is the next declaration after it. [ANCHOR-01, 2026-08-29]
+      app.indexOf('function renderConversation()'),
+      app.indexOf('function showNewChatHint'),
     );
     const addButton = app.slice(
       app.indexOf("privateComposerAddButton?.addEventListener('click'"),
@@ -2865,8 +2927,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-ACTIVATION-04: an activation read that learned nothing re-asks on its own until a definitive answer', () => {
-    // [OWNER 2026-08-22, on the stand with a freshly imported key] "the balance loaded, but the app kept saying the
-    // wallet was not connected; a few minutes later it sorted itself out." The ONE activation read at unlock failed
+    // [decided 2026-08-22] The ONE activation read at unlock failed
     // on a transient (15 s RPC timeouts and an unanswering verifier were in the console), the catch preserved the
     // binding — correctly — and nothing asked again: the auto-refresh re-reads the balance only. So:
     //   (1) the transient catch schedules a re-read on a rising ladder, for THIS wallet;
@@ -3000,7 +3061,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-REPLYDEAD-01: a failed message offers no reply anchor, and the unlanded verdict sheds the dead claim', () => {
-    // [OWNER 2026-08-26, relaying a user] "you can reply to a message that did not send." The reply the user
+    // [decided 2026-08-26] The reply the user
     // then sent quoted a message the peer can never have — and on a wallet with two devices the dead anchor can
     // even point at the SIBLING device record committed under the same seq. All three reply affordances (swipe
     // arming, the hover button, beginPrivateReplyForRow) share one gate: row.dataset.entryId.
@@ -3042,9 +3103,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-CONVSEQ-01: a send that never left the device sheds its (shard, seq) claim, and allocation floors on what was SEEN', () => {
-    // [OWNER 2026-08-26, relaying a user] "my phone ran out of GRAM paying for a message and it did not send;
-    // I topped up and wrote from the PC — all fine; but the phone still shows the unsent message and does not
-    // show the messages I sent from the PC, even though everything is synced." The behavioural halves (the seq
+    // [decided 2026-08-26] The behavioural halves (the seq
     // mark seeding and the echo matcher) run in tests/conv-own-echo-alias.test.ts; THIS gate pins the send
     // path, which cannot be lifted whole.
     const app = readFileSync('web/app.js', 'utf8');
@@ -3070,8 +3129,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-CONVRESTORE-03: a device that is BEHIND merges from the recovery slots — not only an empty one', () => {
-    // [OWNER 2026-08-26: "I talked to a NEW user on one client; the other showed none of it until the user wrote
-    // again" — and the framing that matters: "if I talk on the phone and then open the desktop, losing messages
+    // [decided 2026-08-26 — and the framing that matters: "if I talk on the phone and then open the desktop, losing messages
     // IS a problem".] A conversation BORN on device A is structurally invisible to device B: the conversation
     // scan walks only the local store, and the old restore latched shut on ANY non-empty store ("already holds
     // conversations -> authoritative"), leaving the INTRO scan — with its ~13-minute null-body backoff under a
@@ -3100,8 +3158,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-CONVRESTORE-01: a never-scanned conversation scans from its birth, and the sync reads BOTH sides of it', () => {
-    // [OWNER 2026-08-22, on the stand with a key restored from the recovery slots] "only the peer's replies synced,
-    // mine did not; in some conversations only the peer's latest replies came." Two causes, one function:
+    // [decided 2026-08-22] Two causes, one function:
     //   (1) a record with no cursor (restored, never scanned here) read only the steady W-epoch window — the
     //       conversation's birth (adoptedCreatedAt; a retired root's adoptedAt) was in the record and unused;
     //   (2) the pass derived, probed and read only the INCOMING shards; the device's own sent capsules sit in the
@@ -3118,7 +3175,15 @@ describe('PWA runtime config guard', () => {
     expect(birth, 'a birth in the future is no birth at all').toMatch(/return Number\.isFinite\(birth\) && birth <= epochNow \? birth : null;/);
     expect(sync).toMatch(/const cold = record\.lastScannedEpoch == null;/);
     expect(sync).toMatch(/const birthEpoch = convBirthEpoch\(record, epochNow\);/);
-    expect(sync).toMatch(/const from = \(forceFull \|\| cold\) \? \(birthEpoch \?\? steadyFrom\) : Number\(record\.lastScannedEpoch\);/);
+    expect(sync).toMatch(/const from = \(forceFull \|\| cold\) \? \(birthEpoch \?\? steadyFrom\) : cursorFrom;/);
+    // …and a warm cursor is only trusted while it means what THIS build means [audit 2026-08-31, round 6]. The
+    // mark is monotonic and carried no generation, so a device that scanned epochs past E on a boundary-less
+    // build (everything is generation 17 there) would declare those epochs done after updating — while their
+    // generation-18 RecordShards, at entirely different addresses, had never been read. MEASURED: eight days of
+    // private messages skipped permanently, with the manual Sync the only unadvertised way back. A cursor this
+    // build disagrees about rewinds to the boundary; epochs below it are generation 17 either way and stay done.
+    expect(sync).toMatch(/scannedGeneration !== generationForEpoch\(Number\(record\.lastScannedEpoch\)\)/);
+    expect(sync).toMatch(/Math\.min\(Number\(record\.lastScannedEpoch\), CUTOVER_EPOCH\)/);
     // A manual "Sync messages" (forceIndexRescan) is a full re-walk: every conversation reads from its birth this pass.
     expect(sync).toMatch(/const forceFull = options\?\.forceIndexRescan === true;/);
     expect(app).toMatch(/async function syncConvCapsulesFromShards\(options = \{\}\)/);
@@ -3128,8 +3193,10 @@ describe('PWA runtime config guard', () => {
     expect(sync).toMatch(/const scanFrom = Math\.max\(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, Math\.min\(steadyFrom, from\)\);/);
     // (2) both directions derived per root, both probed, both read through the same lane call and marks.
     // TWO GROUPS PER ROOT on one list — the peer's direction and this device's own — derived, probed and read alike.
-    expect(sync).toMatch(/rootShards\.push\(\{ kRoot, group: 'incoming', shards: await incomingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\) \}\);/);
-    expect(sync).toMatch(/rootShards\.push\(\{ kRoot, group: 'outgoing', shards: await outgoingRecordShards\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\) \}\);/);
+    // Through the PLANNER since 2026-08-29 — the derivation is the same, it just happens once per (keys, epoch,
+    // window) instead of once per pass (CONVPLAN-01..05: 3.575 ms per conversation per pass, measured).
+    expect(sync).toMatch(/rootShards\.push\(\{ kRoot, group: 'incoming', shards: await convShardPlanner\.incoming\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\) \}\);/);
+    expect(sync).toMatch(/rootShards\.push\(\{ kRoot, group: 'outgoing', shards: await convShardPlanner\.outgoing\(\{ kRoot, selfKeyId, peerKeyId, epochNow, windowW \}\) \}\);/);
     const probe = app.slice(app.indexOf('async function readConvShardStates(plans)'), app.indexOf('async function syncConvCapsulesFromShards('));
     expect(probe, 'the probe answers for every shard the pass may read, in one request')
       .toMatch(/for \(const root of plan\.rootShards\)[\s\S]{0,200}?for \(const shard of root\.shards\)/);
@@ -3141,7 +3208,7 @@ describe('PWA runtime config guard', () => {
     // And a cold pass says what it did, per conversation, so a restore that came back short is diagnosable.
     expect(sync).toMatch(/console\.info\('\[conv\] cold conversation', \{/);
     expect(sync).toMatch(/console\.info\('\[conv\] cold scan', \{ conversations: coldConversations, of: conversations, shards: coldShards, manual: forceFull \}\);/);
-    expect(app).toMatch(/import \{ outgoingRecordShard, incomingRecordShards, outgoingRecordShards, selfRecoveryShardSpace \} from '\.\/conv-discovery\.mjs\?v=\d+';/);
+    expect(app).toMatch(/import \{ outgoingRecordShard, createRecordShardPlanner, selfRecoveryShardSpace \} from '\.\/conv-discovery\.mjs\?v=\d+';/);
     // The opened capsule decides the side: the sender's own copy renders 'out' (this is what makes the restore
     // agree with the local echo instead of duplicating it).
     const fromOpened = app.slice(app.indexOf('function messageFromOpenedCapsule(opened, meta, entry)'), app.indexOf('function messageFromOpenedPrivateParts('));
@@ -3171,7 +3238,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-CONVRESTORE-02: an own capsule read back off the outgoing shard MERGES into its local echo, never stands beside it', () => {
-    // [OWNER 2026-08-22, on the stand] "the message doubled with different statuses" — the echo the composer inserts
+    // [decided 2026-08-22] — the echo the composer inserts
     // carries no capsule id (no capsule exists yet), so the chain copy, deduplicated by id, was inserted a second time
     // under 'received'. Four things close it:
     //   (1) the send stamps the echo with the shard address beside the seq — (shard, seq) IS the chain identity;
@@ -3229,8 +3296,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-CLEAR-01: "Clear local data" deletes EVERY platho IndexedDB store — the conversation keys and cursors included', () => {
-    // [OWNER 2026-08-22, on the stand] "cleared it, imported the key again, still five messages; a manual sync brings
-    // them all." The wipe deleted the message history and the replay store only; the conversation KEY store survived
+    // [decided 2026-08-22] The wipe deleted the message history and the replay store only; the conversation KEY store survived
     // with this device's scan cursors, so the re-imported wallet was not a fresh device: the recovery restore stood
     // down ("already holds conversations"), every conversation kept its cursor, and the first sync read the steady
     // window. The wipe now names every store this wallet and deployment can have created, and — where the browser
@@ -3425,7 +3491,7 @@ describe('PWA runtime config guard', () => {
     expect(readFileSync('contracts/PublicShard.tact', 'utf8')).toMatch(/const PS_PAGE_CAP: Int = 96;/);
     expect(app).toMatch(/maximum: Object\.freeze\(\{ id: 'maximum', label: 'Maximum', maxBytes: 64 \* 1024 \}\)/);
     expect(app).toMatch(/function imagePartsForSend\(attachment, label = 'image'\)/);
-    // The "History sync" control is GONE (owner, 2026-08-07), and this gate is why it lasted as long as it did:
+    // The "History sync" control is GONE (decided 2026-08-07), and this gate is why it lasted as long as it did
     // the comment that used to stand here already said the configurable window was a property of paging one
     // shared log and that a shard has no window to configure — and the lines right below it pinned that control's
     // markup and its normaliser anyway. So the gate held a dead switch in place while explaining that it was
@@ -3478,11 +3544,19 @@ describe('PWA runtime config guard', () => {
     expect(EN_STRINGS['composer.privatePartLimit#other']).toBe('Private message has {count} capsules (limit {limit}); split it into smaller messages');
     expect(EN_STRINGS['composer.publicPartLimit#other']).toBe('Post has {count} capsules (limit {limit}); split it into smaller posts');
     expect(helperSource).toMatch(/function assertPrivateComposerPartLimit/);
-    expect(shortfallSource).toMatch(/if \(privateComposerPartLimitMessage\(plan\.length\)\) return true/);
+    // [2026-08-29] The wrapper lost its second clause with the Vault-balance shortfall probe: the part cap is
+    // the WHOLE verdict now, so the pin follows the shape while guarding the same property — the cap gates sends.
+    expect(shortfallSource).toMatch(/return Boolean\(privateComposerPartLimitMessage\(plan\.length\)\);/);
     expect(statusSource).toMatch(/const limitMessage = privateComposerPartLimitMessage\(privatePlan\.length\)/);
     expect(statusSource).toMatch(/\? \{ text: limitMessage, state: 'short' \}/);
     expect(submitSource).toMatch(/const limitMessage = privateComposerPartLimitMessage\(sendPlan\.length\)/);
     expect(submitSource).toMatch(/privateComposerCostStatus\.textContent = limitMessage/);
+    // AND THE GUARD MUST ACTUALLY STOP THE SEND [audit 2026-09-01, round 9]. Everything above pins what the user
+    // is TOLD; none of it pinned the one statement that makes the telling true. MEASURED: deleting only the
+    // `return;` from this branch — leaving the message and the status write in place — kept this test and every
+    // other file naming the symbol green, while the user was shown "Private message has N capsules (limit L)"
+    // and the send proceeded anyway, paying per part for a message the sync window cannot reassemble.
+    expect(submitSource).toMatch(/if \(limitMessage\) \{[\s\S]{0,400}?\n\s*return;\n\s*\}/);
     expect(capsuleSource).toMatch(/assertPrivateComposerPartLimit\(documentParts\.length\)/);
     // The private receive window is the conversation shard's own history (newest-first), not a Hub index: the
     // composer's capsule cap keeps one message inside one pass, and an incomplete group is held back rather than
@@ -3492,11 +3566,21 @@ describe('PWA runtime config guard', () => {
       app.indexOf('async function syncPrivateCapsulesFromChain('),
     );
     expect(convReceiveSource).toMatch(/entries = await lane\.readIncoming\(/);
-    expect(app).toMatch(/if \(parts\.length < partCount\) continue;/);
+    //...and the parts it holds keep the shard's seq mark BELOW them, or the next pass skips them before
+    // decrypting and the group can never be completed (SEQTAIL-08 measures that half).
+    expect(app).toMatch(/if \(parts\.length < partCount\) \{/);
+    expect(app, 'an incomplete group holds the mark below the parts in hand').toMatch(/if \(!abandoned\) hold\(parts\);/);
+    // …but not forever: `partCount` is a peer-controlled uint16, so an unfulfillable group pinned the mark at
+    // floor-1 permanently. SEQTAIL-08 owns that rule and its expiry [audit 2026-09-01, round 9].
     // (The unverified-index read modes and the cursor persistence mode were properties of the CapsuleHub index
     // walk: a shard read has no index to read unverified and no cursor to persist. What replaced the cursor is
     // the per-conversation scan cursor, advanced ONLY on a fully clean pass.)
-    expect(convReceiveSource).toMatch(/if \(convClean && !tornDown\(\)\) await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
+    expect(convReceiveSource).toMatch(/if \(convClean && !tornDown\(\) && epochIsDerivable\('record', epochNow\)\) \{/);
+    // …and the third condition is what stops a SKIPPED epoch from being claimed as scanned [round 7]: the
+    // derivation skips an epoch this build cannot address, so a pass can be clean without having looked at the
+    // top of its window. Advancing there would write a cursor whose generation stamp then MATCHES on the flip
+    // build, so the stale-cursor rewind would never fire — the skip would re-create the loss it prevents.
+    expect(convReceiveSource).toMatch(/await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
     // The rest of this block pinned the CapsuleHub walk's bookkeeping (head-repair links, the pending-publish
     // confirm sweep over hub entries, the body-history ledger, its per-group error capture). The shard receive
     // keeps the two properties that are about the USER's data rather than about the log: an incomplete multipart
@@ -3703,7 +3787,7 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-UNLOCK-RESUME-01: an unlock interrupted by backgrounding is re-armed on resume', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // [OWNER 2026-08-09] "Sometimes the unlock dialog does not appear on resume, though the wallet is locked."
+    // [decided 2026-08-09]
     //
     // THE CHAIN, because no single link of it looks wrong on its own:
     //   1. the prompt clears walletUnlockPromptPending BEFORE opening the password dialog;
@@ -3797,12 +3881,15 @@ describe('PWA runtime config guard', () => {
     // height must come from padding-bottom:100% — honoured everywhere, forever — with the image filling it absolutely.
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
-    // The card wraps the <img> in a frame, and the frame (not the img) carries the hidden toggle.
-    const card = app.slice(app.indexOf('function usernameNftCardNode('), app.indexOf('async function openMyUsernamesDialog('));
+    // The tile wraps the <img> in a frame, and the frame (not the img) carries the hidden toggle. [The Wallet-tab
+    // list this was written for went on 2026-09-08 — the profile card's name tiles are the one place the art lives.]
+    const card = app.slice(app.indexOf('function renderProfileCardNames('), app.indexOf('function wearPlathoUsername('));
     expect(card).toMatch(/frame\.className = 'nft-card-art-frame';/);
     expect(card).toMatch(/frame\.hidden = !nft\.image;/);
-    expect(card).toMatch(/frame\.append\(art\);\s*card\.append\(frame\);/);
+    expect(card).toMatch(/frame\.append\(art\);/);
+    expect(card).toMatch(/face\.append\(frame, label\);/);
     expect(card).not.toMatch(/art\.hidden = /);
+    expect(app, 'the Wallet-tab list is gone with its dialog').not.toMatch(/usernameNftCardNode|openMyUsernamesDialog|myUsernamesButton|renderMyUsernamesStatus/);
     // The frame is a padding-bottom square, and it does NOT lean on aspect-ratio.
     const frame = /(^|[,}])\s*\.nft-card-art-frame\s*\{([^}]*)\}/m.exec(css)?.[2] ?? '';
     expect(frame).toMatch(/padding-bottom:\s*100%/);
@@ -3815,25 +3902,15 @@ describe('PWA runtime config guard', () => {
     expect(art).toMatch(/object-fit:\s*cover/);
     expect(art).not.toMatch(/aspect-ratio/);
 
-    // AND THE LIST MUST NOT SCROLL ITSELF [OWNER 2026-08-24: "just fix this stupid bug with the usernames already"
-    // — and, reading it correctly: "this modal of yours doesn't scroll like our other modals"]. The square above
-    // was correct all along; what cut the art to a strip was the list owning a height.
-    //
-    // A grid sizes its rows from their INTRINSIC contribution, and a percentage padding contributes zero to that.
-    // Given `max-height: 58vh; overflow-y: auto` the grid had a definite height, measured each row as just the foot
-    // (~40px), shared the leftover space among them — six rows of exactly 68.5px, filling the box — and the frame
-    // then painted its real 298px and was clipped by the card's overflow:hidden. MEASURED: card 66px with the
-    // height, 338px without it; the dialog 590/574 (not scrollable) versus 2267/749 (scrollable).
-    const list = /(^|[,}])\s*\.nft-card-list\s*\{([^}]*)\}/m.exec(css)?.[2] ?? '';
-    expect(list.length, 'the list rule must actually be found').toBeGreaterThan(20);
-    expect(list, 'a height here re-breaks the art it has nothing to do with').not.toMatch(/max-height|height:/);
-    expect(list, 'and the dialog does the scrolling, as it does everywhere else').not.toMatch(/overflow/);
+    // The list that once owned a height (and cut the art to a strip) is gone with the Wallet-tab row; the profile
+    // card's grid has no height of its own either (PWA-GIFT-01 pins its columns).
+    expect(css).not.toMatch(/\.nft-card-list|\.nft-card-send|\.nft-card-foot|\.nft-card-name/);
   });
 
   it('PWA-DIALOG-CLOSE-ICON-01: the dialog close control is a mask icon, not a text glyph', () => {
     const html = readFileSync('web/index.html', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
-    // [OWNER 2026-08-09] "X is not centred in the box." MEASURED before changing anything: the &times; ink centre
+    // [decided 2026-08-09] MEASURED before changing anything: the &times; ink centre
     // sits 4.5px above the baseline while the line box centre sits 6.5px above it, so place-items:center centred
     // the BOX and left the ink 2px low — 5% of a 40px button, in EIGHT dialogs at once. Every other icon in the app
     // is a mask, which has no baseline and is therefore centred by construction rather than by luck of the font.
@@ -3847,7 +3924,7 @@ describe('PWA runtime config guard', () => {
     const coords = (svg.match(/[\d.]+/g) ?? []).map(Number).filter((n) => n >= 5 && n <= 19);
     expect(Math.min(...coords) + Math.max(...coords), 'ink must straddle 12').toBeCloseTo(24, 1);
 
-    // [OWNER 2026-08-09, second pass] "кнопка с крестиком слишком большая — сделай как кнопка синхронизации."
+    // [decided 2026-08-09]
     // It was the last .icon-button still at the generic 40px, sitting a few pixels from a 34px sync button in the
     // same kind of header row. The fix reads the SAME token the sync indicator reads, which is what "same size as
     // the sync button" has to mean if it is to stay true: move the token and both move together.
@@ -4149,9 +4226,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/publishConfirmNoProgressDeadlineMs\(message\?\.publishState\) \+ 9 \* 60 \* 1000/);
     // Batch K's position-scaled background nonce wait went with the Vault publish trunk: direct sends order by
     // wallet seqno (one external per chunk), so there is no publish-nonce queue whose depth needs a scaled wait.
-    // ONE message is capped at 8 capsules (= MAX_BATCH_PARTS) on BOTH surfaces — compose-time friendly block +
-    // fail-closed asserts on every programmatic path.
-    expect(app).toMatch(/const COMPOSER_MAX_MESSAGE_PARTS = MAX_BATCH_PARTS;/);
+    // ONE message is capped at 8 capsules (= MAX_MESSAGE_PARTS, capsule-part-policy — the cap the M21C door's
+    // FV_EXT_MAX_ACTIONS is pinned against) on BOTH surfaces — compose-time friendly block + fail-closed asserts.
+    expect(app).toMatch(/const COMPOSER_MAX_MESSAGE_PARTS = MAX_MESSAGE_PARTS;/);
     expect(app).toMatch(/Math\.min\(privateComposerRetrievalPartLimit\(\), COMPOSER_MAX_MESSAGE_PARTS\)/);
     expect(app).toMatch(/function publicComposerPartLimitMessage\(partCount\)/);
     expect(app).toMatch(/function assertPublicComposerPartLimit\(partCount\)/);
@@ -4159,7 +4236,7 @@ describe('PWA runtime config guard', () => {
     // The public composer blocks BEFORE clearing/signing, shows the split-it message, and disables the button.
     expect(app).toMatch(/if \(publicComposerPartLimitMessage\(publicComposerSendPlan\(text, attachments, fileAttachments\)\.length\)\) \{/);
     expect(app).toMatch(/const publicLimitMessage = publicComposerPartLimitMessage\(publicPlan\.length\);/);
-    expect(app).toMatch(/if \(publicComposerPartLimitMessage\(plan\.length\)\) return true;/);
+    expect(app).toMatch(/return Boolean\(publicComposerPartLimitMessage\(plan\.length\)\);/);
     // The private button tooltip states the REAL reason (the limit message), not a GRAM-shortfall misattribution.
     const reason = app.slice(app.indexOf('function privateSendBlockReason'), app.indexOf('function privateSendBlockReason') + 2400);
     const limitIdx = reason.indexOf('privateComposerPartLimitMessage(plan.length)');
@@ -4229,14 +4306,16 @@ describe('PWA runtime config guard', () => {
     // The tail of the import list is open: other names may be added after SHARE_SNIPPET_MAX_BYTES (the capsule
     // size-class helpers were, for the wallet-send-fee reserve). What this pins is that the PROFILE codec names
     // come from the policy module under a versioned URL, not that nothing else does.
-    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,[\s\S]*?\} from '\.\/capsule-part-policy\.mjs\?v=\d+';/);
+    expect(app).toMatch(/encodeProfileBlockContent,\s*decodeProfileBlockContent,\s*normalizeProfileAppearance,\s*normalizeProfileWornGift,\s*PROFILE_LOOK_BACKGROUNDS,\s*PROFILE_LOOK_SETTING_RANGES,\s*PROFILE_LOOK_THEMES,\s*normalizeProfileTags,\s*PROFILE_DESCRIPTION_MAX_BYTES,\s*PROFILE_TAG_MAX_BYTES,\s*PROFILE_MAX_TAGS,\s*utf8ByteLength,\s*encodeShareBlockContent,\s*decodeShareBlockContent,\s*SHARE_SNIPPET_MAX_BYTES,[\s\S]*?\} from '\.\/capsule-part-policy\.mjs\?v=\d+';/);
   });
 
   it('PWA-PROFILE-USERNAME-01: channel .ath username is claimed in the profile, verified on-chain, and only the verified name is shown', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // PUBLISH: the channel embeds the wallet's OWN linked .ath (safe canonicalUsernameDisplay, never throwing normalizeUsernameInput).
     expect(app).toMatch(/const linkedLabel = readLinkedPlathoUsername\(plathoWallet\?\.address\)\?\.label \?\? '';\s*const ownerUsername = linkedLabel \? canonicalUsernameDisplay\(linkedLabel\) : '';/);
-    expect(app).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername \}\]\)/);
+    // …plus the look's claim since 2026-09-07 (PWA-CHANNEL-DRESS-01): a trailer the block carries only when set.
+    // 2026-09-09: the worn gift rides the block as its own field, apart from the channel's look (WORN-02).
+    expect(app).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername, appearance: look, wornGift: worn \}\]\)/);
     // READ: readProfileDocument carries the claim through (the sole funnel for every chain read path).
     expect(app).toMatch(/ownerUsername: typeof profile\.ownerUsername === 'string' \? profile\.ownerUsername : '',/);
     // ANTI-IMPERSONATION: publicAuthorLabel shows ONLY the registry-verified name, NEVER the raw ownerUsername claim.
@@ -4307,30 +4386,32 @@ describe('PWA runtime config guard', () => {
     // return line out of view the moment a comment was added above it (prose-pins-break-on-line-wrap, again).
     const estStart = app.indexOf('function estimatedChannelProfileChargeNanotons(');
     const est = app.slice(estStart, app.indexOf('\n}', estStart));
-    expect(est).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername \}\]\)/);
+    expect(est).toMatch(/encodeMessageDocumentBlocks\(\[\{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername, appearance, wornGift: normalizeProfileWornGift\(wornGift\) \}\]\)/);
     expect(est).toMatch(/splitBytesToCapsuleParts\(documentBytes, MAX_CAPSULE_USEFUL_BYTES\)/);
     // …priced as BOTH legs. publishChannelProfileDirect signs the same payload into the author's CHANNEL shard AND
     // into a BEACON shard (the write that makes the channel discoverable), so pricing publicComposerPublishProfilesForPlan
     // — a channel part only — quoted roughly half of what saving a description costs. [caught in review 2026-08-16]
-    expect(est).toMatch(/composerEstimatedMaxChargeNanotons\(channelProfilePublishProfiles\(parts\), 1\)/);
+    expect(est).toMatch(/composerEstimatedNetCostNanotons\(channelProfilePublishProfiles\(parts\), 1\)/);
     const legs = app.slice(app.indexOf('function channelProfilePublishProfiles('), app.indexOf('function channelProfilePublishProfiles(') + 600);
     expect(legs, 'the estimate must carry the CHANNEL leg and the BEACON leg').toMatch(/publicComposerPublishProfile\(first\.sizeClass, 0\), publicComposerPublishProfile\(first\.sizeClass, 2\)/);
 
     // AND THAT ESTIMATOR MUST QUOTE THE DIRECT-PAY FIGURE. Reported by the owner 2026-08-04: this dialog said
-    // "up to 0.1698 GRAM from Vault". Both halves were wrong. The Vault is deleted, and 0.1698 is what the Vault's
-    // batch-hold model computes (127.8M shared base + per-part) — the publish actually attaches 20.3M + surcharge.
-    // Eight times the truth, on a money figure, in the dialog whose whole job is to say what saving will cost.
-    const maxCharge = app.slice(app.indexOf('function composerEstimatedMaxChargeNanotons('), app.indexOf('function composerEstimatedMaxChargeNanotons(') + 1400);
-    expect(maxCharge, 'under direct pay the max charge IS the attached value — there is no hold to reserve')
-      .toMatch(/if \(privateLaneDirectPayEnabled\(\)\) return composerEstimatedNetCostNanotons\(profile, parts\);/);
+    // "up to 0.1698 GRAM from Vault" — 0.1698 being the Vault batch-hold model (127.8M shared base + per-part)
+    // where the publish actually attaches 20.3M + surcharge. Eight times the truth, on a money figure. The hold
+    // model was deleted outright on 2026-08-29; what this pin now holds is that it STAYS deleted — the estimator
+    // above resolves to the net cost by construction, so the one way the lie returns is the function coming back.
+    expect(app, 'the Vault batch-hold estimator must stay deleted')
+      .not.toContain('function composerEstimatedMaxChargeNanotons(');
 
     // The edit dialog surfaces it as a live summary line, sharing the mint modal's GRAM-cost wording.
-    const dlg = app.slice(app.indexOf('async function openEditChannelProfileDialog('), app.indexOf('async function openEditChannelProfileDialog(') + 1600);
+    // A distance, not a fact: the dialog grew a preset and a look field ahead of its summary on 2026-09-07.
+    const dlg = app.slice(app.indexOf('async function openEditChannelProfileDialog('), app.indexOf('async function openEditChannelProfileDialog(') + 2600);
     expect(dlg).toMatch(/summary: \(values\) =>/);
-    expect(dlg).toMatch(/estimatedChannelProfileChargeNanotons\(values\.description, values\.tags\)/);
-    // The label is just "Cost": the VALUE already names the unit ("до 0.0203 GRAM с кошелька"), so "GRAM cost:
+    // …priced WITH the look's trailer since 2026-09-07 (PWA-CHANNEL-DRESS-01): the bytes that go out are the bytes that are priced.
+    expect(dlg).toMatch(/estimatedChannelProfileChargeNanotons\(values\.description, values\.tags, appearanceOf\(values\), wornGiftClaimAddress\(\)\)/);
+    // The label is just "Cost": the VALUE already names the unit, so "GRAM cost:
     // up to 0.0203 GRAM" said GRAM twice in one line. [owner, 2026-08-04]
-    expect(dlg).toMatch(/label: t\('common\.cost'\), value: t\('common\.gramCostValue', \{ amount: formatTonNanotons\(charge\) \}\)/);
+    expect(dlg).toMatch(/label: t\('common\.cost'\), value: t\('common\.gramCostValue', \{ amount: formatTonNanotonsUp\(charge\) \}\)/);
     expect(EN_STRINGS['common.cost']).toBe('Cost');
     expect(EN_STRINGS['common.gramCostValue']).toBe('up to {amount} GRAM from your wallet');
     // The Vault vocabulary is GONE from this pair, key and value, in every locale — a key called `gramHold` is how
@@ -4398,8 +4479,17 @@ describe('PWA runtime config guard', () => {
     // of the described channels. The bound is the bucket space itself; see DISCOVERSTREAM-05.]
     expect(app).toMatch(/async function discoverChannels\(/);
     expect(app).toMatch(/async function discoverChannelsFromBeacon\(/);
-    expect(readFileSync('web/public-lane.mjs', 'utf8'))
-      .toMatch(/sweepChannelCatalog\(\{ eraWindow = 3, topBuckets = null, onProgress = null \} = \{\}\)/);
+    // [2026-08-29] This line used to retype the whole signature, including `topBuckets = null`. When the sweep
+    // gained a per-pass bucket cap the default moved to the named constant and the pin went red for a reason
+    // that had nothing to do with what the gate is about — a prose pin failing on a change it should have
+    // welcomed. It now asserts the PROPERTY: the sweep takes a bucket bound, and that bound is a named constant
+    // rather than a number typed at the call site, so the ceiling stays greppable and gateable.
+    const lane = readFileSync('web/public-lane.mjs', 'utf8');
+    expect(lane).toMatch(/sweepChannelCatalog\(\{ eraWindow = \d+, topBuckets = ([A-Z_]+|null), onProgress = null \} = \{\}\)/);
+    const cap = lane.match(/topBuckets = ([A-Z_]+)/)?.[1];
+    if (cap) {
+      expect(lane.includes(`const ${cap} = `), `${cap} must be declared in the lane it bounds`).toBe(true);
+    }
     // (The phase-1 head-of-log loop was the Hub scan itself; the beacon sweep's bounds are asserted above.)
     // Phase 2 resolves each candidate with the shallow discovery maxScan (cache-first, bounded).
     // Follow registers the previously-unknown channel THEN subscribes it (ensure rebuilds the registry first).
@@ -4516,9 +4606,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-LIGHTBOX-LOCK-01: the image viewer is dismissed by the lock like every other overlay, and it saves on iPhone', () => {
-    // [OWNER 2026-08-24: "I was looking at an image, then closed the window and saw the lock screen. The image
-    // lightbox definitely ignores the app lock — it behaves differently from every other modal. Put it on the
-    // common mechanism." And: "on the iPhone the image from the viewer doesn't save. Something flickers and
+    // [decided 2026-08-24 And: "on the iPhone the image from the viewer doesn't save. Something flickers and
     // that's it … the download isn't visible anywhere. On Android it saves with no problem."]
     const app = readFileSync('web/app.js', 'utf8');
     // THE LOCK SWEEPS A LIST, not one dialog. It used to close the action dialog only — which closes the lightbox
@@ -4537,8 +4625,7 @@ describe('PWA runtime config guard', () => {
     expect(lock).toContain('closeSessionOverlays();');
     expect(lock, 'the lock must not go back to closing one dialog by hand').not.toMatch(/^\s*closeActionDialog\(null\);$/m);
 
-    // SAVING WORKS THE SAME WAY EVERYWHERE, and the proof was already in this file [OWNER 2026-08-24: "but we do
-    // download things on the iPhone somehow — the wallet key, for instance"]. downloadJsonFile makes a BLOB URL and
+    // SAVING WORKS THE SAME WAY EVERYWHERE, and the proof was already in this file [decided 2026-08-24]. downloadJsonFile makes a BLOB URL and
     // clicks an <a download> at it, and that works on iPhone. So iOS does not ignore the download attribute — it
     // refuses a data: URL, which is what this handler used to hand it, because a private image travels as a data
     // URL inside its capsule. Convert first and there is no platform branch left to get wrong.
@@ -4548,9 +4635,8 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/URL\.revokeObjectURL\(href\)/);
     expect(app).toMatch(/function blobFromDataUrl\(dataUrl\) \{/);
     // A FIRST ATTEMPT REACHED FOR THE SHARE SHEET and was withdrawn: gated on the capability, it turned every
-    // desktop download into a share sheet [OWNER: "right now trying to download offers to share. Is that what you
-    // wanted?"]. The sheet survives ONLY where a click cannot work at all — inside Telegram's WebView, where
-    // <a download>.click() fails silently and a file has nothing to copy manually instead.
+    // desktop download into a share sheet [decided]. The sheet survives ONLY where a click cannot work at all — inside Telegram's WebView, where
+    // <a download>.click fails silently and a file has nothing to copy manually instead.
     expect(app).toMatch(/if \(isTelegramEnv\(\) && blob && navigator\.canShare\?/);
     expect(app, 'no platform test may decide between sharing and downloading').not.toMatch(/isIosDevice\(\) && blob/);
     expect(app, 'a dismissed sheet is the user changing their mind, not a failure').toMatch(/if \(error\?\.name === 'AbortError'\) return 'dismissed';/);
@@ -4562,8 +4648,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-MUTE-01: a contact can be muted from the chevron, and the menu is grouped by what its items DO', () => {
-    // [OWNER 2026-08-24: "add mute to the chevron, so a user can choose not to receive messages from a contact.
-    // And unmute too." Then, on the result: "the items need grouping properly. 'Display as' is only about the way
+    // [decided 2026-08-24 Then, on the result: "the items need grouping properly. 'Display as' is only about the way
     // the contact is SHOWN, and we have mute going in there and pin already in there".]
     const app = readFileSync('web/app.js', 'utf8');
     const css = readFileSync('web/styles.css', 'utf8');
@@ -4580,7 +4665,9 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/thread\.muted = stored\?\.muted === true;/);
     // GROUPED BY WHAT THEY DO: the title covers the local name and the identity options; pin and mute are actions
     // on the contact and sit under their own heading, after the list they never belonged to.
-    expect(app).toMatch(/const actionRows = \[pinRow, muteRow\]\.filter\(Boolean\);/);
+    // "Open profile" joined them [2026-09-06]: it is an action on the contact, not a way of showing them, so it
+    // belongs under this heading and NOT in the identity list above it. Its own gate is PWA-GIFT-02.
+    expect(app).toMatch(/const actionRows = \[profileRow, channelRow, pinRow, muteRow\]\.filter\(Boolean\);/);
     expect(app).toMatch(/actionsTitle\.textContent = t\('chat\.contactActions'\);/);
     expect(app, 'the pin must no longer be interleaved with the display options')
       .not.toMatch(/if \(pinRow && !pinRow\.isConnected\) popover\.append\(pinRow\)/);
@@ -4600,9 +4687,1457 @@ describe('PWA runtime config guard', () => {
     expect((css.match(/--mute-badge-icon:/g) ?? []).length, 'dark + system-light + toggled-light').toBe(3);
   });
 
+  it('PWA-GIFT-01: a worn gift dresses the app through the theme it already has, never around it', () => {
+    // The corner used to be a logo, a dot and a network word. It is a DOOR now, and a worn Telegram gift stands
+    // where the mark was. What must hold is that the decoration cannot damage the app it decorates.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const guard = readFileSync('web/boot-guard.js', 'utf8');
+
+    // THE THEME IS A RULE, NOT A PALETTE. html[data-theme] still only ever says light or dark, so the ~90 places
+    // that read the accent keep their meaning — a red backdrop must not repaint the delete button. The gift choice
+    // is remembered in its OWN key and the forced theme still goes through applyForcedTheme, which is why the
+    // pre-paint boot guard needs no knowledge of gifts at all (and must keep accepting only the two).
+    expect(app).toMatch(/const GIFT_THEME_STORAGE_KEY = 'platho\.giftTheme\.v1';/);
+    // FORCED, not merely matched. Applying it only on a mismatch left the app following the SYSTEM whenever the two
+    // happened to agree, so the next OS flip carried the gift's own side of the contrast line away with it.
+    // 2026-09-10: a CHANNEL's palette arrives with the view (no cross-fade); one's own keeps the fade.
+    expect(app).toMatch(/^  applyForcedTheme\(palette, \{ animate: !presented\.channel \}\);$/m);
+    expect(app, 'a conditional apply is the bug this replaced').not.toMatch(/if \(currentEffectiveTheme\(\) !== wornGiftTheme\.resolved\)/);
+    expect(guard, 'only the two real themes may reach data-theme')
+      .toMatch(/plathoTheme === 'light' \|\| plathoTheme === 'dark'/);
+    // The guard DOES know about a worn gift now [decided 2026-09-06] — but only the plasma's colour
+    // and the pattern mask, which is everything that can be applied before first paint. `--bg` stays exactly where
+    // the theme block above put it, `data-theme` is still light or dark and nothing else, so the whole token
+    // system underneath is untouched.
+    expect(guard).toMatch(/root\.setAttribute\('data-gift-theme', 'true'\);/);
+    expect(guard).toMatch(/root\.style\.setProperty\('--aurora-rgb', glow\[0\] \+ ', ' \+ glow\[1\] \+ ', ' \+ glow\[2\]\);/);
+    expect(guard, 'the guard must not paint the page in the gift either').not.toMatch(/setProperty\('--bg', 'rgb\(' \+ rim/);
+    expect(guard, 'the guard must not start deciding themes from a gift').not.toMatch(/setAttribute\('data-theme'[\s\S]{0,80}gift/);
+
+    // THE GIFT DOES NOT PAINT THE PAGE [decided 2026-09-06]: "the background must come from the
+    // theme, dark or light; the plasma is the colour of the gift's backdrop; the patterns must not be visible on
+    // the background, they should become visible when the plasma runs over them."
+    //
+    // So exactly ONE colour crosses over. An earlier take made `--bg` the gift's backdrop, and it was wrong twice:
+    // it dressed the app in the gift instead of dressing the gift in the app, and it dragged in a rail surface,
+    // harder card glass and an ambient wash that existed only to survive it. All of that is gone.
+    expect(app).toMatch(/setRootToken\('--aurora-rgb'/);
+    expect(app, 'the gift must not own the page background').not.toMatch(/setProperty\('--bg', `rgb/);
+    expect(app, 'nor its second stop').not.toMatch(/setProperty\('--gift-bg-inner', `rgb/);
+    expect(app, 'the capped wash is what this replaced').not.toMatch(/TELEGRAM_GIFT_TINT_ALPHA/);
+    expect(css, 'no rule may key on the gift theme any more — it paints no surface').not.toContain('data-gift-theme=');
+    // …and a session that started on the wallpaper build must not keep one: both are cleared unconditionally.
+    // …and the hero's own writer sits between the two, before the theme is asked (PWA-GIFT-14).
+    expect(app).toMatch(/dropRootToken\('--bg'\);\s*\n\s*dropRootToken\('--gift-bg-inner'\);[\s\S]{0,400}ensureGiftSubjectArt\(\);\s*\n\s*redressProfileCardHeroIfOpen\(\);\s*\n\s*const presented = presentedGiftTheme\(\);[\s\S]{0,400}?applyChannelLook\(channelLookOnScreen\(\), Boolean\(presented\?\.channel\)\);\s*\n\s*if \(!presented\) \{/);
+
+    // The gift still picks WHICH of the two palettes, and the rule is now the OPPOSITE of what it was: the ground
+    // its own colour can be SEEN against, not the text that survived on its backdrop. Aimed at the light, the old
+    // rule is backwards at both extremes — measured, a pale gift resolved to the light theme where its glow is
+    // 1.08 against the background, and a dark gift to the dark theme at 1.75. Both invisible.
+    //
+    // …AND THEN IT WENT AWAY ENTIRELY [owner, 2026-09-07]. Both of those were real measurements of the WRONG
+    // quantity: putting on a BLACK gift turned the app white, because a dark colour stands out against a light
+    // ground. Nobody buys a black gift for a white app. The gift theme is dark, full stop; a light variant, if it
+    // comes, is this one constant and nothing else.
+    expect(app).toMatch(/const TELEGRAM_GIFT_THEME_PALETTE = 'dark';/);
+    expect(app, 'the rule that guessed a palette from the gift is gone').not.toMatch(/giftPaletteForBackdrop/);
+    // AND THE READER MUST NOT DEMAND IT EITHER. It did, for one build: the writer dropped `resolved` and the
+    // validator kept requiring it, so every gift worn after the change was saved correctly and then refused on the
+    // next load — the app came back undressed, looking like it had forgotten. Writer and validator are one
+    // contract, and this is the pin that keeps them together.
+    expect(app, 'the reader must not require a field nothing writes')
+      .not.toMatch(/parsed\.resolved !== 'light'/);
+    // …and the CONTROL must not answer from before the runtime existed. refreshAppearanceUi() also runs during
+    // module evaluation, where giftThemeChosen() is guarded to false, so the theme select read "dark" on every
+    // reload while the app was in fact wearing the gift — the same "it forgot" symptom from the other end.
+    expect(app).toMatch(/globalThis\.__plathoGiftRuntimeReady = true;[\s\S]{0,1100}\n\s*applyGiftAppearance\(\);[\s\S]{0,500}\n\s*refreshAppearanceUi\(\);/);
+    expect(app).toMatch(/function readWornGiftTheme\(\)[\s\S]{0,900}if \(!Array\.isArray\(parsed\.tint\) \|\| parsed\.tint\.length !== 3\) return null;/);
+    expect(app).toMatch(/return \{ tint: edge, inner \};/);
+    expect(app, 'the palette must not be a stored copy of a derived value').not.toMatch(/resolved: appearance\.resolved/);
+    expect(app).toMatch(/const palette = TELEGRAM_GIFT_THEME_PALETTE;\s*\n\s*applyForcedTheme\(palette, \{ animate: !presented\.channel \}\);/);
+
+    // AND THE BUTTONS WEAR IT [owner, 2026-09-06: the green looks foreign now, use the gift's colour].
+    //
+    // TWO FLOORS, NOT A COPIED BRIGHTNESS. Matching the shipped accent's luminance was the first attempt and it
+    // washed the colour out — the shipped mint is bright because mint is intrinsically bright, so dragging a
+    // duller hue up there desaturates it and it stops being the gift's colour (Chill Flame came back a pale
+    // sage). The accent is text twice over — written on the page, and written ON by the button's label — so what
+    // must hold is WCAG's floor on both, and the colour is moved the least distance that clears them.
+    expect(app).toMatch(/const TELEGRAM_GIFT_ACCENT_MIN_CONTRAST = 4\.5;/);
+    expect(app).toMatch(/const reads = \(colour\) => contrastRatio\(colour, page\) >= TELEGRAM_GIFT_ACCENT_MIN_CONTRAST/);
+    expect(app).toMatch(/&& contrastRatio\(ink, colour\) >= TELEGRAM_GIFT_ACCENT_MIN_CONTRAST;/);
+    expect(app, 'a colour that already reads must be left exactly as it is').toMatch(/if \(!reads\(stop\)\) \{/);
+    expect(app, 'the washed-out luminance match must not come back').not.toMatch(/giftColourAtLuminanceOf/);
+    // The ink is the app's own token per palette, because a label on a button has to be legible on whatever the
+    // gift turns out to be — and the two differ.
+    expect(app).toMatch(/const TELEGRAM_GIFT_DARK_THEME_ON_ACCENT = \[0x04, 0x21, 0x1a\];/);
+    expect(app).toMatch(/const TELEGRAM_GIFT_LIGHT_THEME_ON_ACCENT = \[0xff, 0xff, 0xff\];/);
+    expect(css, 'the ink pair must still match styles.css').toMatch(/--on-accent: #04211a;/);
+    expect(css).toMatch(/--on-accent: #ffffff;/);
+    // `--accent-hi` keeps the notch the design uses rather than a second invented step.
+    expect(app).toMatch(/const notch = lightnessOf\(shippedHi\) - lightnessOf\(shipped\);/);
+
+    // ONE CHANNEL TRIPLE FEEDS THE TINTS. The five alpha tokens carried the accent's channels as literals, so a
+    // worn gift would have had to replace six declarations per palette and any miss would leave a teal wash on a
+    // gift-coloured button.
+    expect(css).toMatch(/--accent-rgb: 48, 213, 176;/);
+    expect(css).toMatch(/--accent-rgb: 15, 157, 129;/);
+    expect(css).toMatch(/--a25: rgba\(var\(--accent-rgb\), 0\.25\);/);
+    expect(css, 'no alpha token may still carry the channels itself').not.toMatch(/--a\d\d?: rgba\(48, 213, 176/);
+    // …and NOTHING below the token blocks may carry them either. The dialog hairline did — written as a literal it
+    // stayed teal on a gift-coloured app, which is the one the owner photographed.
+    expect(css).toMatch(/--modal-outline: rgba\(var\(--accent-rgb\), 0\.32\);/);
+    expect(css).toMatch(/--modal-outline: rgba\(var\(--accent-rgb\), 0\.3\);/);
+    expect(css).toMatch(/0% \{ background-color: rgba\(var\(--accent-rgb\), 0\); \}/);
+    const belowTheTokens = css.slice(css.indexOf('--accent-rgb: 48, 213, 176;') + 30);
+    expect(belowTheTokens, 'a literal accent below the tokens is one the gift cannot reach')
+      .not.toContain('48, 213, 176');
+
+    // ONE'S OWN BUBBLE TURNS TOO, and it is NOT an alpha of anything: two specific dark greens, with near-white
+    // text whose legibility rests on how dark they are. So it takes the gift's HUE and keeps its own saturation
+    // and lightness — measured, the text on it holds 8.67 where the shipped pair gives 8.55.
+    expect(app).toMatch(/const TELEGRAM_GIFT_BUBBLE_OUT_STOPS = \[\[0x1a, 0x64, 0x50\], \[0x10, 0x3f, 0x34\]\];/);
+    expect(css, 'the bubble pair must still match styles.css').toMatch(/--bubble-out: linear-gradient\(155deg, #1a6450, #103f34\);/);
+    expect(app).toMatch(/function colourAtHue\(colour, hue\) \{[\s\S]{0,220}hueSaturationToRgb\(hue, saturation, lightnessOf\(colour\)\)/);
+    // A gift with no hue to lend must not be given an invented one.
+    expect(app).toMatch(/const TELEGRAM_GIFT_MIN_SATURATION = 0\.05;/);
+    expect(app).toMatch(/if \(saturation >= TELEGRAM_GIFT_MIN_SATURATION\) \{/);
+    expect(app).toMatch(/dropRootToken\('--bubble-out'\);\s*\n\s*dropRootToken\('--bubble-out-flat'\);/);
+    expect(app).toMatch(/setRootToken\('--accent-rgb', `\$\{accent\[0\]\}, \$\{accent\[1\]\}, \$\{accent\[2\]\}`\);/);
+    // …and all three come off again with the theme.
+    expect(app).toMatch(/dropRootToken\('--accent'\);\s*\n\s*dropRootToken\('--accent-hi'\);\s*\n\s*dropRootToken\('--accent-rgb'\);/);
+    expect(app, 'the text-contrast rule belonged to the wallpaper that is gone').not.toMatch(/TELEGRAM_GIFT_DARK_THEME_TEXT/);
+    // Measured, not eyeballed: the backgrounds are the app's own tokens.
+    expect(app).toMatch(/const TELEGRAM_GIFT_DARK_THEME_BG = \[0x0a, 0x0f, 0x12\];/);
+    expect(app).toMatch(/const TELEGRAM_GIFT_LIGHT_THEME_BG = \[0xe9, 0xf0, 0xee\];/);
+    expect(css, 'the token pair must still match styles.css').toMatch(/--bg: #0a0f12;/);
+    expect(css).toMatch(/--bg: #e9f0ee;/);
+    // CSSOM property assignment, never the style ATTRIBUTE: `style-src 'self'` drops the attribute form silently.
+    expect(app, 'the inline style attribute is CSP-blocked in production').not.toMatch(/setAttribute\('style', `rgb/);
+    expect(app).toMatch(/setRootFlag\('data-gift-theme', 'true'\);/);
+    expect(app).toMatch(/dropRootFlag\('data-gift-theme'\);/);
+
+    // THE NAMES ARE TILES IN THE SAME GRID AS THE GIFTS, AND WEARABLE [owner, 2026-09-07]. Wearing one is not a
+    // new idea: it is the LINKED name — what the wallet is presented under, and what rides every message it sends
+    // — so the tile makes the same pair of writes the Profile pane's link control makes, and tapping the worn one
+    // takes it off. No verification dialog, because the card lists only names the chain has already confirmed.
+    expect(css).toMatch(/\.profile-card-rows \{[\s\S]{0,200}grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
+    expect(app).toMatch(/function wearPlathoUsername\(label\)/);
+    expect(app).toMatch(/writeLinkedPlathoUsername\(identity, wallet\);\s*\n\s*writeWalletDisplayIdentity\(identity, wallet\);/);
+    expect(app).toMatch(/clearLinkedPlathoUsername\(wallet\);/);
+    expect(app).toMatch(/wearPlathoUsername\(worn \? null : nft\.label\);/);
+    // A NAME'S SQUARE MUST NOT COME FROM `aspect-ratio`. Its art is the registry's own SVG — a viewBox with no
+    // width/height — and an engine that ignores the property gives it ZERO height under `width: 100%`; the names
+    // list once rendered as thin strips on exactly that WebView. The gifts can afford it, their art is a raster.
+    expect(app).toMatch(/frame\.className = 'nft-card-art-frame';\s*\n\s*frame\.hidden = !nft\.image;/);
+    expect(css).toMatch(/\.nft-card-art-frame \{[\s\S]{0,200}padding-bottom: 100%;/);
+    // The positives above carry it: the tile builds an .nft-card-art-frame, and that frame's square comes from
+    // padding-bottom. A negative on ".profile-card-name…" cannot say this — the string is a PREFIX of the label
+    // and state class names, so it matches selectors that have every right to sit near an aspect-ratio.
+
+    // THE CORNER IS ONE MARK, ONE SIZE, GIFT OR NO GIFT [owner, 2026-09-06]. The logo was 36px and a worn gift
+    // 58px, so the corner changed shape with its contents and the rail below moved with it.
+    expect(html).toContain('id="brandProfileButton"');
+    expect(html).toContain('data-brand-gift="false"');
+    expect(app).toMatch(/brand\.dataset\.brandGift = 'false';/);
+    expect(html).toMatch(/id="brandMarkImage"[^>]*width="58" height="58"/);
+    expect(css).toMatch(/\.brand-mark \{\s*\n\s*width: 58px;\s*\n\s*height: 58px;/);
+    expect(css, 'a second size for the gift is what made the corner move').not.toMatch(/\.brand\[data-brand-gift="true"\] \.brand-mark/);
+
+    // AND THE BADGE IS ABOUT THE DEPLOYMENT, NOT THE GIFT. A dot reading "mainnet" on mainnet says nothing and only
+    // takes the room; anywhere else it is the one thing worth seeing, and hiding it by deployment keeps the two
+    // states matching within a build while leaving a preview build impossible to mistake for production.
+    expect(css, 'the badge must not key on a worn gift any more').not.toContain('.brand[data-brand-gift="true"] .network-pill');
+    expect(app).toMatch(/brandMeta\.hidden = String\(appConfig\.network\?\.chain \?\? appConfig\.mode \?\? ''\)\.toLowerCase\(\) === 'mainnet';/);
+    // `display: grid` sits on the element itself and beats the attribute unless the stylesheet says otherwise.
+    expect(css).toMatch(/\.brand-meta\[hidden\],\s*\n\.network-pill\[hidden\] \{\s*\n\s*display: none;/);
+    // The elements STAY: the version bumper writes into #appVersionLabel and the release gates read it back out.
+    expect(html).toContain('id="appVersionLabel"');
+    expect(html).toContain('id="brandNetworkPill"');
+
+    // AN AFFORDANCE THAT DOES NOTHING IS A BUG — and the answer changed [owner asked 2026-09-07 when the corner
+    // becomes available, since ACTIVATION lives behind it]. It used to refuse the tap with no wallet, which was
+    // right while the card was all it opened. Now it opens the SETTINGS in that state, so there is always a screen
+    // behind it and it is never disabled; the settings are where activation, the language and the key import are.
+    expect(app).toMatch(/if \(door\) door\.disabled = false;/);
+    expect(app).toMatch(/if \(!wallet\) \{\s*openProfileSettings\(\);/);
+    expect(app).toMatch(/renderBrandGift\(\);[\s\S]{0,400}?setText\(profileHandle, status \?\? t\('profile\.settingsLead'\)\);\s*\n\s*if \(!plathoWallet\) \{/);
+    expect(css).toContain('.brand-mark-button:disabled {');
+
+    // A gift belongs to the wallet that held it — but it is forgotten only on a wallet that is really LOADED and
+    // really different, never on "no wallet yet", which would drop it on every locked start.
+    expect(app).toMatch(/if \(active && wornGiftTheme\?\.wallet && wornGiftTheme\.wallet !== active\)/);
+  });
+
+  it('PWA-NAV-SETTINGS-01: the profile is not a tab, and the corner is never a locked door', () => {
+    // [decided 2026-09-07] The rail is for the places a reader MOVES BETWEEN. Settings is not one of them: you come
+    // once for a language, once to activate, once to import a key. It is a dialog behind the corner now.
+    const html = readFileSync('web/index.html', 'utf8');
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const rail = html.slice(html.indexOf('<nav class="rail"'), html.indexOf('</nav>'));
+    expect(rail.match(/data-tab="/g) ?? [], 'three tabs, not four').toHaveLength(3);
+    expect(rail, 'and the fourth one is the one that left').not.toContain('data-tab="profile"');
+    expect(html, 'the pane is mounted in a backdrop').toContain('id="profileSettingsDialog"');
+    expect(html, 'and is no longer a view the rail can switch to').not.toContain('data-panel="profile"');
+    expect(app, 'so setView has nothing to say about it').not.toMatch(/view === 'profile'/);
+
+    // THE PART THAT COULD HAVE LOCKED PEOPLE OUT, and the owner named it before the code did: a fresh install has
+    // no wallet, so a corner that only opened the profile card would open nothing at all — and the language, the
+    // key import and (until 2026-09-07) the activation are all behind it. Two doors, and never disabled.
+    expect(app).toMatch(/if \(door\) door\.disabled = false;/);
+    expect(app).toMatch(/if \(!wallet\) \{\s*openProfileSettings\(\);\s*return;\s*\}/);
+    // …and the row a new account MUST find is not behind that corner at all: activation moved to the Wallet tab on
+    // 2026-09-07, which the rail reaches in one tap and which has never been gated.
+    const settings = html.slice(html.indexOf('id="profileSettingsDialog"'));
+    expect(settings, 'activation is not behind the corner').not.toContain('id="registerVaultKeysButton"');
+    expect(html.slice(html.indexOf('data-panel="wallet"'), html.indexOf('id="profileSettingsDialog"')),
+      'it is on the Wallet tab').toContain('id="registerVaultKeysButton"');
+
+    // With a wallet the corner shows the card, and the door is a ROW UNDER THE WALLET ROW, in that row's own plate
+    // [owner, 2026-09-07: first "I can't find the settings now" — it was a gear in the hero corner over a gift's
+    // pattern; then "that button is outside the design language, I'd move it under Wallet"].
+    expect(html, 'no icon-only door in the hero').not.toContain('profile-card-hero-settings');
+    expect(html, 'and the row sits directly under the wallet row')
+      .toMatch(/<code id="profileCardWallet"><\/code>\s*<\/button>[\s\S]{0,400}?id="profileCardSettingsRow"/);
+    // THE "DISCOVER CHANNELS" BUTTON, VERBATIM [owner, 2026-09-07, after two invented shapes: "just make me a
+    // button like Discover channels"]. The accent pill and the row it sits in are borrowed whole; the card has no
+    // class of its own for this, and [hidden] must still beat the row's own display.
+    expect(html).toMatch(/<div class="discovery-cta-actions" id="profileCardSettingsRow" hidden>\s*\n\s*<button class="discovery-cta-action" id="profileCardSettingsButton"/);
+    expect(css, 'and no bespoke plate was left behind').not.toContain('.profile-card-settings');
+    expect(css).toMatch(/\.discovery-cta-actions\[hidden\],/);
+    // …stretched across the card because it is alone on its row — a placement rule, not a second button style.
+    expect(css).toMatch(/\.profile-card-dialog \.discovery-cta-action \{\s*\n\s*flex: 1 1 auto;\s*\n\s*justify-content: center;/);
+    // The tiles stand the card's own distance under their note, not glued to it.
+    expect(css).toMatch(/\.profile-card-rows \{[\s\S]{0,700}?margin-top: 6px;/);
+    expect(css).toMatch(/\.profile-card-gifts \{[\s\S]{0,200}?margin-top: 6px;/);
+    expect(app).toMatch(/profileCardSettingsRow\.hidden = !own;/);
+    expect(app).toMatch(/closeProfileCardDialog\(\);\s*openProfileSettings\(\);/);
+    expect(app, 'the actions row is a contact\'s three, and hidden on your own card')
+      .toMatch(/profileCardActions\.hidden = own;\s*\n\s*if \(own\) return;/);
+
+    // …and on the narrow layout the corner is ON the bar, first. It used to be display:none there, which is exactly
+    // why the profile needed a tab of its own — the only door to it was off screen.
+    const mobileBlock = css.slice(css.indexOf('@media (max-width: 900px)'));
+    expect(mobileBlock).toMatch(/\.brand \{[\s\S]{0,200}?display: grid;[\s\S]{0,120}?grid-column: 1;/);
+    // 2026-09-10: the plate cell is ALWAYS there (owner, from a phone with no wallet: reserve the room from the start).
+    expect(mobileBlock).toMatch(/\.rail \{[\s\S]{0,800}?grid-template-columns: minmax\(58px, 0\.72fr\) repeat\(3, minmax\(0, 1fr\)\);/);
+    expect(css, 'the cell is no longer conditional').not.toContain('.has-vault-balance');
+
+    // No sentence may still send the reader to a tab that is not there.
+    for (const [locale, strings] of Object.entries(I18N_STRINGS)) {
+      for (const [key, value] of Object.entries(strings as Record<string, string>)) {
+        if (typeof value !== 'string') continue;
+        expect(value, `${locale}.${key} still sends the reader to the Profile tab`).not.toMatch(/Profile tab|вкладке «Профиль»|个人资料标签页|pestaña Perfil|aba Perfil|onglet Profil|Tab Profil|प्रोफ़ाइल टैब|tab Profil|「プロフィール」タブ/);
+      }
+    }
+  });
+
+  it('PWA-RECIPIENT-NAME-01: every field that takes a person takes a .ath name, through one resolver', () => {
+    // [owner, 2026-09-07 — three times in one day: "are Platho usernames supported here, like everywhere else?"]
+    // The gift transfer, the name transfer and Send GRAM each took a wallet and nothing else, while the new-chat
+    // field has always taken a wallet, a .ath name or a .ton name. They now share the new-chat field's wording and
+    // ONE resolver, which is the private lane's own routing split out under a name — so a name means the same
+    // person in a transfer as it does in a chat, including that a .ath name is movable and resolves to whoever
+    // holds it now.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/async function resolveWalletFromIdentityVariants\(variants, purpose\)/);
+    expect(app).toMatch(/return resolveWalletFromIdentityVariants\(threadIdentityVariants\(thread\), 'Payment recipient'\);/);
+    expect(app).toMatch(/async function resolveTransferRecipient\(input\) \{[\s\S]{0,300}?parseRecipientIdentity\(input\)[\s\S]{0,400}?resolveWalletFromIdentityVariants\(\[parsed\.identity\], 'Transfer recipient'\)/);
+    // Three dialogs, three calls, no second resolver.
+    expect((app.match(/await resolveTransferRecipient\(entered\)/g) ?? []).length, 'gift, name, GRAM').toBe(3);
+    expect((app.match(/label: t\('dialog\.recipient'\),\s*\n\s*(?:\/\/[^\n]*\n\s*)?(?:type: 'text',\s*\n\s*)?placeholder: t\('dialog\.recipientPlaceholder'\)/g) ?? []).length,
+      'each field is worded like the new-chat field').toBe(3);
+    // A definitively unregistered name and a chain that did not answer are different sentences.
+    expect(app).toMatch(/function transferRecipientError\(error, entered\) \{[\s\S]{0,200}?UsernameNotRegisteredError[\s\S]{0,300}?username\.recipientUnresolved/);
+    // No field promises a wallet only any more, and the two keys that said so are gone with it.
+    expect(app).not.toMatch(/placeholder: 'UQ/);
+    expect(app).not.toMatch(/username\.recipientWallet|wallet\.recipientAddress/);
+    // Send GRAM: the live summary never resolves (it re-renders per keystroke); the resolve is at submit, and the
+    // send signs the wallet the dialog confirmed rather than looking the name up a second time.
+    const send = app.slice(app.indexOf('async function requestWalletTonTransferDetails'), app.indexOf('function broadcastMayHaveLanded'));
+    expect(send).toMatch(/const parsed = parseRecipientIdentity\(recipientText\);/);
+    const liveSummary = send.slice(send.indexOf('summary: (values) => {'), send.indexOf('validateSubmit:'));
+    expect(liveSummary.length, 'the summary slice is real').toBeGreaterThan(300);
+    expect(liveSummary, 'nothing in the live summary waits on the chain').not.toMatch(/await /);
+    expect(send).toMatch(/return \{ ok: true, result: \{ recipient: resolved\.wallet, amount: amount\.toString\(\) \} \};/);
+  });
+
+  it('PWA-GIFT-02: the profile card is one dialog for two subjects, and its doors do not nest a button in a button', () => {
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+
+    // ONE dialog, and the subject decides what it offers. Wearing and the network/version footer are own-wallet only.
+    expect(html).toContain('id="profileCardDialog"');
+    expect(html).toMatch(/<section class="action-dialog profile-card-dialog" role="dialog" aria-modal="true" aria-labelledby="profileCardTitle">/);
+    expect(app).toMatch(/const own = sameWalletAddress\(raw, plathoWallet\?\.address \?\? ''\);/);
+    expect(app).toMatch(/setText\(profileCardMeta, own \?/);
+    // THE ADDRESS A HUMAN USES, and no line that repeats another. The raw `0:…` form is for the chain and
+    // this code, not for a reader; and the second line used to abbreviate the very address printed in full
+    // two rows below it, so the card said the same thing three times.
+    expect(app).toMatch(/setText\(profileCardWallet, displayWalletAddress\(raw\)\);/);
+    // A CONTROL THAT WORKS IN SILENCE READS AS A DEAD ONE. There is no global toast in this app, so copying
+    // confirms the way the identity menu's copy button already does: tint and relabel the control itself for
+    // a moment, then put it back — and ONLY on success, because a clipboard the browser refused must not
+    // claim it copied.
+    expect(app).toMatch(/profileCardCopyButton\.classList\.add\('is-copied'\);/);
+    expect(app).toMatch(/setText\(profileCardWalletLabel, t\('wallet\.addressCopied'\)\);/);
+    expect(app).toMatch(/window\.clearTimeout\(profileCardCopyTimer\);/);
+    expect(css).toContain('.profile-card-wallet.is-copied {');
+    expect(app, 'the raw form must not be what the card prints').not.toMatch(/setText\(profileCardWallet, raw\);/);
+    expect(app).toMatch(/secondary && secondary !== name \? secondary : ''/);
+    expect(app).toMatch(/profileCardSubtitle\.hidden = profileCardSubtitle\.textContent === ''/);
+    // STRINGS ON BOTH LINES [owner, 2026-09-08: the card printed "[object Object]" for the name AND under it]. The
+    // wallet display is a {name, tone, identity} record and the linked name an identity record; each line takes
+    // the one field it prints, never the record.
+    const card = app.slice(app.indexOf('async function openProfileCardDialog('), app.indexOf('function openProfileSettings('));
+    expect(card.length).toBeGreaterThan(0);
+    const title = app.slice(app.indexOf('function dressProfileCardTitle('), app.indexOf('function dressProfileCardHero('));
+    expect(title.length).toBeGreaterThan(0);
+    expect(title).toContain('const label = display?.name;');
+    expect(title).toContain('const name = label || shortAddress(raw);');
+    expect(title).toContain("const secondary = own ? canonicalUsernameDisplay(readLinkedPlathoUsername()?.label) : '';");
+    expect(title, 'the display record printed as [object Object]').not.toMatch(/setText\(profileCardName, (display|resolveWalletChannelDisplay|label)\b/);
+    // THE NAME IS PAINTED IN ITS RARITY [owner, 2026-09-08]: the list's own tone class, every one cleared first.
+    expect(title).toContain("profileCardName.classList.remove('identity-label-platho', 'identity-label-platho-epic', 'identity-label-platho-rare');");
+    expect(title).toContain('if (display?.tone) profileCardName.classList.add(`identity-label-${display.tone}`);');
+    // ONE DRESSER FOR THE TITLE [owner, 2026-09-08: with no name worn the card kept saying "platho"]: written at
+    // open, and again by dressProfileCardHero whenever a name is worn or taken off on one's own card.
+    expect(card).toContain('const label = dressProfileCardTitle({ thread, raw, own });');
+    const heroFn = app.slice(app.indexOf('function dressProfileCardHero('), app.indexOf('function renderProfileCardNames('));
+    // …and the face with it: the ring is the avatar's own tier attribute [owner, 2026-09-08: the ring kept the old
+    // rarity after another name was worn].
+    expect(heroFn).toMatch(/if \(own && profileCardSubject\) \{\s*\n\s*dressProfileCardTitle\(\{ thread: null, raw: profileCardSubject, own \}\);\s*\n\s*redressProfileCardFaceIfOpen\(profileCardSubject\);/);
+    expect(card, 'the identity record printed as [object Object]').not.toMatch(/canonicalUsernameDisplay\(readLinkedPlathoUsername\(\)\)/);
+    // A FACE THE CACHE DOES NOT HOLD IS FETCHED [owner, 2026-09-08: "no avatar"]: one profile read through the
+    // feed's own lane, and the face dressed again when it lands — only while the card still shows that wallet.
+    expect(card).toContain("if (profileCardAvatar && !profileCardAvatar.classList.contains('has-image')) {");
+    // One's own face takes the settings pane's road (refreshOwnProfileAvatar); a contact's takes the feed's.
+    expect(card).toContain('const fetchFace = own ? refreshOwnProfileAvatar() : hydrateProfileAvatarsForWallets([raw]);');
+    expect(card).toContain('void fetchFace.then(() => {');
+    expect(card).toContain('if (profileCardSubject === raw && publicAvatarUrlForWallet(raw)) dressProfileCardFace({ node: profileCardAvatar, thread, raw, own, label });');
+    // And the own face that lands LATER (the boot's restore, the chain refresh) reaches the open card the way it
+    // reaches the settings face: from the one place the map is fed.
+    const ownFeed = app.slice(app.indexOf('function setOwnPublicFeedAvatar('), app.indexOf('async function restoreOwnAvatarFromCacheFast('));
+    expect(ownFeed).toContain('redressProfileCardFaceIfOpen(raw);');
+    expect(app).toMatch(/function redressProfileCardFaceIfOpen\(raw\) \{\s*\n\s*let subject = null;\s*\n\s*try \{\s*\n\s*subject = profileCardSubject;/);
+    // A DIV WITH BUTTONS INSIDE, now that a gift has two things you can do with it — wear it, or send it on.
+    // The nesting rule this test is named for is exactly why the tile itself stopped being the button.
+    // The gift tile's own function, not a window of characters: the name tile is built of the same parts now
+    // (PWA-GIFT-13) and sits earlier in the file, so a window from the first `tile.append(face)` reads the wrong tile.
+    const giftTile = app.slice(app.indexOf('function renderProfileCardGifts('), app.indexOf('async function loadUsernameNftsForWallet('));
+    expect(giftTile.length).toBeGreaterThan(0);
+    expect(giftTile).toContain("const tile = document.createElement('div');");
+    expect(giftTile).toContain("const face = document.createElement(own ? 'button' : 'div');");
+    expect(giftTile.indexOf('tile.append(face);'), 'the send button is a sibling of the face, never inside it')
+      .toBeGreaterThan(0);
+    expect(giftTile.indexOf('tile.append(face);')).toBeLessThan(giftTile.indexOf('tile.append(send);'));
+
+    // THE AVATAR IS A DOOR, AND STAYS UNFOCUSABLE. The thread row is itself a <button>; a nested button (or a
+    // focusable role="button") is the invalid nesting this codebase has been bitten by before. The tap therefore
+    // stops the row's own click, and the keyboard route is the chevron menu's "Open profile" row instead.
+    expect(app).toMatch(/avatar\.dataset\.profileDoor = 'true';/);
+    expect(app, 'the avatar must not become focusable inside the row button').not.toMatch(/avatar\.setAttribute\('role', 'button'\)/);
+    expect(app, 'the avatar must not become a nested <button>').not.toMatch(/avatar = document\.createElement\('button'\)/);
+    expect(app).toMatch(/event\.stopPropagation\(\);\s*\n\s*event\.preventDefault\(\);\s*\n\s*openProfileCardDialog/);
+    expect(css).toContain('.thread-item .avatar[data-profile-door="true"]');
+    // …and a thread with no peer wallet ("My notes", a group) stops nothing: the tap opens the conversation.
+    expect(app).toMatch(/const wallet = row \? ownerWalletFromThread\(row\) : null;\s*\n\s*if \(!wallet\) return;/);
+
+    // The keyboard route is offered ONLY where a caller passes the callback — the shared popover serves four
+    // surfaces and an ungated row would appear in all of them.
+    expect(app).toMatch(/if \(typeof onOpenProfile === 'function'\) \{/);
+    expect((app.match(/onOpenProfile: pinWallet \?/g) ?? []).length, 'the private chevron only').toBe(1);
+
+    // A LATE READ MUST NOT PAINT INTO A CARD THAT HAS MOVED ON: both chain reads check the subject they were for.
+    // Guarded ONCE per lane now, inside the retry driver — every path that paints into the card goes through it.
+    expect((app.match(/profileCardSubject !== subject/g) ?? []).length, 'success, failure and the waking retry')
+      .toBeGreaterThanOrEqual(3);
+    // Our own wallet goes through the loader that RECONCILES this device's memory; a contact's never does.
+    expect(app).toMatch(/async function loadUsernameNftsForWallet\(wallet, own\) \{\s*\n\s*if \(own\) return loadOwnedUsernameNfts\(\);/);
+  });
+
+  it('PWA-GIFT-10: a card opens onto the gifts it showed last time, and Transfer waits for the chain without moving anything', () => {
+    // [owner, 2026-09-07] "Can the gifts be saved and shown at once? Re-read them every time, as now, and just
+    // update the list. Transfer only once the app is sure — and reserve its place so the grid does not jump."
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    // Two KVs of the shape the comment cache already uses: the proven list per wallet, the picture per gift.
+    expect(app).toMatch(/createProfileAvatarMediaStore\(\{ dbName: scopedIndexedDbName\('platho-telegram-gifts-v1'\), cap: \d+ \}\)/);
+    expect(app).toMatch(/createProfileAvatarMediaStore\(\{ dbName: scopedIndexedDbName\('platho-telegram-gift-art-v1'\), cap: \d+ \}\)/);
+    // Only a FINISHED read is remembered — the rule the memory cache keeps, kept here too.
+    expect(app).toMatch(/async function writeStoredTelegramGiftList\(rawWallet, result\) \{\s*\n\s*if \(!rawWallet \|\| !result\?\.complete/);
+    // Last time's list is painted UNCONFIRMED, and never over a live answer that got there first.
+    expect(app).toMatch(/if \(!stored \|\| profileCardSubject !== raw \|\| profileCardGiftsConfirmedFor === raw\) return;\s*\n\s*giftLane\.stored = stored;\s*\n\s*renderProfileCardGifts\(stored, own, \{ unconfirmed: true \}\);/);
+    // An incomplete live answer keeps the remembered list up rather than replacing it with a shorter one.
+    expect(app).toMatch(/if \(state\?\.retrying && giftLane\.stored\) \{\s*\n\s*renderProfileCardGifts\(giftLane\.stored, own, \{ unconfirmed: true, retrying: true \}\);/);
+    expect(app).toMatch(/if \(result\?\.complete\) \{\s*\n\s*profileCardGiftsConfirmedFor = raw;\s*\n\s*void writeStoredTelegramGiftList\(raw, result\);/);
+    // The render carries the verdict on the grid, and anything re-rendering a tile from inside it says the same.
+    expect(app).toMatch(/profileCardGifts\.dataset\.confirmed = unconfirmed \? 'false' : 'true';/);
+    // Wear (repaint, then the repaint after the publish offer), "Show to others" after its offer, and transfer.
+    expect((app.match(/renderProfileCardGifts\(result, own, flags\)/g) ?? []).length, 'wear, offer, show-to-others and transfer callbacks').toBe(4);
+    // Transfer is in the tile from the first paint; only its VISIBILITY waits — the space never moves.
+    expect(css).toMatch(/\.profile-card-gifts\[data-confirmed="false"\] \.profile-card-gift-send,\s*\n\.profile-card-rows\[data-confirmed="false"\] \.profile-card-gift-send \{\s*\n\s*visibility: hidden;\s*\n\s*pointer-events: none;/);
+    expect(css).not.toMatch(/\.profile-card-rows\[data-confirmed="false"\] \.profile-card-gift-send \{[^}]*display: none/);
+    // The picture outlives the page: a data URL in the store, not a blob: URL that dies with it.
+    expect(app).toMatch(/const url = bytesToImageDataUrl\(await blobToBytes\(blob\), blob\.type\);\s*\n\s*telegramGiftArtCache\.set\(key, url\);\s*\n\s*void writeStoredTelegramGiftArt\(key, url\);/);
+    expect(app, 'no blob: URL is minted for gift art any more').not.toMatch(/telegramGiftArtCache\.set\(key, URL\.createObjectURL/);
+    // A gift given away is forgotten in both copies.
+    expect(app).toMatch(/telegramGiftListCache\.delete\(parseTonAddress\(wallet\.address\)\.raw\);\s*\n\s*void deleteStoredTelegramGiftList\(parseTonAddress\(wallet\.address\)\.raw\);/);
+  });
+
+  it('PWA-GIFT-11: the accent pills wear the gift the way the hero does', () => {
+    // [owner, 2026-09-07] "These buttons that are supposedly the gift's backdrop colour are a different colour —
+    // make them like the profile, with the radial gradient." They differed BY CONSTRUCTION: the hero paints the
+    // gift's two stops as the artwork does, the pills took --accent, which is the rim colour lifted to a contrast
+    // floor. One derivation now: three tokens, the accent on bare :root, the hero's stops under the gift theme.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const root = css.slice(0, css.indexOf('}'));
+    expect(root).toContain('--cta-fill: var(--accent);');
+    expect(root).toContain('--cta-glow: linear-gradient(135deg, var(--accent-hi), transparent 60%);');
+    expect(root).toContain('--cta-ink: var(--on-accent);');
+    // Under a gift: the hero's rim as the flat underlay, the hero's radial — SAME geometry — as the glow, the
+    // hero's measured ink as the ink. Nothing here is a third colour. Set INLINE beside --accent, where the hero's
+    // own tokens are set — a selector keyed on the gift theme is what the paint-no-surface gate above forbids.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/const heroInk = readableInkOn\(\[ir, ig, ib\]\);\s*\n\s*node\.style\.setProperty\('--gift-hero-ink', heroInk\.join\(' '\)\);/);
+    expect(app).toMatch(/setRootToken\('--cta-fill', `rgb\(\$\{er\}, \$\{eg\}, \$\{eb\}\)`\);/);
+    expect(app).toMatch(/setRootToken\('--cta-glow', `radial-gradient\(ellipse 58% 96% at 50% 38%, rgb\(\$\{ir\}, \$\{ig\}, \$\{ib\}\) 0%, rgb\(\$\{er\}, \$\{eg\}, \$\{eb\}\) 88%\)`\);/);
+    expect(app).toMatch(/setRootToken\('--cta-ink', `rgb\(\$\{heroInk\.join\(', '\)\}\)`\);/);
+    // The pills are the APP's, so they clear with the theme; the hero's ink clears only when no gift is worn at all
+    // (PWA-GIFT-14 — the hero is dressed whenever a gift is worn, theme or not).
+    expect(app, 'cleared with the rest when the theme is not in effect').toMatch(/dropRootToken\('--bubble-out-flat'\);\s*\n\s*dropRootToken\('--cta-fill'\);\s*\n\s*dropRootToken\('--cta-glow'\);\s*\n\s*dropRootToken\('--cta-ink'\);/);
+    expect(app).toMatch(/if \(!theme\) \{\s*\n\s*node\.removeAttribute\('data-gift-hero-pattern'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-inner'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-edge'\);\s*\n\s*node\.style\.removeProperty\('--gift-hero-ink'\);/);
+    expect(css, 'no rule keys on the gift theme for this either').not.toContain('data-gift-theme=');
+    // …and the hero draws it on the same kind of layer the pills do, so a change of gift GLOWS IN on both rather
+    // than snapping on one [owner, 2026-09-07]: background-image cannot animate, a layer's opacity can.
+    expect(css, 'the hero itself uses that geometry, on its glow layer').toMatch(/\.profile-card-hero::before \{[\s\S]{0,400}?transition: opacity 1s ease;[\s\S]{0,200}?radial-gradient\(ellipse 58% 96% at 50% 38%,/);
+    expect(css, 'over a flat rim the cross-fade can ride').toMatch(/\.profile-card-hero \{[\s\S]{0,1600}?background-color: rgb\(var\(--gift-hero-edge, 255 255 255 \/ 0\)\);\s*\n\s*isolation: isolate;/);
+    expect(css).toMatch(/\.theme-anim \.profile-card-hero,/);
+    expect(css).toMatch(/\.theme-anim \.discovery-cta-action::before,\s*\n\s*\.theme-anim \.profile-card-hero::before \{\s*\n\s*opacity: 0;/);
+    // The three pills that share the glow layer read fill, glow and ink from the tokens — and only from them.
+    expect(css).toMatch(/\.send-button,\s*\n\.recipient-submit,\s*\n\.discovery-cta-action \{\s*\n\s*background-color: var\(--cta-fill\);/);
+    expect(css).toMatch(/\.discovery-cta-action::before \{[\s\S]{0,300}?background: var\(--cta-glow\);/);
+    for (const pill of ['.send-button {\n  background: var(--cta-fill);\n  color: var(--cta-ink);', '.recipient-submit {\n  height: 44px;\n  border: 0;\n  border-radius: var(--r-pill);\n  color: var(--cta-ink);']) {
+      expect(css, pill.split(' ')[0]).toContain(pill);
+    }
+    expect(css).toMatch(/\.discovery-cta-action \{[\s\S]{0,200}?background: var\(--cta-fill\);[\s\S]{0,80}?color: var\(--cta-ink\);/);
+    expect(css, 'the glow layer no longer names the accent directly').not.toMatch(/transition: opacity 1s ease;\s*\n\s*background: linear-gradient\(135deg, var\(--accent-hi\)/);
+  });
+
+  it('PWA-GIFT-12: the worn gift moves — the Gift layer of its own Lottie, in the hero and the corner', () => {
+    // [owner, 2026-09-07] "Let's do it in the profile. And the small picture in the corner is no big deal either —
+    // it is not a 3D shooter, it is a tiny 2D animation." MEASURED first (scratchpad probe, Vice Cream #57012):
+    // the Gift layer alone renders with all four corners at alpha 0 — nothing to cut out — at 1.79 ms/frame on
+    // 256 px and 1.67 ms on 58 px (desktop): the price is the vector paths, not the pixels.
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const sw = readFileSync('web/sw.js', 'utf8');
+    // The player is VENDORED like the Telegram SDK (script-src 'self' untouched), precached, and MIT-licensed.
+    expect(existsSync('web/vendor/lottie-web/lottie_light_canvas.min.js')).toBe(true);
+    expect(existsSync('web/vendor/lottie-web/LICENSE')).toBe(true);
+    expect(readFileSync('web/vendor/lottie-web/LICENSE', 'utf8')).toMatch(/MIT License/);
+    expect(sw).toContain("'./vendor/lottie-web/lottie_light_canvas.min.js?v=1',");
+    expect(app).toMatch(/const TELEGRAM_GIFT_LOTTIE_PLAYER_SRC = '\/vendor\/lottie-web\/lottie_light_canvas\.min\.js\?v=1';/);
+    // …loaded LAZILY and ONCE, never on boot: a script tag, single-flight, retried only after a failure.
+    expect(app).toMatch(/function loadTelegramGiftLottiePlayer\(\) \{\s*\n\s*if \(globalThis\.lottie\?\.loadAnimation\) return Promise\.resolve\(globalThis\.lottie\);\s*\n\s*if \(telegramGiftLottiePlayerPromise\) return telegramGiftLottiePlayerPromise;/);
+    expect(html, 'not a boot script').not.toMatch(/<script[^>]*lottie/);
+    // The Gift layer alone — the whole reason the file, not the picture, is the source — for the HERO. The CORNER
+    // plays the whole file: it had always been the whole artwork as a tile, and the first motion build dropped the
+    // backdrop and the pattern from it [owner, 2026-09-07]. Measured at 58 px: 1.49 ms/frame whole, 0.50 subject.
+    expect(app).toMatch(/const layers = \(lottie\?\.layers \?\? \[\]\)\.filter\(\(layer\) => layer\?\.nm === 'Gift'\);/);
+    expect(app).toMatch(/mountGiftMotion\(canvas, wornGiftTheme, brandGiftMotion, \{\s*\n\s*twin: mark,\s*\n\s*onBoxChange: \(\) => \{ stopGiftMotion\(brandGiftMotion\); brandGiftMotion = null; syncBrandGiftMotion\(\); \},/);
+    expect(app).toMatch(/mountGiftMotion\(canvas, theme, heroGiftMotion, \{\s*\n\s*subjectOnly: true,\s*\n\s*twin: profileCardHeroGift,\s*\n\s*onBoxChange: \(\) => \{ stopGiftMotion\(heroGiftMotion\); heroGiftMotion = null; syncHeroGiftMotion\(theme\); \},/);
+    // SIZED FROM A BOX THAT EXISTS [owner, 2026-09-08: "artefacts on the picture" on the phone]: the canvas is
+    // hidden until its player mounts and measures 0 × 0, so the size comes from its visible twin — and follows
+    // the box afterwards through a ResizeObserver, re-rasterising rather than stretching.
+    expect(app).toMatch(/function giftMotionBoxSide\(canvas, twin\) \{\s*\n\s*for \(const node of \[canvas, twin\]\)/);
+    expect(app).toMatch(/observer = new ResizeObserver\(\(\) => \{\s*\n\s*if \(fit\(giftMotionBoxSide\(canvas, twin\)\)\) onBoxChange\(\);/);
+    expect(app, 'a resize re-mounts; lottie-web canvas resize() draws around the old origin (measured)').not.toMatch(/anim\.resize\(\)/);
+    expect(app).toMatch(/try \{ motion\?\.observer\?\.disconnect\(\); \}/);
+    // …and the mark is the same 58 px on the bar as in the corner: no mobile size override any more.
+    const css = readFileSync('web/styles.css', 'utf8');
+    const mobile = css.slice(css.indexOf('@media (max-width: 900px)'));
+    expect(mobile, 'the 42 px override is gone').not.toMatch(/\.brand-mark \{[^}]*width: 42px/);
+    // …and in the hero the subject FILLS its box: the file renders in the full 512-unit frame, where the subject
+    // is under half the square, so it drew at half the size the cut-out had. lottie-web's canvas renderer ignores
+    // viewBoxSize (measured), so the box is measured over four frames and the frame is copied across by hand.
+    expect(app).toMatch(/const GIFT_SUBJECT_CROP_FRAMES = \[0, 45, 90, 135\];/);
+    expect(app).toMatch(/function measureGiftSubjectCrop\(player, data, key\) \{\s*\n\s*if \(telegramGiftCropCache\.has\(key\)\) return telegramGiftCropCache\.get\(key\);/);
+    expect(app).toMatch(/anim\.addEventListener\('enterFrame', copy\);/);
+    // THE RECTANGLE [owner, 2026-09-08]: lottie-web clips every precomp to its declared bounds, and on a gift file
+    // that edge lands inside the tile as a faint lighter square — measured at 58, 87, 232 and native 512. The
+    // bounds are doubled on a COPY before any mount (the cached file stays the file), and both players render in
+    // the file's own units offscreen and copy into the box.
+    expect(app).toMatch(/const GIFT_LOTTIE_PRECOMP_UNCLIP_FACTOR = 2;/);
+    expect(app).toMatch(/const data = unclipLottiePrecomps\(subjectOnly \? giftOnlyLottie\(source\) : source\);/);
+    expect(app).toMatch(/const clone = JSON\.parse\(JSON\.stringify\(lottie\)\);/);
+    expect(app).toMatch(/const units = Math\.max\(GIFT_MOTION_RENDER_PX, Number\(data\.w\) \|\| 0, Number\(data\.h\) \|\| 0\);/);
+    expect(app, 'nothing draws straight onto the visible canvas any more').not.toMatch(/rendererSettings: \{ \.\.\.settings, context: canvas\.getContext\('2d'\) \}/);
+    expect(app, 'a setting the canvas renderer ignores must not be relied on').not.toMatch(/viewBoxSize:/);   // the SETTING; the comment naming it may stay
+    // ONE fetch per gift, ever: the pattern reader reads through the same cache instead of fetching on every wear.
+    expect(app).toMatch(/async function readGiftPatternDrawing\(gift\) \{\s*\n\s*const lottie = await readTelegramGiftLottie\(gift\);/);
+    expect((app.match(/\.lottie\.json`/g) ?? []).length, 'the URL is built in one place').toBe(1);
+    expect(app).toMatch(/void writeStoredTelegramGiftLottie\(key, lottie\);/);
+    // A ceiling on what the gift host may hand us, on both files — they are parsed and stored on the device.
+    expect(app).toMatch(/const TELEGRAM_GIFT_LOTTIE_MAX_BYTES = 4 \* 1024 \* 1024;/);
+    expect(app).toMatch(/if \(text\.length > TELEGRAM_GIFT_LOTTIE_MAX_BYTES\) return null;\s*\n\s*lottie = JSON\.parse\(text\);\s*\n\s*if \(!lottie \|\| typeof lottie !== 'object' \|\| !Array\.isArray\(lottie\.layers\)\) return null;/);
+    expect(app).toMatch(/if \(blob\.size > TELEGRAM_GIFT_ART_MAX_BYTES\) continue;/);
+    // What the player is not allowed to cost.
+    expect(app).toMatch(/anim\.setSubframe\(false\);/);
+    expect(app).toMatch(/if \(giftMotionAllowed\(\) && !document\.hidden\) anim\.play\(\);\s*\n\s*else anim\.goToAndStop\(0, true\);/);
+    expect(app).toMatch(/document\.addEventListener\('visibilitychange', \(\) => \{\s*\n\s*for \(const motion of \[brandGiftMotion, heroGiftMotion\]\)/);
+    expect(app).toMatch(/syncHeroGiftMotion\(false\);   \/\/ a closed card does not deserve a frame/);
+    expect(app, 'sequential awaits, per the no-concurrent-read guard').not.toMatch(/Promise\.all\(\[loadTelegramGiftLottiePlayer/);
+    // The two canvases stand in for the two still pictures, wearing their classes, hidden until a player is up.
+    expect(html).toMatch(/<canvas class="brand-mark" id="brandMarkMotion" width="58" height="58" aria-hidden="true" hidden><\/canvas>/);
+    expect(html).toMatch(/<canvas class="profile-card-hero-gift" id="profileCardHeroGiftMotion" width="44" height="44" aria-hidden="true" hidden><\/canvas>/);
+    // The corner's state lives ABOVE the code that renders the corner during module evaluation.
+    expect(app.indexOf('let brandGiftMotion = null;'), 'declared before renderBrandGift').toBeLessThan(app.indexOf('function renderBrandGift()'));
+    expect(app).toMatch(/function syncBrandGiftMotion\(\) \{\s*\n\s*if \(!globalThis\.__plathoGiftRuntimeReady\) return;/);
+  });
+
+  it('PWA-GIFT-13: the name tile is the gift tile\'s twin — a face to wear, a labelled Transfer, a sent item leaves the grid', () => {
+    // [owner, 2026-09-08] "for the usernames neither a Transfer button nor a Wear one is implemented, unlike the
+    // Telegram gifts". A name was one bare button: tapping it wore the name, and sending one away meant finding
+    // the "My .ath names" dialog behind the settings. The tile is now built of the gift tile's own parts — a face
+    // that wears, a labelled button that sends — under the gift tile's own classes, so there is one tile to style.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const names = app.slice(app.indexOf('function renderProfileCardNames('), app.indexOf('function wearPlathoUsername('));
+    const gifts = app.slice(app.indexOf('function renderProfileCardGifts('), app.indexOf('async function loadUsernameNftsForWallet('));
+    const nameDialog = app.slice(app.indexOf('async function openUsernameNftTransferDialog('), app.indexOf('async function submitUsernameNftTransfer('));
+    const giftDialog = app.slice(app.indexOf('async function openTelegramGiftTransferDialog('), app.indexOf('async function submitTelegramGiftTransfer('));
+    expect(names.length).toBeGreaterThan(0);
+    expect(gifts.length).toBeGreaterThan(0);
+    expect(nameDialog.length).toBeGreaterThan(0);
+    expect(giftDialog.length).toBeGreaterThan(0);
+
+    // A DIV WITH BUTTONS INSIDE, never a button tile: a button inside a button is not markup a browser honours.
+    expect(names).toContain("const tile = document.createElement('div');");
+    expect(names, 'the old shape — the whole tile one button — cannot hold a Transfer').not.toContain("tile.type = 'button'");
+    expect(names).toContain("const face = document.createElement(wearable ? 'button' : 'div');");
+    expect(names).toContain("const wearable = Boolean(own && nft.label);");
+    expect(names).toContain("face.className = 'profile-card-gift-face';");
+    expect(names).toContain('wearPlathoUsername(worn ? null : nft.label);');
+    expect(names).toContain('face.append(frame, label);');
+    // THE SAME BUTTON THE GIFTS HAVE, wired to the dialog the "My .ath names" list already opens — own card only.
+    expect(names).toContain("send.className = 'profile-card-gift-send';");
+    expect(names).toContain("send.textContent = t('username.transferName');");
+    expect(names).toContain('openUsernameNftTransferDialog(nft)');
+    expect(names.indexOf('if (own) {')).toBeLessThan(names.indexOf("send.className = 'profile-card-gift-send';"));
+    // WORN GOES LAST, after the button, as on the gift tile — or the worn tile's button sits lower than its row.
+    expect(names.indexOf('tile.append(send);')).toBeLessThan(names.indexOf("state.className = 'profile-card-name-state';"));
+    // Whatever re-renders from inside a tile says the same thing about the list it came from.
+    expect(names).toContain('const flags = { retrying, unconfirmed };');
+    // REMEMBERED LIKE THE GIFTS [owner, 2026-09-08]: last time's names are painted at once, unconfirmed, and the
+    // chain read paints over them; a finished read is stored; a sent name leaves the record.
+    expect(app).toMatch(/createProfileAvatarMediaStore\(\{ dbName: scopedIndexedDbName\('platho-username-nfts-v1'\), cap: \d+ \}\)/);
+    expect(app).toMatch(/async function writeStoredUsernameNftList\(rawWallet, result\) \{\s*\n\s*if \(!rawWallet \|\| !result\?\.complete \|\| !Array\.isArray\(result\.owned\)\) return;/);
+    // NO BigInt IN THE RECORD [owner, 2026-09-08: "still not remembered"]: nameHash is one, JSON.stringify throws on
+    // it, and the store's catch swallowed the throw — so only what the card prints is written.
+    const writer = app.slice(app.indexOf('async function writeStoredUsernameNftList('), app.indexOf('async function deleteStoredUsernameNftList('));
+    expect(writer).toContain('const owned = result.owned.map(({ label, itemAddress, image }) => ({ label, itemAddress, image }));');
+    expect(writer, 'a BigInt field cannot be stringified').not.toMatch(/nameHash/);
+    expect(names).toContain("profileCardNames.dataset.confirmed = unconfirmed ? 'false' : 'true';");
+    expect(app).toMatch(/if \(!stored \|\| profileCardSubject !== raw \|\| profileCardNamesConfirmedFor === raw\) return;\s*\n\s*nameLane\.stored = stored;\s*\n\s*renderProfileCardNames\(stored, own, \{ unconfirmed: true \}\);/);
+    expect(app).toMatch(/if \(state\?\.retrying && nameLane\.stored\) \{\s*\n\s*renderProfileCardNames\(nameLane\.stored, own, \{ unconfirmed: true, retrying: true \}\);/);
+    expect(app).toMatch(/if \(result\?\.complete\) \{\s*\n\s*profileCardNamesConfirmedFor = raw;\s*\n\s*void writeStoredUsernameNftList\(raw, result\);/);
+    expect(app).toMatch(/removeKnownPlathoUsername\(nft\.label\);\s*\n\s*void deleteStoredUsernameNftList\(parseTonAddress\(wallet\.address\)\.raw\);/);
+    expect(css).toMatch(/\.profile-card-rows\[data-confirmed="false"\] \.profile-card-gift-send \{\s*\n\s*visibility: hidden;\s*\n\s*pointer-events: none;/);
+    // And both notes read "reading the chain" from the first paint [owner, 2026-09-08: the names' note was blank].
+    const card = app.slice(app.indexOf('async function openProfileCardDialog('), app.indexOf('function openProfileSettings('));
+    // …and say NOTHING while the chain is read [owner, later that day: "too much 'reading the chain'"]: the foot of
+    // the card says it once for everything (PWA-GIFT-15).
+    expect(card).toMatch(/for \(const cardNote of \[profileCardNamesNote, profileCardGiftsNote\]\) \{\s*\n\s*if \(!cardNote\) continue;\s*\n\s*cardNote\.textContent = '';\s*\n\s*cardNote\.hidden = true;/);
+    expect(names).not.toMatch(/renderProfileCardNames\(result, own\);/);
+
+    // A SENT ITEM LEAVES ITS GRID. Both dialogs answer true once the transfer is away (and nothing on a cancel), and
+    // both tiles drop the item they were built for — the wallet has already stopped counting it, and a tile that
+    // stayed would offer a second send that can only bounce.
+    expect(nameDialog).toMatch(/fields: \[\],\s*\n\s*\}\);\s*\n\s*return true;/);
+    expect(giftDialog).toMatch(/fields: \[\],\s*\n\s*\}\);\s*\n\s*return true;/);
+    expect(names).toContain('if (sent) result = { ...result, owned: owned.filter((item) => item.itemAddress !== nft.itemAddress) };');
+    expect(gifts).toContain('if (sent) result = { ...result, gifts: gifts.filter((item) => item.itemAddress !== gift.itemAddress) };');
+
+    // ONE TILE IN TWO GRIDS: the container rule is shared, and the face and send rules exist once.
+    expect(css).toMatch(/\.profile-card-gift,\s*\n\.profile-card-name \{/);
+    expect(css.match(/^\.profile-card-gift-face \{/gm)).toHaveLength(1);
+    expect(css.match(/^\.profile-card-gift-send \{/gm)).toHaveLength(1);
+
+    // THE WORN MARK COMPARES THE BARE FORM ON BOTH SIDES [owner, 2026-09-08: "tapping a name does nothing"]. The
+    // link stores "platho.ath" (normalizeLinkedPlathoUsername appends the suffix), the list stores "platho"
+    // (normalizeUsernameLabel strips it); compared raw they never matched, so a worn name never said so.
+    expect(names).toContain("const linked = own ? canonicalUsernameDisplay(readLinkedPlathoUsername(plathoWallet?.address)?.label).toLowerCase() : '';");
+    expect(names).toContain('const worn = Boolean(own && linked && nft.label && linked === canonicalUsernameDisplay(nft.label).toLowerCase());');
+    expect(names, 'the raw comparison that never matched').not.toContain('linked === nft.label)');
+  });
+
+  it('PWA-GIFT-14: the hero wears the worn gift whether or not the app does', () => {
+    // [owner, 2026-09-08] "The backdrop in the profile only shows when the Telegram-gift theme is chosen. Wrong —
+    // it must show whenever a gift is worn." The hero tokens were written inside the theme branch, so a worn gift
+    // with the theme off left the card's hero bare — and its ink at the fallback, which is how the owner met a
+    // hero with nothing on it. The tokens now have a writer of their own, run before the theme is even asked.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const apply = app.slice(app.indexOf('function applyGiftAppearance() {'), app.indexOf('function applyGiftPatternWallpaper() {'));
+    const hero = app.slice(app.indexOf('function applyGiftHeroTokens(node, theme) {'), app.indexOf('function applyGiftAppearance() {'));
+    expect(apply.length).toBeGreaterThan(0);
+    expect(hero.length).toBeGreaterThan(0);
+    // Before the choice is asked, on every call.
+    expect(apply.indexOf('redressProfileCardHeroIfOpen();')).toBeGreaterThan(0);
+    expect(apply.indexOf('redressProfileCardHeroIfOpen();')).toBeLessThan(apply.indexOf('if (!presented) {'));
+    // The writer asks only whether a gift is worn — never whether the theme is chosen.
+    expect(hero).toContain('if (!theme) {');
+    expect(hero).not.toContain('giftThemeChosen()');
+    expect(hero).toMatch(/node\.style\.setProperty\('--gift-hero-inner', `\$\{ir\} \$\{ig\} \$\{ib\}`\);\s*\n\s*node\.style\.setProperty\('--gift-hero-edge', `\$\{er\} \$\{eg\} \$\{eb\}`\);/);
+    expect(hero).toMatch(/const heroInk = readableInkOn\(\[ir, ig, ib\]\);\s*\n\s*node\.style\.setProperty\('--gift-hero-ink', heroInk\.join\(' '\)\);/);
+    // The subject and the tile are built for the hero whether or not the theme is on.
+    expect(hero).not.toContain('ensureGiftSubjectArt();');   // the worn art is refreshed by applyGiftAppearance, not by the (now per-card) token writer
+    expect(apply).toContain('ensureGiftSubjectArt();');
+    // THE HERO'S PATTERN ON ITS OWN TOKENS AND GATE, so the plasma field (a theme matter) stays plain meanwhile.
+    expect(hero).toMatch(/node\.style\.setProperty\('--gift-hero-pattern', `url\("\$\{tile\}"\)`\);\s*\n\s*node\.style\.setProperty\('--gift-hero-pattern-size', `\$\{GIFT_PATTERN_TILE_CSS_PX\}px`\);\s*\n\s*node\.setAttribute\('data-gift-hero-pattern', 'true'\);/);
+    expect(css).toMatch(/\.profile-card-hero-pattern \{[\s\S]{0,900}mask-image: var\(--gift-hero-pattern\);/);
+    expect(css).toMatch(/\.profile-card-hero:not\(\[data-gift-hero-pattern="true"\]\) \.profile-card-hero-pattern \{/);
+    expect(css, 'the field keeps its own gate').toMatch(/\[data-gift-pattern="true"\]\[data-background="plasma"\]/);
+    // The theme branch no longer carries the hero tokens: one writer, not two that can disagree.
+    const themeBranch = apply.slice(apply.indexOf('if (!presented) {'));
+    expect(themeBranch).not.toContain("setProperty('--gift-hero-inner'");
+    expect(themeBranch).not.toContain("removeProperty('--gift-hero-inner'");
+    // 2026-09-09: the hero wears the CARD SUBJECT's gift, never the reader's — the tokens live on the hero, not on
+    // :root, so a contact who owns no gift opens plain whatever this device wears.
+    expect(app).not.toMatch(/applyGiftHeroTokens\((root|document\.documentElement)\)/);
+    expect(app).toContain('const theme = own ? wornGiftTheme : profileCardPeerGiftTheme;');
+    expect(app).toContain('applyGiftHeroTokens(profileCardHero, theme);');
+    // 2026-09-09: the contact's hero wears the gift they PUBLISHED, if the chain holds it — never the first of the
+    // list (tests/worn-gift-is-shown-to-others.test.ts).
+    expect(app).toContain('if (!own) dressProfileCardPeerHero(profileCardSubject, wornGiftAmong(profileCardSubject, gifts));');
+    // The subject cut after the card opened stands on it at once, not at the next open.
+    expect(app).toMatch(/applyGiftAppearance\(\);[^\n]*\n\s*redressProfileCardHeroIfOpen\(\);/);
+    expect(app).toMatch(/function redressProfileCardHeroIfOpen\(\) \{\s*\n\s*let subject = null;\s*\n\s*try \{\s*\n\s*subject = profileCardSubject;/);
+    // And the crop probe declares its four pixel reads, so the browser stops warning about them.
+    const crop = app.slice(app.indexOf('function measureGiftSubjectCrop('), app.indexOf('function measureGiftSubjectCrop(') + 3000);
+    expect(crop).toContain("probe.getContext('2d', { willReadFrequently: true })");
+  });
+
+  it('PWA-GIFT-15: the card says "reading the chain" once, at its foot, and "Synced" when all four reads are in', () => {
+    // [owner, 2026-09-08] "There is too much 'reading the chain'. Say it once, in the line with the network and the
+    // version, and 'Synced' once the description, the latest post, the names and the gifts have been read." The
+    // description rides the latest-post walk (the feed's decoder diverts profile documents into the cache), so
+    // three lanes report and the fourth thing is carried by one of them.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toContain("const PROFILE_CARD_LANES = ['latest', 'names', 'gifts'];");
+    expect(app).toMatch(/const synced = PROFILE_CARD_LANES\.every\(\(lane\) => profileCardLanesDone\.has\(lane\)\);\s*\n\s*const status = synced \? t\('sync\.synced'\) : t\('profileCard\.giftsLoading'\);/);
+    expect(app).toMatch(/setText\(profileCardMeta, own \? `\$\{appConfig\.network\?\.label \?\? appConfig\.mode\} · \$\{PLATHO_APP_RUNTIME_VERSION\} · \$\{status\}` : status\);/);
+    // Each lane reports its final answer for the wallet the card shows, and only then.
+    expect(app).toMatch(/profileCardNamesConfirmedFor = raw;\s*\n\s*void writeStoredUsernameNftList\(raw, result\);\s*\n\s*markProfileCardLaneDone\(raw, 'names'\);/);
+    expect(app).toMatch(/profileCardGiftsConfirmedFor = raw;\s*\n\s*void writeStoredTelegramGiftList\(raw, result\);\s*\n\s*markProfileCardLaneDone\(raw, 'gifts'\);/);
+    expect(app).toMatch(/if \(profileCardSubject === wallet\) renderProfileCardLatestPost\(wallet\);\s*\n\s*if \(state\.status !== 'loading'\) markProfileCardLaneDone\(wallet, 'latest'\);/);
+    // THE LATEST POST IS REMEMBERED TOO [owner, later: "the latest post still loads every time"]: painted from the
+    // store and marked stale, the lane reads the chain behind it; an answer this tab holds is final at once.
+    expect(app).toMatch(/createProfileAvatarMediaStore\(\{ dbName: scopedIndexedDbName\('platho-latest-posts-v1'\), cap: \d+ \}\)/);
+    expect(app).toMatch(/async function writeStoredLatestPost\(rawWallet, state\) \{\s*\n\s*if \(!rawWallet \|\| !state \|\| \(state\.status !== 'ready' && state\.status !== 'empty'\)\) return;/);
+    expect(app).toMatch(/publicDiscoveryLatestPosts\.set\(raw, \{ \.\.\.stored, stale: true \}\);\s*\n\s*renderProfileCardLatestPost\(raw\);/);
+    expect(app).toMatch(/if \(state && !state\.stale && state\.status !== 'loading'\) \{\s*\n\s*markProfileCardLaneDone\(raw, 'latest'\);\s*\n\s*return;\s*\n\s*\}\s*\n\s*queueDiscoveryLatestPost\(raw, \{ retry: true \}\);/);
+    expect(app).toMatch(/if \(state && !state\.stale && \(!retry \|\| state\.status !== 'loading'\)\) return;/);
+    expect(app).toMatch(/if \(\(queued\?\.status !== 'loading' && !queued\?\.stale\) \|\| publicDiscoveryLatestInFlight\.has\(wallet\)\) continue;/);
+    expect(app).toMatch(/markProfileCardLaneDone\(wallet, 'latest'\);\s*\n\s*void writeStoredLatestPost\(wallet, state\);/);
+    // A rate-limited retry keeps the stale preview on screen instead of dropping to the shimmer.
+    expect(app).toMatch(/publicDiscoveryLatestPosts\.set\(wallet, shown\?\.stale \? \{ \.\.\.shown, attempts \} : \{ status: 'loading', attempts \}\);/);
+    expect(app).toMatch(/renderProfileCardLatestPost\(raw\);\s*\n\s*void restoreOrQueueLatestPost\(raw\);/);
+    // Reset per card, guarded like every reader of the card's subject.
+    expect(app).toMatch(/profileCardLanesDone = new Set\(\);\s*\n\s*renderProfileCardMeta\(\);/);
+    expect(app).toMatch(/function markProfileCardLaneDone\(wallet, lane\) \{\s*\n\s*let subject = null;\s*\n\s*try \{\s*\n\s*subject = profileCardSubject;/);
+    // THE DESCRIPTION IS REMEMBERED AND QUIETLY REFRESHED: painted from the durable profile cache at open, and
+    // painted again when a walk writes a newer profile for the wallet the card shows.
+    expect(app).toMatch(/function renderProfileCardAbout\(raw\) \{\s*\n\s*if \(!profileCardAbout\) return;\s*\n\s*const about = String\(cachedChannelProfile\(raw\)\?\.description \?\? ''\)\.trim\(\);/);
+    expect(app).toMatch(/persistChannelProfileCache\(\);\s*\n\s*redressProfileCardAboutIfOpen\(authorWallet\);/);
+    expect(app).toMatch(/function redressProfileCardAboutIfOpen\(wallet\) \{\s*\n\s*let subject = null;\s*\n\s*try \{\s*\n\s*subject = profileCardSubject;/);
+    // No section note says "reading" any more.
+    expect(app).not.toMatch(/profileCard(Names|Gifts)Note\.textContent = t\('profileCard\.giftsLoading'\)/);
+    // No new strings: the foot reuses the app's own "Synced" and the card's own "reading" line.
+    const en = readFileSync('web/i18n-strings.mjs', 'utf8');
+    expect(en).toContain('"sync.synced": "Synced"');
+    expect(en).toContain('"profileCard.giftsLoading": "Reading the chain…"');
+  });
+
+  it('PWA-CHANNEL-DRESS-02: a dressed channel dresses the WHOLE app for the visit, and the reader\'s own look comes back', () => {
+    // [owner, 2026-09-08] "You put the appearance on the header. The whole background must change to the channel's
+    // custom one — and the colours: the hashtags, the comments under a post too. Leaving the channel, my own look
+    // again. And it does not depend on the theme I am using." So the app wears the PRESENTED gift: the channel's
+    // while its view or one of its posts is on screen, else one's own when the gift theme is chosen.
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app).toMatch(/function presentedGiftTheme\(\) \{\s*\n\s*const onScreen = channelGiftOnScreen\(\);\s*\n\s*const channel = onScreen \? channelGiftTheme\(onScreen\) : null;\s*\n\s*if \(channel\) return \{ theme: channel, channel: true \};\s*\n\s*return giftThemeChosen\(\) && wornGiftTheme \? \{ theme: wornGiftTheme, channel: false \} : null;/);
+    // The channel view, or the open post's channel; one's own always, another's only when wanted; proven gifts only.
+    expect(app).toMatch(/const wallet = publicChannelViewOpen\s*\n\s*\? publicChannelViewWallet\s*\n\s*: \(publicPostDetailOpen \? rawWalletAddress\(publicPostDetailItem\?\.authorWallet\) : null\);/);
+    expect(app).toMatch(/if \(!own && !channelAppearancesVisible\(\)\) return null;\s*\n\s*return cachedChannelProfile\(wallet\) \?\? null;/);
+    expect(app).toMatch(/function channelGiftOnScreen\(\) \{\s*\n\s*return channelOnScreen\(\)\?\.verifiedGift \?\? null;/);
+    // The record is the worn gift's shape, cut from the header's own dress; the file is read once, then the app dresses.
+    expect(app).toMatch(/void buildChannelGiftDress\(gift\)\.then\(\(\) => applyGiftAppearance\(\)\)/);
+    expect(app).toMatch(/tint: dress\.edge,\s*\n\s*inner: dress\.inner,\s*\n\s*patternTile: dress\.pattern,/);
+    // The app-wide branch reads the presented theme, not the worn one.
+    const apply = app.slice(app.indexOf('function applyGiftAppearance() {'), app.indexOf('function applyGiftPatternWallpaper() {'));
+    expect(apply).toContain('const presented = presentedGiftTheme();');
+    expect(apply).toContain('const [ir, ig, ib] = giftInnerStop(theme);');
+    expect(apply).toContain('const [er, eg, eb] = theme.tint;');
+    expect(apply, 'the worn gift is read only through presentedGiftTheme here').not.toMatch(/giftInnerStop\(wornGiftTheme\)|wornGiftTheme\.tint/);
+    expect(apply).toContain('if (!presented.channel) ensureGiftSubjectArt();');
+    const wallpaper = app.slice(app.indexOf('function applyGiftPatternWallpaper() {'), app.indexOf('function ensureGiftPatternTile() {'));
+    expect(wallpaper).toContain("const tile = typeof theme?.patternTile === 'string' ? theme.patternTile : null;");
+    expect(wallpaper).toContain('if (presented && !presented.channel) ensureGiftPatternTile();');
+    // WORN, NOT CHOSEN: the forced palette is not persisted while a channel dresses the app, what was there is
+    // remembered once on the way in and put back on the way out.
+    expect(app).toMatch(/if \(!channelDressActive\) \{\s*\n\s*try \{ localStorage\.setItem\(THEME_STORAGE_KEY, next\); \}/);
+    expect(apply).toMatch(/if \(presented\.channel\) \{\s*\n[\s\S]{0,400}?if \(!channelDressActive\) channelDressRestore = root\.getAttribute\('data-theme'\);\s*\n\s*channelDressActive = true;\s*\n\s*\} else \{\s*\n\s*endChannelDress\(\);/);
+    expect(apply).toMatch(/dropRootToken\('--cta-ink'\);\s*\n\s*if \(!channelLookKey\) endChannelDress\(\);[^\n]*\n\s*return;/);
+    expect(app).toMatch(/function endChannelDress\(\) \{\s*\n\s*if \(!channelDressActive\) return;\s*\n\s*channelDressActive = false;\s*\n\s*const back = channelDressRestore;/);
+    // Declared above every reader — the theme forcer sits near the top of the file.
+    expect(app.indexOf('let channelDressActive = false;')).toBeLessThan(app.indexOf('function applyForcedTheme('));
+    // The doors: the channel view and the post view dress on open and undress on close; a proof re-dresses.
+    expect(app).toMatch(/publicPostDetailOpen = true;\s*\n\s*applyGiftAppearance\(\);/);
+    expect(app).toMatch(/publicPostDetailOpen = false;\s*\n\s*publicPostDetailItem = null;\s*\n\s*applyGiftAppearance\(\);/);
+    expect(app).toMatch(/publicChannelViewWallet = null;\s*\n\s*applyGiftAppearance\(\);/);
+    const openView = app.slice(app.indexOf('function openPublicChannelView('), app.indexOf('function closePublicChannelView('));
+    expect(openView).toMatch(/renderPublicChannelView\(\);\s*\n\s*applyGiftAppearance\(\);/);
+    expect(app).toMatch(/refreshChannelAppearanceUi\(\);\s*\n\s*applyGiftAppearance\(\);[^\n]*\n\}/);
+    // A theme chosen DURING the visit is the one to come back to — persisted by hand, the channel's palette kept on.
+    expect(app).toMatch(/if \(channelDressActive\) \{\s*\n[\s\S]{0,400}?channelDressRestore = chosen;\s*\n\s*try \{ localStorage\.setItem\(THEME_STORAGE_KEY, chosen\); \}[^\n]*\n\s*\} else \{\s*\n\s*applyForcedTheme\(chosen\);/);
+    // A channel's dress is remembered with its recipe version, and served from the record before any file read.
+    expect(app).toMatch(/createProfileAvatarMediaStore\(\{ dbName: scopedIndexedDbName\('platho-channel-gift-dress-v1'\), cap: \d+ \}\)/);
+    expect(app).toMatch(/if \(parsed\?\.v !== GIFT_PATTERN_TILE_VERSION \|\| !stop\(parsed\.inner\) \|\| !stop\(parsed\.edge\)\) return null;/);
+    expect(app).toMatch(/const stored = await readStoredChannelGiftDress\(key\);\s*\n\s*if \(stored\) \{\s*\n\s*channelGiftDressCache\.set\(key, stored\);\s*\n\s*return stored;/);
+    expect(app).toMatch(/channelGiftDressCache\.set\(key, dress\);\s*\n\s*if \(dress\) void writeStoredChannelGiftDress\(key, dress\);/);
+  });
+
+  it('PWA-CHANNEL-DRESS-03: a channel\'s look is the WHOLE appearance — theme, background, settings, gift — edited where it is priced, worn for the visit', () => {
+    // [owner, 2026-09-09] "Pass the background animation along when applying it to the channel. Extend the channel
+    // appearance in the settings: the background look and all its settings, not just my worn gift. A look without
+    // a gift too — plasma, or the dots, or future themes. The guests' theme is the one the channel owner chose."
+    const app = readFileSync('web/app.js', 'utf8');
+    const codec = readFileSync('web/capsule-part-policy.mjs', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    // THE WIRE: kind 2, the sliders' own bounds and defaults in the codec, unknown backgrounds "not carried".
+    expect(codec).toContain('export const PROFILE_APPEARANCE_KIND_LOOK = 2;');
+    expect(codec).toMatch(/plasma: Object\.freeze\(\[\[0, 100, 30\], \[1, 16, 5\], \[25, 600, 175\], \[0, 200, 50\]\]\),/);
+    expect(codec).toMatch(/nodes: Object\.freeze\(\[\[0, 300, 100\], \[0, 300, 100\], \[25, 300, 100\], \[0, 300, 100\]\]\),/);
+    expect(codec).toMatch(/background: PROFILE_LOOK_BACKGROUNDS\[backgroundIndex\] \?\? 'unknown',/);
+    // …and those bounds are the Appearance dialog's own sliders — one source, checked against the markup.
+    for (const [id, min, max, value] of [['auroraLevelRange', 0, 100, 30], ['auroraCountRange', 1, 16, 5], ['auroraSpeedRange', 25, 600, 175], ['auroraEnergyRange', 0, 200, 50],
+      ['nodesLevelRange', 0, 300, 100], ['nodesRunnersRange', 0, 300, 100], ['nodesSpeedRange', 25, 300, 100], ['nodesLightsRange', 0, 300, 100]]) {
+      expect(html, `${id} bounds`).toMatch(new RegExp(`id="${id}" type="range" min="${min}" max="${max}" step="\\d+" value="${value}"`));
+    }
+    // THE EDITOR: the Appearance dialog's rows inside the description dialog, prefilled with this device's look.
+    expect(app).toMatch(/function buildChannelLookEditor\(\{ preset = null, current = null, onEdit = null \} = \{\}\) \{/);
+    expect(app).toMatch(/const editor = buildChannelLookEditor\(\{ preset: presetAppearance, current: current\?\.appearance \?\? null, onEdit: \(\) => previewChannelLook\(editor\) \}\);\s*\n\s*const appearanceOf = \(\) => editor\.read\(\);/);
+    expect(app).toMatch(/\{ type: 'custom', className: 'action-custom-field channel-look-field', render: \(\) => editor\.node \},/);
+    // 2026-09-09: the gift row is the CHANNEL's choice; the gift the wallet wears is the block's own claim
+    // (tests/worn-gift-is-shown-to-others.test.ts, WORN-02).
+    expect(app).toMatch(/if \(editor\.wantsGift\(\) && !wornGiftClaimAddress\(\)\) \{\s*\n\s*return \{ ok: false, error: t\('public\.channelAppearanceNeedsGift'\) \};/);
+    expect(app).toMatch(/plasma: \[auroraLevel, auroraCount, auroraSpeed, auroraEnergy\],\s*\n\s*nodes: \[nodesLevel, nodesRunners, nodesSpeed, nodesLights\],/);
+    expect(app).toMatch(/const CHANNEL_LOOK_STEPS = Object\.freeze\(\{ plasma: \[5, 1, 25, 10\], nodes: \[10, 10, 5, 10\] \}\);/);
+    expect(html).toMatch(/<option value="custom" data-i18n="public\.channelAppearanceCustom">Custom<\/option>/);
+    // THE VISIT: the channel's look replaces this device's background, settings and theme, and is put back after.
+    expect(app).toMatch(/function channelLookOnScreen\(\) \{\s*\n\s*const appearance = channelOnScreen\(\)\?\.appearance \?\? null;\s*\n\s*return appearance\?\.kind === 'look' \? appearance : null;/);
+    expect(app).toMatch(/channelLookRestore = \{ backgroundMode, auroraLevel, auroraCount, auroraSpeed, auroraEnergy, nodesLevel, nodesRunners, nodesSpeed, nodesLights \};/);
+    expect(app).toMatch(/if \(look\.background === 'plasma'\) \[auroraLevel, auroraCount, auroraSpeed, auroraEnergy\] = look\.settings;/);
+    expect(app).toMatch(/if \(look\.background === 'nodes'\) \[nodesLevel, nodesRunners, nodesSpeed, nodesLights\] = look\.settings;/);
+    expect(app).toMatch(/function restoreOwnLook\(\) \{\s*\n\s*if \(!channelLookRestore\) return;\s*\n\s*\(\{ backgroundMode, auroraLevel, auroraCount, auroraSpeed, auroraEnergy, nodesLevel, nodesRunners, nodesSpeed, nodesLights \} = channelLookRestore\);/);
+    // The guests' theme is worn like the gift's palette (never persisted); a gift on the look outranks it.
+    expect(app).toMatch(/if \(!giftWorn\) \{[\s\S]{0,300}?if \(!channelDressActive\) channelDressRestore = root\.getAttribute\('data-theme'\);\s*\n\s*channelDressActive = true;\s*\n\s*if \(root\.getAttribute\('data-theme'\) !== look\.theme\) applyForcedTheme\(look\.theme, \{ animate: false \}\);/);
+    expect(app).toMatch(/if \(!channelLookKey\) endChannelDress\(\);/);
+    // A gift is proven out of either kind of appearance; a look without one is not a claim.
+    expect(app).toMatch(/const claimedAddress = normalizeProfileAppearance\(appearance\)\?\.itemAddress \?\? null;/);
+    // No stray plumbing: the old two-way row value is gone.
+    expect(app).not.toMatch(/channelAppearanceSelect\.value === 'gift'/);
+  });
+
+  it('PWA-CHANNEL-DRESS-01: a channel wears its owner\'s gift by the rules the channel profile already keeps', () => {
+    // [owner, 2026-09-07] "Apply a theme to a channel… a technical message the client alone reads… two switches in
+    // Settings… look at how features like this work here and do it the same way." The feature like this is the
+    // channel PROFILE: a diverted post, a self-declared claim, proven on chain, only the proven form shown.
+    const app = readFileSync('web/app.js', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const subs = readFileSync('web/public-channel-subscriptions.mjs', 'utf8');
+    // The claim rides the profile block, through the same reader, into the same record — beside the name's.
+    expect(app).toMatch(/appearance: normalizeProfileAppearance\(profile\.appearance \?\? null\),/);
+    expect(subs).toMatch(/appearance: normalizeProfileAppearanceRecord\(value\.appearance\),\s*\n\s*verifiedGift: normalizeVerifiedGiftRecord\(value\.verifiedGift\),/);
+    // PROVEN BY THE PROOF THE PROFILE CARD RUNS ON ITS OWN GIFTS — one address, the channel's wallet as the owner.
+    expect(app).toMatch(/function verifyChannelGiftClaim\(authorWallet, appearance\)/);
+    expect(app).toMatch(/result = await collectOwnedTelegramGifts\(\{\s*\n\s*ownerWallet: rawWallet,\s*\n\s*indexerItems: \[claim\.itemAddress\],/);
+    // Proven → the chain's own slug and number; definitive loss → stripped; unfinished → the last look stays.
+    // THE VERDICT REACHES THE OVERLAY TOO [owner, 2026-09-08: the channel did not take the gift just published].
+    // cachedChannelProfile prefers the optimistic overlay, so a proof written into the durable copy alone was
+    // invisible until a reload; and one's own channel is dressed whatever the "others' appearances" preference says.
+    expect(app).toMatch(/const overlay = pendingChannelProfileOverlay\.get\(profileKey\) \?\? null;\s*\n\s*const prev = publicChannelProfileCache\[profileKey\] \?\? null;\s*\n\s*const overlayChanged = differs\(overlay\);\s*\n\s*const durableChanged = differs\(prev\);/);
+    expect(app).toMatch(/if \(overlayChanged\) pendingChannelProfileOverlay\.set\(profileKey, \{ \.\.\.overlay, verifiedGift: next \}\);/);
+    // …AND THE OVERLAY COMES OFF once the chain has the profile: the walked copy that is its own, or newer, retires it.
+    expect(app).toMatch(/if \(overlay && \(sameChannelProfileContent\(overlay, incoming\) \|\| compareProfileRecency\(incoming, overlay\) >= 0\)\) \{\s*\n\s*pendingChannelProfileOverlay\.delete\(key\);/);
+    expect(app).toMatch(/function sameChannelProfileContent\(a, b\) \{/);
+    expect(app).toMatch(/applyVerifiedChannelGift\(key, \{ itemAddress: claim\.itemAddress, slug: proven\.slug, number: proven\.number, verifiedAt: nowSec\(\) \}\);/);
+    expect(app).toMatch(/const definitive = result\?\.complete === true \|\| \(result\?\.transferred \?\? \[\]\)\.some/);
+    expect(app).toMatch(/verifyChannelGiftClaim\(authorWallet, incoming\.appearance\);/);
+    expect(app).toMatch(/verifyChannelGiftClaim\(authorWallet, profile\?\.appearance \?\? null\);/);
+    // NO SEPARATE PAINT ON THE HEADER [owner, 2026-09-08: "one seamless background across the whole app"]: the
+    // channel's gift dresses the app through presentedGiftTheme (PWA-CHANNEL-DRESS-02), and only the PROVEN one.
+    expect(app).not.toMatch(/dressPublicChannelView|data-gift-dressed|--channel-gift-|channelGiftDressKey/);
+    expect(css).not.toMatch(/data-gift-dressed|--channel-gift-/);
+    expect(app).toMatch(/return channelOnScreen\(\)\?\.verifiedGift \?\? null;/);
+    expect(app, 'the claim itself is never worn').not.toMatch(/channelGiftTheme\([^)]*\.appearance/);
+    // Publishing is the description dialog's paid post with one more field; the Settings row is a shortcut into it
+    // and shows what is ON CHAIN afterwards, not what was merely selected.
+    expect(app).toMatch(/async function openEditChannelProfileDialog\(\{ appearance: presetAppearance = null \} = \{\}\)/);
+    expect(app).toMatch(/const published = await publishChannelProfile\(description, tags, appearanceOf\(values\), wornGiftClaimAddress\(\)\);/);
+    expect(app).toMatch(/estimatedChannelProfileChargeNanotons\(values\.description, values\.tags, appearanceOf\(values\), wornGiftClaimAddress\(\)\)/);
+    // Wearing offers the publication itself now (offerWornGiftPublish), so the dialog no longer refuses "a gift
+    // nobody wears" — there is no gift row to refuse.
+    expect(app).toMatch(/async function offerWornGiftPublish\(gift, \{ remove = false \} = \{\}\)/);
+    expect(app).toMatch(/channelAppearanceSelect\.value = published \? 'custom' : 'none';/);
+    // …re-read wherever the wallet and activation facts are re-read, not at boot alone: a wallet unlocked after
+    // boot left the row disabled for the session [owner, 2026-09-08: \"it does not switch\"].
+    const messagingStart = app.indexOf('function refreshMessagingControls()');
+    const messaging = app.slice(messagingStart, app.indexOf('\nfunction ', messagingStart + 1));   // the whole function, not a distance
+    expect(messaging).toMatch(/refreshChannelAppearanceUi\(\);/);
+    expect(app).toMatch(/openEditChannelProfileDialog\(\{ appearance: wanted \}\)[\s\S]{0,200}?\.finally\(\(\) => refreshChannelAppearanceUi\(\)\);/);
+    // The reader's switch is local, and defaults to showing.
+    expect(app).toMatch(/const CHANNEL_APPEARANCES_STORAGE_KEY = 'platho\.channelAppearances\.v1';/);
+    expect(app).toMatch(/return text === 'hide' \? 'hide' : 'show';/);
+    expect(html).toMatch(/<select id="channelAppearanceSelect"[^>]*>\s*\n\s*<option value="none"/);
+    expect(html).toMatch(/<select id="channelAppearancesSelect"[^>]*>\s*\n\s*<option value="show"/);
+  });
+
+  it('PWA-GIFT-03: an unfinished read is never dressed up as an empty wallet', () => {
+    // THE BUG, FOUND ON THE OWNER'S DEVICE 2026-09-06. A real Chill Flame sat on the wallet; the card said "No
+    // Telegram gifts on this wallet" and the console was a wall of 429s. Nothing was wrong with the proof — the
+    // gift and its collection both pass the anchor when read directly. The read never happened, and the RENDER
+    // turned "I could not look" into "you own nothing", because the empty branch came first and an unfinished
+    // read is also empty. The module had carried `complete` correctly the whole time.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // Order is the fix: incomplete outranks empty, in BOTH lists.
+    expect(app).toMatch(/if \(!result \|\| result\.complete === false\) profileCardGiftsNote\.textContent = t\('profileCard\.giftsIncomplete'\);/);
+    // The names say it from a note above their grid now, in the gifts' own order — but it is the same order.
+    expect(app).toMatch(/else if \(incomplete\) profileCardNamesNote\.textContent = t\('username\.listMayBeIncomplete'\);/);
+    expect(app).toMatch(/else if \(owned\.length === 0\) profileCardNamesNote\.textContent = t\('username\.noNamesFound'\);/);
+    // A card opened before any answer arrives is not an empty wallet either.
+    // …and holds that line back while another attempt is on its way, because then it is not true yet.
+    expect(app).toMatch(/const incomplete = \(retrying \|\| unconfirmed\) \? false : \(result \? result\.complete === false : true\);/);
+
+    // AND THE ANSWER MUST NOT BE REMEMBERED. Caching an unfinished read kept answering "nothing here" for the
+    // next five minutes, including to someone who closed the card and reopened it to check.
+    expect(app).toMatch(/if \(result\.complete\) telegramGiftListCache\.set\(key, \{ at: Date\.now\(\), result \}\);/);
+
+    // ONE QUEUE. The indexer request had been a bare fetch at the same host the pump paces, so it competed with
+    // the app's own budget instead of taking its turn — and on a fresh wallet, already drawing 429s from a burst
+    // of avatar reads, it lost. It rides the shared pump now, which owns the pacing and the 429 ladder; a private
+    // ladder beside it would be a second mechanism for the one thing the invariant keeps single.
+    // (The reader itself moved into shard-rpc — see the transport-layer assertions above.)
+    // THROUGH THE TRANSPORT LAYER, and therefore through the ONE queue. Two rules meet here. app.js must not
+    // schedule raw toncenter HTTP (PWA-CHAIN-03 — the chain is reached through a replaceable transport), and WHICH
+    // queue a request joins is decided by `rateLimitKey`, not by calling the scheduler: omit it and the request
+    // derives its own bucket, i.e. a second worker with its own spacing and backoff firing a parallel connection
+    // to the same IP. That is what produced 429s on opening a profile and nowhere else. The reader in shard-rpc
+    // supplies the shared key by construction, so it cannot be reintroduced by forgetting an option.
+    expect(app).toMatch(/fetchImpl: createToncenterRestFetch\(\{ requestOptions: \{ priority: 'profile' \} \}\)/);
+    expect(app, 'the app layer must not schedule toncenter HTTP itself').not.toMatch(/scheduleToncenterHttpRequest/);
+    const shardRpc = readFileSync('web/shard-rpc.mjs', 'utf8');
+    expect(shardRpc).toMatch(/export function createToncenterRestFetch\(/);
+    expect(shardRpc).toMatch(/scanRequestOptions\(requestOptions\)\);/);
+    expect(app, 'no private retry ladder beside the pump').not.toMatch(/for \(const waitMs of \[0, 2000, 5000\]\)/);
+    // A request the pump never RAN is not an empty wallet — it is thrown with a status the caller can branch on,
+    // and that lives with the reader now.
+    expect(readFileSync('web/shard-rpc.mjs', 'utf8')).toMatch(/error\.status = 429;/);
+    // A request the pump never ran is not an empty wallet.
+
+    expect(app).toMatch(/apiKey: readStoredToncenterApiKey\(\),/);
+  });
+
+  it('PWA-AVATAR-ABSENT-01: a wallet with no KeyShard has no avatar — an answer, not an error to reprint forever', () => {
+    // OWNER'S CONSOLE, 2026-09-06: a wall of red `TON RPC get-method exit code -13` from getAvatar, on a wallet
+    // that had simply never registered keys. -13 is TON aborting a get-method against an account with NO CODE, so
+    // it is the most definitive answer the chain gives — and it was being treated as a failed read: a stack trace
+    // per occurrence, a fall back to a locally stored pointer that can never load, and (because only successes were
+    // remembered) the same question asked again on every render, forever, on the endpoint everything else queues for.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // THE EXIT CODE, NOT THE MESSAGE. Both codes count (production -13, sandbox -256) and a 404 must not, because
+    // the transport 404s on any proxy or misroute failure — reading that as absence turns a transient into a fact.
+    expect(app).toMatch(/const UNINITIALIZED_ACCOUNT_EXIT_CODES = new Set\(\[-13, -256\]\);/);
+    expect(app).toMatch(/function isUninitializedAccountError\(error\) \{/);
+    expect(app).toMatch(/const code = error\?\.exitCode \?\? error\?\.exit_code \?\? error\?\.body\?\.exit_code;/);
+    expect(app, 'a 404 is not absence').not.toMatch(/UNINITIALIZED_ACCOUNT_EXIT_CODES[\s\S]{0,200}404/);
+    // The message matcher next door answers a DIFFERENT question and must not be borrowed for this one.
+    expect(app).toMatch(/function isAthWalletNotDeployedError\(error\) \{/);
+
+    // The pointer read returns the answer instead of a failure, so the caller stops falling back to a dead pointer.
+    expect(app).toMatch(/if \(isUninitializedAccountError\(error\)\) \{\s*\n\s*writeStoredProfileAvatarPointer\(null, ownerWallet\);\s*\n\s*return \{ ok: true, pointer: null, record: null, absent: true \};/);
+
+    // And the loader REMEMBERS it, with an expiry, because a wallet can register keys at any moment.
+    expect(app).toMatch(/const profileAvatarAbsentUntil = new Map\(\);/);
+    expect(app).toMatch(/const PROFILE_AVATAR_ABSENT_TTL_MS = 15 \* 60_000;/);
+    expect(app).toMatch(/if \(absentUntil > Date\.now\(\)\) return null;/);
+    expect(app).toMatch(/profileAvatarAbsentUntil\.set\(ownerWallet, Date\.now\(\) \+ PROFILE_AVATAR_ABSENT_TTL_MS\);/);
+    // One wallet's answer is never quoted for another's: dropped with the rest of the per-wallet avatar state.
+    expect(app).toMatch(/profileAvatarLoadPromises\.clear\(\);\s*\n\s*profileAvatarAbsentUntil\.clear\(\);/);
+
+    // The whole point: this state prints nothing. Both sites must classify BEFORE they reach their console.error.
+    const pointerCatch = app.slice(app.indexOf('async function readCurrentProfileAvatarPointerResultFromChain'));
+    const uninitAt = pointerCatch.indexOf('isUninitializedAccountError');
+    const logAt = pointerCatch.indexOf('console.error(error)');
+    expect(uninitAt, 'the absence check must come before the log').toBeGreaterThan(-1);
+    expect(uninitAt).toBeLessThan(logAt);
+  });
+
+  it('PWA-GIFT-04: under the gift theme the field wears the gift\'s background SYMBOL, and every other caller keeps its dots', () => {
+    // [decided 2026-09-06] The mark is the gift's BACKGROUND SYMBOL — not a small copy of the gift, which
+    // was the first cut — and the runner heads wear it too, which the first cut missed. The geometry, the
+    // flashlights and the signal routes are untouched; only the MARK changes, and it
+    // changes for BOTH the lattice and the runner heads.
+    const app = readFileSync('web/app.js', 'utf8');
+    const field = readFileSync('web/boot-signal-field.mjs', 'utf8');
+
+    // DEFAULT NULL is the whole safety of this: the boot screen and the worker pass nothing and draw what they
+    // always drew. (A worker could not take a canvas anyway — only an ImageBitmap crosses that boundary.)
+    expect(field).toMatch(/mark = null,\s*\n\s*markSize = 16,/);
+    expect(field).toMatch(/if \(markImage\) \{ drawMarks\(\); return; \}/);
+    expect(app).toMatch(/mark: giftNodeMark\(\),/);
+    // BOTH surfaces. A lattice wearing the gift around a runner still drawing a dot is the seam that was reported.
+    expect(field).toMatch(/function litNode\(x, y, inten, v\) \{[\s\S]{0,400}if \(markImage\) \{/);
+
+    // A PICTURE NEEDS ITS OWN RAMP AND ITS OWN SPACING: the dot's ambient was calibrated for two teal pixels on a
+    // near-black page. The brightness slider still means what it means — only the scale differs.
+    //
+    // NO AMBIENT [owner, 2026-09-06]. The dot kept a faint floor so the lattice always read as a lattice; a
+    // pattern should not, so an unlit tile is the plain backdrop and nothing else.
+    expect(field).toMatch(/const a = boost \* lb \* edgeFade\(x, y\);/);
+    expect(field, 'an unlit tile must not keep a floor').not.toMatch(/const ambient = AMBIENT \* MARK_ALPHA_SCALE;/);
+    // AND THE TRAIL FADES OUT INSTEAD OF SWITCHING OFF. `0.55 + 0.45 * inten` left a node above half opacity at
+    // the intensity where drawSignals stops drawing it, so the symbol vanished mid-brightness; proportional to the
+    // decay, like the dot always was, it is invisible by the time the cutoff arrives.
+    expect(field).toMatch(/const a = inten \* v;/);
+    expect(field, 'the runner trail must not hold a floor either').not.toMatch(/\(0\.55 \+ 0\.45 \* inten\) \* v/);
+    // Retuned when the mark stopped being a dark stamp and became a lifting one: a near-white symbol at the
+    // dark stamp's strength was shouting.
+    expect(field).toMatch(/const MARK_ALPHA_SCALE = 2\.2;/);
+    expect(field).toMatch(/const MARK_STRIDE = 1;/);
+    expect(field).toMatch(/for \(let c = 0; c < cols; c \+= MARK_STRIDE\)/);
+
+    // THE SYMBOL IS DRAWN, NOT EXCAVATED [decided 2026-09-06]. The first cut carved each symbol out of
+    // the .webp — corners as a baseline, every pixel's distance from it called the symbol, then a floor and a
+    // coverage band to guess which was which. Rendered large it was plainly wrong: the mask carried the artwork's
+    // shading as opacity and dragged the gift's own drop shadow along as a smear under every symbol. The Lottie
+    // states what the symbol IS — one closed path with a flat opaque fill — so it is traced and filled, which is
+    // exact at any size and needs no artwork decode at all.
+    expect(app).toMatch(/async function readGiftPatternDrawing\(gift\)/);
+    expect(app).toMatch(/\.find\(\(layer\) => layer\?\.nm === 'Pattern'\)/);
+    expect(app).toMatch(/\$\{TELEGRAM_GIFT_ASSET_ORIGIN\}\/gift\/\$\{gift\.slug\}-\$\{gift\.number\}\.lottie\.json/);
+    // …and the host constant must be IMPORTED, or the whole build fails into a silent empty result, which is
+    // exactly how the first version shipped looking like plain dots.
+    expect(app).toMatch(/import \{\s*\n\s*TELEGRAM_GIFT_ASSET_ORIGIN,/);
+    // The bezier's handles are OFFSETS from their own vertex, not absolute points. Read as absolute, every curve
+    // collapses towards the origin and the glyph is a spike.
+    expect(app).toMatch(/vertices\[n - 1\]\[0\] \+ outgoing\[n - 1\]\[0\], vertices\[n - 1\]\[1\] \+ outgoing\[n - 1\]\[1\],/);
+    expect(app).toMatch(/context\.translate\(position\[0\], position\[1\]\);[\s\S]{0,200}context\.translate\(-anchor\[0\], -anchor\[1\]\);/);
+    // An ANIMATED transform or path is not a wallpaper: it is refused rather than frozen at frame zero.
+    expect(app).toMatch(/if \(property\.a === 1\) return null;/);
+    // …and every guess the pixel path needed is gone with it.
+    expect(app, 'no thresholds survive the vector path').not.toMatch(/GIFT_PATTERN_ALPHA_FLOOR|GIFT_PATTERN_COVERAGE_BAND|GIFT_PATTERN_TILE_SLACK/);
+    // The artwork is still decoded, but only for the GIFT in the middle of the tile, whose backdrop the Lottie
+    // states exactly enough to subtract (PWA-GIFT-06). What is banned is excavating the SYMBOL from pixels.
+    expect(app, 'the symbol must not be cut out of the artwork').not.toMatch(/giftPatternMaskFromTile/);
+    expect(app, 'nor may the mark decode a picture to find its shape')
+      .toMatch(/async function buildGiftPatternMark\(gift\) \{[\s\S]{0,260}composeGiftPatternMark\(drawing\)/);
+
+    // LIGHT LIFTS. Painting the mask in the symbol's OWN colour made a passing flashlight DARKEN the pattern —
+    // light-theme behaviour on a dark theme, which is what the owner caught. Only the SHAPE is the gift's; the
+    // colour is the active theme's text token, read from the token so it cannot drift from styles.css.
+    expect(app).toMatch(/tintGiftPatternMask\(mask, giftPatternMarkColour\(\)\)/);
+    // THE GIFT'S OWN COLOUR, the same one the plasma paints with — not the theme's text token, which is where this
+    // came from when a worn gift WAS the background. On the theme's ground a white grid on an orange app is the
+    // seam that showed. `--aurora-rgb` carries the app's own accent when nothing is worn, so there is no branch.
+    expect(app).toMatch(/function giftPatternMarkColour\(\) \{[\s\S]{0,200}getPropertyValue\('--aurora-rgb'\)/);
+    // …and the lattice, the routes between its points and the mark on them are the ONE colour: the field module
+    // keeps its teal only as the default, for every caller that knows nothing about gifts.
+    expect(field).toMatch(/ink = '48, 213, 176',/);
+    expect(field).toMatch(/const INK = typeof ink === 'string' && ink\.trim\(\) \? ink\.trim\(\) : '48, 213, 176';/);
+    expect(field, 'no painted colour may be baked in any more').not.toMatch(/const TEAL =/);
+    expect((field.match(/\$\{INK\}/g) ?? []).length, 'dots, routes and lit nodes').toBe(3);
+    expect(app).toMatch(/ink: bootFieldInk\(\),/);
+    // `undefined`, never null: a destructuring default applies to the first and not to the second, and a field
+    // painted in null is a field painted in nothing.
+    expect(app).toMatch(/function bootFieldInk\(\)[\s\S]{0,400}return undefined;/);
+    expect(app, 'the symbol colour must no longer be sampled from the artwork').not.toMatch(/sumR \+= data\[at\]/);
+
+    // THE LATTICE BAKES ITS MARK IN AT BUILD TIME, exactly as it bakes the sliders in, so every event that can
+    // change the mark must rebuild it — wearing, unwearing, choosing the theme, leaving it, and the art arriving.
+    expect(app).toMatch(/function refreshGiftNodeMark\(\) \{[\s\S]{0,200}applyBackgroundMode\(\{ rebuildNodes: true \}\);/);
+    expect((app.match(/refreshGiftNodeMark\(\);/g) ?? []).length, 'wear, unwear, select, clear, and art-arrival')
+      .toBeGreaterThanOrEqual(4);
+  });
+
+  it('PWA-GIFT-06: the plasma lights the gift\'s own pattern instead of trying to be seen on its backdrop', () => {
+    {
+      // ABOVE ITS READER AND ABOVE THE AWAIT [owner, 2026-09-08: "errors in the console" — every plasma frame drawn
+      // during the module's top-level await threw on a const declared after it]. The gain the frame loop reads is
+      // declared before the loop's drawer, and before the boot's await.
+      const source = readFileSync('web/app.js', 'utf8');
+      const decl = source.indexOf('const GIFT_PATTERN_LIGHT_GAIN = 4;');
+      expect(decl).toBeGreaterThan(0);
+      expect(decl).toBeLessThan(source.indexOf('function drawAuroraScene('));
+      expect(decl).toBeLessThan(source.indexOf('\nawait Promise.race(['));
+    }
+    // [decided 2026-09-06] Owner: make the plasma exactly the gift's background colour and let it light
+    // or darken the patterns; and look at how a gift arranges them, it may be worth reproducing.
+    //
+    // MEASURED, and it is why the plasma vanished: `--aurora-rgb` is the gift backdrop's own inner stop, which is
+    // 1.13 contrast against the wallpaper it paints on. As a wash it cannot be seen and must not try — a foreign
+    // colour would stop it being the gift's background. So the gift's pattern becomes the wallpaper and the plasma
+    // becomes the light on it.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const guard = readFileSync('web/boot-guard.js', 'utf8');
+
+    // THE GIFT'S OWN ARRANGEMENT, not a grid. Read from one gift's Lottie: 23 instances on rings at radii 137,
+    // 170-177 and 201-265, sizes falling outward from 11.0% of the square to 7.4%, mirrored about the vertical
+    // axis, and an empty middle where the gift itself is drawn.
+    expect(app).toMatch(/function composeGiftPatternTile\(drawing, subject = null\)/);
+    expect(app).toMatch(/const GIFT_PATTERN_TILE_UNITS = 512;/);
+    // WRAPPED, because that map is a medallion and not a tile: symbols cross its edges, and painted once they are
+    // sliced in half at the seam. Nine paintings, eight of which contribute only the neighbour's missing half.
+    expect(app).toMatch(/for \(const dx of \[-units, 0, units\]\) \{\s*\n\s*for \(const dy of \[-units, 0, units\]\)/);
+
+    // AND THE GIFT FILLS THE HOLE ITS OWN PATTERN LEAVES [owner, 2026-09-06: the middle is empty, put the gift
+    // there]. The map's centre is empty because that is where the artwork draws the gift, so a tile without it is
+    // half a composition.
+    //
+    // NOT BY TRACING IT. The Gift precomp is 22 layers of animated positions, scales and opacities, gradient
+    // STROKES and a parenting null — frozen at frame zero and filled flat it is a scribble. The artwork has it
+    // rendered already; what is in the way is the backdrop, and the Lottie states that exactly. So it is
+    // SUBTRACTED, which is a different act from the corner-guessing the symbol cut-out was rightly rid of.
+    expect(app).toMatch(/function readGiftBackdropGradient\(lottie\)/);
+    expect(app).toMatch(/if \(Number\(fill\?\.t\) !== 2\) continue;/);   // radial only, never a frozen guess at another model
+    // 2026-09-09: the tile's mask also takes the object's contours and its own alpha (WORN-08); the hero's colour cut does not.
+    expect(app).toMatch(/function cutGiftSubjectMask\(image, backdrop, units, \{ keepColour = false, solid = false, contours = false, objectAlpha = null \} = \{\}\)/);
+    // A MASK for the tile, which is painted in whatever colour the surface wants; the SUBJECT ITSELF for the
+    // profile's hero, where it has to look like the gift and not like a silhouette of it.
+    expect(app).toMatch(/if \(!keepColour\) \{[\s\S]{0,140}data\[at \+ 3\] = Math\.round\(255 \* alpha\);/);
+    expect(app).toMatch(/const expected = backdrop\.inner\[channel\] \+ \(\(backdrop\.outer\[channel\] - backdrop\.inner\[channel\]\) \* t\);/);
+    // THE COLOUR TEST IS NO LONGER THE WHOLE TEST, and it could not be: measured on Vice Cream, the true backdrop
+    // departs by 9-10 and its CONE by 54 — a cone the colour of its own backdrop cannot be told from it by colour
+    // at all, and a cut of 90 removed most of it (a row through it: 250 pixels of 298 at alpha zero). The cut is
+    // low enough to keep the subject whole, and SHAPE discards what else survives: the backdrop is what a flood
+    // reaches from the frame's edge, and the gift is the LARGEST region that flood cannot reach.
+    expect(app).toMatch(/const GIFT_SUBJECT_CUT = 30;/);
+    // TWO CONSUMERS, OPPOSITE NEEDS [owner, 2026-09-07: for the profile without holes, for the background as it
+    // was — it has turned into a blob]. The hero stands the gift in COLOUR on a ground painted in that gift's own
+    // backdrop, so a hole shows the backdrop through the subject: it wants the silhouette FILLED. The tile draws
+    // the same subject as a one-colour MASK, and the interior gaps — the waffle, the flame's cut-outs — are the
+    // whole reason it reads as a cone rather than a wedge. One cutter, two modes.
+    expect(app).toMatch(/const GIFT_PATTERN_SUBJECT_CUT = 90;/);
+    expect(app).toMatch(/const cut = solid \? GIFT_SUBJECT_CUT : GIFT_PATTERN_SUBJECT_CUT;/);
+    expect(app).toMatch(/cutGiftSubjectMask\(image, drawing\.backdrop, drawing\.units, \{ keepColour, solid: keepColour, contours: !keepColour, objectAlpha \}\)/);
+    // The mask path takes the ramp alone — no flood, no region, nothing filled.
+    expect(app).toMatch(/const stack = solid \? \[\] : null;/);
+    // …and the tile records WHICH cut made it, or the blob would outlive the fix on every device holding one.
+    // 3 since 2026-09-09: the raster cut stays, thinned along the object's own contours and confined to its own
+    // alpha (tests/worn-gift-is-shown-to-others.test.ts, WORN-08). Two pure-vector recipes before it were turned down.
+    expect(app).toMatch(/const GIFT_PATTERN_TILE_VERSION = 3;/);
+    expect(app).toMatch(/wornGiftTheme\.patternTileVersion !== GIFT_PATTERN_TILE_VERSION/);
+    expect(app).toMatch(/if \(size > bestSize\) \{ bestSize = size; bestLabel = label; \}/);
+    // Not "the region under the middle pixel", which is what this was first: Chill Flame's torch lies diagonally
+    // and does not cover the centre, so the seed landed on backdrop and no cut-out was produced at all.
+    expect(app, 'the subject must not be sought at a fixed point').not.toMatch(/const seed = \(Math\.round\(units \/ 2\)/);
+    expect(app).toMatch(/const GIFT_SUBJECT_FIT = 230;/);
+    // A gift whose backdrop cannot be read still gets its pattern — just without the middle.
+    expect(app).toMatch(/if \(!drawing\.backdrop\) return null;/);
+    expect(app).toMatch(/composeGiftPatternTile\(drawing, await cutGiftSubjectForDrawing\(gift, drawing\)\)/);
+
+    // A MASK, not a picture: stored white-on-transparent, so one tile survives a light/dark flip and the colour
+    // is whatever the canvas underneath is painted in.
+    expect(app).toMatch(/setRootToken\('--gift-pattern', `url\("\$\{tile\}"\)`\);/);
+    expect(app).toMatch(/setRootToken\('--gift-pattern-size', `\$\{GIFT_PATTERN_TILE_CSS_PX\}px`\);/);
+    expect(css).toMatch(/\.aurora-pattern:not\(\[hidden\]\) \{[\s\S]{0,400}mask-image: var\(--gift-pattern\);/);
+    // AND NOTHING PAINTS IT AT REST. An ambient wash made the pattern a wallpaper, which is the opposite of the
+    // rule: it must be invisible on the background and appear only where the plasma reaches it.
+    expect(css, 'the pattern must not be visible without the plasma').not.toMatch(/\.aurora-layer::before/);
+
+    // OFF UNLESS THERE IS A TILE. `mask-image: var(--gift-pattern)` with the property unset is INVALID, not
+    // absent: the mask is dropped and the element keeps painting, which for this one is a full-screen ink plate.
+    // So the stylesheet keys on an attribute that is only ever set when a tile exists.
+    expect(css).toMatch(/\.aurora-pattern \{\s*\n\s*display: none;\s*\n\s*\}/);
+    expect(app).toMatch(/setRootFlag\('data-gift-pattern', 'true'\);/);
+    expect(app).toMatch(/if \(!tile\) \{\s*\n\s*dropRootFlag\('data-gift-pattern'\);/);
+
+    // AND IT BELONGS TO THE PLASMA. The lattice draws these same symbols at its own nodes, so under "nodes" they
+    // would double; "none" is a request for a quiet app, not for a different picture.
+    expect(app).toMatch(/document\.documentElement\.setAttribute\('data-background', backgroundMode\);/);
+    expect(css).toMatch(/\[data-gift-pattern="true"\]\[data-background="plasma"\]/);
+
+    // THE LIGHT IS THE SAME PAINTING TWICE: the same suns, the SAME GIFT COLOUR (`rgb`, not a second ink), four
+    // times the strength, cut to the pattern. The mask is what keeps it cheap — the canvas holds only soft blobs
+    // at the plasma's own low resolution and the compositor cuts them to crisp symbols at the device's, so no
+    // full-screen composite runs per frame.
+    expect(app).toMatch(/const GIFT_PATTERN_LIGHT_GAIN = 4;/);
+    expect(app).toMatch(/paintAuroraView\(view, t, rgb, view\.patternCtx, view\.patternCanvas, GIFT_PATTERN_LIGHT_GAIN\)/);
+    expect(app).toMatch(/paintAuroraScene\(scene, t, rgb, scene\.patternCtx, scene\.patternCanvas, GIFT_PATTERN_LIGHT_GAIN\)/);
+    expect(app).toMatch(/auroraGlowPainter\(ctx, w, rgb, level \* gain\)/);
+    // Both canvases share one box, so they must share one resolution — a mismatch would slide the light off its
+    // own mask.
+    expect(app).toMatch(/scene\.patternCanvas\.width = cw;\s*\n\s*scene\.patternCanvas\.height = ch;/);
+    expect(app).toMatch(/if \(scene\.patternCanvas\) scene\.patternCanvas\.hidden = !plasmaOn;/);
+
+    // BEFORE FIRST PAINT, like the colours: the tile travels with the choice as a mask, so the loading screen
+    // needs no decode and no network to wear it. 256 is app.js's GIFT_PATTERN_TILE_CSS_PX, written out because
+    // the guard runs before any module does — these two are the pin.
+    expect(app).toMatch(/const GIFT_PATTERN_TILE_CSS_PX = 256;/);
+    expect(guard).toMatch(/root\.style\.setProperty\('--gift-pattern-size', '256px'\);/);
+    expect(guard).toMatch(/root\.setAttribute\('data-gift-pattern', 'true'\);/);
+    expect(guard).toMatch(/localStorage\.getItem\('platho\.background\.v1'\)/);
+    expect(guard, 'the guard must default exactly as readBackgroundMode does').toMatch(/\? plathoBackground : 'none'/);
+  });
+
+  it('PWA-AVATAR-POINTER-01: a face seen once is not read from the chain again', () => {
+    // [owner, 2026-09-06] "why does it load the avatars from the chain every time, why are they not
+    // saved?" The IMAGES were — IndexedDB, keyed by hash, surviving a restart. The POINTER naming which hash a
+    // wallet wears was not, and without it the hash is unknown, so every launch spent one ProfileRegistry read per
+    // face on screen before it could look in a cache it already had.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // The per-owner store existed all along and only the local wallet used it. The loader consults it when the
+    // caller supplies no pointer, which is the case that was paying for the read.
+    expect(app).toMatch(/if \(!requestedPointer\) \{\s*\n\s*const remembered = readStoredProfileAvatarPointer\(ownerWallet\);/);
+    expect(app).toMatch(/if \(remembered && !profileAvatarPointerIsStale\(remembered\)\) \{/);
+    // …and what gets remembered is the record the shard ANSWERS WITH, which is the wallet's current one whether or
+    // not somebody asked by number (getAvatarVersion answers only when the version matches). The pointer that was
+    // ASKED for — a message names some particular past version — is never the thing written.
+    expect(app).toMatch(/if \(recordPointer && \(!requestedPointer \|\| recordPointer\.profileVersion === requestedPointer\.profileVersion\)\) \{\s*\n\s*writeStoredProfileAvatarPointer\(recordPointer, ownerWallet\);/);
+
+    // THE SECOND REPORT, SAME DAY [owner, 2026-09-07: "they had just loaded, I refreshed, and they are gone
+    // again"]. The images were in IndexedDB and the pointers in localStorage; three things kept them off the screen.
+    // (a) The boot warm looked faces up by the hash embedded in each POST — stale the moment the author changed
+    //     the avatar, absent on a comment — and never by the pointer remembered for the wallet. Now it seeds from
+    //     the remembered current pointer of every feed-source wallet first.
+    const warm = app.slice(app.indexOf('async function warmPublicChannelAvatarsFromCache()'), app.indexOf('async function migrateLegacyAvatarMediaCacheToIndexedDb'));
+    expect(warm).toMatch(/for \(const channel of feedSourcePublicChannels\(\)\) \{[\s\S]{0,400}?const remembered = readStoredProfileAvatarPointer\(raw\);/);
+    // (b) …and says whether it set anything, because the boot render goes ahead after 400 ms and a warm that lands
+    //     later must repaint — the late repaint used to exist for post images only.
+    expect(warm).toMatch(/return changed;\s*\n\}/);
+    expect(app).toMatch(/const facesChanged = await warmPublicChannelAvatarsFromCache\(\)\.catch\(\(\) => false\);\s*\n\s*const changed = \(await warmPublicPostImagesFromCache\(\)\.catch\(\(\) => false\)\) \|\| facesChanged;/);
+    // (c) A version the shard no longer holds was asked about again every sync cycle. Versions only move forward, so
+    //     a requested version OLDER than one already confirmed for the wallet is answered locally; a miss the chain
+    //     does answer is remembered for a day and cleared with the rest on a wallet change.
+    expect(app).toMatch(/if \(remembered && remembered\.profileVersion > requestedPointer\.profileVersion\) \{\s*\n\s*note\('superseded'/);
+    expect(app).toMatch(/const profileAvatarVersionMissUntil = new Map\(\);/);
+    expect(app).toMatch(/if \(requestedPointer\) profileAvatarVersionMissUntil\.set\(key, Date\.now\(\) \+ PROFILE_AVATAR_POINTER_TTL_MS\);/);
+    expect(app).toMatch(/profileAvatarAbsentUntil\.clear\(\);[^\n]*\n\s*profileAvatarVersionMissUntil\.clear\(\);/);
+    // (d) And one key per wallet: the loader wrote under the raw spelling, the own-profile refresh under the
+    //     user-friendly one, so each was blind to the other's record. Canonical now, legacy record moved on read.
+    expect(app).toMatch(/const spelling = canonical \? \(rawWalletAddress\(owner\) \?\? owner\) : owner;/);
+    expect(app).toMatch(/const legacyKey = profileAvatarStorageKey\(owner, \{ canonical: false \}\);/);
+
+    // FRESHNESS HAS TWO SOURCES, which is why a day is not reckless: the pointer also rides every message its
+    // owner sends, so an active peer's change arrives by a different hash and never waits for this at all.
+    expect(app).toMatch(/const PROFILE_AVATAR_POINTER_TTL_MS = 24 \* 60 \* 60_000;/);
+    expect(app).toMatch(/function profileAvatarPointerIsStale\(pointer\) \{[\s\S]{0,200}> PROFILE_AVATAR_POINTER_TTL_MS;/);
+    // A record written before the timestamp existed must be CONFIRMED, not discarded — the pointer in it is good.
+    expect(app).toMatch(/const checkedAt = Number\(parsed\.checkedAt \?\? 0\);/);
+
+    // AND A PEER'S POINTER IS NOT THE USER'S. The write mirrored into `localProfileAvatarPointer` whatever owner
+    // it was handed; harmless only while nothing passed a peer's, which is exactly what now does — a peer with no
+    // KeyShard would have erased the user's own face. Compared as addresses, because this is reached with the raw
+    // form from the loader and the user-friendly one from the own-profile refresh.
+    expect(app).toMatch(/const isLocal = Boolean\(owner\) && Boolean\(plathoWallet\?\.address\) && sameWalletAddress\(owner, plathoWallet\.address\);/);
+    expect(app).toMatch(/if \(isLocal\) localProfileAvatarPointer = null;/);
+    expect(app).toMatch(/if \(!isLocal\) return;\s*\n\s*localProfileAvatarPointer = \{/);
+  });
+
+  it('PWA-GIFT-08: the choice to wear gifts outlives any one gift', () => {
+    // [owner, 2026-09-06] "Taking a gift off drops the theme to plain dark or light; putting one back on
+    // should bring the gift theme back."
+    //
+    // The cause was where the choice was kept: INSIDE the record of which gift is worn. Taking the gift off nulls
+    // that record, so the preference went with it and the next gift arrived "not chosen". A preference about how
+    // the app should look is not a property of one gift.
+    const app = readFileSync('web/app.js', 'utf8');
+    const guard = readFileSync('web/boot-guard.js', 'utf8');
+
+    expect(app).toMatch(/const GIFT_THEME_CHOICE_STORAGE_KEY = 'platho\.giftTheme\.choice\.v1';/);
+    expect(app, 'wearing a gift must not carry — or reset — the choice').not.toMatch(/theme: giftThemeChosen\(\),/);
+    expect(app).toMatch(/function selectGiftTheme\(\) \{[\s\S]{0,200}writeGiftThemeChoice\(true\);/);
+    expect(app).toMatch(/function clearGiftThemeChoice\(\) \{[\s\S]{0,200}writeGiftThemeChoice\(false\);/);
+
+    // THREE QUESTIONS, KEPT APART: chosen, worn, and in effect. With the preference standing but nothing worn
+    // there is nothing to take colours from, so the app is plain — and the control must say so, because a select
+    // reading "Telegram gift" over a plainly dark app is the same lie it told this morning from the other side.
+    expect(app).toMatch(/function giftThemeInEffect\(\) \{\s*\n\s*return giftThemeChosen\(\) && Boolean\(wornGiftTheme\);/);
+    expect(app).toMatch(/appearanceThemeSelect\.value = giftThemeInEffect\(\) \? 'gift' : currentEffectiveTheme\(\);/);
+    // …and wearing one is what puts a standing choice into effect, so the control is re-read there too.
+    expect(app).toMatch(/refreshGiftNodeMark\(\);[\s\S]{0,180}refreshAppearanceUi\(\);\s*\n\}\s*\n\s*function unwearTelegramGift/);
+
+    // THE MIGRATION RUNS BEFORE ANYTHING CAN DESTROY ITS SOURCE. The old answer lives in the record that unwearing
+    // nulls, so a lazy copy-on-first-use would have been too late for exactly the user who unwears before opening
+    // Appearance. An absent key falls back to the old place; that fallback IS the migration.
+    // …and ONLY when there is an old answer to read. Seeding unconditionally stamped "not chosen" on any launch
+    // that found no gift record at all — and that stamp then outranks the fallback forever.
+    expect(app).toMatch(/getItem\(GIFT_THEME_CHOICE_STORAGE_KEY\) === null && localStorage\.getItem\(GIFT_THEME_STORAGE_KEY\)/);
+    expect(app).toMatch(/writeGiftThemeChoice\(giftThemeChosenInStorage\(\)\);/);
+    expect(app).toMatch(/return record\?\.theme === true;   \/\/ written by a build where the choice lived in the gift's record/);
+    // Read from STORAGE, so the boot helpers can ask while the module is still evaluating — literal keys for the
+    // same dead-zone reason as the pattern, and these are the pins that keep them equal to the constants.
+    expect(app).toMatch(/localStorage\.getItem\('platho\.giftTheme\.choice\.v1'\)/);
+    expect(guard).toMatch(/var plathoGiftChoice = localStorage\.getItem\('platho\.giftTheme\.choice\.v1'\);/);
+    expect(guard).toMatch(/plathoGiftChoice === 'true'/);
+    expect(guard, 'the guard must honour an explicit no as well').toMatch(/plathoGiftChoice !== 'false'/);
+    expect(guard, 'the pre-paint guard must not use let\/const').not.toMatch(/\n\s*(?:let|const) plathoGiftChoice/);
+  });
+
+  it('PWA-GIFT-09: the profile card opens on a hero made of the gift and the name\'s rarity', () => {
+    // [owner, 2026-09-07, with a Telegram profile beside it] Drop the headings, take the background from the gift,
+    // put its pattern on it, ring it in the worn username's rarity, centre the name, keep the avatar SQUARE.
+    const app = readFileSync('web/app.js', 'utf8');
+    const css = readFileSync('web/styles.css', 'utf8');
+    const html = readFileSync('web/index.html', 'utf8');
+
+    // The headings go from SIGHT, not from the accessibility tree: the dialog is still labelled by its title.
+    expect(html).toMatch(/<h2 id="profileCardTitle" class="sr-only"/);
+    expect(html, 'the lead sentence was the other half of the noise').not.toContain('data-i18n="profileCard.lead"');
+    expect(html).toMatch(/aria-labelledby="profileCardTitle"/);
+
+    // BOTH BACKDROP STOPS, used the way the artwork uses them — lighter middle, darker rim, pattern in the rim
+    // tone. Published under their own names because the PAGE must still not be painted in the gift.
+    expect(app).toMatch(/node\.style\.setProperty\('--gift-hero-inner', `\$\{ir\} \$\{ig\} \$\{ib\}`\);/);
+    expect(app).toMatch(/node\.style\.setProperty\('--gift-hero-edge', `\$\{er\} \$\{eg\} \$\{eb\}`\);/);
+    expect(app).toMatch(/node\.style\.removeProperty\('--gift-hero-inner'\);/);
+    // The radial lives on the hero's glow LAYER since PWA-GIFT-11's follow-up (a change of gift glows in rather
+    // than snapping); the hero itself carries the rim as the flat underlay the cross-fade rides.
+    expect(css).toMatch(/\.profile-card-hero::before \{[\s\S]{0,600}var\(--gift-hero-inner/);
+    // NEVER A SCROLL CONTAINER [owner, 2026-09-08: "the header just collapses instead of the whole modal
+    // scrolling"]. The panel is a grid; an item with overflow other than visible has an automatic minimum height
+    // of zero, and the grid shrank the hero to its padding the moment the names made the panel taller than the
+    // screen. The corners are kept by a clip-path instead.
+    const heroRule = css.slice(css.indexOf('.profile-card-hero {'), css.indexOf('}', css.indexOf('.profile-card-hero {')))
+      .replace(/\/\*[\s\S]*?\*\//g, '');   // the comment names the very thing the rule must not contain
+    expect(heroRule).toContain('clip-path: inset(0 round var(--r-lg, 16px) var(--r-lg, 16px) 0 0);');
+    expect(heroRule, 'overflow: hidden makes the hero a scroll container the grid may squash').not.toMatch(/overflow(-[xy])?: (hidden|auto|scroll)/);
+    // THE FACE KEEPS ITS `cover` [owner, 2026-09-08: "no avatar in the hero, there is one in the settings"]. The
+    // hero's plate rules used the `background:` shorthand, which resets background-size and background-position —
+    // the base .avatar rule's cover/center — so the photo was painted at natural size from its top-left corner.
+    const strip = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+    const plate = strip(css.slice(css.indexOf('.profile-card-hero .profile-card-avatar {'), css.indexOf('}', css.indexOf('.profile-card-hero .profile-card-avatar {'))));
+    const photo = strip(css.slice(css.indexOf('.profile-card-hero .profile-card-avatar.has-image {'), css.indexOf('}', css.indexOf('.profile-card-hero .profile-card-avatar.has-image {'))));
+    expect(plate).toMatch(/background-image: none;\s*\n\s*background-color: rgb\(var\(--gift-hero-ink, 255 255 255\) \/ 0\.16\);/);
+    expect(photo).toContain('background-color: var(--panel-3);');
+    // ONE RING WHATEVER THE TIER [owner, 2026-09-08: "sometimes inside, sometimes outside"]: the list's inset tier
+    // ring out-specifies the hero's, so the hero restates its outer ring for the tiered photo too.
+    expect(css).toMatch(/\.profile-card-hero \.profile-card-avatar\.has-image\[data-tier="epic"\],\s*\n\.profile-card-hero \.profile-card-avatar\.has-image\[data-tier="rare"\] \{\s*\n\s*box-shadow:\s*\n\s*0 0 0 3px var\(--hero-ring, rgb\(var\(--gift-hero-ink, 255 255 255\) \/ 0\.32\)\),\s*\n\s*0 0 0 4px rgb\(var\(--gift-hero-ink, 0 0 0\) \/ 0\.28\);/);
+    expect(plate, 'the shorthand resets cover/center').not.toMatch(/^\s*background:/m);
+    expect(photo, 'the shorthand resets cover/center').not.toMatch(/^\s*background:/m);
+    expect(css, 'the base face is cover/center, which the hero must inherit').toMatch(/\.avatar \{[\s\S]{0,400}background-size: cover;\s*\n\s*background-position: center;/);
+    expect(css).toMatch(/\.profile-card-hero \{[\s\S]{0,1600}background-color: rgb\(var\(--gift-hero-edge, 255 255 255 \/ 0\)\);/);
+    // AND THE FALLOFF HAPPENS WHERE IT CAN BE SEEN. A gift's two stops are close by design — measured on Vice
+    // Cream, 1.50 apart — so a radial that only reaches its rim colour in the far corners spends the whole
+    // visible band near one colour and reads as the flat fill the owner reported.
+    expect(css).toMatch(/rgb\(var\(--gift-hero-edge, 255 255 255 \/ 0\)\) 88%\);/);
+
+    // THE COLOURS ARE READ, NOT GUESSED. Both stops used to be sampled off the artwork, and the middle sample
+    // lands on the GIFT and its shadow rather than the backdrop behind it — so it came back far darker than the
+    // backdrop is, and every surface derived from the pair was flatter than the gift. The Lottie states them.
+    expect(app).toMatch(/appearance = \{ tint: drawing\.backdrop\.outer, inner: drawing\.backdrop\.inner, stopsFrom: 'lottie' \};/);
+    expect(app).toMatch(/stopsFrom: appearance\.stopsFrom,/);
+    // Stamped, so a gift worn while they were still sampled is corrected once and not re-corrected forever.
+    expect(app).toMatch(/const needsStops = wornGiftTheme\.stopsFrom !== 'lottie';/);
+    expect(app).toMatch(/next\.stopsFrom = 'lottie';/);
+    expect(app, 'the pixel sample stays as the fallback').toMatch(/stopsFrom: 'sample' \}/);
+    expect(css).toMatch(/\.profile-card-hero-pattern \{[\s\S]{0,900}mask-image: var\(--gift-hero-pattern\);/);   // its own token — PWA-GIFT-14
+    // A TONE SHIFT OF THE GROUND, not one of the two stops: measured on Chill Flame they are 1.13 apart, which
+    // is the same colour, and the pattern was invisible. Black or white, whichever the backdrop is not.
+    expect(css).toMatch(/background: rgb\(var\(--gift-hero-ink, 255 255 255\) \/ 0\.14\);/);
+    // ONE WAY OF JUDGING LIGHT AGAINST DARK [owner, 2026-09-07: do not duplicate a function]. This branched on a
+    // hand-picked luminance of 0.35 while every other rule in the file MEASURES contrast — two methods for one
+    // question, and two gifts either side of that line got opposite inks while resolving to the same palette.
+    // Measured, Chill Flame's green takes black at 7.59 against white's 2.77: the threshold was not merely
+    // inconsistent, it was wrong. And it matches what the gifts themselves do — a bright backdrop's pattern is
+    // darkened, a dark one's is lightened.
+    expect(app).toMatch(/function readableInkOn\(colour\)/);
+    // (Computed once into heroInk since PWA-GIFT-11 — the pills take the same measured ink.)
+    expect(app).toMatch(/const heroInk = readableInkOn\(\[ir, ig, ib\]\);\s*\n\s*node\.style\.setProperty\('--gift-hero-ink', heroInk\.join\(' '\)\);/);
+    expect(app, 'no second way of answering it').not.toMatch(/relativeLuminance\([^)]*\) > 0\.\d+ \?/);
+    // The cut-out records WHICH cut made it: the first one punched holes through any subject sharing a colour
+    // with its own backdrop, and a stored picture that cannot know it is stale is one nothing would replace.
+    expect(app).toMatch(/const GIFT_SUBJECT_ART_VERSION = 5;/);
+    expect(app).toMatch(/wornGiftTheme\.subjectArtVersion !== GIFT_SUBJECT_ART_VERSION/);
+    // The close button is the app's icon button, which expects a panel behind it; over a gift's backdrop it had
+    // nothing to sit on and vanished. Its scrim is the backdrop's own opposite tone, so one rule covers both.
+    expect(css).toMatch(/\.profile-card-hero-close \{[\s\S]{0,400}background: rgb\(var\(--gift-hero-ink, 0 0 0\) \/ 0\.22\);/);
+
+    // THE GIFT IS CUT OUT OF ITS OWN BACKDROP. Its artwork is a square that INCLUDES that backdrop, so on a
+    // hero painted in the same backdrop it read as a sticker with a visible edge. Stored with the worn gift,
+    // and the whole picture stays as the fallback for one worn before the cut-out existed.
+    expect(app).toMatch(/async function buildGiftSubjectArt\(gift\)/);
+    // THE BACKDROP IS WHAT THE FLOOD CAN REACH, not what matches a colour. A threshold alone cannot tell the
+    // ground BEHIND a subject from a part OF it that happens to be the same colour — and Vice Cream's cone is
+    // the colour of its own backdrop, so the cut punched holes through it and the gift read as transparent.
+    expect(app).toMatch(/const outside = new Uint8Array\(count\);/);
+    expect(app).toMatch(/if \(outside\[index\] \|\| !looksLikeBackdrop\[index\]\) continue;/);
+    // …and the ramp applies only where it does any work: at the silhouette's edge. Applied throughout the
+    // interior it left every mid-tone at a fraction of its own opacity — measured, 58% solid before, 85% after.
+    expect(app).toMatch(/let alpha = subject\[index\] \? 1 : 0;/);
+    expect(app).toMatch(/alpha = Math\.max\(ramp\[index\], 0\.35\);/);
+    expect(app).toMatch(/cutGiftSubjectForDrawing\(gift, drawing, \{ keepColour: true \}\)/);
+    // 2026-09-09: the hero reads ONE record — one's own worn gift, or the contact's published and proven one.
+    expect(app).toMatch(/theme\.subjectArt \?\? telegramGiftArtCache\.get\(/);
+    expect(app).toMatch(/function ensureGiftSubjectArt\(\)/);
+    // With no tile there is nothing to mask, and an unmasked plate is a flat wash over the whole hero.
+    expect(css).toMatch(/\.profile-card-hero:not\(\[data-gift-hero-pattern="true"\]\) \.profile-card-hero-pattern \{[\s\S]{0,80}display: none;/);
+
+    // THE FRAME IS THE NAME'S RARITY, from the one place that decides where a tier begins, and painted in the
+    // tones a .ath name already carries everywhere else.
+    expect(app).toMatch(/const tier = linked \? plathoUsernameTier\(linked\) : null;/);
+    expect(app).toMatch(/profileCardHero\.dataset\.tier = tier \?\? 'none';/);
+    expect(css).toMatch(/\.profile-card-hero\[data-tier="epic"\] \{ border-bottom-color: var\(--id-platho-epic\); \}/);
+    expect(css).toMatch(/\.profile-card-hero\[data-tier="rare"\] \{ border-bottom-color: var\(--id-platho-rare\); \}/);
+    // Only on one's OWN card: a contact's linked name is not something this device knows, and a frame drawn from a
+    // guess would be a claim about somebody else's property.
+    expect(app).toMatch(/const linked = own \? readLinkedPlathoUsername\(plathoWallet\?\.address\)\?\.label \?\? null : null;/);
+
+    // …and the frame follows the choice that decides it, from either side of the card.
+    expect(app).toMatch(/dressProfileCardHero\(own\);   \/\/ the frame IS this choice/);
+    // (`flags` since PWA-GIFT-10: a tile re-rendered from inside itself says the same about the list it is in.)
+    expect(app).toMatch(/renderProfileCardGifts\(result, own, flags\); dressProfileCardHero\(own\);/);
+
+    // THE FACE FOLLOWS THE DIALOG LIST'S THREE RULES [owner, 2026-09-07]. The card called setAvatarNode directly,
+    // so a bare wallet always got a monogram — of the ADDRESS, which begins "UQ" for everyone, which is the exact
+    // case the anonymity mask exists for. What it must NOT take from setThreadAvatarNode is the pin, mute and
+    // group badges: those describe a conversation row, and this is a profile.
+    expect(app).toMatch(/function dressProfileCardFace\(\{ node, thread, raw, own, label \}\)/);
+    expect(app).toMatch(/node\.innerHTML = ANONYMOUS_AVATAR_SVG;/);
+    expect(app).toMatch(/const named = own \? Boolean\(linked\) : !threadIsBareWalletAddress\(thread\);/);
+    expect(app, 'the card must not build its own monogram from the address').not.toMatch(/setAvatarNode\(profileCardAvatar, String\(label/);
+    // The plate had to become opaque: the avatar's own fill is the accent at 25%/6% alpha, which over a gift's
+    // backdrop is nothing at all — the rectangle was simply not there.
+    expect(css).toMatch(/\.profile-card-hero \.profile-card-avatar \{[\s\S]{0,1200}box-shadow:[\s\S]{0,80}var\(--hero-ring/);
+    // TWO rings: the tier's tone and a hairline of the backdrop's opposite. A tier tone can be the colour it
+    // lands on — gold on a gold gift, green on a green one — and then the frame has no edge at all.
+    expect(css).toMatch(/0 0 0 4px rgb\(var\(--gift-hero-ink, 0 0 0\) \/ 0\.28\);/);
+    // The name is the same problem in text, and takes the same halo.
+    expect(css).toMatch(/text-shadow: 0 1px 3px rgb\(var\(--gift-hero-ink, 0 0 0\) \/ 0\.55\);/);
+    expect(css).toMatch(/\.profile-card-hero\[data-tier="epic"\] \{ --hero-ring: var\(--id-platho-epic\); \}/);
+
+    // THE DESCRIPTION AND THE LATEST POST ARE DISCOVERY'S, NOT COPIES OF THEM [owner, 2026-09-07: it is already
+    // implemented in discovery, do not reinvent it and do not duplicate it]. The description comes from the same
+    // cachedChannelProfile record the channel popover reads; the post is discovery's own reader and its own node.
+    expect(app).toMatch(/cachedChannelProfile\(raw\)\?\.description/);
+    expect(app).toMatch(/const node = buildDiscoveryLatestNode\(wallet\);/);
+    expect(app).toMatch(/queueDiscoveryLatestPost\(raw, \{ retry: true \}\);/);
+    expect((app.match(/async function loadDiscoveryLatestPost\(/g) ?? []).length, 'one reader, not two').toBe(1);
+    // The lane's gate asked which SCREEN was open; it exists to stop reads nobody will see, so it asks that now.
+    expect(app).toMatch(/function discoveryLatestHasAnAudience\(\)/);
+    expect(app).toMatch(/if \(!discoveryLatestHasAnAudience\(\) \|\| !wallet\) return;/);
+    // …and it cannot throw from a dead zone: profileCardSubject is declared far below the discovery lane.
+    expect(app).toMatch(/try \{[\s\S]{0,80}return profileCardSubject !== null;[\s\S]{0,40}\} catch \{/);
+
+    // SQUARE, not Telegram's circle [owner].
+    expect(css).toMatch(/\.profile-card-avatar \{[\s\S]{0,140}border-radius: 20px;/);
+  });
+
+  it('PWA-GIFT-07: a card whose read did not finish keeps asking while it is open', () => {
+    // [owner, 2026-09-06] "I do not like that when reading the gifts fails, the app cheerfully shrugs
+    // and does not try again." Right: the card said "the index could not be reached" once and then sat there, and
+    // the only way to ask again was to close it and open it again. Nothing about one busy minute makes that
+    // answer permanent.
+    const app = readFileSync('web/app.js', 'utf8');
+
+    // THE GAP GROWS AND THEN HOLDS. These reads are not free and they share the app's one request queue, so a card
+    // left open must not become a poller.
+    // FIRST RETRY WAITS FOR NOTHING [owner, 2026-09-06]: the app's one request pump already spaces these reads
+    // and backs off by itself after a 429, so a timer in front of it only made the user wait with an idle
+    // queue. Handing it straight back lets the pump decide when it actually goes.
+    expect(app).toMatch(/const PROFILE_CARD_RETRY_LADDER_MS = \[0, 4_000, 12_000, 30_000\];/);
+    expect(app).toMatch(/function driveProfileCardRead\(subject, lane, attempt = 0\)/);
+    // BOTH failure shapes retry: a read that says it is incomplete, and a read that threw.
+    expect(app).toMatch(/if \(retrying\) scheduleProfileCardRetry\(subject, lane, attempt\);/);
+    expect(app).toMatch(/lane\.render\(null, \{ retrying: true \}\);[\s\S]{0,140}scheduleProfileCardRetry\(subject, lane, attempt\);/);
+    // …and a thrown read must read as UNFINISHED, not as an empty wallet. `result?.complete === false` is false
+    // for null, which sent a failed read straight to "no Telegram gifts".
+    expect(app).toMatch(/if \(!result \|\| result\.complete === false\) profileCardGiftsNote\.textContent = t\('profileCard\.giftsIncomplete'\);/);
+
+    // THE SUBJECT IS THE LIFETIME. It is cleared the moment the card closes or moves to another wallet, so an
+    // attempt that wakes into either finds nothing to paint and stops there — nobody is looking at a closed card.
+    expect(app).toMatch(/function closeProfileCardDialog\(\) \{\s*\n\s*profileCardSubject = null;[\s\S]{0,240}?clearProfileCardRetries\(\);/);
+    expect(app, 'a retry that wakes into a closed card paints nothing').toMatch(/if \(profileCardSubject !== subject\) return;\s*\n\s*driveProfileCardRead\(subject, lane, attempt \+ 1\);/);
+    // Both lists go through it: they fail the same way, and the names lane would have been the next report.
+    expect((app.match(/driveProfileCardRead\(raw, \{/g) ?? []).length, 'names and gifts').toBe(2);
+    // A LIVE ATTEMPT MUST NOT SIT UNDER "could not be reached" — that line is a verdict, and printing one at the
+    // moment the app is about to ask again reads as having given up, which is what the owner saw. Whatever the
+    // read DID find is still painted; only the claim that it finished and failed is withheld.
+    // …and the same line covers a list painted from LAST TIME while the chain is asked again (PWA-GIFT-10): the
+    // chain is being read in both cases, and that is what the note says.
+    // …though the note itself is BLANK for it now — the foot of the card carries the one "reading" line (PWA-GIFT-15).
+    expect(app).toMatch(/if \(retrying \|\| unconfirmed\) profileCardGiftsNote\.textContent = '';/);
+    expect(app).toMatch(/const retrying = result\?\.complete === false;\s*\n\s*lane\.render\(result, \{ retrying \}\);/);
+    expect(app).toMatch(/lane\.render\(null, \{ retrying: true \}\);/);
+  });
+
+  it('PWA-GIFT-05: the loading screen wears the gift too, and no canvas is ever posted to the worker', () => {
+    // [decided 2026-09-06] The loading screen gets the gift as well. Two reasons it did not, both
+    // answered here: the boot screen paints before the app knows anything (so the colours are cached and applied
+    // by the pre-paint guard), and its field runs in a WORKER, which no canvas can cross.
+    const app = readFileSync('web/app.js', 'utf8');
+    const field = readFileSync('web/boot-signal-field.mjs', 'utf8');
+    const worker = readFileSync('web/boot-signal-worker.js', 'utf8');
+    const guard = readFileSync('web/boot-guard.js', 'utf8');
+
+    // NOTHING IS READ FROM THE CHAIN FOR THIS. The worn gift is remembered, exactly as the app remembers it, so
+    // the loading screen needs no network and no app state to be up.
+    expect(guard).toMatch(/localStorage\.getItem\('platho\.giftTheme\.v1'\)/);
+    expect(guard).toMatch(/root\.setAttribute\('data-gift-theme', 'true'\);/);
+    expect(guard).toMatch(/root\.style\.setProperty\('--aurora-rgb', glow\[0\]/);
+    // The guard is ES5 and English-only by OPSEC contract; it must stay that way.
+    expect(guard, 'the pre-paint guard must not use let/const').not.toMatch(/\n\s*(?:let|const) plathoGift/);
+
+    // A CANVAS CANNOT BE STRUCTURED-CLONED. nodesFieldOptions() carries one now, and spreading it into the
+    // worker's init would throw — abandoning the worker and dropping the boot field onto the very thread the
+    // worker exists to spare. The sliders go by name; the mark follows as an ImageBitmap.
+    expect(app).toMatch(/const \{ mark: _boot_mark_not_cloneable, \.\.\.sliders \} = nodesFieldOptions\(\);/);
+    expect(app, 'the raw options must not be spread into postMessage').not.toMatch(/reduceMotion, \.\.\.nodesFieldOptions\(\) \},/);
+    // THE WORKER DECODES IT, and is handed a STRING to decode. Building an ImageBitmap needs a fetch and a decode,
+    // both async and both on the main thread, which during boot is busy with the very crypto this worker exists to
+    // be independent of — the boot trace measured the mark arriving AFTER `ready`, i.e. as the screen was leaving.
+    // A data URL is structured-cloneable, so it rides in with the sliders and the decode happens on the idle thread.
+    expect(app).toMatch(/patternUrl: bootFieldPatternUrl\(\)/);
+    expect(worker).toMatch(/if \(data\.patternUrl\) \{/);
+    expect(worker).toMatch(/\.then\(\(bitmap\) => \{ if \(field\) \{ field\.setMark\(bitmap\); field\.paintOnce\(\); \} \}\)/);
+    expect(app, 'nothing decoded on the main thread for the worker path').not.toMatch(/type: 'mark', bitmap/);
+
+    // The field takes its mark LATE, because on the boot path it cannot have it at construction time.
+    expect(field).toMatch(/let markImage = mark;/);
+    expect(field).toMatch(/function setMark\(next\) \{ markImage = next \?\? null; \}/);
+    expect(field).toMatch(/return \{ resize, start, tick, paintOnce, setMark \};/);
+
+    // Both the mark and the wallpaper tile are BUILT WHEN THE GIFT IS WORN and kept with the choice, because the
+    // loading screen has no time to fetch a Lottie and render a glyph out of it before it paints.
+    expect(app).toMatch(/pattern = tinted \? tinted\.toDataURL\('image\/png'\) : null;/);
+    expect(app).toMatch(/patternTile = tile \? tile\.toDataURL\('image\/png'\) : null;/);
+    // IT READS STORAGE, not module state: initBootScreen() runs while this module is still evaluating, so the
+    // worn-gift variable is in its dead zone and reading it throws into the catch — which is how the mark
+    // silently never arrived once. The literal key must match the constant declared further down.
+    expect(app).toMatch(/function bootFieldPatternUrl\(\) \{/);
+    expect(app).toMatch(/localStorage\.getItem\('platho\.giftTheme\.v1'\) \?\? 'null'/);
+    expect(app).toMatch(/const GIFT_THEME_STORAGE_KEY = 'platho\.giftTheme\.v1';/);
+    // …and a gift worn before the mask was ever persisted heals its own record the first time one is built.
+    // …and heals it again when the colour it was painted in has changed. A cached derivative that does not
+    // record what it was derived FROM cannot know it has gone stale: the app rebuilds its own mark every
+    // session and looked right, while the loading screen kept the old white symbols on a coloured app.
+    expect(app).toMatch(/if \(canvas && wornGiftTheme && \(!wornGiftTheme\.pattern \|\| wornGiftTheme\.patternInk !== ink\)\)/);
+    expect(app).toMatch(/pattern: canvas\.toDataURL\('image\/png'\), patternInk: ink/);
+    expect(app).toMatch(/setBootDebug\(url \? 'mark:queued'/);
+  });
+
   it('PWA-APPEARANCE-02: a settings row keeps the settings size, even inside a dialog', () => {
-    // [OWNER 2026-08-24: "the dropdowns in the cosmetics section are so fat. Make them like the ones in the Profile
-    // tab".] MEASURED: 54px tall in the Appearance dialog against 38px in the profile — `.action-dialog select
+    // [decided 2026-08-24] MEASURED: 54px tall in the Appearance dialog against 38px in the profile — `.action-dialog select
     // { min-height: 56px }`, the dialogs' rule for a big FORM field, beat `height: 38px` (a min-height always does)
     // and tied on specificity, so source order handed it the win. A row of settings is not a form: the control
     // belongs to the row, not to the window it happens to be shown in.
@@ -4619,9 +6154,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-APPEARANCE-01: one modal owns the theme and the background, the app arrives quiet, and the boot screen agrees', () => {
-    // [OWNER 2026-08-23: "let's do centralised appearance. In the profile, an 'Appearance settings' button opening a
-    // modal: theme light/dark; background animation none/plasma/nodes — nodes is the one on the loading screen, I
-    // want it available as the app background too. Below, the settings for plasma and for nodes." Then: "if the user
+    // [decided 2026-08-23 Then: "if the user
     // picks plasma, let it slosh on the loading screen too; if they turned the background off, there must be none
     // there either", "for the nodes, set the defaults to exactly what we have on the loading screen now", "set the
     // default for users to 'none'", and "the theme button can come out of the header".]
@@ -4660,8 +6193,7 @@ describe('PWA runtime config guard', () => {
     // The nodes background pauses with the tab, exactly as the plasma does.
     expect(app).toMatch(/function nodesTick\(now\) \{\s*if \(document\.hidden \|\| backgroundMode !== 'nodes' \|\| !nodesScene\)/);
 
-    // "NONE" MEANS THE LOOP STOPS, NOT THAT IT PAINTS NOTHING [OWNER 2026-08-23: "the plasma and the nodes really
-    // aren't drawn when the background is none? or are you just hiding it while it keeps loading the processor"].
+    // "NONE" MEANS THE LOOP STOPS, NOT THAT IT PAINTS NOTHING [decided 2026-08-23].
     // Measured after this: 60 frame callbacks a second on plasma and on nodes, ZERO on none. The tick must therefore
     // drop out BEFORE it re-arms — an early return under a requestAnimationFrame still wakes the main thread every
     // frame, forever, to decide to do nothing.
@@ -4705,13 +6237,16 @@ describe('PWA runtime config guard', () => {
     }
     expect(app).toMatch(/brightness: nodesLevel \/ 100,\s*runners: nodesRunners \/ 100,\s*speed: nodesSpeed \/ 100,\s*lights: nodesLights \/ 100,/);
     // The worker gets them too, or the loading screen would ignore the user's settings.
-    expect(app).toMatch(/dpr, reduceMotion, \.\.\.nodesFieldOptions\(\) \}/);
+    // The sliders still reach the boot worker — but by NAME, not as a raw spread: the options carry a canvas now
+    // (the gift's pattern mark) and a canvas cannot be structured-cloned. See PWA-GIFT-05.
+    expect(app).toMatch(/const \{ mark: _boot_mark_not_cloneable, \.\.\.sliders \} = nodesFieldOptions\(\);/);
+    expect(app).toMatch(/dpr, reduceMotion, \.\.\.sliders, patternUrl: bootFieldPatternUrl\(\), ink: bootFieldInk\(\) \}/);
 
     // THE THEME BUTTON IS OUT OF THE HEADERS — it is a row of this modal now.
     expect(html, 'no header carries a theme toggle').not.toMatch(/theme-toggle-button/);
     expect(app).not.toMatch(/themeToggleButtons/);
     expect(css, 'and its chrome went with it').not.toMatch(/theme-toggle-button|themeSpin/);
-    expect(app, 'the mechanism itself is untouched').toMatch(/function applyForcedTheme\(next\)/);
+    expect(app, 'the mechanism itself is untouched').toMatch(/function applyForcedTheme\(next, \{ animate = true \} = \{\}\)/);
     expect(app).toMatch(/appearanceThemeSelect\?\.addEventListener\('change'/);
 
     // Every string of the dialog exists in EVERY locale (a missing one renders the raw key id).
@@ -4730,8 +6265,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-ANON-AVATAR-01: a contact with no name and no picture wears a mask, not the address monogram', () => {
-    // [OWNER 2026-08-23: "I don't like that everyone has this UQ. For contacts with no username and no avatar, put an
-    // anonymity icon in the contact's picture."] The monogram was the first two characters of whatever labelled the
+    // [decided 2026-08-23] The monogram was the first two characters of whatever labelled the
     // row, and for a bare wallet that is the ADDRESS — every basechain address a user sees starts with "UQ", so every
     // unnamed contact wore the same one. A monogram identical for everyone looks like an identity and identifies
     // nobody.
@@ -4752,7 +6286,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-NO-DIVIDERS-01: no surface of the shell draws a hairline across the plasma', () => {
-    // THE OWNER SAW THE SAME ARTEFACT TWICE, a day apart: "I see a black strip under the nickname, remove it please"
+    // decided
     // (the conversation header's bottom rule) and then, pointing at the tab bar, "I see a strip here too" (the bar's
     // top rule). They are the same thing: the redesign put every surface on ONE plasma with zero-opacity fills — and
     // on that plasma a full-width --line-soft rule does not read as a subtle separation, it reads as a dark bar
@@ -4796,7 +6330,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-RAIL-BADGE-01: the tab label is addressed as the label, and the unread count is a thin green ring, centred', () => {
-    // [OWNER 2026-08-23: "the font on the Private tab is bigger than on the other tabs", and "the black outline on the
+    // [decided 2026-08-23, and "the black outline on the
     // message count looks far too heavy and foreign — thinner, dark green, and centre the number properly".]
     //
     // ONE SLIP CAUSED BOTH. The tab label was styled as `.rail-item span:last-child`, which it was — until app.js
@@ -4819,8 +6353,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-MESSAGE-SHAPE-01: a burst sits tight, and the bubble keeps the shape it always had', () => {
-    // [OWNER 2026-08-24: "let the messages be a bit closer … so it looks harmonious and it is clear the messages
-    // were sent at the same time" — the space between them is the plasma showing through, so a burst that is not
+    // [decided 2026-08-24 — the space between them is the plasma showing through, so a burst that is not
     // tight reads as six separate sendings.]
     const css = readFileSync('web/styles.css', 'utf8');
     const app = readFileSync('web/app.js', 'utf8');
@@ -4837,8 +6370,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/if \(groupStart\) row\.dataset\.groupStart = 'true';/);
     expect(app, 'and it rides the signature, or a row keeps a boundary that has moved').toMatch(/groupStart \? 'open' : 'cont',/);
 
-    // THE BUBBLE'S SHAPE IS UNCHANGED, and that is a decision, not an omission [OWNER 2026-08-24, after two passes
-    // at it: "put the message design back the way it was before this fuss with the images"]. The body is rounded
+    // THE BUBBLE'S SHAPE IS UNCHANGED, and that is a decision, not an omission [decided 2026-08-24]. The body is rounded
     // and the corner on the SPEAKER's side is the small one; an attempt to inverse that (square body, one big
     // curl) was built, shown, and rejected. This pins the original so a third attempt has to be deliberate.
     expect(css).toMatch(/\.bubble \{[\s\S]*?border-radius: var\(--r-l\);/);
@@ -4851,7 +6383,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-AURORA-RIPPLE-01: the plasma canvas is sized by what the device can actually blur, not by what it claims', () => {
-    // [OWNER 2026-08-24: "the plasma has a ripple, small, but it is there" — then, naming the cause: "it ripples
+    // [decided 2026-08-24 — then, naming the cause: "it ripples
     // because of px".] The canvas is small and stretched, so the ripple is Skia's own dither inside it, magnified.
     // Two things were supposed to hide that: the upscale, and a blur in canvas space. Safari before 18 HAS
     // ctx.filter and ignores it — so the devices the report came from had no blur at all and a raw dither.
@@ -4870,8 +6402,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-MESSAGE-MEDIA-02: the frame fits the picture — whole, never cropped, in both directions', () => {
-    // [OWNER 2026-08-24: "just make the image take up the whole space of the green frame … and if the photo was
-    // sent with text, leave room for the text below", "and not only the green one, the other person's too", then
+    // [decided 2026-08-24, "and not only the green one, the other person's too", then
     // on the result: "why did the screenshot not fit? it could have fitted the picture itself, maybe by making it
     // smaller. And it did the wide picture strangely, with mistakes. The middle-sized one came out well."]
     //
@@ -4882,8 +6413,7 @@ describe('PWA runtime config guard', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // The bubble hands its padding to the content, so nothing has to be cancelled and nothing can be clipped.
     expect(css).toMatch(/\.bubble\.has-media \{\s*\n\s*width: fit-content;\s*\n\s*max-width: 100%;\s*\n\s*padding: 0;\s*\n\s*overflow: hidden;/);
-    // TEXT TAKES THE INSET AS PADDING [OWNER 2026-08-24: "the word 'букв' is right at the edge of the post, and the
-    // next message has a normal inset"]. A margin sits outside the box, and on a bubble whose height is computed
+    // TEXT TAKES THE INSET AS PADDING [decided 2026-08-24]. A margin sits outside the box, and on a bubble whose height is computed
     // (overflow-clipped) rather than grown, the last child's bottom margin is a value an engine may or may not
     // count — Chromium counted it, the owner's WebKit did not, and the last line ended up against the frame.
     expect(css).toMatch(/\.bubble\.has-media > \.message-text-block \{\s*\n\s*padding: var\(--bubble-pad-y\) var\(--bubble-pad-x\);\s*\n\}/);
@@ -4908,8 +6438,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-MESSAGE-MEDIA-01: a burst is stamped once, at its end', () => {
-    // [OWNER 2026-08-24: "for messages sent in one batch with the same received/published and time — write it only
-    // on the last message".] Six lines reading "received · 00:03" under six bubbles say one thing six times.
+    // [decided 2026-08-24] Six lines reading "received · 00:03" under six bubbles say one thing six times.
     //
     // This test used to carry a second half, about images without a plate — that design was built, shown, and
     // withdrawn ("put the message design back the way it was before this fuss with the images"). What survived the
@@ -4929,8 +6458,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-BRAND-01: the NETWORK is TON, the COIN is GRAM — and a blanket rebrand may not confuse the two', () => {
-    // [OWNER 2026-08-24: "you went and replaced TON with GRAM everywhere, and now the boot screen says 'Directly on
-    // the GRAM network'. That's a disaster … people already tell us it looks vibe-coded." Then, the rule itself:
+    // [decided 2026-08-24 Then, the rule itself:
     // "where it speaks about the NETWORK it is TON, where it speaks about the COIN it is GRAM."]
     //
     // The rebrand that renamed the currency to GRAM was deliberate; renaming the chain with it was not. Seventy
@@ -4968,10 +6496,8 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-IOS-FOCUS-01: nothing that raises the keyboard may let the browser scroll the page', () => {
-    // [OWNER 2026-08-24: "there is still an iPhone bug … the interface flies up, it accounts for the keyboard the
-    // way Android does, and on iPhone that must not be done. We fixed it, but it looks like some branch was
-    // missed."] Measured against the source: the cure — focus({ preventScroll: true }) — existed in exactly ONE
-    // place, the composer's maximize toggle, while sixteen other composer focus calls used a plain focus().
+    // [decided 2026-08-24] Measured against the source: the cure — focus({ preventScroll: true }) — existed in exactly ONE
+    // place, the composer's maximize toggle, while sixteen other composer focus calls used a plain focus.
     //
     // A plain focus() asks the browser to bring the field into view, and iOS does that by scrolling the PAGE at the
     // moment of focus, while the shell is still full height and the composer sits where the keyboard is about to
@@ -4993,9 +6519,7 @@ describe('PWA runtime config guard', () => {
       expect(app, `${field} is focused through the helper`).toMatch(new RegExp(`focusComposerField\\(${field}\\)`));
     }
 
-    // THE TAP IS THE OTHER HALF, and it is the one the owner sees [OWNER 2026-08-24: "our problem was that I TAP
-    // the composer and the interface flies up … you are talking about the maximize, not the place with the
-    // problem"]. preventScroll cannot reach it — on a tap nothing of ours calls focus(); the browser focuses the
+    // THE TAP IS THE OTHER HALF, and it is the one the owner sees [decided 2026-08-24]. preventScroll cannot reach it — on a tap nothing of ours calls focus; the browser focuses the
     // field and iOS scrolls the PAGE to reveal it. The single scrollTo(0,0) that used to answer this fires on the
     // one frame the measured height changes, and iOS animates its keyboard, so the scroll can land after it. The
     // correction is therefore HELD across the keyboard's arrival rather than spent on a frame.
@@ -5012,8 +6536,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-IOS-SELECT-01: the selection grips may widen a selection — the page refusal is not allowed to eat that drag', () => {
-    // [OWNER 2026-08-24, correcting his own first report of "cannot select text": "текст выделяется то, но его
-    // нельзя расширить используя полоски"] — on the iPhone a long press DOES select, and neither grip will widen
+    // [decided 2026-08-24, correcting the first report] — on the iPhone a long press DOES select, and neither grip will widen
     // the selection afterwards.
     //
     // The cause is ours and it is one line of reasoning that was half right. refusePageDragWhileKeyboardIsUp
@@ -5025,7 +6548,7 @@ describe('PWA runtime config guard', () => {
     // prevents the touchmove, and a prevented touchmove fails the gesture. The grip does not move.
     //
     // The exception is a LIVE selection — two ends, in the field that has focus — and not "this is an editable",
-    // which is the blanket exemption [OWNER 2026-08-15: "you can still pull the page out by the text field"] that
+    // which is the blanket exemption [decided 2026-08-15] that
     // was removed for good reason and must not come back by the back door.
     const app = readFileSync('web/app.js', 'utf8');
     expect(app).toMatch(/function focusedEditableHoldsLiveSelection\(\) \{/);
@@ -5044,13 +6567,12 @@ describe('PWA runtime config guard', () => {
     expect(armer).toContain('KEYBOARD_PRESENT_PX');
     expect(armer).toMatch(/node\.scrollHeight > node\.clientHeight\) return;/);
 
-    // MAKING A SELECTION IS A DRAG TOO [OWNER 2026-08-24: "on the iPhone I cannot select text in the composer by
-    // the standard means — something intercepts it and resets it"]. The live-selection exception above covers
+    // MAKING A SELECTION IS A DRAG TOO [decided 2026-08-24]. The live-selection exception above covers
     // EXTENDING a selection and stops there: on iOS the gesture that PLACES the two ends starts with the loupe,
     // and the loupe carries a COLLAPSED caret, so the field holds no live selection and the very move that would
     // make one was refused. What tells the two gestures apart is the HOLD — every selection gesture begins with
     // one, a page drag begins moving at once — so the release is time-based, and an immediate drag from the field
-    // stays refused [OWNER 2026-08-15: "you can still pull the page out by the text field"].
+    // stays refused [decided 2026-08-15].
     expect(app).toMatch(/const EDITABLE_SELECTION_HOLD_MS = 350;/);
     expect(app).toMatch(/function touchBeganInEditable\(event\)/);
     expect(armer).toMatch(/pageDragRefusalStartedAt = Date\.now\(\);\s*\n\s*pageDragRefusalInText = touchBeganInEditable\(event\);/);
@@ -5070,8 +6592,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-IOS-STRIP-01: the page is held at the top for as long as the keyboard is up, not for a fixed 900ms', () => {
-    // [OWNER 2026-08-24: an empty dark strip along the bottom, BELOW the tab bar, "sometimes", on tapping the
-    // message field.] The strip is bare <body>: the shell is position:fixed and a fixed element does not stay
+    // [decided 2026-08-24] The strip is bare <body>: the shell is position:fixed and a fixed element does not stay
     // fixed while the keyboard is up (WebKit 191204), so a page carrying an offset of N draws the shell N higher
     // and leaves N pixels of nothing under the bar. Same defect as "the interface flies up", measured small —
     // [MEASURED in the installed app] MAX scroll 386, off 386, shell up 386 were one event, and any part of that
@@ -5107,8 +6628,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-KEYED-ROWS-01: every long list updates through the ONE reconciliation primitive, and none of them wipes itself', () => {
-    // [OWNER 2026-08-23, relaying user reports: "big dialogs and opening posts with lots of comments load the
-    // system heavily … the phone gets hot", then: "make it work consistently, not through the primitive here and
+    // [decided 2026-08-23, then: "make it work consistently, not through the primitive here and
     // any old way there".] Measured before the change: a 960-comment post built 10,560 rows to show 960, because
     // the thread was wiped and rebuilt twice per loaded page. After: 960 rows, 9.5x less wall-clock on a desktop.
     //
@@ -5150,40 +6670,6 @@ describe('PWA runtime config guard', () => {
     // The comment list survives that one wipe — it is the growing part, and the reason this work exists.
     expect(app).toMatch(/const keptCommentList = renderedPostKey && renderedPostKey === publicPostDetailRenderedKey\s*\n\s*\? publicPostDetailBody\.querySelector\('\.comment-list'\)\s*\n\s*: null;/);
     expect(app, 'and never across two different posts').toMatch(/publicPostDetailRenderedKey = null; \/\/ the next open reconciles against nothing/);
-  });
-
-  it('PWA-IDENTITY-ROW-01: the profile identity is a row — avatar left, name right — and the avatar stays square', () => {
-    // [OWNER 2026-08-23: "this stands in a column and takes too much room. Better the avatar on the left and the
-    // platho name on the right."] The redesign centred the 86px avatar with the name and wallet line stacked under
-    // it: 176px of identity before the first setting (measured in the pane), against 98px for the same content in a
-    // row. Our base rule was already a row; the redesign added a `flex-direction: column` override further down the
-    // file, so THE EFFECTIVE VALUE is what this gate reads — a second override would slip past a plain text search.
-    const css = readFileSync('web/styles.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
-    const effective = new Map<string, string>();
-    for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (!/(^|,)\s*\.identity-block\s*$/.test(match[1].trim().replace(/\s+/g, ' '))) continue;
-      for (const decl of match[2].matchAll(/(flex-direction|text-align|align-items):\s*([^;]+);/g)) {
-        effective.set(decl[1], decl[2].trim());
-      }
-    }
-    expect(effective.get('flex-direction'), 'the identity block is a row').toBe('row');
-    expect(effective.get('align-items'), 'and the copy sits centred against the avatar').toBe('center');
-    expect(effective.get('text-align'), 'left-aligned: centred text beside a left avatar drifts with the name length').toBe('left');
-    // THE ROW EXPOSED A SECOND BUG. `width` on a flex item is only a basis, so the name/wallet column beside it
-    // squeezed the 86px square to 77px wide (measured) — a visibly oval avatar. The column layout could never show
-    // this, because nothing competed for the row's width there.
-    expect(css, 'the avatar may not be shrunk by the text beside it').toMatch(
-      /\.identity-block > \.avatar\.large \{\s*flex: 0 0 auto;\s*\}/,
-    );
-    // The copy layout follows the block: start, not centre, on both axes it controls.
-    expect(css).toMatch(/\.identity-copy-layout \{\s*justify-items: start;\s*\}/);
-    expect(css).toMatch(/\.identity-title-row \{\s*justify-content: start;\s*\}/);
-    // And the markup really is avatar-then-copy, in that order — the CSS above assumes it and does not reorder.
-    const html = readFileSync('web/index.html', 'utf8');
-    const blockStart = html.indexOf('<div class="identity-block">');
-    expect(blockStart, 'the identity block is still in the profile pane').toBeGreaterThan(0);
-    const block = html.slice(blockStart, blockStart + 900);
-    expect(block.indexOf('id="profileAvatar"')).toBeLessThan(block.indexOf('identity-copy-layout'));
   });
 
   it('PWA-COPY-01: long-press copies message/comment text with a flash (touch); desktop gets a hover Copy button; avatars open the lightbox', () => {
@@ -5410,7 +6896,7 @@ describe('PWA runtime config guard', () => {
     expect(css).not.toMatch(/#composer\[data-publish-mode/);
     expect(css).not.toMatch(/\.composer:has\(> \.composer-reply-context/);
     expect(css).toMatch(/\.message,\s*\.comment-item \{\s*position: relative;\s*touch-action: pan-y;/);
-    // v648 (owner: "дёргается и возвращается"): the swipe CONTAINERS surrender horizontal touch gestures too —
+    // v648 (owner: ): the swipe CONTAINERS surrender horizontal touch gestures too —
     // a row-LINE swipe starts on the scroller's own space, and without pan-y there the browser claims the
     // gesture and pointercancels the drag mid-flight.
     expect(css).toMatch(/\.message-strip \{[\s\S]*?touch-action: pan-y;/);
@@ -5628,13 +7114,10 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/validateSubmit: config\.validateSubmit \?\? null/);
     const submit = app.slice(app.indexOf("actionForm?.addEventListener('submit'"), app.indexOf("document.addEventListener('click'"));
     expect(submit).toMatch(/const validate = dialogAtStart\.validateSubmit/);
-    expect(submit).toMatch(/if \(outcome && outcome\.ok\) \{\s*closeActionDialog\(outcome\.result \?\? values\)/);
+    // The window grew with the keepOpen branch (a settled dialog's "Done" button, 2026-09-09); the pin is about
+    // the close that follows an ok, not about the distance to it.
+    expect(submit).toMatch(/if \(outcome && outcome\.ok\) \{[\s\S]{0,1400}?closeActionDialog\(outcome\.result \?\? values\)/);
     expect(submit).toMatch(/actionHint\.dataset\.tone = 'error'/);
-    // requestWalletDisplayIdentity verifies via validateSubmit in a single open — NOT a close+reopen while-loop.
-    const fn = app.slice(app.indexOf('async function requestWalletDisplayIdentity'), app.indexOf('async function requestUsernameMintName'));
-    expect(fn).toMatch(/validateSubmit: async \(values\) =>/);
-    expect(fn).toMatch(/verifyWalletDisplayIdentity\(normalizedMode, chosen, plathoWallet\)/);
-    expect(fn).not.toMatch(/while \(true\)/);
     // The submit button is DISABLED while the async gate runs (no double-submit) and the "checking" hint shows.
     expect(submit).toMatch(/if \(actionSubmitButton\) actionSubmitButton\.disabled = true;\s*\n\s*if \(actionHint\) \{ actionHint\.textContent = dialogAtStart\.checkingHint/);
     // Add-public-channel resolves the channel INSIDE validateSubmit, so the "Add channel" button locks while the
@@ -5814,7 +7297,7 @@ describe('PWA runtime config guard', () => {
     );
     expect(fn).not.toMatch(/getKeyRecord|computeVaultMessagingKeyId/);
     expect((fn.match(/await withVaultReadLock\(/g) ?? []).length).toBe(1);
-    expect(fn).toMatch(/provider\.getView\(forWallet, \{ verify: true, priority: 'critical', cacheTtlMs: 0 \}\)/);
+    expect(fn).toMatch(/provider\.getView\(forWallet, \{ verify: true, priority: 'critical', cacheTtlMs: 0, stopOnUninitializedAccount: true \}\)/);
     // The keys are compared against the LOCAL draft (the address-binding already proves the shard is ours), so a
     // local key change shows as "activate" and prompts the re-register that overwrites the shard.
     expect(fn).toMatch(/BigInt\(view\.enc_pubkey \?\? 0n\) === BigInt\(localVaultDraft\.message\.enc_pubkey \?\? 0n\)/);
@@ -5829,10 +7312,26 @@ describe('PWA runtime config guard', () => {
     const shared = config.match(/rateLimitKey: 'toncenter-shared'/g) ?? [];
     expect(shared.length).toBe(2);
     // Wallet teardown cancels the pending rail Vault-balance retry so it can't race the next boot's reads.
-    // Window is 1800 (was 1200/900): the reset function legitimately grew (public confirm-job timers, the public
-    // post-comments SWR cache, and the per-account public-feed sync cursors are cleared here too). The guard still
-    // pins that the nav-balance timer is cleared.
-    expect(app).toMatch(/function clearWalletScopedRuntimeState[\s\S]{0,1800}clearNavVaultBalanceRetryTimer\(\)/);
+    //
+    // BOUNDED BY THE FUNCTION, NOT BY A CHARACTER COUNT [rewritten 2026-09-02]. This was
+    // `/function clearWalletScopedRuntimeState[\s\S]{0,1800}clearNavVaultBalanceRetryTimer\(\)/`, and the window
+    // had already been widened twice (900 -> 1200 -> 1800) by the teardown legitimately growing — the third time
+    // it broke was four lines added to clear the fee-vault state, which is precisely the kind of correct change a
+    // gate must not punish. A distance is the wrong instrument for "this call is in that function": it fails as
+    // the function grows and, worse, it PASSES when the call drifts into a neighbouring one. The slice below is
+    // bounded at both ends and checked to be the function it names, so it answers the real question at any size.
+    const teardown = (() => {
+      const from = app.slice(app.indexOf('function clearWalletScopedRuntimeState'));
+      // Searched from ONE character in: at zero it matches this function's own `function` keyword.
+      const next = from.slice(1).search(/^function /m);
+      return next >= 0 ? from.slice(0, next + 1) : from;
+    })();
+    expect(teardown.startsWith('function clearWalletScopedRuntimeState'),
+      'the slice must be the teardown itself, or this gate proves nothing').toBe(true);
+    expect(teardown.length, 'and it must end at the next declaration, not run on into the file')
+      .toBeLessThan(8400);   // 8000 until audit round 3 (2026-09-06): the teardown grew by the reaction-state reset
+    expect(teardown, 'the wallet teardown must cancel the pending nav-balance retry')
+      .toContain('clearNavVaultBalanceRetryTimer()');
   });
 
   it('PWA-CANONICAL-USERNAME-01: usernames display canonically (no .ath suffix) via displayIdentityLabel + threadDisplayLabel', () => {
@@ -5842,7 +7341,7 @@ describe('PWA runtime config guard', () => {
     expect(canon).toMatch(/\.ath/);
     expect(canon).toMatch(/replace/);
     // The shared identity + thread label functions route through the canonical strip.
-    const displayFn = app.slice(app.indexOf('function displayIdentityLabel(identity)'), app.indexOf('function verifyWalletDisplayIdentity'));
+    const displayFn = app.slice(app.indexOf('function displayIdentityLabel(identity)'), app.indexOf('function readWalletDisplayIdentity'));
     expect(displayFn).toMatch(/canonicalUsernameDisplay\(/);
     const threadFn = app.slice(app.indexOf('function threadDisplayLabel(thread)'), app.indexOf('function threadDisplayTone'));
     expect(threadFn).toMatch(/canonicalUsernameDisplay\(thread\?\.name/);
@@ -5880,8 +7379,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-CHAT-BOTTOM-01: strip content that does not fill hugs the composer, and only the chat strip does', () => {
-    // [OWNER 2026-08-26: "a message was written, the keyboard was dismissed, and the message stayed in place
-    // instead of moving down to the composer"]. The strip is a flex column with no bottom anchoring, so content
+    // [decided 2026-08-26]. The strip is a flex column with no bottom anchoring, so content
     // that does not overflow sat at the TOP: with the keyboard up the strip is short and top IS bottom; the
     // keyboard leaves, the strip grows, and the message stays glued under the header. No scroll fix can reach it
     // — a strip that does not overflow has nothing to scroll. The auto margin on the FIRST child absorbs the free
@@ -5902,8 +7400,7 @@ describe('PWA runtime config guard', () => {
     // timer resets on every scroll event), so restoring it mid-scroll jumped to a pre-gesture position.
     expect(renderSource).toMatch(/const stripMeasurable = messageStrip\.clientHeight > 0 && messageStrip\.scrollHeight > 0;/);
     expect(renderSource).toMatch(/messageStrip\.scrollTop = prevConversationScrollTop;/);
-    // ...but a SEND never teleports first [OWNER 2026-08-25: "if I write one more message, the page jumps back to
-    // where I came in and scrolls down to my new message from there"]. The re-assert was a genuine restore when
+    //...but a SEND never teleports first [decided 2026-08-25]. The re-assert was a genuine restore when
     // the strip was rebuilt from empty and scrollTop fell to 0; reconciled rows never move, so it had nothing
     // left to restore and could only put a stale number on screen. The report is those two lines in order: the
     // teleport, then the scroll away from it. Invisible on the first send, where the remembered position is
@@ -6077,7 +7574,7 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-PUBLIC-POST-IMAGE-WARM-01: a reloaded post image hydrates from IndexedDB before first render (no chain re-walk)', () => {
     const app = readFileSync('web/app.js', 'utf8');
-    // Owner: "the image reappears after ~a minute, looks like it re-downloads from the blockchain every time". It does
+    // Owner report: the image reappeared after about a minute, as if re-downloaded from the chain each time. It does
     // NOT re-download (the body is a durable-cache HIT) — the minute is the serial chain HEADER/INDEX walk that
     // rediscovers the per-part entry ids before the durable body cache can be consulted (its keys + header_boc are not
     // persisted). Fix = mirror the avatar/comment durable-media model: a decoded post-image store warmed BEFORE the
@@ -6093,12 +7590,16 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function applyPublicPostMediaRecord\(post, media\) \{[\s\S]*?if \(publicPostRenderableImageMedia\(post\)\) return false;/);
     // 3) The warm runs BEFORE the first render, after the avatar warm (SEQUENTIAL — never a concurrent Promise.all,
     //    per the no-concurrent-read guard), bounded by the boot deadline.
-    expect(app).toMatch(/await warmPublicChannelAvatarsFromCache\(\);\s*\n\s*const changed = await warmPublicPostImagesFromCache\(\)/);
+    expect(app).toMatch(/await warmPublicChannelAvatarsFromCache\(\)\.catch\(\(\) => false\);\s*\n\s*const changed = \(await warmPublicPostImagesFromCache\(\)/);
     expect(app).toMatch(/await Promise\.race\(\[publicBootMediaWarm, delay\(400\)\]\)/);
     expect(app).not.toMatch(/Promise\.all\(\[/); // must not reintroduce the forbidden concurrent-read form
     // 4) Every feed-cache write goes through one choke point that ALSO persists the heavy decoded image to IndexedDB —
     //    symmetric with the localStorage strip — and the chain-sync commit routes through it (no bare writer there).
-    expect(app).toMatch(/function commitPublicChannelFeedCache\(\) \{\s*\n\s*writePublicChannelFeedCache\(publicChannelStorage\(\), publicChannelFeedCache\);\s*\n\s*schedulePublicPostImageMediaPersist\(\);/);
+    // The write's answer is no longer discarded [audit 2026-09-01, round 9]: the writer trims the oldest posts
+    // and retries until the cache fits, so `false` means site data is blocked outright — and staying silent over
+    // that let memory and storage diverge, with a reload showing 1 post of the 400 the reader was scrolling.
+    expect(app).toMatch(/function commitPublicChannelFeedCache\(\) \{[\s\S]{0,600}?if \(!writePublicChannelFeedCache\(publicChannelStorage\(\), publicChannelFeedCache\)\)/);
+    expect(app).toMatch(/function commitPublicChannelFeedCache\(\) \{[\s\S]{0,900}?schedulePublicPostImageMediaPersist\(\);/);
     expect(app).toMatch(/if \(syncedFromChain\) \{\s*\n\s*commitPublicChannelFeedCache\(\);/);
     expect(app).toMatch(/await store\.put\(key, JSON\.stringify\(media\)\);/);
     // The persist keys are session-guarded (post media is immutable) so a post persists at most once per session.
@@ -6393,7 +7894,9 @@ describe('PWA runtime config guard', () => {
     // The permalink row leads: it is the only target that reaches someone who has no Platho account yet.
     expect(shareList).toMatch(/icon: 'link',[\s\S]*?shareCopyToClipboard[\s\S]*?isSavedMessagesThread\(thread\)[\s\S]*?label: t\('chat\.myNotes'\),\s*thread,[\s\S]*?if \(own && ownWallet\)[\s\S]*?const contacts = orderThreadsForList\(/);
     const shareCss = readFileSync('web/styles.css', 'utf8');
-    expect(shareCss).toMatch(/--modal-outline: rgba\(48, 213, 176, 0\.\d+\);/);
+    // The hairline's own colour now reads the accent's channel triple, so a worn gift reaches it too
+    // (PWA-GIFT-01); what matters here is that the dialog border keeps taking it from the token.
+    expect(shareCss).toMatch(/--modal-outline: rgba\(var\(--accent-rgb\), 0\.\d+\);/);
     expect(shareCss).toMatch(/\.recipient-dialog,\s*\.action-dialog,\s*\.docs-dialog,\s*\.install-dialog \{[\s\S]*?border: 1px solid var\(--modal-outline\);/);
     // Every locale ships the share strings (OPSEC key parity) — incl. the v793 copy-to-clipboard trio.
     for (const locale of Object.keys(I18N_STRINGS)) {
@@ -6415,7 +7918,7 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/function renderPublicChannelView\(\)/);
     // The view filters the SAME chronological items by channelId (one data path with the feed, no second store).
     // The `&& item.emptyChannel !== true` half went with the placeholder it guarded against (v896).
-    expect(app).toMatch(/filter\(\(item\) => item\.channelId === publicChannelViewChannelId\)/);
+    expect(app).toMatch(/filter\(\(item\) => item\.channelId === publicChannelViewChannelId && publicItemVisibleUnderModeration\(item, 0\)\)/);
     // NOT-followed channels ride as a TRANSIENT feed source so the standard sync walk fetches the preview...
     expect(app).toMatch(/publicChannelPreviewChannelId && !channels\.some\(\(channel\) => channel\.id === publicChannelPreviewChannelId\)/);
     // ...the preview is EXCLUDED from the main feed render + unread counts until followed...
@@ -6451,7 +7954,9 @@ describe('PWA runtime config guard', () => {
     expect(renderFn, 'and the anchor key is the post id it was always').toMatch(/const itemId = String\(item\.id\);/);
     // ...(5) posts are NOT marked read while the post detail / discovery is stacked over the view, and (6) the
     // header Back routes through requestNavBack (Telegram BackButton + history sentinel stay consistent).
-    expect(renderFn).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && markVisiblePublicFeedRead\(capped\)/);
+    // (round 8: the render holds what it painted; flushPublicFeedRead takes the mark when the reader leaves —
+    // the visibility guard this pins is unchanged, and UNREAD-04/05 drive the cycle.)
+    expect(renderFn).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen\)\s*\{\s*holdPublicFeedPainted\(capped\)/);
     expect(app).toMatch(/publicChannelViewBackButton\?\.addEventListener\('click', \(\) => requestNavBack\(\)\);/);
     // Round-2 review fixes: (7) the pending flag is raised BEFORE the first paint (a cold preview channel opens on
     // "Loading posts…", never flashes a false "No posts yet")...
@@ -6469,7 +7974,8 @@ describe('PWA runtime config guard', () => {
     // budget every cycle for the rest of the session...
     // ...(10) the FEED's own mark-read is also overlay-guarded (posts arriving while an overlay covers the feed
     // stay unread until actually seen).
-    expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\s*&& markVisiblePublicFeedRead\(windowItems\)/);
+    // (round 8: the render holds, the leave doors mark — the overlay guard this pins is unchanged.)
+    expect(app).toMatch(/isPublicViewActive\(\) && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen\)\s*\{\s*holdPublicFeedPainted\(windowItems\)/);
     // Round-3/4 review fixes: (11) opening the view closes a floating "Display as" popover (the entry points
     // stopPropagation, so the document click-closer never sees the opening tap) — hoisted ABOVE the same-channel
     // early return, else an author-row tap INSIDE the open view leaves the popover floating...
@@ -6966,7 +8472,7 @@ describe('PWA runtime config guard', () => {
     // CSS overlay: fixed, sized to the UNFLOORED visual-viewport var (keyboard-safe on short viewports), z-index 30.
     expect(css).toMatch(/\.composer\.is-maximized \{[\s\S]*?position: fixed;[\s\S]*?height: var\(--app-viewport-height-exact, var\(--app-viewport-height, 100dvh\)\);[\s\S]*?z-index: 30;/);
     expect(app).toMatch(/setProperty\('--app-viewport-height-exact'/); // the unfloored height var is published
-    // THE PLATE FADES, THE GEOMETRY DOES NOT [OWNER 2026-08-23: "expanding/collapsing, it snaps to fully opaque",
+    // THE PLATE FADES, THE GEOMETRY DOES NOT [decided 2026-08-23,
     // and after the fade landed: "the frame is still ugly"]. The overlay must END opaque (it covers the whole screen
     // — a translucent one would show the app sliding behind the text being written), so what softens is the ARRIVAL:
     // the fill AND the edge transition in both directions while position/height switch at once. The exact curve is
@@ -7262,7 +8768,7 @@ describe('PWA runtime config guard', () => {
   it('PWA-THREAD-PREVIEW-STRIP-01: the plain-text thread-list preview strips inline markdown markers (v800)', () => {
     const app = readFileSync('web/app.js', 'utf8');
     // thread.preview is shown via textContent (can't render bold), so raw **/*/`/[label](url) markers were noise
-    // (owner screenshot: "**пр** **ивет**"). stripInlineFormatting removes them; it's display-only (the bubble
+    // (owner screenshot: ). stripInlineFormatting removes them; it's display-only (the bubble
     // renders bold from the message's own blocks, and the wire is untouched).
     expect(app).toContain('function stripInlineFormatting(text)');
     expect(app).toContain("preview.textContent = stripInlineFormatting(thread.preview);");
@@ -7421,7 +8927,10 @@ describe('PWA runtime config guard', () => {
     // SendIgnoreErrors (platho-wallet `sendMode | 2`) drops that leg SILENTLY — bytes land, paid for, no
     // pointer, no error. ATH is fail-closed, GRAM fail-open; the asymmetry is asserted on the helpers.
     expect(directSource).toMatch(/await assertConnectedAthAtLeast\(PROFILE_AVATAR_PRICE_ATH, 'set an avatar'\)/);
-    expect(directSource).toMatch(/await assertWalletGramAtLeast\(\s*avatarValue \* BigInt\(shardParts\.length\) \+ PROFILE_AVATAR_DIRECT_REQUEST_VALUE/);
+    // The sum is NAMED since the squat cushion joined it [2026-09-03]: the funnel's `assertAffordable` adds a squat
+    // debt to the same `avatarNeed` rather than to a copy of the expression. The shape pinned is the same: every
+    // shard part plus the ATH payment request plus the send fee, asserted before the transfer is signed.
+    expect(directSource).toMatch(/const avatarNeed = \(avatarValue \+ squatCushionNanotons\(LANE_PUBLIC\)\) \* BigInt\(shardParts\.length\) \+ PROFILE_AVATAR_DIRECT_REQUEST_VALUE[\s\S]{0,400}?await assertWalletGramAtLeast\(avatarNeed, 'set an avatar'\)/);
     const athGuardSource = app.slice(
       app.indexOf('async function assertConnectedAthAtLeast'),
       app.indexOf('async function loadConnectedAthWalletBalance'),
@@ -7469,7 +8978,13 @@ describe('PWA runtime config guard', () => {
     expect(directSource).toMatch(/avatar_part_count: BigInt\(parts\.length\)/);
     // ONE wallet transfer carries both legs — bytes without a paid pointer (or the reverse) is the split-state
     // this pins against.
-    expect(directSource).toMatch(/publishPublicLaneParts\(\{ wallet: plathoWallet, transport \}, shardParts, \{ extraMessages: \[athRequest\] \}\)/);
+    // THE ARGUMENT LIST GAINED THE DOOR CHOICE [2026-09-02]. What this pins is unchanged — ONE wallet transfer
+    // carries the shard bytes and the paid pointer together — and `publicPublishRouting` adds only the payer's
+    // own vault and their own fee, which is empty for everyone who has not staked.
+    // ONE transfer still: the shard parts and the ATH payment request ride together; the funnel additionally gets
+    // `assertAffordable`, through which a squat debt above the budgeted cushion is asserted against the SAME sum
+    // before anything is signed [2026-09-03, web/shard-debt.mjs].
+    expect(directSource).toMatch(/publishPublicLaneParts\(\{ wallet: plathoWallet, transport, \.\.\.\(await publicPublishRouting\(\)\) \}, shardParts,\s*\{ extraMessages: \[athRequest\], assertAffordable: \(extra\) => assertWalletGramAtLeast\(avatarNeed \+ extra, 'set an avatar'\) \}\)/);
     expect(directSource).toMatch(/await writeProfileAvatarMediaCache\(avatarHash, bytesToImageDataUrl\(avatar\.bytes, 'image\/webp'\)\)/);
     // No Vault publish machinery on the direct path.
     expect(directSource).not.toMatch(/publishState/);
@@ -7769,7 +9284,13 @@ describe('PWA runtime config guard', () => {
     expect(refreshSource).not.toMatch(/ATH_TOTAL_SUPPLY_ATOMIC/);
     // Profile reads are serialized (one at a time) to avoid the iOS concurrent-read freeze (v509 pattern):
     // await GRAM balance -> ATH stats -> own avatar.
-    expect(viewSource).toMatch(/if \(view === 'profile' && plathoWallet\?\.address\) \{[\s\S]*await refreshAthProtocolStats\(\)/);
+    // Read from the function that does the serializing, not from the tab switch that used to call it — the tab is
+    // gone and the ORDER is the thing this line is about.
+    const profileReadsSource = app.slice(
+      app.indexOf('function refreshProfilePaneReads'),
+      app.indexOf('function refreshProfilePaneReads') + 900,
+    );
+    expect(profileReadsSource).toMatch(/await refreshWalletTonBalanceForProfile\(\)[\s\S]*await refreshAthProtocolStats\(\)[\s\S]*await refreshOwnProfileAvatar\(\)/);
     // Burn ATH user row removed (see the index.html assertions). The ATHBurn message primitive itself stays
     // for the protocol buyback/burn-due path; there is no longer a user-facing wallet-burn handler to assert.
     expect(app).not.toMatch(/async function submitAthWalletBurn/);
@@ -7847,7 +9368,7 @@ describe('PWA runtime config guard', () => {
       app.indexOf('const explicit = resolveContactDisplay(counterpartyWallet);'),
     );
     expect(ownDisplay).toMatch(/return ownIdentity\s*\n\s*\? \{ name: displayIdentityLabel\(ownIdentity\), tone: identityTone\(ownIdentity\), identity: ownIdentity, localLabel: null \}\s*\n\s*: null;/);
-    // C2 (v748, owner rule "username главнее адреса"): the DEFAULT channel display falls back to the channel's
+    // C2 (v748, owner rule ): the DEFAULT channel display falls back to the channel's
     // chain-VERIFIED .ath over the bare wallet address, so a just-subscribed channel shows the username
     // automatically (matching the "Display as" chevron) instead of the address the user then overrides by hand.
     const walletDisplayTail = app.slice(
@@ -8118,7 +9639,6 @@ describe('PWA runtime config guard', () => {
     // The self-hosted Telegram Mini App SDK is precached so it is available offline
     // and on poor networks, same as the rest of the runtime.
     expect(sw).toMatch(/\.\/vendor\/telegram-web-app\.js/);
-    expect(sw).toMatch(/\.\/publish-batch-orchestration\.mjs/);
     expect(sw).toMatch(/\.\/platho-config\.mjs/);
     expect(sw).toMatch(/\.\/username-ton-rpc-provider\.mjs/);
     expect(sw).toMatch(/\.\/message-pricing-policy\.mjs/);
@@ -8545,10 +10065,9 @@ describe('PWA runtime config guard', () => {
 
   it('PWA-VAULTWORDS-01: no user-visible string names the deleted Vault, and a label says what its value IS', () => {
     // THIRD TIME TODAY the retired Vault turned up in the interface: "up to X GRAM from Vault" in the channel
-    // dialog, "Route: Vault" in the mint dialog, and — spotted by the owner on the unlock modal — "Хранилище:
-    // AES-GCM-256 + PBKDF2-SHA256". The last one is the subtle case and worth naming precisely, because it was not
+    // dialog, "Route: Vault" in the mint dialog, and — spotted by the owner on the unlock modal —. The last one is the subtle case and worth naming precisely, because it was not
     // a leftover reference at all: `wallet.storageLabel` described the LOCAL encrypted wallet record, which has
-    // nothing to do with the Vault contract. It read as a leftover because "Хранилище" is exactly the word the
+    // nothing to do with the Vault contract. It read as a leftover because  is exactly the word the
     // Russian UI used for the Vault, and the label was also simply wrong — its value is a cipher and a KDF, not a
     // place. Renaming it to Encryption fixes the collision and the mislabel in one move.
     const app = readFileSync('web/app.js', 'utf8');
@@ -8569,7 +10088,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-HONESTGREEN-01: the green means the CHAIN has it, not that the POST returned', () => {
-    // OWNER, 2026-08-05: "вижу, что она published и закрываю приложение... придёт это сообщение адресату?" The old
+    // decided 2026-08-05 The old
     // answer was "maybe": 'published' was painted the instant toncenter accepted the broadcast, while the external
     // was still in flight — MEASURED at 4-200s to reach a block, and the network demonstrably drops some. With the
     // app closed nothing re-sends it, and the confirm driver only reddened the message on the next launch.
@@ -8584,7 +10103,11 @@ describe('PWA runtime config guard', () => {
     // The invariant is not "one place" but "only where the chain was READ". Since the INTRO lane stopped carrying a
     // message (2026-08-14) there is exactly ONE such place left — the CONV confirm's res.landed branch above — and
     // no way to paint green without it.
-    expect((app.match(/message\.meta = 'published';/g) ?? []).length, 'a second green appeared — check what proves it').toBe(1);
+    // TWO greens since audit round 3 (2026-09-06), each with its proof: the CONV record read back from the shard, and a
+    // self-note whose RecoveryShard slots showed the claimed seq AND the h1 this device sealed (markSelfNotePublished).
+    expect((app.match(/message\.meta = 'published';/g) ?? []).length, 'another green appeared — check what proves it').toBe(2);
+    expect(app).toMatch(/function markSelfNotePublished\(thread, message\) \{[\s\S]{0,200}?message\.meta = 'published';/);
+    expect(app).toMatch(/if \(receipt\.landed\) \{ markSelfNotePublished\(thread, message\); return; \}/);
     expect(app, 'the inline INTRO green came back without a message to justify it').not.toContain('options.verified === true');
 
     // The deadline case that can prove neither side says so, in the SENT bucket — an unverified success, not a failure.
@@ -8636,15 +10159,18 @@ describe('PWA runtime config guard', () => {
     expect(app).toMatch(/message\.meta = options\.awaitsConfirm === false \? 'sent' : 'sending';/);
 
     // EVERY caller is accounted for, and each one must justify its bucket:
-    //   armed  — a delivery confirm follows on the next line and will resolve 'sending';
+    //   armed  — a delivery confirm follows on the next line and will resolve 'sending' (the CONV confirm, or — since
+    //            audit round 3, 2026-09-06 — the notes receipt, which reads the RecoveryShard slots' seq and h1 back);
+    //   proven — the chain already holds exactly this content (a notes save whose every chunk matched), painted at once;
     //   opted out — nothing verifies that lane at all, so it must not sit in 'sending' forever.
-    const callers = [...app.matchAll(/markDirectSendBroadcast\(thread, message([^)]*)\);\n(.*)/g)]
+    const callers = [...app.matchAll(/markDirectSendBroadcast\(thread, message([^)]*)\);[^\n]*\n(.*)/g)]
       .map((m) => ({ opts: m[1], next: m[2] }));
-    expect(callers.length, 'a caller appeared or vanished — re-check each one').toBe(3);
+    expect(callers.length, 'a caller appeared or vanished — re-check each one').toBe(4);
     for (const caller of callers) {
       const optedOut = caller.opts.includes('awaitsConfirm: false');
-      const armed = caller.next.includes('armConvDeliveryConfirm(thread, message)');
-      expect(optedOut || armed, `a caller justifies no bucket: ${caller.opts}`).toBe(true);
+      const armed = caller.next.includes('armConvDeliveryConfirm(thread, message)') || caller.next.includes('armSelfNoteReceipt(context, outcome)');
+      const proven = caller.next.includes('markSelfNotePublished(thread, message)');
+      expect(optedOut || armed || proven, `a caller justifies no bucket: ${caller.opts} / ${caller.next}`).toBe(true);
     }
 
     // THE INTRO LANE MARKS NOTHING, and that is what keeps this invariant whole: it establishes the conversation and
@@ -8839,7 +10365,11 @@ describe('PWA runtime config guard', () => {
     // Every external that RESOLVES a seqno takes the lane; one carrying an explicit seqno (an idempotent re-broadcast
     // of already-signed bytes) reads nothing and signs nothing, so parking it behind a predecessor would only delay
     // the one thing that can end the wait.
-    expect(wallet).toMatch(/export async function sendPlathoWalletTransaction\(wallet, transaction, options = \{\}\) \{\s*\n\s*if \(options\.seqno !== undefined\) return sendPlathoWalletTransactionInLane\(wallet, transaction, options\);\s*\n\s*return withWalletSendLane\(wallet, \(\) => sendPlathoWalletTransactionInLane\(wallet, transaction, options\)\);/);
+    // [2026-08-31] The cutover gate sits ABOVE the fork, before either route: a build past its baked boundary
+    // refuses every NEW write (its shard addresses are unreadable by the new generation) while the explicit-seqno
+    // re-broadcast stays exempt — those bytes were signed before the boundary and re-sending them is idempotent.
+    // The one-lane property is unchanged: both routes below still pass through the lane machinery.
+    expect(wallet).toMatch(/export async function sendPlathoWalletTransaction\(wallet, transaction, options = \{\}\) \{\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(options\.seqno === undefined && cutoverUpdateRequired\(\)\) \{[\s\S]{0,1200}?\}\s*\n\s*if \(options\.seqno !== undefined\) return sendPlathoWalletTransactionInLane\(wallet, transaction, options\);\s*\n\s*return withWalletSendLane\(wallet, \(\) => sendPlathoWalletTransactionInLane\(wallet, transaction, options\)\);/);
     // The tail is detached from the task's outcome, or one failed send wedges every later one (the SENDLANE lesson).
     expect(wallet).toMatch(/const tail = previous\.then\(\(\) => gate\);/);
     expect(wallet).toMatch(/\} finally \{\s*\n\s*release\(\);/);
@@ -8855,7 +10385,8 @@ describe('PWA runtime config guard', () => {
     expect(sync.match(/if \(tornDown\(\)\) return privateSyncResult\(\{ ok: false, reason: 'torn_down', scanComplete: false \}\);/g)?.length,
       'after the state batch, at the top of each conversation, around the reads, and before the append')
       .toBeGreaterThanOrEqual(3);
-    expect(sync).toMatch(/if \(convClean && !tornDown\(\)\) await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
+    expect(sync).toMatch(/if \(convClean && !tornDown\(\) && epochIsDerivable\('record', epochNow\)\) \{/);
+    expect(sync).toMatch(/await store\.advanceConvScanCursor\(selfKeyId, peerKeyId, epochNow\);/);
     expect(sync, 'the live global must not be dereferenced after the first await').not.toMatch(/await convKeyStore\./);
   });
 
@@ -8878,10 +10409,15 @@ describe('PWA runtime config guard', () => {
     // lane's half); this pins that the app passes the mark, keyed the same way the mark is kept.
     const app = readFileSync('web/app.js', 'utf8');
     const sync = app.slice(app.indexOf('async function syncConvCapsulesFromShards('), app.indexOf('async function syncPrivateCapsulesFromChain('));
-    expect(sync).toMatch(/knownSeqOf: forceFull \? \(\) => 0 : convBucketSeqHighWater,/);
+    // THREE walks descend now, not one [audit 2026-09-01, round 9]: the manual rescan, a COLD record (fresh,
+    // restored, history cleared — it widened its epoch range to birth and then read the newest 128 bodies of each
+    // shard-day and marked the day fully read), and a conversation a routine pass came back SHORT on. CFW-03/04
+    // in tests/conv-full-walk-depth.test.ts own the depth rule and drive the short-read handling.
+    expect(sync).toMatch(/knownSeqOf: deepWalk \? \(\) => 0 : convBucketSeqHighWater,/);
+    expect(sync, 'a short read may not be mistaken for a clean one').toContain('onShardGap: (address, info) =>');
     // The same key the app advances: the lane's bucket.address is what the app stores the mark under.
     expect(sync).toContain("const bucket = String(found.address ?? '');");
-    expect(sync).toContain('advanceConvBucketSeqHighWater(bucket, seq)');
+    expect(sync).toContain('advanceConvBucketSeqHighWater(bucket, capped)');
     // And the INTRO twin: a replay is tagged by the handler and retired by the runner, never re-fetched.
     const handler = readFileSync('web/intro-receive-handler.mjs', 'utf8');
     const runner = readFileSync('web/intro-scan-runner.mjs', 'utf8');
@@ -8890,14 +10426,12 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-MYNAMES-01: the "My .ath names" row is reconciled with the chain, and checked once per session at load', () => {
-    // OWNER 2026-08-21: "I had five names, gave one away; the dialog shows four and fixes the row, and after a reload
-    // the row says five again" — and: "at load it would be good to check the real number". The verified read kept its
+    // decided 2026-08-21 — and: "at load it would be good to check the real number". The verified read kept its
     // answer in memory only; the remembered list (the row's cold number) was never reconciled, and nothing ran the
     // read until the dialog was opened.
     const app = readFileSync('web/app.js', 'utf8');
-    const load = app.slice(app.indexOf('function renderMyUsernamesStatus()'), app.indexOf('function usernameNftCardNode('));
-    // 0. THE ROW COUNTS NAMES, NOT SPELLINGS [OWNER 2026-08-24: "the app periodically lies about how many usernames
-    // I have — I have one and always had one, and it periodically decides there are two"]. One .ath has two written
+    const load = app.slice(app.indexOf('function scheduleOwnedUsernameNftsSessionCheck()'), app.indexOf('async function openUsernameNftTransferDialog('));
+    // 0. THE ROW COUNTS NAMES, NOT SPELLINGS [decided 2026-08-24]. One.ath has two written
     // forms, "platho" and "platho.ath", and this list is built from sources that disagree on which: the linked name
     // is normalised to the suffixed form, the chain reconcile writes the suffixed form, but an entry stored by an
     // older build — or restored from a prefs snapshot one of them published — can still be bare. A plain Set kept
@@ -8921,7 +10455,7 @@ describe('PWA runtime config guard', () => {
     // give a name up safely (re-verify, fall back to another owned name, never strip on a degraded read) is queued.
     expect(load).toMatch(/writeLinkedPlathoUsername\(\{ \.\.\.linked, verified_at: 0 \}, owner\);/);
     expect(load).toMatch(/queueUsernameHygiene\(\(\) => reconcileOwnLinkedUsername\(\)\);/);
-    // FORGET ONLY ON PROOF [OWNER 2026-08-22: "sometimes at unlock the linked username does not load"]. A name is
+    // FORGET ONLY ON PROOF [decided 2026-08-22]. A name is
     // forgotten (and unlinked) only when the chain named it TRANSFERRED — authoritative, another owner, label proven
     // — never on mere absence from a complete list; and a candidate derivation that failed leaves the list incomplete
     // instead of silently dropping the name from it.
@@ -8946,17 +10480,14 @@ describe('PWA runtime config guard', () => {
     // username-hygiene lane so it never overlaps another username resolve.
     expect(load).toMatch(/queueUsernameHygiene\(async \(\) => \{/);
     expect(load).toMatch(/if \(tonRpcLimited\(\)\) \{ ownedUsernameNftsSessionChecked\.delete\(owner\); return; \}/);
-    // From the row's own paint (renderMyUsernamesStatus), which every wallet-identity render reaches: the row shows
-    // what the device REMEMBERS at once and schedules the one real read behind that first paint.
-    const row = app.slice(app.indexOf('function renderMyUsernamesStatus()'), app.indexOf('function scheduleOwnedUsernameNftsSessionCheck()'));
-    expect(row.length, 'the row slice must not collapse').toBeGreaterThan(400);
-    expect(row).toContain('scheduleOwnedUsernameNftsSessionCheck();');
-    expect(app).toMatch(/renderMyUsernamesStatus\(\);/);
+    // Scheduled from the wallet identity render itself [2026-09-08: the row that used to paint first and schedule
+    // behind that paint is gone — the profile card lists the names], so the one real read still runs once a session.
+    expect(app).toMatch(/setText\(walletAddressStatus, shortAddress\(walletAddressForCopy\(plathoWallet\)\)\);\s*\n[\s\S]{0,400}?scheduleOwnedUsernameNftsSessionCheck\(\);\s*\n\}/);
+    expect(app).not.toMatch(/renderMyUsernamesStatus/);
   });
 
   it('PWA-PIN-01: a contact can be PINNED from the chevron menu — kept at the top, pinned ones still ordered by freshness', async () => {
-    // OWNER 2026-08-21: "add a Pin button to the 'Display as' menu; pinned contacts at the top of the contact list,
-    // and pinned ones still change places among themselves by the freshness of the last message."
+    // decided 2026-08-21
     const { orderThreadsForList } = await import('../web/thread-list-order.mjs');
     const at = (ms: number) => ({ createdAtMs: ms });
     const saved = { id: 'saved', pinned: false, ...at(1) };
@@ -9008,7 +10539,7 @@ describe('PWA runtime config guard', () => {
     expect(toggle).toContain('pinned: pinned === true,');
     expect(toggle).toContain('renderThreads();');
 
-    // THE BADGE [OWNER 2026-08-23: "a pin icon in the corner of the icon"] — so the top of the list reads as a
+    // THE BADGE [decided 2026-08-23] — so the top of the list reads as a
     // decision rather than as freshness. Written where EVERY thread avatar routes through, so the list, the
     // conversation header and the share sheet cannot disagree; "My notes" is never pinnable and never wears it.
     const avatarFn = app.slice(app.indexOf('function setThreadAvatarNode(node, thread) {'), app.indexOf('function formatThreadListTimestamp('));
@@ -9038,7 +10569,7 @@ describe('PWA runtime config guard', () => {
   });
 
   it('PWA-SENDPROFILE-01: a slow publish is measurable by phase, on ONE stopwatch, and it reaches the dump', () => {
-    // Owner, 2026-08-04: "скорость важна". Two large images landed 22s and 37s apart on chain — both published, but
+    // decided 2026-08-04. Two large images landed 22s and 37s apart on chain — both published, but
     // far past the 1-5s of index lag the seqno fix was expected to cost. Guessing the owner phase is the mistake
     // this project keeps paying for, so the send path gets the same instrument the sync tick has.
     const app = readFileSync('web/app.js', 'utf8');

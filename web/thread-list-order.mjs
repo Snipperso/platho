@@ -1,8 +1,7 @@
 // thread-list-order — the ONE rule for how the contact list is ordered, shared by the Private thread list and the
 // share-to-contact sheet.
 //
-// OWNER 2026-08-21: "add a Pin button to the chevron menu, so a contact is kept at the top of the contact list; and
-// pinned contacts must still change places among themselves by the freshness of the last message."
+// decided 2026-08-21
 //
 //   1. "My notes" (the self thread) first — it was pinned by design before any user pin existed;
 //   2. then every PINNED dialog, newest activity first;

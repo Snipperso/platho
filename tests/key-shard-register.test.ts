@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Blockchain } from '@ton/sandbox';
 import { Address, Cell, beginCell, toNano } from '@ton/core';
@@ -89,6 +90,27 @@ describe('KEY-SHARD-REGISTER', () => {
     expect(view.key_id, 'key_id computed').not.toBe(0n);
     // PIN the funding figure against the LIVE contract floor: KEYSHARD_REGISTER_VALUE must cover min_register_value.
     expect(BigInt(view.min_register_value) <= KEYSHARD_REGISTER_VALUE, 'the funded value covers the shard register floor').toBe(true);
+
+    // AND THE CLIENT PRICES A RE-WRITE FROM THE SHARD, NOT FROM THE CONSTANT [audit 2026-09-02]. Gate 22110 asks
+    // for the REGISTER floor on a first write and the REPLACE floor on a re-write, and the two differ by the whole
+    // base endowment. The activation path sent the register figure for both — refunded by the contract, so no loss
+    // — but it also ASSERTED affordability at that figure, so a wallet holding plenty for a repair was told it
+    // could not afford one. After the migration that is the common case, not the rare one: an adopted identity is
+    // already registered, so restoring its rotation key is a replace.
+    const replaceFloor = BigInt(view.min_replace_value);
+    const registerFloor = BigInt(view.min_register_value);
+    expect(replaceFloor < registerFloor, 'a re-write really is the cheaper door — the premise of the pricing')
+      .toBe(true);
+    const app = readFileSync('web/app.js', 'utf8');
+    expect(app, 'the activation path must read the charged floor off the view it already holds')
+      .toContain('? { charged: view.min_replace_value, register: view.min_register_value }');
+    expect(app, 'and the affordability check must ask for what the send is about to use')
+      .toContain('registerValue + walletSendFeeReserveNanotons([KEYSHARD_REGISTER_SIZE_CLASS])');
+    expect(app, 'and the send must carry that same figure')
+      .toContain('keyRecord: localVaultDraft.message, value: registerValue,');
+    // The headroom is derived, not a second mirror: a first registration still funds exactly what it always did.
+    expect(KEYSHARD_REGISTER_VALUE - registerFloor > 0n, 'the client carries headroom over the register floor')
+      .toBe(true);
   }, 240_000);
 
   it('KSR-AUTH-GUARD: the builder REFUSES a missing/zero/degenerate auth key (the contract would brick, gates 22118/22119)', async () => {

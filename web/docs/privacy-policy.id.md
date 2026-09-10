@@ -1,6 +1,6 @@
 # Kebijakan Privasi
 
-Terakhir diperbarui: 18 Agustus 2026
+Terakhir diperbarui: 29 Agustus 2026
 
 Platho adalah messenger tanpa backend. Dokumen ini singkat karena memang sangat
 sedikit yang perlu diungkapkan — dan menjadi rinci di tempat sesuatu benar-benar
@@ -24,11 +24,25 @@ Kami tidak meminta alamat email, nomor telepon, atau nama.
 - Riwayat pesan dan draf Anda.
 - Pengaturan Anda, termasuk API key opsional untuk penyedia node TON publik.
 
-Data ini disimpan di penyimpanan lokal peramban Anda dan dienkripsi dengan kata
-sandi yang Anda pilih (AES-GCM-256 dengan penurunan kunci PBKDF2-SHA-256). Kami
-tidak pernah menerimanya. Menghapus data peramban Anda akan menghapusnya, dan
-tanpa frasa pemulihan Anda, data itu tidak dapat dipulihkan oleh kami maupun
-oleh siapa pun.
+Tidak ada satu pun yang sampai kepada kami, dan pelindungnya tidak sama — jadi
+masing-masing disebut satu per satu, bukan satu pernyataan untuk ketiganya:
+
+- **Frasa pemulihan dan kunci yang diturunkan darinya** dienkripsi dengan kata
+  sandi yang Anda pilih (AES-GCM-256, penurunan kunci PBKDF2-SHA-256). Tanpa kata
+  sandi itu keduanya tidak dapat dibaca, baik oleh kami maupun oleh siapa pun yang
+  memegang perangkat.
+- **Riwayat pesan dan draf** dienkripsi dengan kunci yang dibuat peramban Anda di
+  perangkat ini dan disimpan dalam bentuk yang tidak dapat diekspor — bukan dengan
+  kata sandi Anda. Menyalin data tersimpan ke mesin lain karena itu tidak
+  menghasilkan apa pun yang terbaca; ini bukan perlindungan terhadap orang yang
+  sudah memakai peramban Anda dalam keadaan terbuka.
+- **Pengaturan** — tema, bahasa, apa yang Anda ikuti — disimpan sebagai teks
+  biasa; tak satu pun di antaranya rahasia, dan tak satu pun sampai kepada kami.
+  Satu-satunya yang rahasia, API key opsional penyedia node, disegel dengan jenis
+  kunci perangkat yang sama seperti riwayat pesan, bukan disimpan terbuka.
+
+Menghapus data peramban Anda akan menghapus semuanya, dan tanpa frasa pemulihan
+Anda, data itu tidak dapat dipulihkan oleh kami maupun oleh siapa pun.
 
 ## Apa yang bersifat publik secara desain
 
@@ -56,6 +70,7 @@ menggunakan Platho, peramban Anda mengirim permintaan ke:
 - `toncenter.com`
 - `tonapi.io`
 - `mainnet-v4.tonhubapi.com`
+- `nft.fragment.com`
 
 Para penyedia ini mau tidak mau melihat alamat IP Anda dan permintaan yang
 dibuat perangkat Anda, dan mereka beroperasi di bawah kebijakan privasi mereka

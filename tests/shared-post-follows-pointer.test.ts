@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 // A REPOST IS A REFERENCE, AND NOTHING FOLLOWED IT.
 //
-// Owner, 2026-08-07: "а почему репост публичного поста отправляется не полностью и без картинок?"
+// decided 2026-08-07
 //
 // By design the SHARE block carries a pointer (entry id, body hash, author wallet), a 4KB text snapshot and a
 // "has image" flag — copying the picture would republish it on chain at full price. The half that was missing: the
@@ -32,7 +32,11 @@ describe('SHAREREF — a shared post resolves to its original', () => {
     // shard-qualified) has no coordinates and must resolve to nothing rather than read a guessed address.
     const coords = functionBody('function sharedPostShardCoordinates(');
     expect(coords).toContain("const parts = String(entryId ?? '').split('.');");
-    expect(coords).toContain("if (parts.length !== 3 || !parts.every((part) => /^\\d+$/.test(part))) return null;");
+    // THREE parts or FOUR [round 5]: the fourth names the generation, which the flip made part of a post's
+    // identity (in the era straddling the boundary the two generations' shards share an epoch_tag AND a seq, and
+    // both number entries from 0). A v1 share is still a bare uint64 and still resolves to nothing.
+    expect(coords).toContain("if (parts.length < 3 || parts.length > 4 || !parts.every((part) => /^\\d+$/.test(part))) return null;");
+    expect(coords).toContain('generation: parts.length === 4 ? Number(parts[3]) : null,');
   });
 
   it('SHAREREF-02: at most one read per post per session, and none at all when nothing is missing', () => {
@@ -44,12 +48,66 @@ describe('SHAREREF — a shared post resolves to its original', () => {
     expect(resolve).toContain('sharedPostChainReads.set(key, job);');
     expect(resolve).toContain('while (sharedPostChainReads.size > SHARED_POST_CHAIN_READ_LIMIT)');
 
-    // And the card only asks when the snapshot is genuinely short of the original. A complete short repost — the
-    // common case — costs zero requests. embedDepth bounds a repost OF a repost: the inner card keeps its snapshot
-    // instead of every level fetching the next one's original.
+    // ZERO REQUESTS WHEN NOTHING IS MISSING — but the reader's CACHE is what decides that, never the sender.
+    // [audit 2026-08-31, round 8] This used to pin `&& (block.hasImage || block.textTruncated)`: two bits the
+    // SENDER encodes, with nothing on the wire binding them to the post being referenced. A hostile block with
+    // flags = 0 skipped verification entirely while wearing the referenced author's registry-verified name,
+    // hash-verified avatar and a header tap into their real channel — broadcast impersonation on the public
+    // feed. The cost property it was protecting survives intact and is now DRIVEN below rather than read: a
+    // cache hit still costs nothing, because the reader already holds the original.
     const embed = functionBody('function buildSharedPostEmbed(');
-    expect(embed).toContain('if (embedDepth === 0 && block.entryId && (block.hasImage || block.textTruncated)) {');
+    expect(embed, 'verification may not be gated on flags the sender writes')
+      .not.toMatch(/block\.hasImage \|\| block\.textTruncated\) \{/);
+    expect(embed).toContain('if (embedDepth === 0 && claimsChainRow) {');
+    // …and a card the read bound cannot reach is LABELLED, never trusted [pre-stage security review 2026-09-08]:
+    // a share nested inside a verified post wore the referenced author's verified name with only a quiet rule.
+    expect(embed).toMatch(/if \(claimsChainRow && embedDepth > 0\) \{\s*\n\s*const note = document\.createElement\('span'\);\s*\n\s*note\.className = 'shared-post-embed-unverified-note';/);
+    // embedDepth bounds a repost OF a repost: the inner card keeps its snapshot instead of every level fetching
+    // the next one's original.
     expect(embed).toContain('appendPublicItemContent(real, post, embedDepth + 1);');
+  });
+
+  it('SHAREREF-02B: the resolver costs one chain read per post per session, and none on a cache hit', () => {
+    // The cost half of SHAREREF-02, RUN rather than read — because it is the half a security fix could quietly
+    // trade away, and a source pin could not tell.
+    const source = functionBody('function resolveSharedPostOriginal(');
+    let fetches = 0;
+    let cached: any = null;
+    // eslint-disable-next-line no-new-func
+    const resolve = new Function('setCached', 'counter', `
+      const sharedPostChainReads = new Map();
+      const SHARED_POST_CHAIN_READ_LIMIT = 64;
+      let __cached = null;
+      const findCachedPublicPostByEntryId = () => __cached;
+      const normalizeBodyHashHex = (h) => (h == null ? null : String(h).toLowerCase());
+      const noteTonRpcRateLimit = () => true;
+      const fetchSharedPostFromChain = async () => { counter(); return { id: 'from-chain' }; };
+      ${source}
+      return {
+        resolveSharedPostOriginal,
+        setCached: (post) => { __cached = post; },
+        reads: () => sharedPostChainReads.size,
+      };
+    `)(null, () => { fetches += 1; });
+
+    // (1) The reader already holds the original and its body hash matches the claim: no request at all.
+    resolve.setCached({ id: 'local', bodyHash: 'AABB' });
+    expect(resolve.resolveSharedPostOriginal('20800.0.5', 'aabb', 'w')).resolves.toMatchObject({ id: 'local' });
+    expect(fetches, 'a complete repost the reader already has costs nothing').toBe(0);
+
+    // (2) A cache entry whose body hash does NOT match the claim is not an answer — that is the whole point of
+    //     carrying the hash. It must read the chain rather than serve the wrong post under the claim.
+    resolve.setCached({ id: 'local', bodyHash: 'CCDD' });
+    resolve.resolveSharedPostOriginal('20800.0.6', 'aabb', 'w');
+    expect(fetches, 'a mismatched cache entry may not answer for the reference').toBe(1);
+
+    // (3) …and the same post never reads twice in a session, however many cards render it.
+    resolve.setCached(null);
+    resolve.resolveSharedPostOriginal('20800.0.7', 'aabb', 'w');
+    resolve.resolveSharedPostOriginal('20800.0.7', 'aabb', 'w');
+    resolve.resolveSharedPostOriginal('20800.0.7', 'aabb', 'w');
+    expect(fetches, 'one read per post per session, whatever the render count').toBe(2);
+    void cached;
   });
 
   it('SHAREREF-03: only a body-authentic post may answer for the reference, and it replaces the snapshot one way', () => {
@@ -130,7 +188,11 @@ describe('SHAREREF — a shared post resolves to its original', () => {
     // read — which is the point of the pin: a new reader of shard posts joins this decoder, it does not copy it.
     expect((APP.match(/await publicPostPartsFromShardPosts\(/g) ?? []).length).toBe(3);
     const decoder = functionBody('async function publicPostPartsFromShardPosts(');
-    // The feed identity is what the SHARE block's entryId is compared against — it must be built in that one place.
-    expect(decoder).toContain('const globalEntryId = `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`;');
+    // The feed identity is what the SHARE block's entryId is compared against — it must be built in that one
+    // place. Since round 5 it carries the GENERATION as a fourth coordinate when there is one: generation 17
+    // keeps the exact three-part form every minted id and share block in the wild already uses, so a pre-flip
+    // share still compares equal; only 18 appends, and its posts are born after the flip.
+    expect(decoder).toContain('? `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`');
+    expect(decoder).toContain(': `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}.${postGeneration}`;');
   });
 });

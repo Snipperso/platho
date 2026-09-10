@@ -6,6 +6,7 @@ import {
   openConvKeyMap,
   createConvKeySealKey,
   createSealedConvKeyStore,
+  mergeConvKeyMaps,
 } from '../web/conv-key-persist.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -96,5 +97,69 @@ describe('CONV-KEY-PERSIST', () => {
     await expect(openConvKeyMap(key2, record)).rejects.toThrow();
     // a missing / empty blob simply yields an empty map (fresh device), never throws.
     expect((await openConvKeyMap(key1, null)).size).toBe(0);
+  });
+  it('CKP-10: a second tab of the same wallet cannot erase what the first one learned', async () => {
+    // THE DEFECT [audit 2026-09-01, round 9]. The persisted form is ONE sealed blob holding the whole map,
+    // hydrated once at boot and never re-read, and nothing in this app coordinates tabs — a repo-wide search for
+    // BroadcastChannel, navigator.locks and the storage event found ZERO hits. So a tab holding a stale view
+    // erased everything the other had learned since it booted, on its very next write. The window opens every
+    // sync tick (12-60 s), because a quiet conversation persists its cursor on each one, and what it erases is a
+    // K_root: the conversation the peer PAID to open becomes undecryptable and they must send a new INTRO.
+    const key = await createConvKeySealKey();
+    const backend = memoryBackend(key);
+    const open = () => createSealedConvKeyStore({ key, readBlob: backend.readBlob, writeBlob: backend.writeBlob });
+
+    const tab1: any = await open();
+    await tab1.upsertConversationKRoot(A, B, { kRoot: kroot(0x31), createdAt: 100, introNonce: nonce(1), peerWallet: null });
+
+    // Tab 2 boots now — its view is a snapshot of this moment and it never re-reads.
+    const tab2: any = await open();
+    expect(tab2.getConversation(A, B), 'tab 2 sees what was there when it booted').toBeTruthy();
+
+    // Tab 1 then adopts a SECOND conversation — a first contact, paid for by the peer.
+    const C = new Uint8Array(32).fill(0x33);
+    await tab1.upsertConversationKRoot(A, C, { kRoot: kroot(0x77), createdAt: 200, introNonce: nonce(2), peerWallet: null });
+    expect(tab1.getConversation(A, C)).toBeTruthy();
+
+    // …and tab 2 does something entirely unrelated: it advances a cursor on the conversation it already knew.
+    await tab2.advanceConvScanCursor(A, B, 20_800);
+
+    // The blob must still hold BOTH. Read it back the way a reload would.
+    const reloaded: any = await open();
+    expect(reloaded.getConversation(A, C), 'the conversation tab 1 adopted was erased by tab 2').toBeTruthy();
+    expect(hex(reloaded.getConversation(A, C).kRootCurrent)).toBe(hex(kroot(0x77)));
+    // …and tab 2's own write survived too, and tab 2 is no longer stale about the conversation it never saw.
+    expect(Number(reloaded.getConversation(A, B).lastScannedEpoch)).toBe(20_800);
+    expect(tab2.getConversation(A, C), 'the writing tab adopts the merged map').toBeTruthy();
+  });
+
+  it('CKP-11: the merge never rolls a monotonic field backwards', async () => {
+    // A cursor and an outgoing seq are claims about THIS DEVICE — both tabs read the same chain into the same
+    // message store — so the max is the honest value. For outgoingSeq it is also load-bearing: RecordShard gate
+    // 13653 refuses a seq that does not advance, so a rolled-back counter BOUNCES the next send of that day.
+    const mine = new Map<string, any>([['lo:hi', {
+      kRootCurrent: kroot(0xa1), kRootsForRead: [{ kRoot: kroot(0xa0), adoptedAt: 90 }],
+      peerKeyId: B, peerWallet: null, adoptedCreatedAt: 100, adoptedIntroNonce: nonce(7),
+      outgoingSeq: { 20800: 5, 20801: 1 }, lastScannedEpoch: 20_799, lastScannedGeneration: 17,
+    }]]);
+    const theirs = new Map<string, any>([['lo:hi', {
+      kRootCurrent: kroot(0xa1), kRootsForRead: [{ kRoot: kroot(0xb0), adoptedAt: 80 }],
+      peerKeyId: B, peerWallet: null, adoptedCreatedAt: 100, adoptedIntroNonce: nonce(7),
+      outgoingSeq: { 20800: 9 }, lastScannedEpoch: 20_805, lastScannedGeneration: 18,
+    }]]);
+    const merged: any = mergeConvKeyMaps(theirs, mine).get('lo:hi');
+    expect(merged.outgoingSeq[20800], 'the higher claim on a shared epoch wins').toBe(9);
+    expect(merged.outgoingSeq[20801], 'an epoch only one side has is kept').toBe(1);
+    expect(Number(merged.lastScannedEpoch), 'the further cursor wins').toBe(20_805);
+    expect(merged.lastScannedGeneration, 'and carries the stamp that belongs to it').toBe(18);
+    // A retired root either side holds still decrypts that side's history, so the read set unions.
+    expect(merged.kRootsForRead.map((entry: any) => hex(entry.kRoot)).sort())
+      .toEqual([hex(kroot(0xa0)), hex(kroot(0xb0))].sort());
+
+    // …and a re-INTRO on the other side replaces the root, never the reverse (the importConversations rule).
+    const rotated = new Map<string, any>([['lo:hi', { ...theirs.get('lo:hi'), kRootCurrent: kroot(0xcc), adoptedCreatedAt: 500 }]]);
+    expect(hex(mergeConvKeyMaps(rotated, mine).get('lo:hi').kRootCurrent)).toBe(hex(kroot(0xcc)));
+    expect(hex(mergeConvKeyMaps(mine, rotated).get('lo:hi').kRootCurrent),
+      'and an older record can never roll a live root back').toBe(hex(kroot(0xcc)));
   });
 });

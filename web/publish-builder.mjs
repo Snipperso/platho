@@ -28,7 +28,7 @@ import { storeCapsulePublish, RecordShard } from '../build/RecordShard/RecordSha
 import { storeIntroPublish, IntroShard } from '../build/IntroShard/IntroShard_IntroShard';
 import { storeRecoveryStore, RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
 import { storePublicPublish, PublicShard } from '../build/PublicShard/PublicShard_PublicShard';
-import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=3';
+import { recoveryOwnerSecret, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=5';
 
 const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
 
@@ -106,7 +106,7 @@ export function introBodyCommit(header0, body) {
  * CONV publish. The shard's identity is the conversation-direction's WRITE PUBLIC KEY (conv-routing.convWritePublicKey),
  * not a bare bucket hash: the address is public once anything is published there, so authorization has to be a
  * signature, not knowledge of where to send. `writeSecret` signs (seq ‖ commitment); `seq` MUST strictly exceed the
- * shard's last_seq (read get_view().last_seq; a fresh shard is 0), which is what stops a captured publish from being
+ * shard's last_seq (read get_view.last_seq; a fresh shard is 0), which is what stops a captured publish from being
  * replayed to burn SAFE_CAP slots.
  *
  * FUNDING: attach CONV_PUBLISH_VALUE from web/publish-price.mjs — the DEPLOY figure — for every publish, not
@@ -114,7 +114,7 @@ export function introBodyCommit(header0, body) {
  * measurement shows that overpaying an existing shard simply comes back: a later publish attached at the deploy
  * figure returned 3_137_794 of it. The alternative rules all read or infer state, and the obvious one — "pay
  * more only when the account is absent" — is forgeable, because anyone can create a shard with a bare value
- * message and leave it with zero entries. This used to read "fund at or above get_view().min_value", which is
+ * message and leave it with zero entries. This used to read "fund at or above get_view.min_value", which is
  * now wrong for the publish that matters most: the first one.
  */
 export async function buildConvPublish({ writePublicKey, writeSecret, seq, epoch, header0, header1, body, value }) {
@@ -167,20 +167,20 @@ export async function buildIntroPublish({ epoch, bucket, r, viewTag, header0, bo
 /**
  * RECOVERY publish: the owner-signed K_root blob, stored ON CHAIN (this lane alone) so it survives even archive
  * pruning. The slot commits to the recovery owner key derived from the seed, so only the seed-holder can bind it
- * (gate 13575). `seq` MUST be strictly greater than the slot's current seq — read get_view().seq first; a fresh
+ * (gate 13575). `seq` MUST be strictly greater than the slot's current seq — read get_view.seq first; a fresh
  * slot is 0 (after an eviction it is the retained high-water mark). The blob is capped at max_blob_cells (13560),
  * and `bh` is derived from `body` — do not pass it.
  *
  * `slotIndex` selects which of the owner's RS_MAX_SLOTS books this is, and is REQUIRED — see recoveryOwnerSlotKey
  * for why it must not default. Each slot carries its own independent `seq`; they are separate accounts, so reading
- * one slot's get_view().seq says nothing about another's.
+ * one slot's get_view.seq says nothing about another's.
  */
 export async function buildRecoveryPublish({ seed, slotIndex, seq, h0, h1, body, value }) {
   const ownerSecret = await recoveryOwnerSecret(seed, slotIndex);   // W1-015: per-slot key
   const ownerPub = await recoveryOwnerPublicKey(seed, slotIndex);
   const slotKey = recoveryOwnerSlotKey(ownerPub, slotIndex);
   const target = await recoveryShardState(slotKey);
-  // bh is DERIVED from the body, never supplied: the contract requires body.hash() == bh (gate 13557), so letting a
+  // bh is DERIVED from the body, never supplied: the contract requires body.hash == bh (gate 13557), so letting a
   // caller pass it separately only creates a way to get it wrong and have the publish bounce.
   const bh = cellBig(body);
 
@@ -210,7 +210,7 @@ export async function buildRecoveryPublish({ seed, slotIndex, seq, h0, h1, body,
 /**
  * PUBLIC publish: a post, comment, beacon announcement or avatar part into a PublicShard partition. Unlike CONV
  * there is NO signature — authorization is the preimage gate (13702): for CHANNEL/AVATAR the contract folds
- * sender() and only the owner wallet matches, so the message carries no proof of its own. The caller supplies the
+ * sender and only the owner wallet matches, so the message carries no proof of its own. The caller supplies the
  * already-derived `partitionKey` and `epochTag` (web/shard-discovery computes and pins them); this builder's job
  * is the message and the address, kept narrow so the two derivations cannot drift.
  *

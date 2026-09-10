@@ -188,7 +188,7 @@ describe('conv-routing (CONV lane key schedule — clean-16 hybrid)', () => {
   });
 
   it('CONV-ROUTE-10: outgoingBucketKeys is the window of exactly the buckets outgoingBucketKey published into', async () => {
-    // [OWNER 2026-08-22, restored device: "only the peer's replies synced, mine did not".] A restore reads its own
+    // [decided 2026-08-22] A restore reads its own
     // sent messages back from the OUTGOING buckets, so the window derivation must name, per epoch, the very bucket
     // (and write key) the per-send derivation used — and it must be the peer's INCOMING set, bucket for bucket.
     const A = await identity();

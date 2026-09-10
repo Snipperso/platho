@@ -21,8 +21,8 @@
 // to "you own nothing", and this list is a statement about somebody's PROPERTY. A down indexer must degrade to "here
 // is what I can prove, the list may be incomplete" and never to silence — `complete` carries that, and a caller that
 // ignores it will show a list that lies.
-import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=64';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
+import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=73';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=21';
 
 /** Public indexer, read-only. Already reachable under the production CSP as a broadcast door; this reads. */
 const TONAPI_ORIGIN = 'https://tonapi.io';
@@ -191,7 +191,7 @@ export async function collectOwnedUsernameNfts({
   // A verification that THREW is a name neither shown nor denied. It also makes the list INCOMPLETE — and `complete`
   // has to say so, because a caller now acts on a complete list: it reconciles the device's remembered names against
   // it (a transferred-away name is forgotten, a newly found one remembered). A transient read failure must never be
-  // able to forget a name the user still owns. [OWNER 2026-08-21: the row kept saying "5 names" after one was given
+  // able to forget a name the user still owns. [decided 2026-08-21] after one was given
   // away, reload after reload — the remembered list was never reconciled with the chain's answer.]
   let unverified = 0;
   // NAMES THE CHAIN SAYS ARE SOMEBODY ELSE'S NOW — the one positive proof that a remembered name was given away.

@@ -1,9 +1,10 @@
 import { ed25519, x25519 } from './vendor/@noble/curves/ed25519.js';
 import { hmac } from './vendor/@noble/hashes/hmac.js';
 import { pbkdf2Async } from './vendor/@noble/hashes/pbkdf2.js';
-import { sha512 } from './vendor/@noble/hashes/sha2.js';
+import { sha256 as sha256Sync, sha512 } from './vendor/@noble/hashes/sha2.js';
 import { ml_kem768 } from './vendor/@noble/post-quantum/ml-kem.js';
 import { TON_MNEMONIC_WORDLIST } from './ton-mnemonic-wordlist.mjs?v=1';
+import { cutoverUpdateRequired } from './cutover-epoch.mjs?v=4';
 import {
   CONTRACT_CRYPTO_SUITE,
   CRYPTO_SUITES,
@@ -12,9 +13,9 @@ import {
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-} from './crypto/platho-crypto.mjs?v=15';
-import { tonCell } from './pwa-contract-transactions.mjs?v=37';
-import { beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=80';
+} from './crypto/platho-crypto.mjs?v=21';
+import { tonCell } from './pwa-contract-transactions.mjs?v=47';
+import { TON_RPC_MAX_QUEUE_WAIT_MS, beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=89';
 
 const {
   beginCell,
@@ -191,10 +192,11 @@ async function hkdfBytes(seed, info, length) {
   return new Uint8Array(bits);
 }
 
+// Defers to the ONE shared implementation [2026-08-28]: this used to wrap the ASYNCHRONOUS
+// crypto.subtle.digest, whose per-call overhead is the whole cost on small inputs (MEASURED 16x on the shard
+// derivation path). The async signature is kept so every caller stays unchanged.
 async function sha256(bytes) {
-  const cryptoImpl = globalThis.crypto;
-  if (!cryptoImpl?.subtle) throw new Error('crypto.subtle is unavailable');
-  return new Uint8Array(await cryptoImpl.subtle.digest('SHA-256', bytes));
+  return sha256Sync(bytes);
 }
 
 function walletCodeCell() {
@@ -563,6 +565,16 @@ export async function getPlathoWalletSeqno(wallet, transport, options = {}) {
       // why exactly two landed. The same cache also froze waitForWalletSeqnoAtLeast's poll loop, so a multipart send
       // could spin the full 40 attempts against a value that could not change.
       cacheTtlMs: 0,
+      // THE READ THAT GATES EVERY SEND RUNS ON THE SEND'S TIER [audit 2026-08-31, round 8]. `seqno` is absent
+      // from the transport's per-method priority table, so this call resolved to 'background' — weight 4, the
+      // same tier as the shard scan sweep, while sendBoc itself defaults to 'critical'. MEASURED with six
+      // background scan reads and one critical read queued: this read dispatched 8th of 8. On the shared serial
+      // pump that is N x the request spacing before a user's send can even be signed (1100 ms each without an
+      // API key: ~17.6 s at queue depth 16). And a 429 park DROPPED it outright, because get-method reads take
+      // skipIfRateLimited from a transport-wide switch that defaults true — so a rate limit turned "wait" into
+      // "the send failed". Both are now the send's own posture: first in the queue, never dropped.
+      priority: 'critical',
+      skipIfRateLimited: false,
       // A never-deployed wallet aborts this get-method with exit_code -13. Tell
       // the fallback transport that is a definitive answer, so it does not
       // exhaust (and load) the censorship-survival fallback transports just to
@@ -851,8 +863,25 @@ async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options 
     : (validUntilMs > 0 ? Number.POSITIVE_INFINITY : 40);
   let lastBroadcastAt = Date.now();
   let rebroadcasts = 0;
+  let lastReadError = null;
   for (let attempt = 0; ; attempt += 1) {
-    const seqno = await getPlathoWalletSeqno(wallet, transport);
+    // A FAILED READ IS NOT A VERDICT [audit 2026-08-31, round 8]. This read was the one bare `await` in the
+    // loop: the re-broadcast below is carefully wrapped, with a comment saying "the seqno read is the verdict
+    // here, not this POST" — and the verdict mechanism itself aborted the whole send on a single transient
+    // failure. It is reachable from ordinary production conditions: a 429 park DROPS this read outright
+    // (skipIfRateLimited defaults true on the background tier this call uses) and raises
+    // PLATHO_WALLET_SEQNO_UNAVAILABLE. Between the externals of a multi-part message that threw out of the
+    // chunk loop with chunk 0 already broadcast and PAID, which the caller then read as "nothing left the
+    // device" (see the builtBoc attach in the chunk loop). The chain is what decides whether the external
+    // landed; not being able to ask right now only means ask again. The deadline (validUntil) and the
+    // attempt cap still bound the wait, and the last read error rides out on the eventual throw.
+    let seqno = -1;
+    try {
+      seqno = await getPlathoWalletSeqno(wallet, transport);
+      lastReadError = null;
+    } catch (error) {
+      lastReadError = error;
+    }
     if (seqno >= targetSeqno) {
       if (rebroadcasts > 0) console.info('[platho] wallet external landed after re-broadcast', { targetSeqno, rebroadcasts });
       clearPendingWalletExternal(wallet);
@@ -862,6 +891,9 @@ async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options 
     const expired = validUntilMs > 0 && now >= validUntilMs;
     if (expired || attempt + 1 >= attemptsCap) {
       const error = new Error(`Wallet seqno did not reach ${targetSeqno}`);
+      // Why we stopped asking, when the answer never arrived: a caller that classifies a transient RPC
+      // condition needs it, and without it the cause vanished behind a generic sentence.
+      if (lastReadError) { error.cause = lastReadError; error.seqnoReadFailed = true; }
       // ONLY expiry frees the seqno. Running out of polls means we stopped looking, not that the external died —
       // releasing on that would put a fresh signature on a slot a live copy can still take.
       if (expired) error.walletExternalExpired = true;
@@ -875,7 +907,12 @@ async function awaitWalletSeqnoConsumed(wallet, transport, targetSeqno, options 
         // The signed seqno rides with the bytes: a door's verdict (classifyBroadcastDoorAnswer) is only meaningful
         // against the seqno these bytes were signed for.
         const rotated = await broadcastThroughNextDoor(pending.boc, { ...options, seqno: pending.seqno });
-        if (!rotated) await transport.sendBoc({ boc: pending.boc, walletAddress: wallet.address, seqno: pending.seqno });
+        if (!rotated) {
+          await transport.sendBoc({
+            boc: pending.boc, walletAddress: wallet.address, seqno: pending.seqno,
+            queueTimeoutMs: TON_RPC_MAX_QUEUE_WAIT_MS,   // same allowance as the first broadcast
+          });
+        }
         rebroadcasts += 1;
       } catch {
         // The seqno read is the verdict here, not this POST. A failed re-send changes nothing: the earlier copy may
@@ -932,6 +969,23 @@ export function __resetWalletSendLanesForTests() {
 }
 
 export async function sendPlathoWalletTransaction(wallet, transaction, options = {}) {
+  // THE GENERATION GATE, at the ONE lane every chain write passes through [CUTOVER.md items 6/7, 2026-08-31].
+  // Past the baked boundary this build's writes land in shard addresses the new generation's readers never
+  // derive — accepted by the chain, reported as success, read by no one. Refusing HERE turns that silent loss
+  // into a visible error on every path at once (CONV, INTRO, PUBLIC, usernames, ATH — none can bypass the
+  // lane), instead of trusting each caller to remember a check. Dormant while CUTOVER_EPOCH is null.
+  // The EXCEPTION is a deliberate re-broadcast (options.seqno): those bytes were signed BEFORE the boundary
+  // and re-sending the SAME external is idempotent — refusing it could strand a send that already half-landed.
+  if (options.seqno === undefined && cutoverUpdateRequired()) {
+    // NO "network" IN THE WORDS [audit 2026-08-31, round 7]. This sentence used to read "the network moved to a
+    // new contract generation" — and `isTonRpcTransientError` matches /network/i, so the app classified a
+    // PERMANENT refusal as a transient blip: eight retries over ~2.5 minutes, then "not sent: retry limit
+    // reached" — a false reason that names no action, on the one error whose whole purpose is to tell the user
+    // to update. The `code` below is the real signal; the prose must not contradict it by accident.
+    const error = new Error('app update required: this version can no longer publish, reload to update');
+    error.code = 'CUTOVER_UPDATE_REQUIRED';
+    throw error;
+  }
   if (options.seqno !== undefined) return sendPlathoWalletTransactionInLane(wallet, transaction, options);
   return withWalletSendLane(wallet, () => sendPlathoWalletTransactionInLane(wallet, transaction, options));
 }
@@ -983,7 +1037,20 @@ async function sendPlathoWalletTransactionInLane(wallet, transaction, options = 
     profile?.mark('sign');
     let result = null;
     try {
-      result = await transport.sendBoc({ boc: built.boc, walletAddress: wallet.address, seqno });
+      // A QUEUE ALLOWANCE, so the upload budget is not spent waiting for the pump [audit 2026-08-31, round 8;
+      // WIDENED round 9]. callSend bounds the WHOLE operation at requestTimeoutMs + queueTimeoutMs, and its own
+      // comment says the allowance is what keeps a busy pump from eating the upload budget — but the allowance
+      // defaults to 0 and the wallet passed none. MEASURED: with one accountStates batch in flight, this call
+      // threw TIMEOUT after 15,006 ms having issued ZERO POSTs, and two such aborts park the healthy primary door
+      // for 30 s. Round 8 allowed one request timeout, on the reasoning that a 'critical' send is taken next off
+      // the queue — wrong twice over (equal-weight tasks are FIFO, and a rate-limit park delays all of them), and
+      // MEASURED to reject at 15 s under a 40 s park where the older posture waited and landed. The allowance is
+      // now what a queue wait can legitimately BE (TON_RPC_MAX_QUEUE_WAIT_MS: the ladder's last rung plus one
+      // in-flight request). Overshooting THAT rejects as QUEUE_TIMEOUT, which is transient AND provably
+      // pre-broadcast, instead of an ambiguous operation TIMEOUT.
+      result = await transport.sendBoc({
+        boc: built.boc, walletAddress: wallet.address, seqno, queueTimeoutMs: TON_RPC_MAX_QUEUE_WAIT_MS,
+      });
     } catch (error) {
       // Surface WHY toncenter rejected the WALLET external (transfers/top-ups/deploy) — this was the last
       // broadcast path without a [platho] warn, so its 500s showed as bare mysteries in the console.
@@ -1000,8 +1067,13 @@ async function sendPlathoWalletTransactionInLane(wallet, transaction, options = 
       //      caller's next attempt reads the chain and signs a seqno that can actually be accepted.
       //   2. These bytes are a corpse. Re-broadcasting them is guaranteed to fail, so they must NOT be offered for
       //      the idempotent re-broadcast path below, which exists for AMBIGUOUS failures only.
-      const definitivelyRejected = walletErrorIsSeqnoMismatch(error);
-      if (definitivelyRejected) resetWalletSeqnoFloor(wallet);
+      const seqnoMismatch = walletErrorIsSeqnoMismatch(error);
+      if (seqnoMismatch) resetWalletSeqnoFloor(wallet);
+      // ...BUT A MISMATCH AFTER AN UNOBSERVED POST IS NOT PROOF THESE BYTES DIED [audit 2026-09-06, round 3]. When an
+      // earlier door took the bytes and its answer was lost (the transport marks that on the error), the chain may
+      // have consumed this very seqno BY EXECUTING THEM — the next door's 133 then means "already done", not
+      // "wrong". Such bytes ride along as ambiguous, and the caller confirms by reading instead of signing again.
+      const definitivelyRejected = seqnoMismatch && error?.tonRpcPriorDeliveryAmbiguous !== true;
       // Attach the SIGNED external so an AMBIGUOUS broadcast (the send may or may not have landed) can be re-broadcast
       // idempotently on retry instead of re-signing a fresh seqno — a fresh sign would double-execute if the first
       // copy actually landed. The external is bound to `seqno`, so the chain runs it at most once. [direct-pay send hardening]
@@ -1021,6 +1093,29 @@ async function sendPlathoWalletTransactionInLane(wallet, transaction, options = 
       // it meanwhile. Marked in `finally` so a wait that throws is still attributed.
       try {
         seqno = await awaitWalletSeqnoConsumed(wallet, transport, seqno + 1, options);
+      } catch (error) {
+        // THIS CHUNK IS ALREADY BROADCAST AND PAID [audit 2026-08-31, round 8]. `builtBoc` was attached only in
+        // the catch around sendBoc, so a throw from the WAIT arrived at the caller with builtBoc undefined —
+        // and every consumer reads its absence as "we failed before anything left the device". CONV then shed
+        // the pre-broadcast (shard, seq) claim and offered a Retry that REBUILT the message with fresh seqs,
+        // while the wallet still held this chunk in walletPendingExternals and kept re-broadcasting it: the
+        // parts that landed are published twice and paid for twice. Attaching the same pair the sendBoc catch
+        // does makes the flag mean what its three consumers already believe it means — bytes left the device,
+        // the outcome is unknown — so the retry re-broadcasts these bytes instead of minting new ones.
+        // …BUT NOT ONCE THEY ARE PROVABLY DEAD [audit 2026-09-01, round 9]. `walletExternalExpired` is set only
+        // when the wait ran past validUntil, and past that the external can never execute. Attaching there told
+        // the CONV retry to re-broadcast a corpse on every attempt for the whole 330 s re-broadcast window,
+        // building nothing, and told the public resume path to store bytes with validUntil: null. The sendBoc
+        // catch has always guarded its own attach the same way (`!definitivelyRejected`); this is that guard.
+        // ...AND EXPIRY PROVES DEATH ONLY WHEN THE WAIT WATCHED THE CHAIN [audit 2026-09-06, round 3]: a wait whose
+        // every seqno read failed (`seqnoReadFailed`) ran out the clock without once seeing whether the external was
+        // consumed. Its bytes can no longer execute in the future, but they may have executed in the past — and a
+        // caller that reads their absence as "nothing left the device" rebuilds and pays twice. They ride along.
+        if (error && typeof error === 'object' && built?.boc && error.builtBoc === undefined
+          && !(error.walletExternalExpired === true && error.seqnoReadFailed !== true)) {
+          try { error.builtBoc = built.boc; error.builtSeqno = seqno; } catch { /* frozen error — best effort */ }
+        }
+        throw error;
       } finally {
         profile?.mark('chunkWait');
       }

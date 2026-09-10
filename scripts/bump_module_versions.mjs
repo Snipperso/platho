@@ -65,6 +65,38 @@ function versionedModules() {
   return out;
 }
 
+/**
+ * WHERE EVERY IMPORTER DISAGREES — the blind spot this tool had until 2026-09-02, and the one that cannot heal
+ * itself. The map above is `set` per hit, so the LAST file scanned silently wins; and a bump rewrites importers
+ * by EXACT old-version match, so a file that has fallen one round behind is never matched again and drifts
+ * further with every future round. MEASURED that day: `web/app.js` sat one or two versions behind on TWENTY-ONE
+ * modules while this tool reported the tree as consistent, because nothing here compared importers with each
+ * other. The
+ * browser then loads two copies of each module, with SEPARATE module state — the failure `?v=` exists to cause
+ * on purpose for a new release and must never cause inside one.
+ */
+function versionSkew() {
+  const votes = new Map();
+  for (const file of sourceFiles()) {
+    for (const m of readFileSync(file, 'utf8').matchAll(REF)) {
+      if (!votes.has(m[2])) votes.set(m[2], new Map());
+      const per = votes.get(m[2]);
+      if (!per.has(m[3])) per.set(m[3], []);
+      per.get(m[3]).push(file);
+    }
+  }
+  const skewed = [];
+  for (const [mod, per] of votes) {
+    if (per.size < 2) continue;
+    const spread = [...per.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([v, files]) => `v${v} (${files.join(', ')})`)
+      .join(' vs ');
+    skewed.push(`${mod}: imported at two versions — ${spread}`);
+  }
+  return skewed;
+}
+
 // app.js is not a COUNTER-versioned module: phase 2 gives it a content-derived build id instead. The counter rule
 // cannot apply to it. It once had to equal the version label living inside app.js, so bumping the counter edited
 // app.js, which made the counter stale again — a circle that cost a release cycle on 2026-08-04. A hash has no such
@@ -171,11 +203,21 @@ if (!RUN) {
     // The build id is not written yet, so the exact cache id cannot be computed here — it will move regardless.
     problems.push(`${SERVICE_WORKER}: CACHE_NAME пересчитается вместе с ним`);
   }
+  // A SKEW IS NOT FIXED BY --run, so it is reported separately and never folded into the count above: the
+  // rewrite matches an exact old version, which is precisely what a drifted importer no longer carries. It has
+  // to be repaired by pointing the laggard at the version everyone else uses.
+  const skewed = versionSkew();
+  if (skewed.length > 0) {
+    for (const line of skewed) console.log(`SKEW ${line}`);
+    console.log(`\nmodules imported at two versions: ${skewed.length}. --run does NOT repair this: it rewrites `
+      + 'importers by exact old-version match, which a drifted importer no longer carries. Point the laggard at '
+      + 'the version the others use.');
+  }
   if (problems.length > 0) {
     for (const line of problems) console.log(line);
     console.log(`\nвсего: ${problems.length}. Запусти с --run, чтобы применить.`);
-    process.exit(1);
   }
+  if (problems.length > 0 || skewed.length > 0) process.exit(1);
   console.log('всё в порядке: ни один изменённый модуль не остался со старой ?v=, идентификаторы сборки и кэша совпадают');
   process.exit(0);
 }

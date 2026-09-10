@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-Dernière mise à jour : 18 août 2026
+Dernière mise à jour : 29 août 2026
 
 Platho est une messagerie sans serveur dorsal. Ce document est court parce qu'il
 y a très peu de choses à divulguer — et précis là où quelque chose quitte
@@ -25,11 +25,26 @@ Nous ne demandons ni adresse e-mail, ni numéro de téléphone, ni nom.
 - Votre historique de messages et vos brouillons.
 - Vos réglages, y compris une clé d'API facultative pour un fournisseur public de nœuds TON.
 
-Ces données sont conservées dans le stockage local de votre navigateur et
-chiffrées à l'aide d'un mot de passe que vous choisissez (AES-GCM-256 avec
-dérivation de clé PBKDF2-SHA-256). Nous ne les recevons jamais. Effacer les
-données de votre navigateur les supprime et, sans votre phrase de récupération,
-ni nous ni quiconque d'autre ne peut les restaurer.
+Rien de tout cela ne nous parvient, et la protection n'est pas la même pour
+chacun — chaque élément est donc nommé séparément plutôt qu'en une seule phrase :
+
+- **La phrase de récupération et les clés qui en dérivent** sont chiffrées avec un
+  mot de passe que vous choisissez (AES-GCM-256, dérivation de clé
+  PBKDF2-SHA-256). Sans ce mot de passe, elles sont illisibles, pour nous comme
+  pour quiconque tient l'appareil.
+- **L'historique des messages et les brouillons** sont chiffrés avec une clé que
+  votre navigateur génère sur cet appareil et conserve sous une forme non
+  exportable — et non avec votre mot de passe. Copier les données stockées vers
+  une autre machine ne donne donc rien de lisible ; cela ne protège pas de
+  quelqu'un qui utilise déjà votre navigateur déverrouillé.
+- **Les réglages** — le thème, la langue, vos abonnements — sont conservés en
+  texte ordinaire ; rien n'y est secret et rien ne nous parvient. La seule valeur
+  qui le soit, la clé d'API facultative d'un fournisseur de nœuds, est scellée avec
+  le même type de clé d'appareil que l'historique des messages, plutôt que laissée
+  en clair.
+
+Effacer les données de votre navigateur supprime tout cela et, sans votre phrase
+de récupération, ni nous ni quiconque d'autre ne peut le restaurer.
 
 ## Ce qui est public par conception
 
@@ -56,6 +71,7 @@ Platho, votre navigateur envoie des requêtes à :
 - `toncenter.com`
 - `tonapi.io`
 - `mainnet-v4.tonhubapi.com`
+- `nft.fragment.com`
 
 Ces fournisseurs voient nécessairement votre adresse IP et les requêtes émises
 par votre appareil ; ils appliquent leurs propres politiques de confidentialité,

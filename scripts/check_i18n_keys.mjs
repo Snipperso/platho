@@ -24,7 +24,7 @@ const html = readFileSync('web/index.html', 'utf8');
 
 // EVERY MODULE, not just app.js. The first version read app.js alone, which was true of the code at the time and
 // stopped being true the moment a module other than app.js called t() — public-channel-subscriptions.mjs does, for
-// the words on a channel card. A checker whose input set is narrower than the thing it checks reports "чисто" about
+// the words on a channel card. A checker whose input set is narrower than the thing it checks reports  about
 // the part it happened to look at, which is worse than not running: the missing key still renders as [key].
 const sources = ['web/app.js'];
 for (const name of readdirSync('web')) {

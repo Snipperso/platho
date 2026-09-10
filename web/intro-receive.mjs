@@ -21,10 +21,10 @@
 //   - The scan window must cover the full retention period, not just today. An intro published just before
 //     midnight lives in yesterday's shard, and entries stay live for a week from the moment they were written.
 
-import { INTRO_READ_SPACE, introShardAddress, addrKey } from './shard-discovery.mjs?v=23';
-import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=1';
-import { readAccountStates, changedSince, changeMarkerOf } from './shard-reader.mjs?v=26';
-import { scanIntros } from './intro-scan.mjs';
+import { INTRO_READ_SPACE, introShardAddress, epochIsDerivable, addrKey } from './shard-discovery.mjs?v=58';
+import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=2';
+import { readAccountStates, changedSince, changeMarkerOf } from './shard-reader.mjs?v=61';
+import { scanIntros } from './intro-scan.mjs?v=6';
 
 // THE WINDOW REACHES FORWARD AS WELL AS BACK, and the forward edge is not decoration.
 // The publish gate (13684) accepts a shard whose epoch is now +/-1, so a sender with a fast clock legitimately
@@ -138,6 +138,12 @@ export async function scanIntroWindow({
 
   const targets = [];
   for (let epoch = fromEpoch; epoch <= toEpoch; epoch += 1) {
+    // SKIP AN EPOCH THIS BUILD CANNOT ADDRESS, never reject the pass on it [audit 2026-08-31, round 5]. The
+    // window looks one epoch AHEAD (C+1, for clock skew), so on day E-1 it reaches the boundary epoch itself —
+    // generation 18, whose cell a pre-flip build does not carry. Deriving it throws, and the throw is OUTSIDE
+    // the per-bucket guard below: the whole scan pass would reject and that day's first contacts would never be
+    // delivered. Skipping is also the honest answer — before the flip no gen-18 intro shard exists to read.
+    if (!epochIsDerivable('intro', epoch)) continue;
     for (const bucket of bucketList) {
       targets.push({ epoch, bucket, address: await introShardAddress(epoch, bucket) });
     }
@@ -145,9 +151,28 @@ export async function scanIntroWindow({
   const byKey = new Map(targets.map((t) => [addrKey(t.address), t]));
   const states = await readStates(targets.map((t) => t.address));
 
+  // DUST FILTER [audit 2026-08-28]. An address the indexer has EVER seen keeps returning a full ~525 B `uninit`
+  // row forever — this file's own policy note describes that primitive, having considered only retired shards.
+  // An attacker sends 1 nanoton to each of the 1024 bucket addresses of an epoch: no contract runs, no fee, no
+  // gate, and every scanner's every pass now carries 1024 dead rows. Those rows poisoned BOTH things this pass
+  // decides: `changedSince` listed each one (its marker is unknown), spending a doomed getter call, and
+  // `distinctLiveBuckets` counted it, which is the statistic that sizes the hot range and therefore the poll
+  // interval. MEASURED by the audit: hot pass 987 B -> 579,686 B, poll interval 1 minute -> 60 minutes, for
+  // 0.31 GRAM per epoch. The note beside distinctLiveBuckets below argues a COUNT cannot be poisoned the way a
+  // maximum was, because one outlier adds one bucket — true, and irrelevant when the attacker buys all of them.
+  // Every other lane already drops non-active rows (public-lane.mjs, six sites); this one did not.
+  // 'unknown' rows are KEPT: that status means the endpoint declined to answer, so nothing was measured and the
+  // bucket must still be read the slow way — exactly the distinction changedSince itself draws.
+  const live = new Map();
+  for (const [key, state] of states) {
+    if (state && state.status !== undefined && state.status !== 'active' && state.status !== 'unknown') continue;
+    live.set(key, state);
+  }
+  const active = new Map([...live].filter(([, s]) => !s || s.status !== 'unknown'));
+
   const seen = new Map();
   for (const [key, entry] of cursors) seen.set(key, entry?.marker ?? null);
-  const changed = changedSince(states, seen);
+  const changed = changedSince(live, seen);
 
   // Pass 2 — open only what moved, and only from where we stopped. This is the step a whole-state read cannot do:
   // data_boc always returns the entire dictionary, while the getter takes a cursor.
@@ -204,6 +229,15 @@ export async function scanIntroWindow({
     if (drained) nextCursors.set(key, { marker: changeMarkerOf(state), nextId: fromId });
   }
 
+  // WHICH BUCKETS ACTUALLY BEAR AN INTRO — the one definition both statistics below use. A drained bucket
+  // carries its `next_id` in the cursor and `next_id` only ever grows, so a positive one proves the bucket has
+  // held at least one entry; a bucket the pass could not drain keeps no cursor and stays counted, because a read
+  // that failed is not a bucket that is empty. Read from `nextCursors`, so it includes what THIS pass learned.
+  const bearingKeys = [...active.keys()].filter((key) => {
+    const seenNextId = nextCursors.get(key)?.nextId;
+    return !(Number.isFinite(Number(seenNextId)) && Number(seenNextId) === 0);
+  });
+
   // The filter itself. One X25519 per candidate — unavoidable, it is what stealth costs.
   const hits = candidates.length ? await scanIntros(scanSecretKey, candidates) : [];
 
@@ -214,24 +248,56 @@ export async function scanIntroWindow({
       window: [fromEpoch, toEpoch],
       buckets: [from, to],
       probed: targets.length,
-      live: states.size,
+      live: active.size,
       // The highest bucket actually in use. Kept for diagnostics, NOT for sizing the hot range any more — see
       // distinctLiveBuckets below for why a maximum is the wrong statistic to steer on.
-      highestLiveBucket: [...states.keys()].reduce((max, key) => Math.max(max, byKey.get(key)?.bucket ?? -1), -1),
-      // HOW MANY DISTINCT BUCKET INDICES ARE IN USE, which is what actually sizes the hot range.
+      highestLiveBucket: [...active.keys()].reduce((max, key) => Math.max(max, byKey.get(key)?.bucket ?? -1), -1),
+      // HOW MANY DISTINCT BUCKET INDICES ACTUALLY HOLD AN INTRO, which is what sizes the hot range.
       //
-      // The hot range used to track `highestLiveBucket`, and a maximum is trivially poisoned: ONE intro written
-      // to bucket 1023 — 0.0134 GRAM — dragged every scanner's range from a handful of buckets to the full 1024
-      // and held it there, because the runner ratchets the figure upward and only a full sweep can lower it.
-      // A count cannot be poisoned that way: the same outlier adds ONE bucket, not a thousand.
+      // This statistic has been poisoned twice, each time by counting something cheaper than an intro.
+      //   1. It tracked `highestLiveBucket`, and a maximum is trivially poisoned: ONE intro written to bucket
+      //      1023 — 0.0134 GRAM — dragged every scanner's range to the full 1024 and held it there.
+      //   2. It counted every ACCOUNT THAT EXISTS. The dust filter above already drops rows that are merely
+      //      `uninit`, so the answer to that was to make the account real — and `IntroShard.receive() {}`
+      //      accepts a bare transfer, which leaves the bucket `active` with no entries in it at all.
+      //      MEASURED 2026-09-01: 1024 such buckets in one epoch cost 2.24 GRAM, and they took the poll
+      //      interval from 60,000 ms to 980,111 ms — a first contact arriving in sixteen minutes instead of one,
+      //      for every scanner in the network. Ten epochs of the window pin it at the 3,600,000 ms cap.
+      //      The contract cannot close that door: MEASURED, a message carrying StateInit applies it EVEN WHEN
+      //      THE TRANSACTION ABORTS (an unknown opcode throws 130 and the account is still `active`, balance 0),
+      //      so making the empty receiver throw would only make the attack cheaper — the attacker would keep the
+      //      value and pay gas alone.
       //
-      // It is the right statistic now rather than merely a robust one, because senders pack densely from the
-      // bottom (web/intro-bucket.mjs). Under that rule the live set is 0..k-1, so the count IS the frontier.
-      // A sender that ignores the rule is caught by the periodic full sweep, which is precisely its job.
-      distinctLiveBuckets: new Set([...states.keys()].map((key) => byKey.get(key)?.bucket)).size,
+      // So count what an intro actually is: an ENTRY. A bucket the scan has drained and found empty carries
+      // `nextId: 0` in its cursor — `next_id` only ever grows, so a positive one is proof the bucket has held at
+      // least one entry. This is read from `nextCursors`, not `cursors`, so it includes what THIS pass just
+      // learned: the narrowing takes effect on the very pass that opens the bucket, not the one after
+      // (MEASURED: 15 active-but-empty buckets, pass 1 already reports 1). A bucket the pass could NOT drain
+      // keeps no cursor at all and therefore still counts — a read that failed is not a bucket that is empty,
+      // the same rule the cursor commit itself follows a few lines up.
+      //
+      // `liveBucketIndices` below deliberately keeps naming the empty ones. It costs ~57 B each in the next
+      // request URL and buys the thing this trade is about: a bucket outside the dense prefix that a rule-
+      // ignoring sender writes to would otherwise be invisible until the six-hourly full sweep. The poisoning
+      // lived in the INTERVAL, not in the naming, so only the interval's input is narrowed.
+      distinctLiveBuckets: new Set(bearingKeys.map((key) => byKey.get(key)?.bucket)).size,
       // WHICH buckets are live, so the next pass can name them even if they sit above the dense prefix. Sorted
       // and de-duplicated; bounded by readSpace, so it cannot grow without limit.
-      liveBucketIndices: [...new Set([...states.keys()]
+      //
+      // THE SAME PREDICATE AS THE COUNT ABOVE, and it has to be [audit 2026-09-01, round 15]. Round 14 narrowed
+      // only the count — which sets the poll INTERVAL and the `asked` term of the cost model — and deliberately
+      // left this list naming every bucket that merely EXISTS, reasoning that the poisoning "lived in the
+      // interval, not in the naming". MEASURED, that was exactly backwards: this list becomes the next pass's
+      // `extraBuckets`, which is what the pass actually ASKS ABOUT and which `passCostBytes` does not count at
+      // all. So the request stayed 1,024 addresses wide and the interval fell from 980,111 ms to 60,000 ms —
+      // the same poisoned pass, SIXTEEN TIMES MORE OFTEN: 90,269 address-asks a day became 1,474,560, against a
+      // 30 MiB daily budget. The fix made the attack it was written against cheaper for the attacker to sustain
+      // and dearer for the victim.
+      // What naming an empty bucket bought was reach: a sender who ignores the write rule (web/intro-bucket.mjs
+      // packs densely from the bottom) and writes above the dense prefix would otherwise wait for the six-hourly
+      // full sweep. That is what the full sweep is FOR, it is the documented fallback, and six hours of delay
+      // for an off-rule sender is not worth 857 MiB a day for everyone else.
+      liveBucketIndices: [...new Set(bearingKeys
         .map((key) => byKey.get(key)?.bucket)
         .filter((b) => Number.isInteger(b)))].sort((a, b) => a - b),
       changed: changed.length,

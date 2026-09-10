@@ -13,24 +13,33 @@
     <link rel="manifest" href="/manifest.webmanifest?v=3">
     <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="/assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="/styles.css?v=372">
+    <link rel="stylesheet" href="/styles.css?v=448">
     <!-- Plain-script watchdog: shows a diagnostic screen if the module graph
          never boots (old Safari, blocked resources). Vendor modules use
          relative imports, so no import map is needed and the iOS floor is
          not tied to import-map support (Safari 16.4). -->
-    <script src="/boot-guard.js?v=8"></script>
+    <script src="/boot-guard.js?v=12"></script>
   </head>
   <body>
     <div class="app-shell" data-view="public">
       <aside class="sidebar" aria-label="Navigation" data-i18n-aria-label="nav.navigation">
-        <div class="brand">
-          <img class="brand-mark" src="/assets/platho-icon-192.png?v=3" alt="" width="34" height="34">
-          <div>
+        <!-- The corner is a DOOR, not a logo slot. It carried a mark, a dot and a network word that answered nothing a
+             user asks; now one tap opens the profile card, and a worn Telegram gift stands where the mark was (the
+             dot and the word move inside the card, which is where "which network, which version" belongs). With no
+             gift worn this is byte-for-byte the old corner. -->
+        <div class="brand" data-brand-gift="false">
+          <button class="brand-mark-button" id="brandProfileButton" type="button" aria-label="Profile" title="Profile" aria-haspopup="dialog" data-i18n-aria-label="profileCard.open" data-i18n-title="profileCard.open">
+            <img class="brand-mark" id="brandMarkImage" src="/assets/platho-icon-192.png?v=3" alt="" width="58" height="58">
+            <!-- The worn gift in motion (app.js: the Gift layer of its own Lottie). Hidden until a player has
+                 mounted; the still picture above stays the fallback and the first paint. -->
+            <canvas class="brand-mark" id="brandMarkMotion" width="58" height="58" aria-hidden="true" hidden></canvas>
+          </button>
+          <div class="brand-meta" id="brandMeta">
             <div class="brand-name">Platho</div>
-            <div class="network-pill">
+            <div class="network-pill" id="brandNetworkPill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">1.3.13</span>
+              <span class="app-version-label" id="appVersionLabel">1.3.14</span>
             </div>
           </div>
         </div>
@@ -52,10 +61,6 @@
           <button class="rail-item" type="button" data-tab="wallet" aria-label="Wallet" title="Wallet" data-i18n-aria-label="common.wallet" data-i18n-title="common.wallet">
             <span class="icon icon-wallet"></span>
             <span data-i18n="common.wallet">Wallet</span>
-          </button>
-          <button class="rail-item" type="button" data-tab="profile" aria-label="Profile" title="Profile" data-i18n-aria-label="nav.profile" data-i18n-title="nav.profile">
-            <span class="icon icon-user"></span>
-            <span data-i18n="nav.profile">Profile</span>
           </button>
         </nav>
       </aside>
@@ -191,6 +196,8 @@
             <span class="icon icon-search"></span>
             <input id="publicChannelSearch" type="search" placeholder="Search public" autocomplete="off" data-i18n-placeholder="public.searchPublic">
           </div>
+          <!-- The moderation notice: a restriction or the warning count for the connected wallet, nothing otherwise. -->
+          <div class="public-moderation-notice" id="moderationNotice" hidden></div>
           <div class="public-feed" id="publicFeed"></div>
           <button class="public-jump-down-button" id="publicJumpDownButton" type="button" aria-label="Jump to newest public posts" title="Jump to newest public posts" hidden data-i18n-aria-label="public.jumpToNewest" data-i18n-title="public.jumpToNewest">
             <span class="icon icon-up"></span>
@@ -377,6 +384,13 @@
                 <button id="createWalletButton" type="button"><span data-i18n="wallet.create">Create wallet</span><strong id="createWalletStatus" data-i18n="wallet.statusRecommended">recommended</strong></button>
                 <button id="importWalletButton" type="button"><span data-i18n="wallet.import">Import wallet</span><strong id="importWalletStatus" data-i18n="wallet.status24Words">24 words</strong></button>
                 <button id="unlockWalletButton" type="button"><span data-i18n="wallet.unlock">Unlock wallet</span><strong id="unlockWalletStatus" data-i18n="wallet.statusNotStored">not stored</strong></button>
+                <!-- [owner, 2026-09-07: "new users will wear themselves out looking for it"] THE ONE ROW A NEW
+                     ACCOUNT MUST FIND, so it sits in the column a newcomer already walks — create or import the
+                     wallet, unlock it, activate the account — and not behind the settings dialog. It registers
+                     MESSAGING keys, which is why it lived beside "Replace message keys" from 2026-08-10 until
+                     today; that reading is still true and is still the wrong trade for a first-run step that
+                     spends GRAM from this very wallet. It hides itself once the account is active (app.js). -->
+                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
                 <button id="changeWalletPasswordButton" type="button"><span data-i18n="wallet.changePassword">Change password</span><strong id="changeWalletPasswordStatus" data-i18n="wallet.statusEncrypted">encrypted</strong></button>
                 <button id="exportWalletKeyButton" type="button"><span data-i18n="wallet.exportKey">Export wallet key</span><strong id="exportWalletKeyStatus" data-i18n="wallet.statusEncryptedFile">encrypted file</strong></button>
                 <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
@@ -394,6 +408,33 @@
                 <!-- [OWNER 2026-08-08] The other way to get ATH: buy it from the sealed reserve instead of earning it.
                      The status carries the PRICE, like every other row here that spends money. -->
                 <button id="buyAthButton" type="button"><span data-i18n="profile.buyAth">Buy ATH</span><strong class="profile-action-status" id="buyAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <!-- THE DISCOUNT THE CONTRACTS PROMISE AND THE APP COULD NOT REACH [2026-09-02]. FeeVault is a
+                     clean-18 contract: fifteen of its client builders had zero callers anywhere, so a stake of
+                     100..10,000 ATH bought 1%..100% off every message fee on chain and nowhere in the product.
+                     The band is enforced in THIS field because the contract cannot hold it — the frozen ATHWallet
+                     credits its balance before it notifies, with bounce:false, so a throw there would strand the
+                     ATH outside the mirror instead of returning it (CUTOVER.md item 11). Before the seal the row
+                     says so and opens nothing: web/shard-code-18.mjs, which carries the vault's code cell, is a
+                     seal-time artifact. The withdraw row appears only once there is something staked. -->
+                <button id="feeDiscountButton" type="button"><span data-i18n="profile.feeDiscount">Fee discount</span><strong class="profile-action-status" id="feeDiscountStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <button id="unstakeAthButton" type="button" hidden><span data-i18n="profile.unstake">Withdraw stake</span><strong class="profile-action-status" id="unstakeAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <!-- ATH THE VAULT HOLDS BUT DOES NOT COUNT [2026-09-02]. A transfer that reached the vault's own
+                     ATH wallet without a notification (a forward amount of zero, a stranger's donation, a credit
+                     the vault never heard) sits outside the `staked` mirror: Unstake cannot reach it (gate 28033)
+                     and the discount does not see it. The contract's hatch, EmergencyExit, had no caller in the
+                     app at all. It drains EVERYTHING — a partial exit cannot close the gap, measured — so this row
+                     appears only when at least 1 ATH is stranded, names the whole amount that will come back, and
+                     the stake screen refuses a re-stake for the 300-second absorb window on its own. -->
+                <button id="recoverAthButton" type="button" hidden><span data-i18n="profile.recoverAth">Recover uncounted ATH</span><strong class="profile-action-status" id="recoverAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <!-- GRAM THE VAULT PARKS [audit 2026-09-05]. Every publish leaves its unspent self-reserve behind, every
+                     unstake's excesses come back here (the vault must name itself as response_destination — that ack
+                     IS the interlock), a stake's notification carries its own change in, and a refused publish leaves
+                     its take un-booked in the balance. The contract's WithdrawFloat returns everything above the rent
+                     float and the protocol's booked fees; until this row the app had no caller for it. Shown only
+                     when at least FV_FLOAT_RETURN_MIN is free. -->
+                <button id="vaultFloatButton" type="button" hidden><span data-i18n="profile.vaultFloat">GRAM parked in the vault</span><strong class="profile-action-status" id="vaultFloatStatus"></strong></button>
+                <!-- The moderators' queue [CUTOVER item 15]: shown only when the connected wallet is on the ledger's roster. -->
+                <button id="moderationQueueButton" type="button" hidden><span data-i18n="profile.moderationQueue">Moderation queue</span></button>
               </div>
               <div class="profile-stat-list">
                 <div class="profile-stat-row">
@@ -407,23 +448,15 @@
                    treasury ones the app never offered) are in the local operator console, tools/admin. -->
             </section>
 
-            <section class="profile-section" aria-label=".ath names" data-i18n-aria-label="username.myNames">
-              <h2 data-i18n="username.myNames">My .ath names</h2>
-              <!-- [OWNER 2026-08-09] In the WALLET tab, not beside the minting controls in Profile. A name you can
-                   hand over or sell is PROPERTY; what Profile decides is which name other people see, which is
-                   identity. Same object, two different questions, and the owner asked for this one here. -->
-              <div class="settings-list">
-                <button id="myUsernamesButton" type="button"><span data-i18n="username.myNames">My .ath names</span><strong class="profile-action-status" id="myUsernamesStatus" data-i18n="profile.statusChecking">checking</strong></button>
-              </div>
-            </section>
           </div>
         </section>
 
-        <section class="content-pane profile-pane view-panel" data-panel="profile" aria-label="Profile" data-i18n-aria-label="nav.profile">
+        <div class="modal-backdrop" id="profileSettingsDialog" hidden>
+        <section class="content-pane profile-pane profile-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="profileSettingsTitle">
           <header class="pane-header inline">
             <div class="pane-title-block">
-              <h1>Platho.app</h1>
-              <p id="profileHandle" data-i18n="nav.profile">Profile</p>
+              <h1 id="profileSettingsTitle" data-i18n="profile.settingsTitle">Settings</h1>
+              <p id="profileHandle" data-i18n="profile.settingsLead">This device and this account</p>
               <!-- Build version, duplicated from the rail badge: the rail is hidden on the narrow (mobile / TG
                    Mini App) layout, and TMA webviews cache hard — this is the on-device way to verify the build.
                    HIDDEN (owner, 2026-08-07): it is an operator affordance, not something a reader of the profile
@@ -431,33 +464,14 @@
                    text, and still carries the click handler that copies the private-lane diagnostic; removing
                    `hidden` brings all of it back. It is the version ANCHOR the release cascade pins, so deleting
                    the element would also break PWA-CONFIG-01B. -->
-              <span class="app-version-label" id="profileVersionLabel" hidden>1.3.13</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.3.14</span>
             </div>
-            <div class="header-actions">
-              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
-                <span class="icon icon-open-app"></span>
-              </button>
-              <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
-                <span class="icon icon-info"></span>
-              </button>
-              <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
-            </div>
+            <button class="icon-button" id="profileSettingsCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
           </header>
 
           <div class="profile-scroll-content">
-            <div class="identity-block">
-              <div class="avatar large" id="profileAvatar" aria-hidden="true">P</div>
-              <div class="identity-copy-layout">
-                <div class="identity-title-row">
-                  <h2 id="identityName" data-i18n="profile.noWallet">No wallet</h2>
-                  <button class="icon-button identity-copy-button" id="copyWalletAddressButton" type="button" aria-label="Copy wallet address" title="Copy wallet address" disabled data-i18n-aria-label="profile.copyWalletAddress" data-i18n-title="profile.copyWalletAddress">
-                    <span class="icon icon-copy"></span>
-                  </button>
-                </div>
-                <p id="identitySubtitle" data-i18n="profile.createOrImportWallet">Create or import a wallet</p>
-              </div>
-            </div>
-
             <div class="profile-sections">
             <section class="profile-section" aria-label="Language">
               <h2 data-i18n="profile.language.title">Language</h2>
@@ -480,11 +494,9 @@
                     <option value="anonymous" data-i18n="chat.anonymous">Anonymous</option>
                   </select>
                 </label>
-                <!-- [OWNER 2026-08-10] Activation lives HERE, not in the Wallet tab: it registers your MESSAGING
-                     keys on-chain, which is what this section is about, and the row directly below it is the one
-                     that replaces those same keys ("activate account first"). The quick-start step has always told
-                     users to find it "on the Profile tab" — until today that sentence was simply wrong. -->
-                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
+                <!-- Activation left this section on 2026-09-07 for the Wallet tab — see the note beside it there.
+                     What replaces those same keys stays: a key rotation is a once-in-a-lifetime maintenance action,
+                     and its status still reads "activate account first" when there is nothing yet to replace. -->
                 <button id="replaceVaultKeysButton" type="button"><span data-i18n="sync.replaceMessageKeys">Replace message keys</span><strong id="vaultRotateStatus" data-i18n="sync.statusActivateAccountFirst">activate account first</strong></button>
               </div>
             </section>
@@ -504,6 +516,23 @@
                   <select id="feedTimestampModeSelect" aria-label="Post timestamps" data-i18n-aria-label="public.timestampMode">
                     <option value="datetime" selected data-i18n="public.timestampDateTime">Date and time</option>
                     <option value="date" data-i18n="public.timestampDateOnly">Date only</option>
+                  </select>
+                </label>
+                <!-- A channel in its owner's gift [owner, 2026-09-07]. MINE is a publish: the choice goes out in the
+                     same paid profile post as the description, through the description dialog (the row presets it
+                     and afterwards shows what is on chain). OTHERS' is this device's preference alone. -->
+                <label class="settings-select-row compact-select-row" for="channelAppearanceSelect">
+                  <span data-i18n="public.channelAppearance">Channel appearance</span>
+                  <select id="channelAppearanceSelect" aria-label="Channel appearance" data-i18n-aria-label="public.channelAppearance">
+                    <option value="none" data-i18n="public.channelAppearanceNone">None</option>
+                    <option value="custom" data-i18n="public.channelAppearanceCustom">Custom</option>
+                  </select>
+                </label>
+                <label class="settings-select-row compact-select-row" for="channelAppearancesSelect">
+                  <span data-i18n="public.channelAppearances">Other channels' appearances</span>
+                  <select id="channelAppearancesSelect" aria-label="Other channels' appearances" data-i18n-aria-label="public.channelAppearances">
+                    <option value="show" data-i18n="public.channelAppearancesShow">Show</option>
+                    <option value="hide" data-i18n="public.channelAppearancesHide">Hide</option>
                   </select>
                 </label>
                 <!-- Moved out of the Wallet block: saving subscriptions is a public-channels action that happens to
@@ -527,20 +556,9 @@
             <section class="profile-section" aria-label="Usernames and avatars" data-i18n-aria-label="username.usernamesAndAvatarsLabel">
               <h2 data-i18n="username.usernamesAndAvatars">Usernames and Avatars</h2>
               <div class="settings-list">
-                <button id="mintUsernameButton" type="button"><span data-i18n="username.mintAthName">Mint .ath name</span><strong class="profile-action-status" id="mintUsernameStatus">100-10k ATH + 1.1 GRAM</strong></button>
-                <button id="linkUsernameButton" type="button"><span data-i18n="username.linkAthName">Link .ath name</span><strong id="linkedUsernameStatus" data-i18n="username.statusVerify">verify</strong></button>
                 <button id="setAvatarButton" type="button"><span data-i18n="avatar.setAvatar">Set avatar</span><strong class="profile-action-status" id="setAvatarStatus">100 ATH + from 0.2395 GRAM</strong></button>
                 <input id="profileAvatarInput" type="file" accept="image/*" hidden>
-                <!-- [OWNER 2026-08-03] Moved out of the Wallet tab. This picks whether other people see an address or
-                     a .ath name — that is identity, not money, and it belongs beside the name it selects between. -->
-                <label class="settings-select-row" for="walletDisplayModeSelect">
-                  <span data-i18n="wallet.displayAs">Display as</span>
-                  <select id="walletDisplayModeSelect" aria-label="Wallet display mode" data-i18n-aria-label="wallet.displayMode">
-                    <option value="address" data-i18n="wallet.optionAddress">Address</option>
-                    <option value="platho_nft" data-i18n="wallet.optionPlathoName">Platho name</option>
-                  </select>
-                  <strong id="walletDisplayModeStatus" data-i18n="wallet.statusAddress">address</strong>
-                </label>
+                <input id="groupAvatarInput" type="file" accept="image/*" hidden>
               </div>
             </section>
 
@@ -571,6 +589,7 @@
             </div>
           </div>
         </section>
+        </div>
       </main>
 
       <div class="modal-backdrop" id="newChatDialog" hidden>
@@ -611,6 +630,39 @@
             </button>
           </header>
           <div class="share-post-list" id="sharePostList"></div>
+        </section>
+      </div>
+
+      <!-- MODERATION [CUTOVER item 15, 2026-09-03]: a report picks a reason and goes to the target's ReportShard for
+           a small fee; the moderators' queue is the same dialog shell over the sweep of those shards. Both stay hidden
+           until the ledger address is in the config and the report lane's cell is in this build. -->
+      <div class="modal-backdrop" id="reportPostDialog" hidden>
+        <section class="recipient-dialog share-post-dialog" role="dialog" aria-modal="true" aria-labelledby="reportPostTitle">
+          <header>
+            <div>
+              <h2 id="reportPostTitle" data-i18n="dialog.reportPost">Report</h2>
+              <p data-i18n="dialog.reportPostHint">Tell the moderators why. A report costs a small fee and is public on the chain.</p>
+            </div>
+            <button class="icon-button" id="reportPostCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="share-post-list" id="reportReasonList"></div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="moderationQueueDialog" hidden>
+        <section class="recipient-dialog share-post-dialog" role="dialog" aria-modal="true" aria-labelledby="moderationQueueTitle">
+          <header>
+            <div>
+              <h2 id="moderationQueueTitle" data-i18n="dialog.moderationQueue">Moderation queue</h2>
+              <p data-i18n="dialog.moderationQueueHint">Reports from readers, most reported first.</p>
+            </div>
+            <button class="icon-button" id="moderationQueueCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <p class="public-moderation-notice" id="moderationQueueStatus" hidden></p>
+          <div class="share-post-list" id="moderationQueueList"></div>
         </section>
       </div>
 
@@ -686,6 +738,10 @@
               <select id="appearanceThemeSelect">
                 <option value="dark" data-i18n="appearance.themeDark">Dark</option>
                 <option value="light" data-i18n="appearance.themeLight">Light</option>
+                <!-- Not a third PALETTE — a rule. The worn gift's backdrop decides light-or-dark by its own
+                     brightness and tints the app behind the same two token sets, so the 92 places that read the
+                     accent keep their meaning (a red backdrop must never repaint the delete button). -->
+                <option value="gift" data-i18n="appearance.themeGift">Telegram gift</option>
               </select>
             </label>
             <label class="settings-select-row compact-select-row" for="appearanceBackgroundSelect">
@@ -736,6 +792,64 @@
             </label>
           </div>
           <p class="appearance-note" data-i18n="appearance.bootNote">The loading screen uses the same background.</p>
+        </section>
+      </div>
+
+      <!-- ONE card, TWO subjects. Opened on your own corner it is your account; opened on a contact's avatar it is
+           theirs, and the difference is only which wallet the rows are read for. Everything in it is chain-read:
+           the names come from the registry, the gifts from their own collections. The per-subject controls (wearing
+           a gift, the network/version footer) render only for your own. -->
+      <div class="modal-backdrop" id="profileCardDialog" hidden>
+        <section class="action-dialog profile-card-dialog" role="dialog" aria-modal="true" aria-labelledby="profileCardTitle">
+          <h2 id="profileCardTitle" class="sr-only" data-i18n="profileCard.title">Profile</h2>
+          <div class="profile-card-hero" id="profileCardHero" data-tier="none">
+            <span class="profile-card-hero-pattern" aria-hidden="true"></span>
+            <button class="icon-button profile-card-hero-close" id="profileCardCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+            <div class="profile-card-hero-face">
+              <div class="avatar profile-card-avatar" id="profileCardAvatar" aria-hidden="true"></div>
+              <img class="profile-card-hero-gift" id="profileCardHeroGift" alt="" hidden>
+              <canvas class="profile-card-hero-gift" id="profileCardHeroGiftMotion" width="44" height="44" aria-hidden="true" hidden></canvas>
+            </div>
+            <strong class="profile-card-hero-name" id="profileCardName"></strong>
+            <span class="profile-card-hero-sub" id="profileCardSubtitle"></span>
+          </div>
+          <p class="profile-card-about" id="profileCardAbout" hidden></p>
+          <div class="profile-card-latest" id="profileCardLatest" hidden></div>
+          <div class="profile-card-actions" id="profileCardActions" hidden></div>
+          <button class="profile-card-wallet" id="profileCardCopyButton" type="button" title="Copy wallet address" data-i18n-title="profile.copyWalletAddress">
+            <span id="profileCardWalletLabel" data-i18n="common.wallet">Wallet</span>
+            <code id="profileCardWallet"></code>
+          </button>
+          <!-- Own card only (app.js hides it on a contact's): these are THIS device's settings, not a property of
+               the wallet being looked at. THE "DISCOVER CHANNELS" BUTTON, verbatim [owner, 2026-09-07] — the accent
+               pill and the row it sits in are the ones the contact and channel plates already use. -->
+          <div class="discovery-cta-actions" id="profileCardSettingsRow" hidden>
+            <button class="discovery-cta-action" id="profileCardSettingsButton" type="button" aria-haspopup="dialog" data-i18n="profile.settingsTitle">Settings</button>
+          </div>
+          <div class="profile-card-section">
+            <h3 data-i18n="profileCard.names">.ath names</h3>
+            <p class="profile-card-note" id="profileCardNamesNote"></p>
+            <div class="profile-card-rows" id="profileCardNames" aria-live="polite"></div>
+            <!-- MINTING LIVES WITH THE NAMES [owner, 2026-09-08]: the row is the Settings button's own. THE FEE RIDES
+                 INSIDE THE PILL as a second, smaller line [owner: "the price looks sloppy — put it in the button"];
+                 the mint's progress or refusal takes that same line while one runs. Own card only. -->
+            <div class="discovery-cta-actions" id="profileCardMintNameRow" hidden>
+              <button class="discovery-cta-action" id="profileCardMintNameButton" type="button">
+                <span class="discovery-cta-action-stack">
+                  <span data-i18n="username.mintAthName">Mint .ath name</span>
+                  <small class="discovery-cta-action-note" id="profileCardMintNameStatus">100-10k ATH + 1.1 GRAM</small>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="profile-card-section">
+            <h3 data-i18n="profileCard.gifts">Telegram gifts</h3>
+            <p class="profile-card-note" id="profileCardGiftsNote"></p>
+            <div class="profile-card-gifts" id="profileCardGifts" aria-live="polite"></div>
+          </div>
+          <p class="profile-card-meta" id="profileCardMeta"></p>
         </section>
       </div>
 
@@ -887,10 +1001,31 @@
         </div>
       </div>
     </div>
+    <!-- CUTOVER UPDATE SCREEN [CUTOVER.md items 6/7]: shown by app.js refreshCutoverGate once the baked boundary
+         epoch has passed and this build's generation can no longer write.
+
+         A DIRECT CHILD OF <body>, DELIBERATELY [audit 2026-08-31, round 7]. It used to sit inside .app-shell,
+         which sets `isolation: isolate` — a stacking context — so its z-index could never leave that subtree
+         however high it went. MEASURED by hit test: the external-link confirm dialog, appended to <body> at the
+         same z-80 in the ROOT context, painted AND took clicks above the update screen, so a blocked build could
+         still open a link from behind it. The number was never the problem; the container was.
+
+         role/aria-modal announce it to a screen reader (which otherwise found 43 still-focusable controls behind
+         it and said nothing), and app.js marks .app-shell `inert` so nothing behind it can be tabbed to or
+         Ctrl+Enter'd into a send the screen says is impossible. Hidden by default and inert while
+         CUTOVER_EPOCH is null. -->
+    <div class="cutover-screen" id="cutoverScreen" role="dialog" aria-modal="true"
+         aria-labelledby="cutoverTitle" aria-describedby="cutoverBody" hidden>
+      <div class="cutover-screen-inner">
+        <h2 class="cutover-title" id="cutoverTitle" data-i18n="cutover.updateRequiredTitle">Update required</h2>
+        <p class="cutover-body" id="cutoverBody" data-i18n="cutover.updateRequiredBody">The network has moved to a new contract generation, and this version can no longer send or receive. Reload to update — your keys, history and balance are untouched.</p>
+        <button type="button" class="cutover-reload-button" id="cutoverReloadButton" data-i18n="cutover.reloadNow">Reload and update</button>
+      </div>
+    </div>
     <!-- Telegram Mini App SDK (self-hosted to keep script-src 'self'). In an
          ordinary browser window.Telegram.WebApp.platform is 'unknown' and the
          in-app adapter stays inert, so the standalone PWA is unaffected. -->
     <script src="/vendor/telegram-web-app.js?v=1"></script>
-    <script src="/app.js?v=b62c18324" type="module"></script>
+    <script src="/app.js?v=bb186649f" type="module"></script>
   </body>
 </html>

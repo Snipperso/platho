@@ -19,8 +19,9 @@
 // It reuses the shared transport (runGetMethod through the app's pump, readAccountStates for the batched sweep,
 // the /messages reader) rather than inventing a path — one queue per client key is what the rate model rests on.
 
-import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=37';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
+import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=47';
+import { parseVaultPublishEnvelope } from './m21c-envelope.mjs?v=3';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=21';
 
 export class PublicShardTonRpcProviderError extends Error {
   constructor(message) {
@@ -33,7 +34,7 @@ export class PublicShardTonRpcProviderError extends Error {
 // and reader cannot disagree about it — this mirror is what lets the check run in a browser.
 const PS_BODY_DOMAIN = 0x50534644n;
 
-function stackItemValue(item) {
+export function stackItemValue(item) {
   if (Array.isArray(item)) return item[1];
   if (item && typeof item === 'object' && 'value' in item) return item.value;
   if (item && typeof item === 'object' && 'num' in item) return item.num;
@@ -42,7 +43,7 @@ function stackItemValue(item) {
   return item;
 }
 
-function readInt(stack, index, name) {
+export function readInt(stack, index, name) {
   const raw = stackItemValue(stack[index]);
   if (typeof raw === 'bigint') return raw;
   if (typeof raw === 'number' && Number.isSafeInteger(raw)) return BigInt(raw);
@@ -55,7 +56,7 @@ function readInt(stack, index, name) {
   throw new PublicShardTonRpcProviderError(`${name} is not an integer stack item`);
 }
 
-function readCell(stack, index) {
+export function readCell(stack, index) {
   const raw = stackItemValue(stack[index]);
   if (!raw) return null;
   if (typeof raw === 'string') { try { return parseBocBase64(raw); } catch { return null; } }
@@ -71,7 +72,7 @@ function cellRefs(cell) {
 }
 
 /** A sequential bit reader over either cell world. Reads big-endian, exactly as Tact stored the fields. */
-function cellReader(cell) {
+export function cellReader(cell) {
   if (cell && typeof cell.beginParse === 'function') {
     const slice = cell.beginParse();
     return {
@@ -100,7 +101,7 @@ function cellReader(cell) {
   };
 }
 
-function extractStack(result) {
+export function extractStack(result) {
   const stack = result?.stack ?? result?.result?.stack;
   if (!Array.isArray(stack)) throw new PublicShardTonRpcProviderError('TON get-method response did not include a stack');
   return stack;
@@ -139,6 +140,8 @@ export function decodePublicShardView(result, decodeAddressSliceBoc) {
 }
 
 export const PUBLIC_ROW_BITS = 448;                    // mirrors PS_ROW_BITS in contracts/PublicShard.tact
+/** PS_HIDDEN_PAGE_CAP: ids one get_hidden_ids answers (MEASURED 276,019 gas at a full page). */
+export const HIDDEN_PAGE_CAP = 310;
 export const PUBLIC_PUBLISHER_TAG_MOD = 1n << 128n;    // mirrors PS_PUBLISHER_TAG_MOD
 
 /** The same low-128-bit tag the shard packs, computed from a full raw address ("0:hex64"). */
@@ -166,22 +169,64 @@ export function decodePublicPage(result) {
 
   const rows = [];
   let reader = rowsCell ? cellReader(rowsCell) : null;
+  // THE HIDDEN MASK [2026-09-04, CUTOVER item 15]: a clean-18 cell leads with 2 bits — bit i for row i of the cell —
+  // before its 448-bit rows, so it is 450 or 898 bits where a clean-17 cell is 448 or 896. `bits % 448 == 2` tells
+  // the generations apart with no other knowledge, and the mask is read once per cell.
+  let mask = 0n;
+  let rowInCell = 0;
+  const openCell = (r) => {
+    mask = r.remaining() % PUBLIC_ROW_BITS === 2 ? r.loadUint(2) : 0n;
+    rowInCell = 0;
+  };
+  if (reader) openCell(reader);
   for (let i = 0; i < count; i += 1) {
     if (!reader) break;
     if (reader.remaining() < PUBLIC_ROW_BITS && reader.refs() > 0) {
       const next = reader.loadRef();
       if (!next) break;
       reader = cellReader(next);
+      openCell(reader);
     }
     if (reader.remaining() < PUBLIC_ROW_BITS) break;
     const bodyCommit = reader.loadUint(256);
     const createdAt = reader.loadUint(64);
     const publisherTag = reader.loadUint(128);
+    const hidden = ((mask >> BigInt(rowInCell)) & 1n) === 1n;
+    rowInCell += 1;
     rows.push({
-      entry_id: fromId + BigInt(i), body_commit: bodyCommit, created_at: createdAt, publisher_tag: publisherTag,
+      entry_id: fromId + BigInt(i), body_commit: bodyCommit, created_at: createdAt, publisher_tag: publisherTag, hidden,
     });
   }
   return { from_id: fromId, count: BigInt(count), entry_count: entryCount, rows };
+}
+
+/**
+ * get_hidden -> the moderation bits of a range of entries [CUTOVER item 15, round 2]: bit i = entry (from_id + i)
+ * hidden, 1023 per cell, ref-chained tail first (the head cell holds the first bits). A reader that already holds a
+ * shard's rows refreshes their `hidden` from this when the shard moves, instead of re-reading pages it has.
+ */
+/**
+ * The HIDDEN INDEX of a PublicShard, read by position: { count, returned, hidden: Set<entryId> }. `count` is how
+ * many entries the shard hides in all, `returned` how many this page named — a caller that reads the whole index
+ * (count <= returned) may clear the bit on rows it holds and this answer does not name; one that stopped short
+ * may only set it. The bitmap this replaces cost the shard's FILL to answer (measured 6,041,335 gas at 4,096
+ * entries, six times what a get-method may spend), so it stopped working exactly where moderation matters.
+ */
+export function decodeHiddenIds(result) {
+  const stack = extractStack(result);
+  if (stack.length !== 3) {
+    throw new PublicShardTonRpcProviderError(`PublicShard get_hidden_ids ABI mismatch: expected 3 stack items, got ${stack.length}`);
+  }
+  const count = Number(readInt(stack, 0, 'count'));
+  const returned = Number(readInt(stack, 1, 'returned'));
+  const hidden = new Set();
+  let reader = readCell(stack, 2) ? cellReader(readCell(stack, 2)) : null;
+  for (let i = 0; i < returned && reader; i += 1) {
+    if (reader.remaining() < 32 && reader.refs() > 0) reader = cellReader(reader.loadRef());
+    if (reader.remaining() < 32) break;
+    hidden.add(Number(reader.loadUint(32)));
+  }
+  return { count, returned, hidden, complete: hidden.size >= count };
 }
 
 /** The 256-bit hash of a cell from either world: @ton/core Cell.hash() (a Buffer) or the browser hasher. */
@@ -245,6 +290,40 @@ export function createPublicShardTonRpcProvider(options = {}) {
       }), decodeAddr);
     },
 
+    /** The whole hidden index of a shard, paged: PS_HIDDEN_PAGE_CAP ids a call, at most `maxPages` calls.
+     *  `complete` is true only when every hidden id was named — the caller may clear bits only then. */
+    async getHiddenIds(shardAddress, { maxPages = 16, callOptions = {} } = {}) {
+      const transport = resolveTransport(options);
+      const address = parseTonAddress(shardAddress).raw;
+      const hidden = new Set();
+      let count = 0;
+      let from = 0;
+      // THE INDEX MAY MOVE BETWEEN PAGES [audit 2026-09-06, round 3]: an unhide swap-deletes — the last position moves
+      // into the freed one, so an id already walked past can move into a position already read and never be named,
+      // while `count` shrinks by one and the union still equals it. A walk whose `count` changed is not complete.
+      let firstCount = null;
+      let drifted = false;
+      for (let page = 0; page < maxPages; page += 1) {
+        const answer = decodeHiddenIds(await transport.runGetMethod({
+          address,
+          method: 'get_hidden_ids',
+          stack: [
+            { type: 'num', value: `0x${BigInt(from).toString(16)}` },
+            { type: 'num', value: `0x${BigInt(HIDDEN_PAGE_CAP).toString(16)}` },
+          ],
+          cacheTtlMs: 0,
+          ...criticalCallOptions(callOptions),
+        }));
+        count = answer.count;
+        if (firstCount === null) firstCount = count;
+        else if (count !== firstCount) drifted = true;
+        for (const id of answer.hidden) hidden.add(id);
+        from += answer.returned;
+        if (answer.returned === 0 || from >= count) break;
+      }
+      return { count, hidden, complete: !drifted && hidden.size >= count };
+    },
+
     async getPage(shardAddress, fromId = 0n, maxCount = 96n, callOptions = {}) {
       const transport = resolveTransport(options);
       return decodePublicPage(await transport.runGetMethod({
@@ -288,9 +367,98 @@ export function createPublicShardTonRpcProvider(options = {}) {
       // at 120 entries the reader returned entries 0..95 and the channel's 24 newest posts were invisible; at
       // 260 the windows stopped overlapping entirely and the shard read back EMPTY — every paid post gone from
       // the feed, silently. A caller that genuinely wants an older slice passes fromId explicitly.
-      if (messagesByRowTime === true) {
-        if (fromId === null) throw new PublicShardTonRpcProviderError('messagesByRowTime requires an explicit fromId');
-        const matchByTime = async (rows) => {
+      // DECLARED ABOVE BOTH READERS, not between them. [FOUND 2026-08-29 by PL-WINDOW-03.] This matcher used to
+      // sit below the messagesByRowTime branch, and that branch calls it: `const` is hoisted but not initialised,
+      // so the row-time path threw ReferenceError on its FIRST line every time it ran — the comment reader's
+      // date jump and any deep window whose cursor carries no lt. It is the one path with no test of its own,
+      // which is exactly why it could ship broken.
+      const matchRows = async (rows, messages) => {
+        // [CHANGED 2026-07-30, wave-8 HIGH] On a duplicate body_commit the OLDEST entry wins, not the newest.
+        //
+        // The publisher tag alone is not enough here, and that is worth spelling out: the shard genuinely accepts both
+        // publications, so BOTH rows are valid and each matches its own publisher. Keying by commit collapses them, and
+        // `new Map(rows.map(...))` kept the LAST — the squatter's. Lowest entry_id is the original by construction:
+        // entries are append-only, ids are contiguous, and nothing removes one, so the first id holding a commit is the
+        // publication that came first. The tag then binds the surviving row to the message that actually produced it.
+        const commitToRow = new Map();
+        for (const r of rows) {
+          const key = r.body_commit.toString();
+          const prev = commitToRow.get(key);
+          if (!prev || r.entry_id < prev.entry_id) commitToRow.set(key, r);
+        }
+        const out = [];
+        const claimed = new Set();
+        for (const message of messages) {
+          const parsed = parsePublicPublish(message.bodyCell);
+          if (!parsed) continue;                          // a top-up, bounce or foreign message, not a publish
+          const commit = (await publicBodyCommit(parsed.header, parsed.body)).toString();
+          const row = commitToRow.get(commit);
+          if (!row || claimed.has(commit)) continue;      // not an accepted entry, or a duplicate already matched
+          // [ADDED 2026-07-30, wave-8 HIGH] VERIFY the publisher against the shard's own record instead of inferring it
+          // from whichever message happened to match first.
+          //
+          // Nothing binds sender() when an entry is appended to a BEACON or THREAD view, so anyone may republish
+          // someone else's cells byte for byte and create a SECOND entry with the SAME body_commit. Duplicates collapse
+          // in commitToRow, and `messages` arrives NEWEST FIRST — so the attacker's copy was always the one that
+          // matched, and their address became the channel's in the catalogue for the price of one publish. The shard
+          // stores the authoritative publisher; the row now carries a checkable tag of it, so a message whose source
+          // does not match the entry simply is not that entry.
+          if (!message.source) continue;
+          // THE SOURCE IS NOT ALWAYS THE PUBLISHER. Through the M21C door the transaction's source is the
+          // sender's VAULT while the row's tag is the PAYER's — so a discounted message failed this check even
+          // when it parsed, which is the second, independent half of the same silent loss. The shard is the
+          // authority on both: it refuses any VaultPublish whose sender is not vaultAddressOf(payer) (gate
+          // 13720) and then stamps that payer as the entry's publisher, so a row carrying this tag can only
+          // have come from that payer's own vault. The anti-squatter property is unchanged — see the note in
+          // web/m21c-envelope.mjs, including the stronger form available once the vault code ships client-side.
+          const source = parseTonAddress(message.source).raw;
+          const publisher = parsed.publisher ?? source;
+          if (publisherTagOf(publisher) !== row.publisher_tag) continue;
+          claimed.add(commit);
+          out.push({
+            entry_id: row.entry_id,
+            created_at: row.created_at,
+            publisher,
+            header: parsed.header,
+            body: parsed.body,
+            hidden: row.hidden === true,     // the moderation bit the row carries (clean-18); false on clean-17 rows
+            lt: message.createdLt ?? null,   // where in the shard's message history this body sits — for paging back
+          });
+        }
+        return out;
+      };
+
+      // THE BODY WINDOW IS AIMED BY THE ROWS, FOR EVERY READ [audit 2026-09-01, round 14]. This used to be the
+      // private helper of the messagesByRowTime branch, and the DEFAULT path — the newest window, the one every
+      // feed, Discover card and avatar read takes — asked /messages for the plain newest-N instead.
+      //
+      // MEASURED (tests/public-read-window-poisoning.test.ts, over a real PublicShard and the shipping reader):
+      // five paid posts, then 128 well-formed PublicPublish messages from a stranger. The shard REFUSES every
+      // one at 13702 and entry_count never moves — but a refused message is still an inbound message of that
+      // account, and live toncenter indexes it: of 40 transactions on a real mainnet address, 19 failed in
+      // COMPUTE and ALL 19 of their inbound messages came back from /api/v3/messages. The reader's opcode filter
+      // could not help, because the opcode is chosen by the SENDER. Result: 64 junk -> 5 posts, 127 -> 1,
+      // 128 -> 0. A channel read back completely empty for the price of the griefer's gas, with no error
+      // anywhere, and stayed that way until the channel published a fresh window or the era rolled.
+      //
+      // Aiming by the rows closes it at the root rather than at four call sites: get_page returns the shard's
+      // OWN stored entries, and a public entry and the body that produced it are the SAME transaction — the
+      // contract stamps the row with now() while handling that very message — so no genuine body can sit above
+      // its row's stamp, and everything sent afterwards is outside the window by construction.
+      //
+      // It costs one /messages call per page instead of one shared across the two straddle pages: at most two
+      // where there was one. The bodies can no longer be read once up front, because the window they need is not
+      // known until the rows are.
+      // HOW MANY EXTRA PAGES A POISONED WINDOW MAY COST. Bounding the window by the rows' own time excludes
+      // everything sent AFTER the newest row — but a griefer floods ONCE, and the channel's own next post then
+      // lifts `maxAt` back over the flood. MEASURED (PL-POISON-03): five posts, 128 refused messages stamped
+      // between them, one more post afterwards — and the reader returned ONE of six. The window was right; the
+      // reader simply stopped at the first page of it.
+      // So it pages, the way readMessageRows and the CONV lane already do, and it knows when to stop because it
+      // knows what it is looking for: get_page named the rows, so a page that leaves some of them unmatched has
+      // bodies below it. An honest window matches everything on the first request and costs exactly one.
+      const MATCH_EXTRA_PAGES = 6;
+      const matchByTime = async (rows, endLtBound = null) => {
           if (rows.length === 0) return [];
           let minAt = rows[0].created_at;
           let maxAt = rows[0].created_at;
@@ -298,12 +466,45 @@ export function createPublicShardTonRpcProvider(options = {}) {
             if (row.created_at < minAt) minAt = row.created_at;
             if (row.created_at > maxAt) maxAt = row.created_at;
           }
+          const found = new Map();
+          let cursor = endLtBound === null || endLtBound === undefined ? null : String(endLtBound);
+          for (let attempt = 0; attempt <= MATCH_EXTRA_PAGES; attempt += 1) {
           const timed = await readMessagesWithSource(raw, {
+            ...(cursor === null ? {} : { endLt: cursor }),
+            // THE TOP OF THIS WINDOW IS THE ROWS' OWN NEWEST STAMP, WITH NO SLACK ABOVE IT, and that is not a
+            // tightening for its own sake. A public entry and the body that produced it are the SAME transaction:
+            // the contract stamps the row with now() while it is handling that very message, so the two carry one
+            // value and a body can never sit above its row's stamp. Slack below is free (extra candidates are
+            // filtered by body_commit anyway); slack above is not, because /messages is served newest-first under
+            // a limit — MEASURED on a channel posting a second apart, ten minutes of slack admitted 600 newer
+            // messages and the window's own 128 went entirely to them: 32 rows matched of 96 asked for, and after
+            // a relaunch the read below what the reader already held made no progress at all.
             startUtime: Math.max(0, Number(minAt) - 600),
-            endUtime: Number(maxAt) + 600,
+            endUtime: Number(maxAt),
           });
-          return matchRows(rows, timed);
-        };
+          if (!timed || timed.length === 0) break;                 // the history inside the window ran out
+          for (const post of await matchRows(rows, timed)) found.set(String(post.entry_id), post);
+          if (found.size >= rows.length) break;                    // every row the getter named has its body
+          // Page BELOW the oldest message this page carried. A page of somebody else's traffic is a page to get
+          // past, not the end: the rows we still want are older than everything we just saw.
+          let oldestLt = null;
+          for (const message of timed) {
+            if (message?.createdLt == null) continue;
+            try {
+              const lt = BigInt(message.createdLt);
+              if (oldestLt === null || lt < oldestLt) oldestLt = lt;
+            } catch { /* not an lt */ }
+          }
+          if (oldestLt === null || oldestLt === 0n) break;          // nothing to page by
+          const next = String(oldestLt - 1n);
+          if (next === cursor) break;                               // the endpoint ignored end_lt — stop, do not spin
+          cursor = next;
+          }
+          return [...found.values()];
+      };
+
+      if (messagesByRowTime === true) {
+        if (fromId === null) throw new PublicShardTonRpcProviderError('messagesByRowTime requires an explicit fromId');
         const page = await this.getPage(raw, BigInt(fromId), maxCount, callOptions);
         const entryCountHead = page.entry_count;
         if (page.rows.length === 0) return { entry_count: entryCountHead, posts: [], oldestLt: null };
@@ -339,55 +540,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
       } else {
         start = BigInt(fromId);
       }
-      const matchRows = async (rows, messages) => {
-        // [CHANGED 2026-07-30, wave-8 HIGH] On a duplicate body_commit the OLDEST entry wins, not the newest.
-        //
-        // The publisher tag alone is not enough here, and that is worth spelling out: the shard genuinely accepts both
-        // publications, so BOTH rows are valid and each matches its own publisher. Keying by commit collapses them, and
-        // `new Map(rows.map(...))` kept the LAST — the squatter's. Lowest entry_id is the original by construction:
-        // entries are append-only, ids are contiguous, and nothing removes one, so the first id holding a commit is the
-        // publication that came first. The tag then binds the surviving row to the message that actually produced it.
-        const commitToRow = new Map();
-        for (const r of rows) {
-          const key = r.body_commit.toString();
-          const prev = commitToRow.get(key);
-          if (!prev || r.entry_id < prev.entry_id) commitToRow.set(key, r);
-        }
-        const out = [];
-        const claimed = new Set();
-        for (const message of messages) {
-          const parsed = parsePublicPublish(message.bodyCell);
-          if (!parsed) continue;                          // a top-up, bounce or foreign message, not a publish
-          const commit = (await publicBodyCommit(parsed.header, parsed.body)).toString();
-          const row = commitToRow.get(commit);
-          if (!row || claimed.has(commit)) continue;      // not an accepted entry, or a duplicate already matched
-          // [ADDED 2026-07-30, wave-8 HIGH] VERIFY the publisher against the shard's own record instead of inferring it
-          // from whichever message happened to match first.
-          //
-          // Nothing binds sender() when an entry is appended to a BEACON or THREAD view, so anyone may republish
-          // someone else's cells byte for byte and create a SECOND entry with the SAME body_commit. Duplicates collapse
-          // in commitToRow, and `messages` arrives NEWEST FIRST — so the attacker's copy was always the one that
-          // matched, and their address became the channel's in the catalogue for the price of one publish. The shard
-          // stores the authoritative publisher; the row now carries a checkable tag of it, so a message whose source
-          // does not match the entry simply is not that entry.
-          if (!message.source) continue;
-          const source = parseTonAddress(message.source).raw;
-          if (publisherTagOf(source) !== row.publisher_tag) continue;
-          claimed.add(commit);
-          out.push({
-            entry_id: row.entry_id,
-            created_at: row.created_at,
-            publisher: source,
-            header: parsed.header,
-            body: parsed.body,
-            lt: message.createdLt ?? null,   // where in the shard's message history this body sits — for paging back
-          });
-        }
-        return out;
-      };
 
-      // The bodies are read ONCE and reused across pages: /messages is the expensive call, get_page is cheap.
-      const messages = await readMessagesWithSource(raw, messagesEndLt === null || messagesEndLt === undefined ? {} : { endLt: messagesEndLt });
       let posts = [];
       let entryCountSeen = 0n;
       let cursor = start;
@@ -405,7 +558,9 @@ export function createPublicShardTonRpcProvider(options = {}) {
         // 6..95), so merge by entry_id — a duplicated part would otherwise inflate a stream past its part_count
         // and make an incomplete group look complete.
         const merged = new Map();
-        for (const post of [...(await matchRows(page.rows, messages)), ...posts]) merged.set(String(post.entry_id), post);
+        // An explicit messagesEndLt still composes: a caller paging backwards bounds the window from above by lt
+        // AND by the rows' own time, and readMessageRows enforces both against the rows it got back.
+        for (const post of [...(await matchByTime(page.rows, messagesEndLt)), ...posts]) merged.set(String(post.entry_id), post);
         posts = [...merged.values()];
         if (fromId !== null || cursor === 0n) break;
         if (!hasIncompletePublicStream(posts)) break;
@@ -451,8 +606,16 @@ const PUBLIC_PUBLISH_OPCODE = 0x50535031;   // "PSP1" — message(0x50535031) Pu
  */
 export function parsePublicPublish(bodyCell) {
   if (!bodyCell) return null;
+  // A DISCOUNTED PUBLISH ARRIVES WRAPPED. The user's FeeVault sends it as an M21C VaultPublish; the shard
+  // unwraps `record` and stamps `publisher = payer`, so the ENTRY is identical to a direct publish — but this
+  // reader walks the shard's message HISTORY, where the envelope is what it meets. Matching the direct opcode
+  // alone returned null on every discounted message: on chain, paid for, correctly attributed, shown to nobody.
+  // `publisher` rides out with the parse because the second half of the same break lives in matchRows below.
+  // See web/m21c-envelope.mjs for the layout and for why trusting `payer` is safe.
+  const envelope = parseVaultPublishEnvelope(bodyCell, cellReader);
+  const inner = envelope ? envelope.record : bodyCell;
   try {
-    const r = cellReader(bodyCell);
+    const r = cellReader(inner);
     if (r.remaining() < 32 + 8 + 256 + 32) return null;
     if (Number(r.loadUint(32)) !== PUBLIC_PUBLISH_OPCODE) return null;
     const kind = Number(r.loadUint(8));
@@ -462,7 +625,12 @@ export function parsePublicPublish(bodyCell) {
     const header = r.loadRef();
     const body = r.loadRef();
     if (!header || !body) return null;
-    return { kind, key_arg: keyArg, shard_seq: shardSeq, header, body };
+    return {
+      kind, key_arg: keyArg, shard_seq: shardSeq, header, body,
+      // NULL on the direct door, where the transaction's source IS the publisher. Set only through the vault,
+      // where it is not.
+      publisher: envelope ? envelope.payer : null,
+    };
   } catch {
     return null;
   }

@@ -1,19 +1,14 @@
-import { randomBytes, parseTonAddress } from './crypto/platho-crypto.mjs?v=15';
+import { randomBytes, parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=21';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
-export const VAULT_OPS = Object.freeze({
-  DepositTon: 716160408,
-  WithdrawTonFromVaultBalance: 2115981368,
-  WithdrawAthFromVaultBalance: 2115981369,
-  RegisterMessagingKeys: 1383096026,
-  ReplaceMessagingKeys: 2312521915,
-  PublishPrivateFromVaultBalance: 2115981361,
-  PublishPublicFromVaultBalance: 2115981362,
-  SetProfileAvatarFromVaultBalance: 2115981363,
-  MintUsernameFromVaultBalance: 2115981364,
-});
-
 export const ATH_WALLET_OPS = Object.freeze({
+  // TEP-74's own transfer, 0x0F8A7EA5. The frozen wallet serves TWO notify lanes and they are NOT interchangeable:
+  // this one makes the RECIPIENT's wallet emit the standard JettonTransferNotification, while
+  // ATHTransferRequestWithNotify makes it emit Platho's own AthTransferNotification. A contract that listens for
+  // one hears silence from the other — which is exactly what the M21C FeeVault does, so staking into a vault has
+  // to travel this lane. [2026-08-29: the vault refused the custom lane's notification with its unknown-body
+  // throw, and the client had no builder for this one at all.]
+  JettonTransfer: 0x0F8A7EA5,
   ATHBurn: 1096042497,
   ATHTransferRequest: 1096042512,
   ATHTransferRequestWithNotify: 1096042516,
@@ -36,27 +31,13 @@ export const VAULT_PUBLISH_KIND = Object.freeze({
   PUBLIC: 2n,
 });
 
-export const VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN = 0x56504231n; // "VPB1"
-export const VAULT_BATCH_PUBLISH_SIGNING_DOMAIN = 0x56504232n; // "VPB2" batch-publish signed-root domain
-export const VAULT_BATCH_PUBLISH_ID_DOMAIN = 0x42504931n;      // "BPI1" batch publish_id derivation
-export const CAPSULE_ENTRY_PUBLISH_ID_DOMAIN = 0x45504931n;    // "EPI1" per-entry publish_id derivation
-export const OP_PUBLISH_BATCH = 0x7e1f5041n;                   // Vault external op for PublishBatchFromVaultBalance
-export const MAX_BATCH_PARTS = 8;                              // mirrors contracts/Vault.tact MAX_BATCH_PARTS
 export const MAX_EXTERNAL_MESSAGE_BYTES = 65535;               // TON max_ext_msg_size (config-43); validators
                                                                // DROP a larger inbound external BoC before the
-                                                               // contract runs (Vault.tact EXT_HARD_BITS=65535*8).
-export const VPB2_VERSION = 1n;                                // mirrors contracts/Vault.tact VPB2_VERSION
-// Pinned affine charge floor (mirrors contracts/Vault.tact BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * n).
-// Recalibrated 2026-06-14: base = worst-case EXT_HARD import hold (89.63M -> 92M) + reject base compute (0.7M).
-export const BATCH_FLOOR_BASE_PIN = 92_700_000n;
-export const BATCH_FLOOR_PER_PART_PIN = 6_200_000n;
-export const VAULT_PROFILE_AVATAR_SIGNING_DOMAIN = 0x56504131n; // "VPA1"
-export const VAULT_USERNAME_MINT_SIGNING_DOMAIN = 0x56554E31n; // "VUN1"
-export const VAULT_WITHDRAW_TON_SIGNING_DOMAIN = 0x56545731n; // "VTW1"
-export const VAULT_WITHDRAW_ATH_SIGNING_DOMAIN = 0x56574131n; // "VWA1"
-export const VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN = 0x56524B31n; // "VRK1"
-export const VAULT_KEY_ID_DOMAIN = 0x4b455949n; // "KEYI"
-
+                                                               // contract runs. The chain config is the ONLY
+                                                               // authority here: the note used to cite
+                                                               // Vault.tact EXT_HARD_BITS, a contract clean-17
+                                                               // deleted, and a dead citation invites a reader
+                                                               // to go looking for a limit nothing enforces.
 export const VAULT_SIZE_CLASS = Object.freeze({
   KIB_1: 1n,
   KIB_2: 2n,
@@ -118,16 +99,6 @@ export const PROFILE_AVATAR_DIRECT_NOTIFY_VALUE_NANOTONS = 66_000_000n;
 export const PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS = 200_000_000n;
 const UINT128_MOD = 1n << 128n;
 
-export const VAULT_RESERVES_NANOTONS = Object.freeze({
-  userStateStorage: 10_000_000n,
-  keyRecordStandardStorage: 5_000_000n,
-  keyRecordLongTermStorage: 30_000_000n,
-  stateGrowthExec: 2_000_000n,
-  depositTonExec: 2_000_000n,
-  withdrawTonExec: 2_000_000n,
-  withdrawAthMinValue: 58_000_000n,
-});
-
 export const ATH_WALLET_RESERVES_NANOTONS = Object.freeze({
   transferNotifyAckValue: 1_000_000n,
   internalTransferAckValue: 3_000_000n,
@@ -182,7 +153,9 @@ function assertUint(value, bitLength, name) {
   return bigint;
 }
 
-function bytesToBase64(bytes) {
+// EXPORTED alongside externalInMessageCell: a builder that serializes an external has to hand the transport the
+// same base64 every other builder here does, and a private copy of a base64 encoder is a duplicate waiting to drift.
+export function bytesToBase64(bytes) {
   const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   if (typeof Buffer !== 'undefined') return Buffer.from(input).toString('base64');
   let binary = '';
@@ -297,10 +270,11 @@ function uint16Bytes(value, name = 'uint16') {
   return new Uint8Array([(value >> 8) & 0xff, value & 0xff]);
 }
 
+// Defers to the ONE shared implementation [2026-08-28]: this used to wrap the ASYNCHRONOUS
+// crypto.subtle.digest, whose per-call overhead is the whole cost on small inputs (MEASURED 16x on the shard
+// derivation path). The async signature is kept so every caller stays unchanged.
 async function sha256(bytes) {
-  const cryptoImpl = globalThis.crypto;
-  if (!cryptoImpl?.subtle) throw new Error('crypto.subtle is unavailable');
-  return new Uint8Array(await cryptoImpl.subtle.digest('SHA-256', toUint8Array(bytes)));
+  return sha256Sync(toUint8Array(bytes));
 }
 
 function writeBit(bytes, bitOffset, bit) {
@@ -553,6 +527,13 @@ class TinyCellBuilder {
     return this.bytesValue(bigintToBytes(amount, byteLength, name), byteLength, name);
   }
 
+  /** TEP-74's `Maybe ^Cell`: ONE bit then the ref. Distinct from maybeRef, which serialises Maybe (Either …). */
+  customPayloadMaybe(cell, name = 'custom_payload') {
+    if (!cell) return this.uint(0n, 1, `${name}.none`);
+    this.uint(1n, 1, `${name}.some`);
+    return this.ref(cell, name);
+  }
+
   maybeRef(cell, name = 'maybeRef') {
     if (!cell) return this.uint(0n, 1, `${name}.none`);
     this.uint(1n, 1, `${name}.some`);
@@ -569,10 +550,6 @@ class TinyCellBuilder {
   toBocBase64() {
     return bytesToBase64(serializeBoc(this.endCell()));
   }
-}
-
-function beginVaultBody(op) {
-  return new TinyCellBuilder().uint(op, 32, 'op');
 }
 
 function beginAthWalletBody(op) {
@@ -601,33 +578,6 @@ function normalizeUsernameBytes(username) {
   return new TextEncoder().encode(raw);
 }
 
-function keyRecordStorageEndowment(cryptoSuiteMask) {
-  const mask = toBigInt(cryptoSuiteMask, 'crypto_suite_mask');
-  if (mask === 2n) return VAULT_RESERVES_NANOTONS.keyRecordLongTermStorage;
-  throw new RangeError('Platho v1 messaging keys require hybrid-v1');
-}
-
-export function estimateVaultAttachedValueNanotons(type, params = {}, context = {}) {
-  assertString(type, 'type');
-  const userExists = context.userExists === true;
-
-  if (type === 'DepositTon') {
-    return assertUint(params.amount, 128, 'amount')
-      + VAULT_RESERVES_NANOTONS.depositTonExec
-      + (userExists ? 0n : VAULT_RESERVES_NANOTONS.userStateStorage);
-  }
-  if (type === 'RegisterMessagingKeys') {
-    return keyRecordStorageEndowment(params.crypto_suite_mask)
-      + VAULT_RESERVES_NANOTONS.stateGrowthExec
-      + (userExists ? 0n : VAULT_RESERVES_NANOTONS.userStateStorage);
-  }
-  if (type === 'ReplaceMessagingKeys') {
-    return keyRecordStorageEndowment(params.crypto_suite_mask)
-      + VAULT_RESERVES_NANOTONS.stateGrowthExec;
-  }
-  throw new Error(`Unsupported Vault message type ${type}`);
-}
-
 /** Mirrors ATH_INTERNAL_TRANSFER_ARRIVAL_MIN — what gate 14212 demands of an arriving ATHInternalTransfer. */
 function athInternalTransferArrivalMin() {
   return ATH_WALLET_RESERVES_NANOTONS.internalTransferExec
@@ -646,6 +596,24 @@ function athNotifyTransferValue(notifyValue) {
 
 export function estimateAthWalletAttachedValueNanotons(type, params = {}) {
   assertString(type, 'type');
+  if (type === 'JettonTransfer') {
+    // Gate 14704, term for term:
+    //   required = OWNER_REQUEST_EXEC + arrival_min + INTERNAL_TRANSFER_FWD_FEE_ALLOWANCE
+    // with arrival_min, for a forwarding transfer, being
+    //   forward + SOURCE_ACK + NOTIFY_EXEC + NOTIFY_STORAGE_ENDOWMENT + readForwardFee(this very message).
+    // readForwardFee is the fee of the owner's OWN message, which a client cannot compute — so it is covered by a
+    // second internalTransferFwdFeeAllowance. That is the contract's own name for this class of fee on this lane,
+    // and the payload here is empty, so 8,000,000 is orders of magnitude of headroom rather than a guess. The
+    // excess is not lost: the wallet refunds the owner's change on the same hop.
+    const forward = assertUint(params.forward_ton_amount, 128, 'forward_ton_amount');
+    return ATH_WALLET_RESERVES_NANOTONS.ownerRequestExec
+      + forward
+      + ATH_WALLET_RESERVES_NANOTONS.internalTransferSourceAckValue
+      + ATH_WALLET_RESERVES_NANOTONS.transferNotifyExec
+      + ATH_WALLET_RESERVES_NANOTONS.transferNotifyStorageEndowment
+      + ATH_WALLET_RESERVES_NANOTONS.internalTransferFwdFeeAllowance
+      + ATH_WALLET_RESERVES_NANOTONS.internalTransferFwdFeeAllowance;
+  }
   if (type === 'ATHTransferRequest') {
     // [CORRECTED 2026-08-01] This restated gate 14204 term by term and inherited its omission: the contract's
     // ARRIVAL floor includes internalTransferSourceAckValue and this sum did not. It matched only because the old
@@ -666,87 +634,6 @@ export function estimateAthWalletAttachedValueNanotons(type, params = {}) {
       + ATH_WALLET_RESERVES_NANOTONS.notifyOwnerRequestExec;
   }
   throw new Error(`Unsupported ATHWallet message type ${type}`);
-}
-
-function vaultBalancePublishOwner(params) {
-  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
-}
-
-function vaultBalancePublishManifestHash(params) {
-  const value = params.deployment_manifest_hash
-    ?? params.deploymentManifestHash
-    ?? params.manifest_hash
-    ?? params.manifestHash;
-  if (typeof value === 'string' && /^[0-9a-fA-F]{64}$/.test(value.trim())) {
-    return `0x${value.trim()}`;
-  }
-  return value;
-}
-
-function vaultBalancePublishVaultAddress(params) {
-  return params.vault_address ?? params.vaultAddress;
-}
-
-function basechainAddressHashValue(address, name) {
-  const parsed = parseTonAddress(assertString(address, name));
-  if (parsed.workchain !== 0) throw new Error(`${name} must be a basechain address`);
-  return bytesToBigInt(parsed.hash);
-}
-
-export async function computeVaultMessagingKeyId(params = {}) {
-  assertObject(params, 'params');
-  const keyFields = beginCell()
-    .uint(params.enc_pubkey ?? params.encPubkey, 256, 'enc_pubkey')
-    .uint(params.sign_pubkey ?? params.signPubkey, 256, 'sign_pubkey')
-    .uint(params.pq_kem_pubkey_hash ?? params.pqKemPubkeyHash, 256, 'pq_kem_pubkey_hash')
-    .endCell();
-  const keyIdCell = beginCell()
-    .uint(VAULT_KEY_ID_DOMAIN, 32, 'key_id_domain')
-    .address(params.owner_wallet ?? params.ownerWallet, 'owner_wallet')
-    .uint(params.key_generation ?? params.keyGeneration, 32, 'key_generation')
-    .uint(params.pq_kem_pubkey_len ?? params.pqKemPubkeyLen, 16, 'pq_kem_pubkey_len')
-    .uint(params.crypto_suite_mask ?? params.cryptoSuiteMask, 16, 'crypto_suite_mask')
-    .ref(keyFields, 'key_fields')
-    .endCell();
-  const { hash } = await computeCellHashAndDepth(keyIdCell);
-  return bytesToBigInt(hash);
-}
-
-// Public author-index key id: hash of the FULL standard-address serialization of the author wallet, byte-for-byte
-// matching CapsuleHub.publicAuthorKeyId = beginCell().storeAddress(author).endCell().hash(). The builder's
-// .address() serializes identically to Tact storeAddress (tag 2 + anycast 0 + workchain byte + 32 hash bytes).
-// MUST be used for getPublicAuthorIndex — do NOT use basechainAddressHashValue (the bare 256-bit account hash, a
-// DIFFERENT value): a mismatch would make the author index resolve to "no posts" for every author.
-export async function computePublicAuthorKeyId(authorWallet) {
-  const cell = beginCell().address(authorWallet, 'author_wallet').endCell();
-  const { hash } = await computeCellHashAndDepth(cell);
-  return bytesToBigInt(hash);
-}
-
-function privateVaultBalancePublishSignedDataCell(params) {
-  const publish = assertObject(params.publish ?? params, 'publish');
-  const payload = beginCell()
-    .uint(publish.size_class, 8, 'size_class')
-    .uint(publish.crypto_suite, 8, 'crypto_suite')
-    .uint(publishHashValue(publish.header_0_hash, 'publish.header_0_hash'), 256, 'header_0_hash')
-    .uint(publishHashValue(publish.header_1_hash, 'publish.header_1_hash'), 256, 'header_1_hash')
-    .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
-    .ref(publishCellFromPayload(publish.header_0_cell, 'publish.header_0_cell'), 'header_0')
-    .ref(publishCellFromPayload(publish.header_1_cell, 'publish.header_1_cell'), 'header_1')
-    .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
-    .endCell();
-  return beginCell()
-    .uint(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
-    .uint(VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
-    .uint(basechainAddressHashValue(vaultBalancePublishOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
-    .uint(publish.size_class, 8, 'signed_size_class')
-    .uint(publish.crypto_suite, 8, 'signed_crypto_suite')
-    .ref(payload, 'payload')
-    .endCell();
 }
 
 const PUBLIC_SIZE_CLASSES = Object.freeze([1, 2, 4, 8, 16, 32]);
@@ -772,228 +659,9 @@ function publicUsefulBytesForSizeClass(sizeClass) {
   return Number(normalizePublicSizeClass(sizeClass)) * 1024;
 }
 
-function publicVaultBalancePublishSignedDataCell(params) {
-  const publish = assertObject(params.publish ?? params, 'publish');
-  const sizeClass = normalizePublicSizeClass(publish.size_class ?? publish.sizeClass, 'publish.size_class');
-  const payload = beginCell()
-    .uint(publishHashValue(publish.header_hash ?? publish.header_0_hash, 'publish.header_hash'), 256, 'header_hash')
-    .uint(publishHashValue(publish.body_hash, 'publish.body_hash'), 256, 'body_hash')
-    .ref(publishCellFromPayload(publish.header_cell ?? publish.header_0_cell, 'publish.header_cell'), 'header')
-    .ref(publishCellFromPayload(publish.body_cell, 'publish.body_cell'), 'body')
-    .endCell();
-  return beginCell()
-    .uint(VAULT_BALANCE_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
-    .uint(VAULT_PUBLISH_KIND.PUBLIC, 8, 'publish_kind')
-    .uint(basechainAddressHashValue(vaultBalancePublishOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
-    .uint(sizeClass, 8, 'signed_size_class')
-    .uint(VAULT_CRYPTO_SUITE.PUBLIC_NONE, 8, 'signed_crypto_suite')
-    .ref(payload, 'payload')
-    .endCell();
-}
-
-function vaultBalancePublishSignedDataCell(type, params = {}) {
-  assertString(type, 'type');
-  assertObject(params, 'params');
-  if (type === 'PublishPrivateFromVaultBalance') return privateVaultBalancePublishSignedDataCell(params);
-  if (type === 'PublishPublicFromVaultBalance') return publicVaultBalancePublishSignedDataCell(params);
-  throw new Error(`Unsupported Vault balance publish type ${type}`);
-}
-
-function vaultProfileAvatarOwner(params) {
-  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
-}
-
-function vaultProfileAvatarRegistryAddress(params) {
-  return params.profile_registry_address
-    ?? params.profileRegistryAddress
-    ?? params.registry_address
-    ?? params.registryAddress;
-}
-
-function vaultProfileAvatarSignedDataCell(params) {
-  const avatarPayload = beginCell()
-    .address(vaultProfileAvatarRegistryAddress(params), 'profile_registry_address')
-    .uint(publishHashValue(params.avatar_hash ?? params.avatarHash, 'avatar_hash'), 256, 'avatar_hash')
-    .uint(params.avatar_entry_id ?? params.avatarEntryId ?? 0n, 64, 'avatar_entry_id')
-    .uint(params.avatar_stream_id ?? params.avatarStreamId, 128, 'avatar_stream_id')
-    .uint(params.avatar_part_count ?? params.avatarPartCount, 16, 'avatar_part_count')
-    .uint(params.media_format ?? params.mediaFormat ?? PUBLIC_BODY_MEDIA_FORMATS.WEBP, 8, 'media_format')
-    .endCell();
-  return beginCell()
-    .uint(VAULT_PROFILE_AVATAR_SIGNING_DOMAIN, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultProfileAvatarOwner(params), 'owner_wallet')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .uint(params.max_ton_charge ?? params.maxTonCharge, 128, 'max_ton_charge')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
-    .ref(avatarPayload, 'avatar_payload')
-    .endCell();
-}
-
-function vaultUsernameMintRegistryAddress(params) {
-  return params.username_registry_address
-    ?? params.usernameRegistryAddress
-    ?? params.registry_address
-    ?? params.registryAddress;
-}
-
-function vaultUsernameMintOwner(params) {
-  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
-}
-
-function vaultUsernameMintSignedDataCell(params) {
-  const usernameBytes = normalizeUsernameBytes(params.username);
-  const usernamePayload = beginCell()
-    .address(vaultUsernameMintRegistryAddress(params), 'username_registry_address')
-    .uint(usernameBytes.length, 8, 'username_len')
-    .bytesValue(usernameBytes, usernameBytes.length, 'username')
-    .endCell();
-  return beginCell()
-    .uint(VAULT_USERNAME_MINT_SIGNING_DOMAIN, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultUsernameMintOwner(params), 'owner_wallet')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .uint(params.max_ton_charge ?? params.maxTonCharge, 128, 'max_ton_charge')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
-    .ref(usernamePayload, 'username_payload')
-    .endCell();
-}
-
-
-function vaultWithdrawOwner(params) {
-  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
-}
-
-function vaultWithdrawSignedDataCell(params = {}, domain) {
-  const actionPayload = beginCell()
-    .uint(params.amount, 128, 'amount')
-    .address(params.recipient, 'recipient')
-    .endCell();
-  return beginCell()
-    .uint(domain, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishVaultAddress(params), 'vault_address')
-    .address(vaultWithdrawOwner(params), 'owner_wallet')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .ref(actionPayload, 'action_payload')
-    .endCell();
-}
-
-async function buildVaultWithdrawExternalBoc(params = {}, options = {}, domain, op) {
-  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const deploymentManifestHash = options.deployment_manifest_hash
-    ?? options.deploymentManifestHash
-    ?? params.deployment_manifest_hash
-    ?? params.deploymentManifestHash;
-  const signedData = vaultWithdrawSignedDataCell({
-    ...params,
-    vaultAddress,
-    deploymentManifestHash,
-  }, domain);
-  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
-  const { hash } = await computeCellHashAndDepth(signedData);
-  const signature = ed25519.sign(hash, signingSecretKey);
-  const bodyCell = beginVaultBody(op)
-    .address(vaultWithdrawOwner(params), 'owner_wallet')
-    .bytesValue(signature, 64, 'signature')
-    .ref(signedData, 'signed_payload')
-    .endCell();
-  const root = externalInMessageCell(vaultAddress, bodyCell);
-  return {
-    bodyCell,
-    signedData,
-    signedDataHash: bytesToHex(hash),
-    signature: bytesToHex(signature),
-    boc: bytesToBase64(serializeBoc(root)),
-    vaultAddress,
-  };
-}
-
-export async function buildVaultWithdrawTonExternalBoc(params = {}, options = {}) {
-  return buildVaultWithdrawExternalBoc(
-    params,
-    options,
-    VAULT_WITHDRAW_TON_SIGNING_DOMAIN,
-    VAULT_OPS.WithdrawTonFromVaultBalance,
-  );
-}
-
-export async function buildVaultWithdrawAthExternalBoc(params = {}, options = {}) {
-  return buildVaultWithdrawExternalBoc(
-    params,
-    options,
-    VAULT_WITHDRAW_ATH_SIGNING_DOMAIN,
-    VAULT_OPS.WithdrawAthFromVaultBalance,
-  );
-}
-
-
-function replaceMessagingKeysOwner(params) {
-  return assertString(params.owner_wallet ?? params.ownerWallet, 'owner_wallet');
-}
-
-function replaceMessagingKeysSignedDataCell(params = {}) {
-  const payload = beginCell()
-    .uint(params.enc_pubkey, 256, 'enc_pubkey')
-    .uint(params.sign_pubkey, 256, 'sign_pubkey')
-    .uint(params.pq_kem_pubkey_hash, 256, 'pq_kem_pubkey_hash')
-    .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
-    .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
-    .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
-    .endCell();
-
-  return beginCell()
-    .uint(VAULT_REPLACE_MESSAGING_KEYS_SIGNING_DOMAIN, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
-    .uint(basechainAddressHashValue(replaceMessagingKeysOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .ref(payload, 'replace_keys_payload')
-    .endCell();
-}
-
-export async function buildVaultReplaceMessagingKeysBodyCell(params = {}) {
-  assertObject(params, 'params');
-  const signedData = replaceMessagingKeysSignedDataCell(params);
-  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
-  const { hash } = await computeCellHashAndDepth(signedData);
-  const signature = ed25519.sign(hash, signingSecretKey);
-  return {
-    bodyCell: beginVaultBody(VAULT_OPS.ReplaceMessagingKeys)
-      .address(replaceMessagingKeysOwner(params), 'owner_wallet')
-      .bytesValue(signature, 64, 'signature')
-      .ref(signedData, 'signed_payload')
-      .endCell(),
-    signedData,
-    signedDataHash: bytesToHex(hash),
-    signature: bytesToHex(signature),
-  };
-}
-
-export async function buildVaultReplaceMessagingKeysExternalBoc(params = {}, options = {}) {
-  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const deploymentManifestHash = options.deployment_manifest_hash
-    ?? options.deploymentManifestHash
-    ?? params.deployment_manifest_hash
-    ?? params.deploymentManifestHash;
-  const built = await buildVaultReplaceMessagingKeysBodyCell({
-    ...params,
-    vaultAddress,
-    deploymentManifestHash,
-  });
-  const root = externalInMessageCell(vaultAddress, built.bodyCell);
-  return {
-    ...built,
-    boc: bytesToBase64(serializeBoc(root)),
-    vaultAddress,
-  };
-}
-
-function externalInMessageCell(destinationAddress, bodyCell) {
+// EXPORTED so the M21C vault door builds its externals with the SAME envelope every other external here uses
+// (web/fee-vault.mjs). A second hand-rolled copy of this header is a class of bug this repo has already paid for.
+export function externalInMessageCell(destinationAddress, bodyCell) {
   return beginCell()
     .uint(2n, 2, 'ext_in_msg_info.tag')
     .uint(0n, 2, 'ext_in_msg_info.src_none')
@@ -1005,378 +673,26 @@ function externalInMessageCell(destinationAddress, bodyCell) {
     .endCell();
 }
 
-export async function buildVaultBalancePublishBodyCell(type, params = {}) {
-  const signedData = vaultBalancePublishSignedDataCell(type, params);
-  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
-  const { hash } = await computeCellHashAndDepth(signedData);
-  const signature = ed25519.sign(hash, signingSecretKey);
-  const op = type === 'PublishPrivateFromVaultBalance'
-    ? VAULT_OPS.PublishPrivateFromVaultBalance
-    : VAULT_OPS.PublishPublicFromVaultBalance;
-  return {
-    bodyCell: beginVaultBody(op)
-      .address(vaultBalancePublishOwner(params), 'owner_wallet')
-      .bytesValue(signature, 64, 'signature')
-      .ref(signedData, 'signed_payload')
-      .endCell(),
-    signedData,
-    signedDataHash: bytesToHex(hash),
-    signature: bytesToHex(signature),
-  };
-}
-
-export async function buildVaultBalancePublishExternalBoc(type, params = {}, options = {}) {
-  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const deploymentManifestHash = options.deployment_manifest_hash
-    ?? options.deploymentManifestHash
-    ?? params.deployment_manifest_hash
-    ?? params.deploymentManifestHash;
-  const built = await buildVaultBalancePublishBodyCell(type, {
-    ...params,
-    vaultAddress,
-    deploymentManifestHash,
-  });
-  const root = externalInMessageCell(vaultAddress, built.bodyCell);
-  return {
-    ...built,
-    boc: bytesToBase64(serializeBoc(root)),
-    vaultAddress,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// VPB2 batch publish (signed BATCH external). Mirrors contracts/Vault.tact
-// external(PublishBatchFromVaultBalance) + tests/helpers/vpb2.ts byte-for-byte.
-// All inputs are pre-built capsule cells + scalar fields; nothing here reads app state.
-// ---------------------------------------------------------------------------
-
-// Worst-case affine floor max_charge must clear (mirrors Vault.batchChargeFloor / BATCH_FLOOR_*_PIN).
-export function batchChargeFloor(partCount) {
-  const n = assertUint(partCount, 8, 'part_count');
-  return BATCH_FLOOR_BASE_PIN + BATCH_FLOOR_PER_PART_PIN * n;
-}
-
-function batchPartKind(part) {
-  const raw = part?.kind ?? part?.publish_kind ?? part?.publishKind;
-  if (raw !== undefined && raw !== null) {
-    const kind = toBigInt(raw, 'part.kind');
-    if (kind === VAULT_PUBLISH_KIND.PRIVATE) return VAULT_PUBLISH_KIND.PRIVATE;
-    if (kind === VAULT_PUBLISH_KIND.PUBLIC) return VAULT_PUBLISH_KIND.PUBLIC;
-    throw new RangeError('part.kind must be PRIVATE(1) or PUBLIC(2)');
-  }
-  // Discriminator fallback: a private part carries two headers, a public part one.
-  const hasH1 = (part?.header_1_cell ?? part?.header1Cell) !== undefined
-    || (part?.header_1_hash ?? part?.header1Hash) !== undefined;
-  return hasH1 ? VAULT_PUBLISH_KIND.PRIVATE : VAULT_PUBLISH_KIND.PUBLIC;
-}
-
-// One linked-list part cell. PRIVATE: size(8) suite(8) h0(256) h1(256) bh(256) + ref h0,h1,body[,next].
-// PUBLIC: size(8) reserved(8=0) h(256) bh(256) + ref header,body[,next]. `part.next` (a built cell) appends
-// the 4th/3rd ref to the successor part — the head is part 0, the tail (last) carries no next ref.
-export function buildBatchPublishPartCell(part) {
-  assertObject(part, 'part');
-  const next = part.next ?? part.nextCell ?? null;
-  if (batchPartKind(part) === VAULT_PUBLISH_KIND.PRIVATE) {
-    const header0 = publishCellFromPayload(part.header_0_cell ?? part.header0Cell, 'part.header_0_cell');
-    const header1 = publishCellFromPayload(part.header_1_cell ?? part.header1Cell, 'part.header_1_cell');
-    const body = publishCellFromPayload(part.body_cell ?? part.bodyCell, 'part.body_cell');
-    const builder = beginCell()
-      .uint(part.size_class ?? part.sizeClass, 8, 'size_class')
-      .uint(part.crypto_suite ?? part.cryptoSuite ?? VAULT_CRYPTO_SUITE.HYBRID, 8, 'crypto_suite')
-      .uint(publishHashValue(part.header_0_hash ?? part.header0Hash, 'part.header_0_hash'), 256, 'header_0_hash')
-      .uint(publishHashValue(part.header_1_hash ?? part.header1Hash, 'part.header_1_hash'), 256, 'header_1_hash')
-      .uint(publishHashValue(part.body_hash ?? part.bodyHash, 'part.body_hash'), 256, 'body_hash')
-      .ref(header0, 'header_0')
-      .ref(header1, 'header_1')
-      .ref(body, 'body');
-    if (next) builder.ref(next, 'next_part');
-    return builder.endCell();
-  }
-  const header = publishCellFromPayload(part.header_cell ?? part.headerCell ?? part.header_0_cell, 'part.header_cell');
-  const body = publishCellFromPayload(part.body_cell ?? part.bodyCell, 'part.body_cell');
-  const builder = beginCell()
-    .uint(normalizePublicSizeClass(part.size_class ?? part.sizeClass, 'part.size_class'), 8, 'size_class')
-    // reserved byte: bit0 = is_profile (clean-11 channel-description PROFILE post), bits 1..7 stay 0. Defaults to 0
-    // (a normal public post) so this is a no-op on clean-10; callers set is_profile ONLY when the genesis supports
-    // the profile-pointer (clean-10 Vault/Hub reject reserved != 0).
-    .uint((part.is_profile ?? part.isProfile) ? 1n : 0n, 8, 'reserved')
-    .uint(publishPublicParentLink(part), 64, 'parent_link')
-    .uint(publishHashValue(part.header_hash ?? part.headerHash ?? part.header_0_hash, 'part.header_hash'), 256, 'header_hash')
-    .uint(publishHashValue(part.body_hash ?? part.bodyHash, 'part.body_hash'), 256, 'body_hash')
-    .ref(header, 'header')
-    .ref(body, 'body');
-  if (next) builder.ref(next, 'next_part');
-  return builder.endCell();
-}
-
-// parent_link wire field (entryLink convention): 0 -> top-level post (indexed by author on-chain);
-// parentEntryId+1 -> comment (indexed by parent). Mirrors CapsuleHub's parentLink/entryIdFromLink.
-function publishPublicParentLink(part) {
-  const explicit = part.parent_link ?? part.parentLink;
-  if (explicit !== undefined && explicit !== null) return BigInt(explicit);
-  const pid = part.parent_entry_id ?? part.parentEntryId;
-  if (pid === undefined || pid === null) return 0n;
-  const value = BigInt(pid);
-  return value < 0n ? 0n : value + 1n;
-}
-
-// Link 1..MAX_BATCH_PARTS parts into the singly-linked list and return its head (part 0). Built tail-first so
-// each non-last part carries a ref to its successor.
-export function buildBatchPublishPartsRoot(parts) {
-  if (!Array.isArray(parts) || parts.length < 1) {
-    throw new RangeError('parts must be a non-empty array');
-  }
-  if (parts.length > MAX_BATCH_PARTS) {
-    throw new RangeError(`parts must be at most ${MAX_BATCH_PARTS}`);
-  }
-  let next = null;
-  for (let i = parts.length - 1; i >= 0; i -= 1) {
-    next = buildBatchPublishPartCell({ ...parts[i], next });
-  }
-  return next;
-}
-
-// Signed ROOT cell: domain(32) manifest(256) vault_hash(256) kind(8) owner_hash(256) nonce(64) max_charge(128)
-// part_count(8) version(8) + ref(partsRoot). Field order is the Vault's authoritative re-validation order.
-export function buildBatchPublishSignedRootCell(params = {}) {
-  assertObject(params, 'params');
-  return beginCell()
-    .uint(VAULT_BATCH_PUBLISH_SIGNING_DOMAIN, 32, 'domain_magic')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .uint(basechainAddressHashValue(vaultBalancePublishVaultAddress(params), 'vault_address'), 256, 'vault_address_hash')
-    .uint(params.kind ?? params.publish_kind ?? VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
-    .uint(basechainAddressHashValue(vaultBalancePublishOwner(params), 'owner_wallet'), 256, 'owner_wallet_hash')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .uint(params.max_charge ?? params.maxCharge, 128, 'max_charge')
-    .uint(params.part_count ?? params.partCount, 8, 'part_count')
-    .uint(params.version ?? VPB2_VERSION, 8, 'version')
-    .ref(params.partsRoot ?? params.parts_root, 'parts_root')
-    .endCell();
-}
-
-// BPI1 batch publish_id = sha256(domain(32) manifest(256) owner(address) nonce(64) parts_root_hash(256) kind(8)
-// part_count(8)). The owner is a FULL address here (not a hash), matching Vault.computeBatchPublishId.
-export async function computeBatchPublishId(params = {}) {
-  assertObject(params, 'params');
-  const partsRoot = params.partsRoot ?? params.parts_root;
-  const { hash: partsRootHash } = await computeCellHashAndDepth(partsRoot);
-  const idCell = beginCell()
-    .uint(VAULT_BATCH_PUBLISH_ID_DOMAIN, 32, 'batch_publish_id_domain')
-    .uint(vaultBalancePublishManifestHash(params), 256, 'deployment_manifest_hash')
-    .address(vaultBalancePublishOwner(params), 'owner_wallet')
-    .uint(params.client_nonce ?? params.clientNonce, 64, 'client_nonce')
-    .uint(bytesToBigInt(partsRootHash), 256, 'parts_root_hash')
-    .uint(params.kind ?? params.publish_kind ?? VAULT_PUBLISH_KIND.PRIVATE, 8, 'publish_kind')
-    .uint(params.part_count ?? params.partCount, 8, 'part_count')
-    .endCell();
-  const { hash } = await computeCellHashAndDepth(idCell);
-  return bytesToBigInt(hash);
-}
-
-// EPI1 entry publish_id = sha256(domain(32) batch_publish_id(256) part_index(16)).
-export async function computeEntryPublishId(batchPublishId, partIndex) {
-  const idCell = beginCell()
-    .uint(CAPSULE_ENTRY_PUBLISH_ID_DOMAIN, 32, 'capsule_entry_publish_id_domain')
-    .uint(batchPublishId, 256, 'batch_publish_id')
-    .uint(partIndex, 16, 'part_index')
-    .endCell();
-  const { hash } = await computeCellHashAndDepth(idCell);
-  return bytesToBigInt(hash);
-}
-
-// Signed envelope (external body): op(32) owner_wallet(address) signature(512) + ref(signedRoot). The signature
-// is ed25519 over signedRoot.hash() with the user's AUTH secret key (32-byte seed), NOT the messaging sign key.
-export async function buildBatchPublishExternalBody(params = {}) {
-  assertObject(params, 'params');
-  const partsRoot = params.partsRoot ?? params.parts_root;
-  if (!partsRoot) throw new TypeError('partsRoot is required');
-  const signedRoot = buildBatchPublishSignedRootCell({ ...params, partsRoot });
-  const authSecretKey = assertBytes(params.authSecretKey ?? params.auth_secret_key, 32, 'authSecretKey');
-  const { hash } = await computeCellHashAndDepth(signedRoot);
-  const signature = ed25519.sign(hash, authSecretKey);
-  const bodyCell = beginVaultBody(Number(OP_PUBLISH_BATCH))
-    .address(vaultBalancePublishOwner(params), 'owner_wallet')
-    .bytesValue(signature, 64, 'signature')
-    .ref(signedRoot, 'signed_root')
-    .endCell();
-  return {
-    bodyCell,
-    signedRoot,
-    signedRootHash: bytesToHex(hash),
-    signature: bytesToHex(signature),
-  };
-}
-
-// Full signed BATCH external: serialized external-in BOC + the derived ids the client can confirm against later.
-export async function buildBatchPublishExternalBoc(params = {}, options = {}) {
-  assertObject(params, 'params');
-  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const deploymentManifestHash = options.deployment_manifest_hash
-    ?? options.deploymentManifestHash
-    ?? params.deployment_manifest_hash
-    ?? params.deploymentManifestHash;
-  const partsRoot = params.partsRoot ?? params.parts_root;
-  if (!partsRoot) throw new TypeError('partsRoot is required');
-  const kind = params.kind ?? params.publish_kind ?? VAULT_PUBLISH_KIND.PRIVATE;
-  const partCount = params.part_count ?? params.partCount;
-  const merged = { ...params, vaultAddress, deploymentManifestHash, partsRoot, kind, part_count: partCount };
-  const built = await buildBatchPublishExternalBody(merged);
-  const batchPublishId = await computeBatchPublishId(merged);
-  const count = Number(assertUint(partCount, 8, 'part_count'));
-  const entryPublishIds = [];
-  for (let i = 0; i < count; i += 1) {
-    entryPublishIds.push(await computeEntryPublishId(batchPublishId, i));
-  }
-  const root = externalInMessageCell(vaultAddress, built.bodyCell);
-  const serializedRoot = serializeBoc(root);
-  // Fail-closed backstop. TON validators silently DROP an external BoC larger than max_ext_msg_size
-  // before the Vault's external() receiver runs (no acceptMessage, no nonce bump, no bounce), which strands
-  // the publish at SENT forever. NEVER sign/broadcast an oversized external — surface a deterministic error
-  // so the size-aware packer (groupPublishItemsIntoBatches in publish-batch-orchestration.mjs) can split
-  // instead of broadcasting into the void. This is the last line of defense if the packer's byte estimate
-  // is ever too loose for an unusual capsule shape.
-  if (serializedRoot.length > MAX_EXTERNAL_MESSAGE_BYTES) {
-    throw new RangeError(`batch external is ${serializedRoot.length} bytes, exceeds max_ext_msg_size ${MAX_EXTERNAL_MESSAGE_BYTES}`);
-  }
-  return {
-    boc: bytesToBase64(serializedRoot),
-    bodyCell: built.bodyCell,
-    signedRoot: built.signedRoot,
-    signedRootHash: built.signedRootHash,
-    signature: built.signature,
-    batchPublishId,
-    entryPublishIds,
-    vaultAddress,
-  };
-}
-
-// K pre-signed VARIANTS of the SAME batch external (same nonce/parts/ids), differing only in max_charge
-// (+k nanotons, k = variant index). Every TON dedup layer keys on either the serialized bytes or the root
-// repr hash — both change with the signature — so rotating variants makes EVERY retry a REAL broadcast
-// (a same-BoC re-POST within the network's ~60s dedup windows is a silent no-op, which is what made large
-// externals take minutes: the retry ladder was almost entirely fake). Correctness: max_charge is NOT part of
-// computeBatchPublishId, so batchPublishId/entryPublishIds are byte-identical across variants and every
-// confirm/receipt path matches unchanged; all variants share ONE nonce, so the contract's pre-accept
-// throwUnless(16453) lets exactly ONE land (over-reserve refunded by the mode-128 ACK) and bounces the rest
-// uncharged — no double-spend by construction. Cost: <= K-1 nanotons on the winning variant, refunded.
-export async function buildBatchPublishExternalVariants(params = {}, options = {}, variantOptions = {}) {
-  const variantCount = Math.max(1, Math.min(64, Number(variantOptions.variantCount ?? 16)));
-  const baseMaxCharge = BigInt(params.max_charge ?? params.maxCharge);
-  const variants = [];
-  let first = null;
-  for (let k = 0; k < variantCount; k += 1) {
-    const built = await buildBatchPublishExternalBoc({
-      ...params,
-      max_charge: baseMaxCharge + BigInt(k),
-      maxCharge: baseMaxCharge + BigInt(k),
-    }, options);
-    if (k === 0) first = built;
-    variants.push(built.boc);
-  }
-  return { ...first, maxCharge: baseMaxCharge, variants };
-}
-
-export async function buildVaultProfileAvatarBodyCell(params = {}) {
-  assertObject(params, 'params');
-  const signedData = vaultProfileAvatarSignedDataCell(params);
-  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
-  const { hash } = await computeCellHashAndDepth(signedData);
-  const signature = ed25519.sign(hash, signingSecretKey);
-  return {
-    bodyCell: beginVaultBody(VAULT_OPS.SetProfileAvatarFromVaultBalance)
-      .address(vaultProfileAvatarOwner(params), 'owner_wallet')
-      .bytesValue(signature, 64, 'signature')
-      .ref(signedData, 'signed_payload')
-      .endCell(),
-    signedData,
-    signedDataHash: bytesToHex(hash),
-    signature: bytesToHex(signature),
-  };
-}
-
-export async function buildVaultProfileAvatarExternalBoc(params = {}, options = {}) {
-  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const deploymentManifestHash = options.deployment_manifest_hash
-    ?? options.deploymentManifestHash
-    ?? params.deployment_manifest_hash
-    ?? params.deploymentManifestHash;
-  const built = await buildVaultProfileAvatarBodyCell({
-    ...params,
-    vaultAddress,
-    deploymentManifestHash,
-  });
-  const root = externalInMessageCell(vaultAddress, built.bodyCell);
-  return {
-    ...built,
-    boc: bytesToBase64(serializeBoc(root)),
-    vaultAddress,
-  };
-}
-
-export async function buildVaultUsernameMintBodyCell(params = {}) {
-  assertObject(params, 'params');
-  const signedData = vaultUsernameMintSignedDataCell(params);
-  const signingSecretKey = assertBytes(params.signingSecretKey, 32, 'signingSecretKey');
-  const { hash } = await computeCellHashAndDepth(signedData);
-  const signature = ed25519.sign(hash, signingSecretKey);
-  return {
-    bodyCell: beginVaultBody(VAULT_OPS.MintUsernameFromVaultBalance)
-      .address(vaultUsernameMintOwner(params), 'owner_wallet')
-      .bytesValue(signature, 64, 'signature')
-      .ref(signedData, 'signed_payload')
-      .endCell(),
-    signedData,
-    signedDataHash: bytesToHex(hash),
-    signature: bytesToHex(signature),
-  };
-}
-
-export async function buildVaultUsernameMintExternalBoc(params = {}, options = {}) {
-  const vaultAddress = assertString(options.vaultAddress ?? params.vaultAddress, 'vaultAddress');
-  const deploymentManifestHash = options.deployment_manifest_hash
-    ?? options.deploymentManifestHash
-    ?? params.deployment_manifest_hash
-    ?? params.deploymentManifestHash;
-  const built = await buildVaultUsernameMintBodyCell({
-    ...params,
-    vaultAddress,
-    deploymentManifestHash,
-  });
-  const root = externalInMessageCell(vaultAddress, built.bodyCell);
-  return {
-    ...built,
-    boc: bytesToBase64(serializeBoc(root)),
-    vaultAddress,
-  };
-}
-
-export function buildVaultMessageBody(type, params = {}) {
-  assertObject(params, 'params');
-  switch (type) {
-    case 'DepositTon':
-      return beginVaultBody(VAULT_OPS.DepositTon)
-        .uint(params.amount, 128, 'amount')
-        .toBocBase64();
-    case 'RegisterMessagingKeys':
-      return beginVaultBody(VAULT_OPS.RegisterMessagingKeys)
-        .uint(params.enc_pubkey, 256, 'enc_pubkey')
-        .uint(params.sign_pubkey, 256, 'sign_pubkey')
-        .uint(params.auth_pubkey, 256, 'auth_pubkey')
-        .ref(beginCell()
-          .uint(params.pq_kem_pubkey_hash, 256, 'pq_kem_pubkey_hash')
-          .uint(params.pq_kem_pubkey_len, 16, 'pq_kem_pubkey_len')
-          .ref(pqKemPubkeyCellFromParams(params), 'pq_kem_pubkey')
-          .uint(params.crypto_suite_mask, 16, 'crypto_suite_mask')
-          .endCell(), 'register_keys_tail')
-        .toBocBase64();
-    default:
-      throw new Error(`Unsupported Vault message type ${type}`);
-  }
-}
-
 export function buildAthWalletMessageBody(type, params = {}) {
   assertObject(params, 'params');
   switch (type) {
+    case 'JettonTransfer':
+      // Layout is TEP-74's, which the frozen wallet implements verbatim: custom_payload is a maybe-ref and
+      // forward_payload is `Slice as remaining`, so an empty one appends nothing at all.
+      return beginAthWalletBody(ATH_WALLET_OPS.JettonTransfer)
+        .uint(params.query_id, 64, 'query_id')
+        .coins(params.amount, 'amount')
+        .address(params.destination, 'destination')
+        .address(params.response_destination, 'response_destination')
+        // ONE bit, not two. `maybeRef` writes `some` + `right` because its other caller (platho-wallet.mjs) is
+        // serialising a `Maybe (Either X ^X)`; TEP-74's custom_payload is a plain `Maybe ^Cell`, which ATHWallet
+        // declares as `custom_payload: Cell?`. Using maybeRef here left an extra set bit in the body, and the
+        // frozen wallet then read the following coins field off by one — MEASURED as exit 9, cell underflow,
+        // aborted. Harmless today only because every caller passes null (which maybeRef also writes as one bit),
+        // so the defect waited for the first non-null payload.
+        .customPayloadMaybe(params.custom_payload ?? null)
+        .coins(params.forward_ton_amount, 'forward_ton_amount')
+        .toBocBase64();
     case 'ATHTransferRequest':
       return beginAthWalletBody(ATH_WALLET_OPS.ATHTransferRequest)
         .uint(params.query_id, 64, 'query_id')
@@ -1469,18 +785,6 @@ export function buildProfileRegistryMessageBody(type, params = {}) {
   }
 }
 
-export function createVaultWalletMessage(type, params = {}, options = {}) {
-  const address = assertString(options.vaultAddress, 'vaultAddress');
-  const amount = options.valueNanotons !== undefined
-    ? assertUint(options.valueNanotons, 128, 'valueNanotons')
-    : estimateVaultAttachedValueNanotons(type, params, options);
-  return {
-    address,
-    amount: amount.toString(),
-    payload: buildVaultMessageBody(type, params),
-  };
-}
-
 export function createAthWalletMessage(type, params = {}, options = {}) {
   const address = assertString(options.athWalletAddress, 'athWalletAddress');
   const amount = options.valueNanotons !== undefined
@@ -1515,22 +819,6 @@ export function createProfileRegistryMessage(type, params = {}, options = {}) {
     amount: amount.toString(),
     payload: buildProfileRegistryMessageBody(type, params),
   };
-}
-
-/**
- * AirdropTicket.TicketClaim — an EMPTY message, so the body is nothing but its opcode.
- *
- * Mirrors `message(0x41544332) TicketClaim {}` in contracts/AirdropTicket.tact. Declared here with the other
- * contract bodies rather than inline at the call site: a hand-rolled opcode is exactly the kind of literal that
- * drifts silently, and a wrong one reaches the ticket's catch-all `receive(_: Slice)` — which tolerates unknown
- * bodies instead of bouncing, so the claim would be swallowed with the wallet reporting success.
- */
-export const AIRDROP_TICKET_OPS = Object.freeze({
-  TicketClaim: 0x41544332,
-});
-
-export function buildAirdropTicketClaimBody() {
-  return new TinyCellBuilder().uint(AIRDROP_TICKET_OPS.TicketClaim, 32, 'op').toBocBase64();
 }
 
 export function createWalletTransaction(messages, options = {}) {
@@ -1840,9 +1128,9 @@ export async function createPublicPostPayload(input, options = {}) {
     layout: PUBLIC_BODY_LAYOUT,
     kind: parsed.kind,
     type: parsed.type,
-    // clean-11: a channel-PROFILE post sets reserved bit0 (is_profile) in buildBatchPublishPartCell so the contract
-    // threads it into the global profile chain. Wire-only (not part of the header/body hash) so bodyHash-based feed
-    // merging is unaffected; baked in before signing so retries stay byte-identical. Caller gates on the genesis.
+    // clean-11 history: a channel-PROFILE post set reserved bit0 (is_profile) on the retired Vault batch wire so
+    // the contract threaded it into the global profile chain. The wire is gone; the field survives here because
+    // V1 payload READERS still surface it for old locally-cached posts.
     is_profile: input.is_profile === true,
     headerBytes: headerBytes.length,
     bodyBytes: bodyBytes.length,

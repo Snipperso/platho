@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir as tempRoot } from 'node:os';
+import { join as joinPath } from 'node:path';
+import { stalePrepFiles } from '../scripts/lib/deploy-prep-freshness.mjs';
 import {
   createStaticWebDeployReport,
   selectStaticWebRuntimeFiles,
@@ -184,5 +187,39 @@ describe('static web deploy prep', () => {
     expect(script).toContain('"--mode", $Mode, "--clean"');
     expect(script).toContain('$prep.mode -ne $Mode');
     expect(script).toContain('$Mode -eq "production" -and $prep.productionReady -ne $true');
+  });
+
+  it('WEB-DEPLOY-08: the deploy refuses a prep older than web/ — the tarball is the snapshot, not the tree', () => {
+    // [2026-09-08] Two source edits and a module bump went into web/ after the last prepare step, and the stand
+    // deploy shipped the EARLIER bundle without a word: "deployed", said the log, while the stand still served the
+    // old build id. Nothing in the deploy rebuilds anything — the tarball is made from the prepared directory —
+    // and the only check on the prep was its mode.
+    const script = readFileSync('scripts/deploy_static_web.mjs', 'utf8');
+    expect(script).toContain("import { stalePrepFiles } from './lib/deploy-prep-freshness.mjs';");
+    expect(script).toMatch(/const stale = stalePrepFiles\(prep\);\s*\n\s*if \(stale\.length > 0\) \{\s*\n\s*die\(/);
+    // Refused BEFORE the tarball is built, not after a byte has left the machine.
+    expect(script.indexOf('const stale = stalePrepFiles(prep);')).toBeLessThan(script.indexOf("spawnSync('tar', ['-cf'"));
+    // The refusal names the way out — the prepare step, the same line the version guard prints.
+    expect(script).toMatch(/deploy prep is older than web\/[\s\S]{0,400}npm run web:deploy:prepare/);
+
+    // THE REAL FUNCTION AGAINST A REAL TREE: a record of two files, one edited after it was made, one removed.
+    const dir = mkdtempSync(joinPath(tempRoot(), 'platho-prep-'));
+    try {
+      writeFileSync(joinPath(dir, 'a.js'), 'a');
+      mkdirSync(joinPath(dir, 'sub'));
+      writeFileSync(joinPath(dir, 'sub', 'b.css'), 'b');
+      const listed = [
+        { path: 'a.js', sha256: createHash('sha256').update('a').digest('hex') },
+        { path: 'sub/b.css', sha256: createHash('sha256').update('b').digest('hex') },
+      ];
+      expect(stalePrepFiles({ runtime: { files: listed } }, dir)).toEqual([]);
+      writeFileSync(joinPath(dir, 'a.js'), 'a, edited after the prep');
+      const record = { runtime: { files: [...listed, { path: 'gone.svg', sha256: '00' }] } };
+      expect(stalePrepFiles(record, dir)).toEqual(['a.js', 'gone.svg (missing)']);
+      // No record, no verdict: a prep without a file list is the older format, and that is the mode check's job.
+      expect(stalePrepFiles({}, dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

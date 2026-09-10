@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // COMPOSER DRAFTS FOLLOW THEIR DIALOG — typed-but-unsent work must never ride into another chat.
 //
-// [OWNER 2026-08-26, relaying a user] "if you write something in the message box without sending and open
-// another chat, the same message is sitting there — I do not think that should happen." The composer text,
+// [decided 2026-08-26] The composer text,
 // image/file attachments, the swipe-reply quote and the shared-post draft were ALL process-globals: whatever
 // dialog was opened next inherited them, and one click would SEND them to the wrong contact.
 //

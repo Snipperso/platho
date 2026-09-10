@@ -4,9 +4,7 @@ import { readFileSync } from 'node:fs';
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // A DEFERRED BACKGROUND LOCK IS A POSTPONEMENT, NEVER A CANCELLATION.
 //
-// Owner, 2026-08-19: "Проблема с модалкой «Купить ATH». Она видимо не подчиняется законам блокировки
-// приложения. Свернул приложение с открытой модалкой, развернул и увидел модалку. Закрыл её и увидел экран
-// блокировки."
+// decided 2026-08-19
 //
 // Both halves of that sentence came from one missing deadline. shouldIgnoreTransientWalletLock() answers "yes"
 // for as long as an action dialog is on screen, and the deferral branch in lockPlathoWallet used to simply
@@ -158,6 +156,9 @@ function harness({ telegram = false }: { telegram?: boolean } = {}): Harness {
     // the rest are no-ops in this harness, which has no DOM; what it models is that the sweep runs and the dialog
     // it closes really goes.
     function closeSessionOverlays() { closeActionDialog(); }
+    // The lock drops the group runtime — the closure that holds the wallet seed and every group key [audit
+    // 2026-09-05, round 1]; a no-op here, and asserted present in the real body below.
+    function dropGroupRuntime() {}
 
     ${fn('vaultSendNeedsKeyNow')}
     ${fn('shouldDeferLockForActiveSend')}
@@ -334,8 +335,7 @@ describe('background wallet lock deferral', () => {
   });
 
   it('BGLOCK-10: the background grace is no longer Telegram-only — a plain departure defers everywhere', () => {
-    // [OWNER 2026-08-25: "5 minutes is more adequate. We have things like getting an RPC key, which can take a
-    // while ... it makes the app much easier to work with."] The grace used to be granted only inside Telegram,
+    // [decided 2026-08-25] The grace used to be granted only inside Telegram,
     // because Telegram backgrounds its WebView on every small interaction. Leaving any app to fetch something and
     // coming straight back is the same moment. Safe to generalise because the deadline is enforced on the RETURN
     // door by the wall clock, not by the timer that armed it.
@@ -362,8 +362,7 @@ describe('background wallet lock deferral', () => {
   });
 
   it('BGLOCK-09: the lock takes the decrypted conversations with it, and leaves the public ones', () => {
-    // [OWNER 2026-08-25: "on the desktop, if you do not unlock and just close the window, everything is clean,
-    // there are no conversations. On mobile I can close the window and read conversations."] Tearing down the keys
+    // [decided 2026-08-25] Tearing down the keys
     // left everything they had already decrypted on screen. A desktop window CLOSE destroys the page, which is why
     // the leak could only be seen on a phone: it freezes the page and hands it back intact — and the unlock prompt
     // is dismissable by design, so declining revealed the app with every private message still on it.
@@ -393,8 +392,7 @@ describe('background wallet lock deferral', () => {
     expect(deferBranch.length, 'the slice must not collapse or run away').toBeGreaterThan(100);
     expect(deferBranch, 'a deferral must leave a deadline behind').toContain('scheduleBackgroundGraceLock(WALLET_TRANSIENT_LOCK_GRACE_MS);');
     expect((app.match(/shouldIgnoreTransientWalletLock\(\)/g) ?? []).length, 'definition + the three readers above').toBe(4);
-    // THE GRACE IS NO LONGER TELEGRAM'S ALONE [OWNER 2026-08-25: "5 minutes is more adequate ... it makes the app
-        // much easier to work with"]. What made it safe to generalise is that the deadline is enforced on the RETURN
+    // THE GRACE IS NO LONGER TELEGRAM'S ALONE [decided 2026-08-25]. What made it safe to generalise is that the deadline is enforced on the RETURN
         // door by the wall clock, not by the timer that armed it — so a platform that freezes timers while hidden is
         // caught all the same, which is what retired the iOS carve-out.
         expect(app).toMatch(/function lockPlathoWalletForBackground\(\)[\s\S]{0,1400}?scheduleBackgroundGraceLock\(BACKGROUND_LOCK_GRACE_MS\);/);
@@ -420,8 +418,11 @@ describe('background wallet lock deferral', () => {
     // (closeSessionOverlays), which is what stops the next window being forgotten — see PWA-LIGHTBOX-LOCK-01.
     const lockBody = app.slice(app.indexOf('function lockPlathoWallet('), app.indexOf('const BACKGROUND_LOCK_GRACE_MS'));
     expect(lockBody, 'the overlays go with the session that owned them').toContain('closeSessionOverlays();');
+    // THE GROUP RUNTIME GOES TOO [audit 2026-09-05, round 1]: its identity closure holds the wallet seed, the X25519
+    // and ML-KEM secrets and every epoch key of every group; a lock that left it alive kept everything that unlocks.
+    expect(lockBody, 'the lock drops the group runtime').toContain('dropGroupRuntime();');
     expect(app).toMatch(/function closeSessionOverlays\(\) \{[\s\S]{0,400}?closeActionDialog\(null\);[\s\S]{0,400}?closeImageLightbox\(\);/);
-    const seedGate = app.slice(app.indexOf('async function enforceTelegramSeedBackupGate('), app.indexOf('function showTelegramManualExportDialog('));
+    const seedGate = app.slice(app.indexOf('async function enforceTelegramSeedBackupGate('), app.indexOf('function showManualExportDialog('));
     expect(seedGate, 'the one dialog loop that re-opens on null must stop when the wallet is gone')
       .toMatch(/for \(let attempt[\s\S]{0,600}?if \(plathoWallet\?\.address !== wallet\.address\) return;[\s\S]{0,80}?await openActionDialog\(/);
   });

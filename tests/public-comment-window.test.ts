@@ -149,7 +149,7 @@ describe('PCWINDOW — a post keeps its newest comments and loses sight of the o
   }, 600_000);
 
   it('PCWINDOW-04: past 128 comments the BODIES page back with the rows — every press yields the page before', async () => {
-    // OWNER 2026-08-21: "Show earlier comments works once, then presses do nothing." The rows paged back through
+    // decided 2026-08-21 The rows paged back through
     // get_page, but the bodies always came from the NEWEST 128 messages: the second page of a 260-comment thread
     // (rows 68..163) had bodies only for its newest part, the third (rows 0..67) had none — so the button kept
     // showing (rows remained) and pressing it changed nothing. The cursor now carries the lt of the oldest body

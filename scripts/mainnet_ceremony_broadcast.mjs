@@ -195,6 +195,47 @@ async function main() {
   }
   console.log(`\n=== CEREMONY ${PHASE.toUpperCase()} — ${msgs.length} message(s) | manifest ${packet.manifest_hash_hex.slice(0, 16)} | ${DO_BROADCAST ? 'BROADCAST' : 'DRY-RUN'} ===\n`);
 
+  // ── FUNDING PREFLIGHT, BEFORE THE FIRST SEND ────────────────────────────────────────────────────────────
+  // A SHORTFALL DOES NOT LOOK LIKE A FAILURE FROM HERE, and that is the whole reason this exists [audit
+  // 2026-09-01, round 14]. This script's proof of delivery is "the signer's seqno advanced" — and it advances on
+  // a transaction whose ACTION phase failed for lack of funds just as it does on one that landed. MEASURED by
+  // the audit against a real wallet seeded at the balance the genesis signer actually held: three sinks
+  // deployed, then FORTY-SIX consecutive steps burned gas, advanced the seqno by one each, and deployed nothing
+  // — all of them printed as `processed` — before the wallet finally stopped being able to pay at all. The only
+  // thing that would have told the operator was `--verify` at the end, after the burn.
+  //
+  // The check below is a POLICY margin, not a fee measurement: the packet declares every value exactly, so the
+  // sum is real, and the margin exists to cover per-message fees whose size this script has no business
+  // modelling. It is deliberately generous — refusing a run that could have squeaked through costs one top-up,
+  // while starting one that cannot finish costs burned steps on the single irreversible ceremony.
+  const FUNDING_MARGIN_BPS = 1000n;   // 10% of the declared total, a policy floor for fees — never a measurement
+  {
+    const needByRole = new Map();
+    for (const m of msgs) {
+      const v = BigInt(m.value_nanotons_recommended || m.value_nanotons_min || 0);
+      needByRole.set(m.signer_role, (needByRole.get(m.signer_role) || 0n) + v);
+    }
+    for (const [role, total] of needByRole) {
+      // THE PACKET'S OWN signer_address, not one derived from a seed — so this runs on a DRY RUN, before the
+      // operator has touched a key. The loop below still refuses any message whose declared signer disagrees
+      // with the wallet the seed derives, so reading a balance from the declared address cannot mislead.
+      const addr = msgs.find((m) => m.signer_role === role).signer_address;
+      const st = await gwState(addr);
+      if (!st) die(`preflight: cannot read the balance of signer ${role} from any endpoint — refusing to act blind`);
+      const balance = BigInt(st.balance || '0');
+      const need = total + (total * FUNDING_MARGIN_BPS) / 10000n;
+      console.log(`  preflight ${role}: balance ${fmt(balance)} against ${fmt(total)} of declared value `
+        + `+ ${Number(FUNDING_MARGIN_BPS) / 100}% margin = ${fmt(need)}`);
+      if (balance < need) {
+        die(`preflight: signer ${role} (${addr}) holds ${fmt(balance)} but this phase declares ${fmt(total)} of `
+          + `value across ${msgs.filter((m) => m.signer_role === role).length} message(s), and a shortfall does `
+          + `NOT stop this script — the seqno advances on an underfunded send and every step prints as `
+          + `processed. Top the signer up to at least ${fmt(need)} and re-run.`);
+      }
+    }
+  }
+
+
   const targetsToPoll = [];
   const localSeqno = {}; // per-signer: immune to load-balanced stale seqno reads
   for (const m of msgs) {

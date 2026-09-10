@@ -1,5 +1,6 @@
 import {
   CRYPTO_SUITES,
+  PLATHO_CAPSULE_UNREADABLE_CODE,
   createEncryptedConvCapsule,
   createEncryptedIntroCapsule,
   createVaultMessagingKeyDraft,
@@ -20,7 +21,7 @@ import {
   runPlathoCryptoSelfTest,
   verifyVaultKeyRecordBinding,
   verifySignedPublicKeyBundle,
-} from './crypto/platho-crypto.mjs?v=15';
+} from './crypto/platho-crypto.mjs?v=21';
 import {
   PLATHO_WALLET_NETWORK_GLOBAL_IDS,
   createPlathoWallet,
@@ -31,7 +32,7 @@ import {
   getPlathoWalletSeqno,
   importPlathoWallet,
   sendPlathoWalletTransaction,
-} from './platho-wallet.mjs?v=38';
+} from './platho-wallet.mjs?v=57';
 import { createIndexedDbReplayStore, createMemoryReplayStore } from './replay-store.mjs?v=1';
 import {
   createInlineFormatRegex, messagePreviewText,
@@ -42,7 +43,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=6';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=126';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=143';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -52,7 +53,7 @@ import {
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
   BROADCAST_VERDICT,
-} from './ton-rpc-transport.mjs?v=80';
+} from './ton-rpc-transport.mjs?v=89';
 import {
   DEFAULT_PUBLIC_CHANNELS,
   DEFAULT_PUBLIC_CHANNEL_ID,
@@ -69,12 +70,10 @@ import {
   subscribedPublicChannels,
   writePublicChannelFeedCache,
   writePublicChannelSubscriptions,
-  publicEvictionFloor,
-  prunePublicPostsBelowFloor,
   readPublicChannelProfileCache,
   writePublicChannelProfileCache,
   normalizeChannelProfile,
-} from './public-channel-subscriptions.mjs?v=70';
+} from './public-channel-subscriptions.mjs?v=112';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -92,7 +91,7 @@ import {
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=7';
+} from './recipient-identities.mjs?v=8';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
@@ -105,6 +104,11 @@ import {
   decodeFileBlockContent,
   encodeProfileBlockContent,
   decodeProfileBlockContent,
+  normalizeProfileAppearance,
+  normalizeProfileWornGift,
+  PROFILE_LOOK_BACKGROUNDS,
+  PROFILE_LOOK_SETTING_RANGES,
+  PROFILE_LOOK_THEMES,
   normalizeProfileTags,
   PROFILE_DESCRIPTION_MAX_BYTES,
   PROFILE_TAG_MAX_BYTES,
@@ -115,18 +119,14 @@ import {
   SHARE_SNIPPET_MAX_BYTES,
   minimalCapsuleUsefulBytesForLength,
   capsuleSizeClassForUsefulBytes,
-} from './capsule-part-policy.mjs?v=10';
+  MAX_MESSAGE_PARTS,
+} from './capsule-part-policy.mjs?v=16';
 import {
   INCLUDED_NETWORK_FEE_NANOTONS,
   MESSAGE_PRICE_SUITES,
-  BATCH_SHARED_BASE_HOLD_NANOTONS,
-  capsulePerPartHoldNanotons,
-  batchHoldNanotons,
-  privateCapsuleBaseNetPriceNanotons,
-  publicCapsuleBaseNetPriceNanotons,
   networkFeeSurchargeNanotons,
   resolveNetworkFeeEstimateNanotons,
-} from './message-pricing-policy.mjs?v=14';
+} from './message-pricing-policy.mjs?v=15';
 import {
   createProfileRegistryMessage,
   createAthWalletMessage,
@@ -139,13 +139,6 @@ import {
   readPublicPostPayloadV2,
   createUsernameRegistryMessage,
   createWalletTransaction,
-  buildVaultReplaceMessagingKeysExternalBoc,
-  buildVaultWithdrawAthExternalBoc,
-  buildVaultWithdrawTonExternalBoc,
-  buildVaultUsernameMintExternalBoc,
-  computeVaultMessagingKeyId,
-  createVaultWalletMessage,
-  estimateVaultAttachedValueNanotons,
   PROFILE_AVATAR_PRICE_ATH,
   PROFILE_AVATAR_DIRECT_NOTIFY_VALUE_NANOTONS,
   PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS,
@@ -161,54 +154,72 @@ import {
   USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS,
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
-  VAULT_RESERVES_NANOTONS,
-} from './pwa-contract-transactions.mjs?v=37';
-import {
-  MAX_BATCH_PARTS,
-} from './publish-batch-orchestration.mjs?v=10';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=59';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=62';
-import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=4';
+} from './pwa-contract-transactions.mjs?v=47';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=68';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=71';
+import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=27';
 // clean-17 public/avatar lane (direct-pay PublicShard, replaces the Vault→CapsuleHub public path).
-import { createPublicLane } from './public-lane.mjs?v=45';
-import { createPublicShardTonRpcProvider, parsePublicPublish } from './public-shard-ton-rpc-provider.mjs?v=6';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage } from './public-lane-send.mjs?v=23';
-import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=1';
-import { walletSendFeeNanotons, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=9';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=21';
-import { createIntroLane } from './intro-lane.mjs?v=37';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=7';
-import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=5';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=7';
+import { createPublicLane } from './public-lane.mjs?v=97';
+import { createPublicShardTonRpcProvider, parsePublicPublish, extractStack, readInt } from './public-shard-ton-rpc-provider.mjs?v=28';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage, chooseBeaconBucket } from './public-lane-send.mjs?v=69';
+import { squatCushionNanotons, applyShardSurcharge, surchargeExtraNanotons, defaultShardDebtResolver, LANE_PUBLIC, LANE_CONV, LANE_INTRO, LANE_REPORT, LANE_SANCTION } from './shard-debt.mjs?v=12';
+import {
+  moderationSupported, moderationGateAddress, createModerationLedgerReader, createSanctionCache, createReportQueueReader,
+  buildReportMessage, buildVerdictMessage, readPublicEntry, reportShardPrices, sanctionShardRoom, reportAttachValue, walletHashOf, sanctionShardAddressFor,
+  createLocalMuteStore, reportEraOf, callGetter, decodeSanctionWallet, REPORT_REASONS, VERDICT_ACTION, WARNINGS_TO_RESTRICT, MODERATION_GENERATION,
+} from './moderation.mjs?v=9';
+import { publicShardAddressBytesFor, rawAddress as rawShardAddress, feeVaultCodeBoc } from './shard-address.mjs?v=29';
+import { FV_DEPLOY_FUNDING, FV_PROTOCOL_FEE, FV_RENT_FLOAT, buildVaultDeployMessage, vaultTakeFor } from './fee-vault.mjs?v=8';
+import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=9';
+import {
+  createFeeVaultReader, planRecovery, planStake, planUnstake, planUnstakeUnjam, planWithdrawFloat, stakeBandVerdict, strandedAtoms,
+  vaultAddressFor, vaultSnapshot, vaultSupported, FV_ATOMIC_PER_ATH, FV_STAKE_MAX_ATH, FV_STAKE_MIN_ATH, VAULT_LIVE,
+  VAULT_UNKNOWN, VAULT_ABSENT,
+} from './vault-account.mjs?v=14';
+import { walletSendFeeNanotons, walletSendSizeClassForPayloadBytes, WALLET_SEND_FEE_PER_PART_NANOTONS } from './wallet-send-fee.mjs?v=29';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=50';
+import { createIntroLane } from './intro-lane.mjs?v=79';
+import { createIndexedDbDeviceSecretStore } from './device-secret-store.mjs?v=2';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=17';
+import { createMemoryConvKeyStore, conversationId } from './conv-key-store.mjs?v=12';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=21';
 // clean-17 private CONV lane (direct-pay RecordShard, replaces the Vault→CapsuleHub private path).
-import { outgoingRecordShard, incomingRecordShards, outgoingRecordShards, selfRecoveryShardSpace } from './conv-discovery.mjs?v=22';
-import { publishConvLaneParts } from './conv-lane-send.mjs?v=21';
-import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=5';
-import { createConvReadLane } from './conv-lane.mjs?v=32';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=28';
-import { createShardMessagesWithSourceReader, createShardStatesRequest } from './shard-rpc.mjs?v=24';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, changeMarkerOf } from './shard-reader.mjs?v=26';
+import { outgoingRecordShard, createRecordShardPlanner, selfRecoveryShardSpace } from './conv-discovery.mjs?v=58';
+import { publishConvLaneParts } from './conv-lane-send.mjs?v=62';
+import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=15';
+import { createConvReadLane } from './conv-lane.mjs?v=79';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, confirmConvRecordsLanded, CAPSULE_PUBLISH_OPCODE } from './conv-lane-read.mjs?v=70';
+import { createShardMessagesWithSourceReader, createShardStatesRequest, createToncenterRestFetch, toncenterRestOrigin} from './shard-rpc.mjs?v=40';
+import { createGroupRuntime } from './group-runtime.mjs?v=15';
+import { createGroupRecordStore, GROUP_RECORD_DB_NAME } from './group-record-store.mjs?v=2';
+import { GROUP_SIZE_GROUP, GROUP_SIZE_ROOM } from './group-store.mjs?v=10';
+import { encodeGroupInviteToken, parseGroupInviteToken, parseGroupJoinToken, GROUP_JOIN_PREFIX } from './group-protocol.mjs?v=9';
+import {
+  buildReactMessage, decodePublicReactions, reactionsGetterCall, reactionsShown, createOwnReactionStore,
+  PUBLIC_REACTION_GLYPHS, PUBLIC_REACTION_COUNT, PUBLIC_REACTION_PAGE_CAP, PUBLIC_REACT_VALUE,
+} from './public-reactions.mjs?v=4';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, changeMarkerOf } from './shard-reader.mjs?v=61';
 import { sha256 as nobleSha256 } from './vendor/@noble/hashes/sha2.js';
-import { orderThreadsForList } from './thread-list-order.mjs?v=2';
-import { reconcileKeyedRows } from './keyed-rows.mjs?v=1';
-import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=3';
+import { orderThreadsForList } from './thread-list-order.mjs?v=3';
+import { reconcileKeyedRows } from './keyed-rows.mjs?v=2';
+import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W } from './crypto/conv-routing.mjs?v=5';
 // clean-17 first-contact (INTRO) send.
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=21';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=64';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet, sendContentSurvivesReload,
 } from './intro-send-state.mjs?v=2';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=21';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=28';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=57';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=63';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=1';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=8';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=27';
 // clean-17 RECOVERY (K_root durability: back up on chain, restore on reinstall from the seed).
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot } from './recovery-lane.mjs?v=28';
-import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=28';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=27';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsSnapshot, confirmRecoverySlotWrite, confirmRecoverySlotWrites } from './recovery-lane.mjs?v=65';
+import { prepareNotesBackup, restoreNotes, mergeNotes } from './notes-lane.mjs?v=64';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=62';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -219,25 +230,36 @@ import {
   publicEpochTag,
   publicEraOf,
   PUBLIC_BEACON_READ_SPACE,
+  epochIsDerivable,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=23';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=58';
+} from './shard-discovery.mjs?v=58';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=71';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=64';
+} from './username-ton-rpc-provider.mjs?v=73';
 import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=4';
+} from './username-nft-owned.mjs?v=13';
+import {
+  TELEGRAM_GIFT_ASSET_ORIGIN,
+  TELEGRAM_GIFT_TRANSFER_VALUE_NANOTONS,
+  TELEGRAM_GIFT_URI_MAX_BYTES,
+  collectOwnedTelegramGifts,
+  readCollectionContentUri,
+  decodeNftItemDataStack,
+  discoverTelegramGiftItems,
+  telegramGiftImageSources,
+} from './telegram-gift-nfts.mjs?v=5';
 import {
   USERNAME_NFT_TRANSFER_VALUE_NANOTONS,
   buildUsernameNftTransferBody,
   nextUsernameNftTransferQueryId,
-} from './username-nft-transfer.mjs?v=1';
+} from './username-nft-transfer.mjs?v=11';
 import {
   encodeCanvasToWebp,
   isWebpBytes,
@@ -251,15 +273,16 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=93';
-import { createBootSignalField } from './boot-signal-field.mjs?v=2';
+} from './i18n.mjs?v=131';
+import { createBootSignalField } from './boot-signal-field.mjs?v=14';
+import { cutoverUpdateRequired, generationForEpoch, CUTOVER_EPOCH } from './cutover-epoch.mjs?v=4';
 
 const appConfig = PLATHO_APP_CONFIG;
 // Locale resolves BEFORE any rendering (stored choice -> Telegram profile -> browser); static HTML gets its
 // dictionary pass here so even pre-shell paints are already in the user's language.
 initI18n();
 applyStaticTranslations();
-// refreshProfileFeeLabels() canNOT be called here: it reads the `mintUsernameStatus` / `setAvatarStatus` element
+// refreshProfileFeeLabels() canNOT be called here: it reads the `profileCardMintNameStatus` / `setAvatarStatus` element
 // consts, which are declared a few hundred lines below, and a `const` read before its declaration throws
 // ReferenceError — at module top level that aborts the whole script and the app never boots. It runs with the
 // other boot-time UI initialisers instead, after every element const exists.
@@ -271,7 +294,7 @@ applyStaticTranslations();
 // move on every deploy or installed clients keep serving the old bundle from cache with nothing able to dislodge
 // it. Those two jobs used to share one `vNNN` counter — that is the confusion this split removes. See
 // PLATHO_APP_BUILD_ID below for the half that moves per build.
-const PLATHO_APP_RUNTIME_VERSION = '1.3.13';
+const PLATHO_APP_RUNTIME_VERSION = '1.3.14';
 
 // The running build, read off the URL this very module was loaded from (`./app.js?v=<id>`). NOT a declared
 // constant on purpose: a declared one is a second copy of a number that lives in index.html, and every copy of a
@@ -333,10 +356,20 @@ function installConfiguredTonRuntime(config = appConfig) {
   // Client-direct RPC: load the user's own toncenter API key (if saved) BEFORE building the transport,
   // so the user-toncenter provider (useUserApiKey) captures it; anonymous until the user adds one.
   if (globalThis.plathoToncenterApiKey === undefined) {
-    try {
-      const savedToncenterKey = globalThis.localStorage?.getItem('platho.toncenter.apiKey.v1');
-      globalThis.plathoToncenterApiKey = savedToncenterKey && savedToncenterKey.trim() ? savedToncenterKey.trim() : null;
-    } catch { globalThis.plathoToncenterApiKey = null; }
+    // SEALED, AND THEREFORE ASYNCHRONOUS. The key used to sit in localStorage as ordinary text and could be read
+    // right here, in the same breath as building the transport. It is now sealed under the device key
+    // (device-secret-store), which is an IndexedDB read — so the transport is built keyless first and rebuilt the
+    // moment the key lands, through the same drop-and-rebuild path a user typing a new key has always used.
+    // The window is one boot's worth of reads at the keyless pace, and only for a user who has a key at all.
+    globalThis.plathoToncenterApiKey = null;
+    // DEFERRED BY A MICROTASK, and this is structural rather than stylistic. This line runs DURING module
+    // evaluation — installConfiguredTonRuntime is called at the top of this file — while the sealed store's own
+    // constants are declared hundreds of lines below, still in their temporal dead zone. Calling straight into it
+    // threw `Cannot access ... before initialization` inside a promise: the app booted looking perfectly fine and
+    // simply never picked the key up. Fixing the first binding only moved the throw to the second, which is the
+    // signal that the ordering itself was the defect. A microtask runs once the module body has finished, so
+    // everything below exists. [FOUND 2026-08-29 by opening the app, with the whole suite green over it.]
+    queueMicrotask(() => { void loadSealedToncenterApiKey(); });
   }
   if (!statesBatchCeilingPersistence) {
     try {
@@ -353,9 +386,13 @@ function installConfiguredTonRuntime(config = appConfig) {
     if (transport) globalThis.plathoTonRpcTransport = transport;
   }
 
-  if (config?.feeAccumulator?.address) {
-    globalThis.plathoFeeAccumulatorAddress = config.feeAccumulator.address;
-  }
+  // plathoFeeAccumulatorAddress WAS HERE AND HAD NO READER [audit 2026-09-02]. Measured across the whole tree: one
+  // occurrence, the assignment itself. Its four siblings on this pattern have 4, 9, 12 and 44 — it was the only
+  // orphan. The client does not need the address at all: fee routing goes THROUGH the shard, which carries its own
+  // sink, and a reader that wants it takes it from the shard's own get_view (public-shard-ton-rpc-provider, the
+  // fee_sink stack item). The config entry stays for now because CFGGEN-02 cross-checks it against the verified
+  // genesis and clean-17 is what is live; CFGGEN-05 turns red on it the day the client writes generation 18, where
+  // FeeAccumulator does not exist.
   if (config?.ath?.masterAddress) {
     globalThis.plathoAthMasterAddress = config.ath.masterAddress;
   }
@@ -419,10 +456,15 @@ const installButtons = [...document.querySelectorAll('.install-header-button')];
 
 // ── Theme. Forced theme rides html[data-theme] (styles.css overrides prefers-color-scheme for it); boot-guard.js
 // re-applies the persisted choice before first paint. The .theme-anim class arms the CSS colour cross-fade.
-// CHOSEN IN THE APPEARANCE DIALOG [OWNER 2026-08-23: "the theme button can come out of the header"] — the header
+// CHOSEN IN THE APPEARANCE DIALOG [decided 2026-08-23] — the header
 // carried a toggle on every surface, which is a lot of chrome for a setting that is now one row of the one modal
 // that decides how the app looks. The mechanism below is unchanged; only the door moved.
 const THEME_STORAGE_KEY = 'platho.theme.v1';
+// A CHANNEL'S DRESS IS WORN FOR THE VISIT [owner, 2026-09-08]: while a dressed channel (or one of its posts) is on
+// screen the app wears that channel's gift — background, pattern, accent, everything the worn gift's theme sets —
+// whatever theme the reader chose, and takes it off again on the way out. Declared here, above every reader.
+let channelDressActive = false;
+let channelDressRestore = null;   // the data-theme to put back when the dress comes off (null: none was forced)
 let themeAnimTimer = 0;
 
 function currentEffectiveTheme() {
@@ -441,14 +483,91 @@ function reflectThemeColorMeta() {
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', bg);
 }
 
-function applyForcedTheme(next) {
+/**
+ * A PAGE THAT IS NOT PRODUCING FRAMES starts CSS transitions and animations and then freezes them at currentTime 0
+ * (a hidden tab, an occluded window, a WebView that stopped compositing, a main thread inside a long task) — and a
+ * frozen one SUPPLIES the computed value. The theme cross-fade kept every surface in its list at the OLD palette
+ * while the tokens under it, and color-scheme with them, had already switched: black native controls on a light
+ * panel [owner, 2026-09-09; MEASURED on prod: --panel #0f1518, background rgb(245,249,248), timeline at 0]. Neither a
+ * style recalc nor removing the class rescues it — cancelling needs a tick too — so whatever is still at 0 when the
+ * fade should long be over is cancelled here and the element falls back to its own computed value. On a rendering
+ * page the sweep finds nothing: the transitions finished and left the list.
+ */
+function cancelFrozenAnimations(scope = document, { transitionsOnly = false } = {}) {
+  if (typeof scope?.getAnimations !== 'function') return;
+  const list = scope === document ? scope.getAnimations() : scope.getAnimations({ subtree: true });
+  for (const anim of list) {
+    if (transitionsOnly && !anim.transitionProperty) continue;
+    if (anim.playState === 'running' && anim.currentTime === 0) anim.cancel();
+  }
+}
+
+/**
+ * WRITES THAT CHANGE NOTHING ARE NOT MADE [owner, 2026-09-10: switching between two tabs that share the same
+ * background "reloaded" it every time]. The dress is re-applied on every tab switch so that it can come and go with
+ * the view — but a token re-set to its own value still invalidates style, a mask re-resolved from the same data URL
+ * repaints the plasma's pattern plate, and a theme re-forced to itself restarts the cross-fade window. With these
+ * four, a re-apply that finds everything in place touches the document not at all.
+ */
+function setRootToken(name, value) {
+  const style = document.documentElement.style;
+  if (style.getPropertyValue(name) === value) return;
+  style.setProperty(name, value);
+}
+
+function dropRootToken(name) {
+  const style = document.documentElement.style;
+  if (style.getPropertyValue(name) === '') return;
+  style.removeProperty(name);
+}
+
+function setRootFlag(name, value) {
   const root = document.documentElement;
-  root.classList.add('theme-anim');
-  root.setAttribute('data-theme', next);
-  try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* best-effort persist */ }
-  reflectThemeColorMeta();
+  if (root.getAttribute(name) !== value) root.setAttribute(name, value);
+}
+
+function dropRootFlag(name) {
+  const root = document.documentElement;
+  if (root.hasAttribute(name)) root.removeAttribute(name);
+}
+
+function applyForcedTheme(next, { animate = true } = {}) {
+  const root = document.documentElement;
+  // ALREADY THAT THEME: nothing to fade, nothing to invalidate. A re-force to the same value is not free — the
+  // cross-fade window restarts and the out-bubbles drop their gradient for it — and the dress re-applies on every
+  // tab switch (see setRootToken). The key is still written: "forced" is a persisted fact, not only an attribute.
+  if (root.getAttribute('data-theme') === next) {
+    if (!channelDressActive) {
+      try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* best-effort persist */ }
+    }
+    return;
+  }
+  // A cross-fade needs frames: a page that is not visible cannot run one, and a fade that never runs pins the old
+  // colours — see cancelFrozenAnimations. (visibilityState still reads 'visible' for an occluded window or a jammed
+  // main thread, which is why the sweep below is the load-bearing half.)
+  //
+  // A DRESS IS NOT A THEME CHOICE [owner, 2026-09-10: "on a tab switch the first frame still wears the channel's
+  // look, then it repaints"]: the cross-fade is for the theme the user picks. A channel's palette comes and goes
+  // WITH THE VIEW, in the view's own frame, so the dress paths pass animate: false — and a fade still running is
+  // cut short here rather than carried into the next screen as its first frame.
   clearTimeout(themeAnimTimer);
-  themeAnimTimer = setTimeout(() => root.classList.remove('theme-anim'), 550);
+  if (animate && document.visibilityState === 'visible') {
+    root.classList.add('theme-anim');
+  } else {
+    root.classList.remove('theme-anim');
+  }
+  root.setAttribute('data-theme', next);
+  // Not while a channel dresses the app: that palette is the channel's, not a choice, and the boot guard must not
+  // paint it next time.
+  if (!channelDressActive) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* best-effort persist */ }
+  }
+  reflectThemeColorMeta();
+  if (!root.classList.contains('theme-anim')) return;
+  themeAnimTimer = setTimeout(() => {
+    root.classList.remove('theme-anim');
+    cancelFrozenAnimations(document, { transitionsOnly: true });
+  }, 550);
 }
 
 // Boot-guard may have applied a persisted forced theme before this module ran — align the meta pair once.
@@ -459,6 +578,8 @@ if (document.documentElement.getAttribute('data-theme')) reflectThemeColorMeta()
 // only needs a re-render; the locale/mode terms in publicFeedItemRenderSignature force the card rebuild.
 const FEED_TIMESTAMP_MODE_KEY = 'platho.feedTimestampMode.v1';
 const feedTimestampModeSelect = document.querySelector('#feedTimestampModeSelect');
+const channelAppearanceSelect = document.querySelector('#channelAppearanceSelect');
+const channelAppearancesSelect = document.querySelector('#channelAppearancesSelect');
 
 function feedTimestampMode() {
   try { return localStorage.getItem(FEED_TIMESTAMP_MODE_KEY) === 'date' ? 'date' : 'datetime'; } catch { return 'datetime'; }
@@ -574,9 +695,6 @@ const keyAuthStatus = document.querySelector('#keyAuthStatus');
 const vaultDraftStatus = document.querySelector('#vaultDraftStatus');
 const capsulePolicyStatus = document.querySelector('#capsulePolicyStatus');
 const walletAddressStatus = document.querySelector('#walletAddressStatus');
-const copyWalletAddressButton = document.querySelector('#copyWalletAddressButton');
-const walletDisplayModeSelect = document.querySelector('#walletDisplayModeSelect');
-const walletDisplayModeStatus = document.querySelector('#walletDisplayModeStatus');
 const privateSenderModeSelect = document.querySelector('#privateSenderModeSelect');
 const createWalletButton = document.querySelector('#createWalletButton');
 const createWalletStatus = document.querySelector('#createWalletStatus');
@@ -620,12 +738,9 @@ const publicCommentsDefaultSelect = document.querySelector('#publicCommentsDefau
 const setAvatarButton = document.querySelector('#setAvatarButton');
 const setAvatarStatus = document.querySelector('#setAvatarStatus');
 const profileAvatarInput = document.querySelector('#profileAvatarInput');
-const mintUsernameButton = document.querySelector('#mintUsernameButton');
-const mintUsernameStatus = document.querySelector('#mintUsernameStatus');
-const linkUsernameButton = document.querySelector('#linkUsernameButton');
-const myUsernamesButton = document.querySelector('#myUsernamesButton');
-const myUsernamesStatus = document.querySelector('#myUsernamesStatus');
-const linkedUsernameStatus = document.querySelector('#linkedUsernameStatus');
+const groupAvatarInput = document.querySelector('#groupAvatarInput');
+const profileCardMintNameButton = document.querySelector('#profileCardMintNameButton');
+const profileCardMintNameStatus = document.querySelector('#profileCardMintNameStatus');
 const toncenterApiKeyInput = document.querySelector('#toncenterApiKeyInput');
 const toncenterKeyStatus = document.querySelector('#toncenterKeyStatus');
 const rpcKeyRow = document.querySelector('#rpcKeyRow');
@@ -659,22 +774,67 @@ function setToncenterKeyStatusIcon(kind) {
 }
 
 function refreshToncenterKeyUi() {
-  let key = globalThis.plathoToncenterApiKey ?? null;
-  if (key == null) {
-    try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
-  }
+  const key = globalThis.plathoToncenterApiKey ?? null;
   setToncenterKeyStatusIcon(key ? 'active' : 'empty');
   if (toncenterApiKeyInput && document.activeElement !== toncenterApiKeyInput) {
     toncenterApiKeyInput.value = key ?? '';
   }
 }
 
-function applyToncenterApiKey(rawKey) {
+// THE NODE API KEY IS SEALED AT REST, like the message history and the conversation keys, and unlike where it
+// used to live: `localStorage['platho.toncenter.apiKey.v1']`, as ordinary text, readable by anything that can read
+// the browser profile or a backup of it. [OWNER 2026-08-29, on being shown that the fix had been to correct the
+// privacy policy: "what is the problem with encrypting the key instead of editing the documents? We do AAA+."]
+//
+// DEPLOYMENT-SCOPED, NOT WALLET-SCOPED, and that is deliberate: this is a device setting used BEFORE any wallet is
+// unlocked — the public feed and every boot read go through the transport it configures — so binding it to a wallet
+// (or to the vault password) would leave the keyed transport dark for exactly the reads that happen first.
+// device-secret-store's header says plainly what the seal does and does not buy.
+const TONCENTER_API_KEY_SECRET_ID = 'toncenter-api-key-v1';
+// The handle lives on globalThis beside plathoToncenterApiKey and the transports it rebuilds — one place holds the
+// whole of this setting's live state, and it survives being reached from anywhere in the file.
+function toncenterApiKeySecretStore() {
+  if (!globalThis.plathoDeviceSecretStore) {
+    globalThis.plathoDeviceSecretStore = createIndexedDbDeviceSecretStore({
+      dbName: scopedIndexedDbName('platho-device-secrets-v1'),
+      id: TONCENTER_API_KEY_SECRET_ID,
+    }).catch(() => null);
+  }
+  return globalThis.plathoDeviceSecretStore;
+}
+
+/**
+ * Read the sealed key at boot and adopt any plain-text one left by an earlier version.
+ *
+ * The migration is one-way and destructive on purpose: the old value is sealed, and only once the seal is written
+ * does the plain-text copy go. A device that cannot seal (no IndexedDB, no WebCrypto) keeps working from the
+ * plain-text key rather than losing it — degrading a rate-limit token into no token would be a worse outcome than
+ * the exposure it removes, and that device has no sealed store to put it in either.
+ */
+async function loadSealedToncenterApiKey() {
+  let legacy = null;
+  try { legacy = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { legacy = null; }
+  const store = await toncenterApiKeySecretStore();
+  let key = null;
+  if (store) {
+    try { key = await store.read(); } catch { key = null; }
+    if (!key && legacy && legacy.trim()) {
+      try {
+        key = await store.write(legacy.trim());
+        try { globalThis.localStorage?.removeItem(TONCENTER_API_KEY_STORAGE_KEY); } catch { /* ignore */ }
+      } catch { key = legacy.trim(); }
+    }
+  } else if (legacy && legacy.trim()) {
+    key = legacy.trim();
+  }
+  if (!key) { refreshToncenterKeyUi(); return null; }
+  useToncenterApiKey(key);
+  return key;
+}
+
+/** Apply a key to this session: hold it, rebuild the transports that captured the old one, repaint the setting. */
+function useToncenterApiKey(rawKey) {
   const key = String(rawKey ?? '').trim();
-  try {
-    if (key) globalThis.localStorage?.setItem(TONCENTER_API_KEY_STORAGE_KEY, key);
-    else globalThis.localStorage?.removeItem(TONCENTER_API_KEY_STORAGE_KEY);
-  } catch { /* ignore storage errors */ }
   globalThis.plathoToncenterApiKey = key || null;
   // The RPC transports captured the previous key at build; drop and rebuild so the new key applies now.
   globalThis.plathoTonRpcTransport = null;
@@ -686,6 +846,16 @@ function applyToncenterApiKey(rawKey) {
   } catch { /* best-effort; the next read rebuilds */ }
   refreshToncenterKeyUi();
   return Boolean(key);
+}
+
+function applyToncenterApiKey(rawKey) {
+  const key = String(rawKey ?? '').trim();
+  // Sealed asynchronously, applied synchronously: the user must not wait on a database write to see their key take
+  // effect, and a write that fails leaves the session working with a key that simply is not remembered.
+  void toncenterApiKeySecretStore().then((store) => store?.write(key)).catch(() => {});
+  // A plain-text copy from before the seal existed must not survive a change made after it.
+  try { globalThis.localStorage?.removeItem(TONCENTER_API_KEY_STORAGE_KEY); } catch { /* ignore storage errors */ }
+  return useToncenterApiKey(key);
 }
 
 // Validate a TON Center API key with one lightweight authenticated call. toncenter returns 401
@@ -823,8 +993,17 @@ refreshToncenterKeyUi();
 const buyAthButton = document.querySelector('#buyAthButton');
 const buyAthStatus = document.querySelector('#buyAthStatus');
 const athSupplyStatus = document.querySelector('#athSupplyStatus');
+const feeDiscountButton = document.querySelector('#feeDiscountButton');
+const feeDiscountStatus = document.querySelector('#feeDiscountStatus');
+const unstakeAthButton = document.querySelector('#unstakeAthButton');
+const unstakeAthStatus = document.querySelector('#unstakeAthStatus');
+const recoverAthButton = document.querySelector('#recoverAthButton');
+const recoverAthStatus = document.querySelector('#recoverAthStatus');
+const vaultFloatButton = document.querySelector('#vaultFloatButton');
+const vaultFloatStatus = document.querySelector('#vaultFloatStatus');
 const replayStoreStatus = document.querySelector('#replayStoreStatus');
 const brandNetworkLabel = document.querySelector('#brandNetworkLabel');
+const brandMeta = document.querySelector('#brandMeta');
 const chatCountLabel = document.querySelector('#chatCountLabel');
 const publicSubtitle = document.querySelector('#publicSubtitle');
 const publicPane = document.querySelector('.public-pane');
@@ -879,6 +1058,15 @@ const publicShareCancelButton = document.querySelector('#publicShareCancelButton
 const sharePostDialog = document.querySelector('#sharePostDialog');
 const sharePostList = document.querySelector('#sharePostList');
 const sharePostCloseButton = document.querySelector('#sharePostCloseButton');
+const reportPostDialog = document.querySelector('#reportPostDialog');
+const reportReasonList = document.querySelector('#reportReasonList');
+const reportPostCloseButton = document.querySelector('#reportPostCloseButton');
+const moderationQueueDialog = document.querySelector('#moderationQueueDialog');
+const moderationQueueList = document.querySelector('#moderationQueueList');
+const moderationQueueStatus = document.querySelector('#moderationQueueStatus');
+const moderationQueueCloseButton = document.querySelector('#moderationQueueCloseButton');
+const moderationQueueButton = document.querySelector('#moderationQueueButton');
+const moderationNotice = document.querySelector('#moderationNotice');
 const publicPostDetail = document.querySelector('#publicPostDetail');
 const publicPostDetailBody = document.querySelector('#publicPostDetailBody');
 const publicPostDetailAvatar = document.querySelector('#publicPostDetailAvatar');
@@ -891,14 +1079,12 @@ const navVaultTonBalances = [...document.querySelectorAll('[data-nav-vault-ton]'
 const navVaultAthBalances = [...document.querySelectorAll('[data-nav-vault-ath]')];
 const navVaultBalanceContainers = [...document.querySelectorAll('[data-nav-vault-balance]')];
 const profileHandle = document.querySelector('#profileHandle');
-const profileAvatar = document.querySelector('#profileAvatar');
-const identityName = document.querySelector('#identityName');
-const identitySubtitle = document.querySelector('#identitySubtitle');
 const walletRuntimeLabel = document.querySelector('#walletRuntimeLabel');
 const localStateLabel = document.querySelector('#localStateLabel');
 const networkRuntimeLabel = document.querySelector('#networkRuntimeLabel');
 const appVersionLabel = document.querySelector('#appVersionLabel');
 const profileVersionLabel = document.querySelector('#profileVersionLabel');
+const profileSettingsDialog = document.querySelector('#profileSettingsDialog');
 
 // --- Private-routing on-device diagnostic (support tool) ---------------------------------------------------------
 // A Telegram Mini App / iOS webview has no console. Tapping the build badge copies a compact JSON snapshot of the
@@ -1319,8 +1505,7 @@ let publicShareDraft = null;
 let privateFileAttachments = [];
 // PER-THREAD COMPOSER DRAFTS (in-memory). The composer's text, attachments, reply and share drafts were ALL
 // process-globals, so anything typed-but-not-sent in one dialog rode along into whichever chat was opened next —
-// and could then be SENT to the wrong contact [OWNER 2026-08-26, relaying a user: "write something without
-// sending, open another chat — the same message is sitting there; that should not happen"]. Keyed by thread id
+// and could then be SENT to the wrong contact [decided 2026-08-26]. Keyed by thread id
 // and synced at the renderConversation choke point (the one place every thread switch passes through), so none
 // of the dozen activeThreadId writers needs to know drafts exist. In-memory on purpose: a draft is DECRYPTED
 // content, and the wallet-scoped teardown (lock, account switch) clears the map along with everything else.
@@ -1395,6 +1580,33 @@ function createSerialLane() {
 // lane costs ~no wall-clock (the reads were already effectively serial at the network) while removing
 // the concurrent-pending run-loop stall on iOS.
 const enqueueAvatarChainRead = createSerialLane();
+
+/**
+ * Wallets proven to have NO KeyShard, and until when to believe it.
+ *
+ * Not a cache of a read — a cache of an ANSWER: the account has no code, so there is no avatar to find. It expires
+ * because a wallet can register keys at any moment, and it is dropped entirely when the wallet changes (below,
+ * beside profileAvatarLoadPromises) so one account's answer is never quoted for another's.
+ */
+const profileAvatarAbsentUntil = new Map();
+const PROFILE_AVATAR_ABSENT_TTL_MS = 15 * 60_000;
+/**
+ * (wallet, version, hash) requests the shard has answered "no such record" to, and until when to believe it.
+ *
+ * A post carries the pointer its author wore WHEN IT WAS WRITTEN. Once the author changes the avatar, the shard
+ * holds only the new version and answers exists:false for the old one — an answer that was remembered nowhere, so
+ * every 30-second sync cycle asked the chain the same question about the same post again [2026-09-07]. A day,
+ * like the pointer itself: the post still gets a face, the wallet's CURRENT one, from the per-wallet map.
+ */
+const profileAvatarVersionMissUntil = new Map();
+/**
+ * How long a remembered avatar pointer is served without asking the chain again.
+ *
+ * Generous on purpose: the pointer also rides every message its owner sends, so anyone who posts refreshes it for
+ * free by arriving with a different hash. This only governs the quiet ones — and the alternative it replaces was
+ * one registry read per face on every single launch.
+ */
+const PROFILE_AVATAR_POINTER_TTL_MS = 24 * 60 * 60_000;
 
 /**
  * EVERY OUTGOING MESSAGE LEAVES ONE AFTER ANOTHER — private, public, comments, notes to self, first contact.
@@ -1474,7 +1686,7 @@ let walletIdentityFlashTimer = null;
 let profileAvatarPickerSuppressedUntil = 0;
 let imageLightboxPreviousFocus = null;
 let walletUnlockPromise = null;
-// [OWNER 2026-08-09] "Sometimes the unlock dialog does not appear on resume, though the wallet is locked."
+// [decided 2026-08-09]
 //
 // The chain was: the unlock prompt clears walletUnlockPromptPending BEFORE it opens the password dialog, and
 // lockPlathoWallet — the ONLY thing that re-arms it — returns immediately when the wallet is already locked. So
@@ -1485,8 +1697,7 @@ let walletUnlockPromise = null;
 // a deliberate dismissal. A user who closes the dialog to browse the public feed locked is not asked again; a user
 // whose dialog was taken away by the OS is.
 let walletUnlockPromptInterrupted = false;
-// [OWNER 2026-08-13, with a screenshot] "The app is being dumb and does not show the unlock modal after I bring it
-// back." It was: the fix above only covers a dialog that was ON SCREEN when the app went away —
+// [decided 2026-08-13] It was: the fix above only covers a dialog that was ON SCREEN when the app went away —
 // noteWalletUnlockInterruptedByBackground raises its flag only `if (walletUnlockPromise)`. An unlock attempt that
 // had already FINISHED without a wallet (the ✕ on the cold-start password dialog, or on a resume prompt) leaves
 //
@@ -1541,6 +1752,9 @@ function withVaultReadLock(fn) {
   return run;
 }
 let privateChainSyncPromise = null;
+// Whether the pass in flight is the DEEP one — a routine tick may coalesce onto anything, but a manual full
+// rescan may only coalesce onto another full rescan (see syncPrivateCapsulesFromChainOnce).
+let privateChainSyncIsFull = false;
 let messageAutoSyncTimer = null;
 let messageAutoSyncAt = 0;
 let messageAutoSyncCountdownTimer = null;
@@ -1704,9 +1918,23 @@ publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
 const PRIVATE_CHAIN_INDEX_READ_LIMIT = 120;
 const PUBLIC_COMMENTS_DEFAULT_STORAGE_KEY = 'platho.publicCommentsDefault.v2';
 const PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY = 'platho.publicCustomChannels.v1';
-const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v1';
-// HOW FAR THE READER GOT IN EACH COMMENT THREAD [OWNER 2026-08-23: "if I read down to some comment, coming back
-// into that thread I want to be at the last comment I read and carry on from there"]. The twin of the cursors
+// HOW FAR THE READER GOT IN EACH CHANNEL — the post's TIME, not its entry id [audit 2026-08-31, round 7].
+//
+// v1 held a stringified entry id and compared it with `>`. That stopped working the day the feed identity became
+// the shard COMPOSITE (`epochTag.seq.entryId`, and since round 5 a fourth generation part): `BigInt("20800.0.5")`
+// throws, the parse helper swallows it in a bare catch and answers null, `isUnreadPublicItem` returns false on
+// null, and `markVisiblePublicFeedRead` skips the row — so MEASURED, no chain post has EVER been unread and this
+// key has never been written. The unread border and the "N unread" count have been dead the whole time, silently.
+//
+// A composite is not orderable as a number and its tuple order is not time order either (`seq` is an overflow
+// dimension, not a clock), so the cursor moves to the one total order the feed already uses: the post's own
+// chain-stamped `createdAt`. It is generation-independent, so it survives the flip for free.
+//
+// THE KEY IS BUMPED, deliberately: a v1 value is an entry id, and read as milliseconds it would be a moment in
+// 1970 — every post newer, i.e. the whole history flooding in as unread. v2 starts empty and the first pass
+// establishes the baseline (below), so nobody is handed a wall of unread posts for history they have seen.
+const PUBLIC_READ_CURSORS_STORAGE_KEY = 'platho.publicReadCursors.v2';
+// HOW FAR THE READER GOT IN EACH COMMENT THREAD [decided 2026-08-23]. The twin of the cursors
 // above — same shape, same scoping — but keyed by POST identity (channel + entry) instead of channel, holding the
 // newest comment entry id that has scrolled past the reader's eyes.
 const PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY = 'platho.publicCommentReadCursors.v1';
@@ -1839,6 +2067,118 @@ function scopedIndexedDbName(baseName) {
   return `${baseName}.${deploymentStorageSuffix()}`;
 }
 
+/**
+ * A KEY FOR THE PERSONAL HALF OF THE PUBLIC TAB — scoped to the WALLET, not just the deployment.
+ *
+ * [audit 2026-09-01, round 9.] Everything under the Public tab shared one deployment scope, and three of its keys
+ * had no scope at all. A deployment suffix is the ProfileRegistry address, so switching wallets on a device
+ * changed nothing: wallet B opened onto wallet A's follow list, A's read cursors, A's unsaved-prefs flag, and a
+ * channel entry labelled "you" pointing at A's address. That is the cross-wallet identity bleed this codebase has
+ * been bitten by before, and it does not stop at looking: buildPrefsSnapshot reads the follow list to publish it,
+ * so B could write A's interest graph into B's own seed-derived on-chain prefs slot. Worse, drainRestoredPrefsSnapshots
+ * applies a restored snapshot only when `prefsLastSyncedAt === null && !prefsDirty && !hasLocalFollows` — all three
+ * inherited from A, so B's OWN on-chain prefs were never applied at all.
+ *
+ * The CONTENT caches beside it stay deployment-scoped on purpose: posts, channel profiles and avatars are public,
+ * content-addressed, and are wanted before the wallet is even unlocked. What moves here is only what belongs to a
+ * person: who they follow, what they added by hand, and what they have read.
+ */
+/**
+ * THE WALLET WHOSE PERSONAL PUBLIC STATE IS ON SCREEN — one derivation for every read and every write [F-22,
+ * 2026-09-09]. The runtime's active wallet first (recorded by prepareWalletScopedRuntimeForWallet BEFORE it hydrates,
+ * and kept through a lock), else the STORED record's address while the device boots locked (the encrypted record
+ * carries its address in the clear, so the feed shows this person's follows before unlock, as it always did), else
+ * none. Never `plathoWallet` on its own: every runtime prepare runs one line BEFORE that assignment, so keying on it
+ * read the deployment bucket at unlock while every later write went to the wallet bucket — a follow made while
+ * unlocked was gone on the next reload, and the whole follow list with it (measured on stage, 2026-09-09).
+ */
+function personalPublicScopeAddress() {
+  return activeWalletRuntimeAddress() ?? storedPlathoWalletRecord()?.address ?? null;
+}
+
+function walletScopedStorageKey(baseKey) {
+  return `${scopedStorageKey(baseKey)}:${walletIndexedDbSuffix(personalPublicScopeAddress())}`;
+}
+
+/**
+ * The personal keys, listed inside a function on purpose: several of these constants are declared far below this
+ * point, and a module-level Set would read them in their temporal dead zone at load time.
+ */
+function isWalletScopedPublicKey(baseKey) {
+  return baseKey === PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY
+    || baseKey === PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY
+    || baseKey === PREFS_DIRTY_STORAGE_KEY
+    || baseKey === PREFS_LAST_SYNCED_STORAGE_KEY
+    || baseKey === PUBLIC_READ_CURSORS_STORAGE_KEY
+    || baseKey === PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY;
+}
+
+/**
+ * The scoped key a personal value lives under, MIGRATING it once from wherever it lived before.
+ *
+ * Without this, shipping the scope change would silently empty every existing user's follow list. The first
+ * wallet to open after the update adopts what was there and REMOVES the old copy, so a second wallet on the same
+ * device starts clean — which is the whole point.
+ */
+/**
+ * LOAD THE PERSONAL HALF OF THE PUBLIC TAB — at boot, and again whenever the wallet changes.
+ *
+ * [audit 2026-09-01, round 9.] These six values are now keyed per wallet, which is only half the fix: they are
+ * also held in module-level bindings that boot filled once and no teardown touched. Scoping the KEYS while
+ * leaving the VALUES in memory would have shown wallet B exactly what it showed before, until a reload. So the
+ * hydration is one function and the wallet switch calls it, rather than boot owning a sequence nobody else can
+ * repeat.
+ */
+function hydratePersonalPublicState() {
+  customPublicChannels = readCustomPublicChannels();
+  rebuildPublicChannelRegistry();
+  publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
+  loadPrefsSyncMeta();
+  publicReadCursors = readScopedJsonMap(PUBLIC_READ_CURSORS_STORAGE_KEY);
+  publicCommentReadCursors = readScopedJsonMap(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY);
+}
+
+function personalPublicStorageKey(baseKey) {
+  if (!isWalletScopedPublicKey(baseKey)) return scopedStorageKey(baseKey);
+  // NO WALLET, NO MIGRATION [audit 2026-09-01, round 10 — a defect this function introduced hours earlier].
+  //
+  // The personal state is hydrated at module scope, BEFORE any wallet exists, so walletIndexedDbSuffix() answered
+  // 'wallet-locked' and the migration below moved the device's follow list, read cursors, custom channels and
+  // prefs flags into a bucket keyed by that string — and REMOVED the original. No unlocked wallet ever reads that
+  // bucket, so the effect was: every existing user loses their follow list on the first load after the update,
+  // every follow made while unlocked disappears on the next reload, and the cross-wallet bleed this whole change
+  // exists to close stays open on the path people actually use (unlocking a second wallet on a fresh launch
+  // rather than switching mid-session).
+  //
+  // With no wallet known AT ALL (no stored record, nothing unlocked) the answer is the DEPLOYMENT key — which is
+  // where the value already lives, and which is right on its own terms: until a wallet is known there is no
+  // identity to scope to. A device that merely boots LOCKED does have one — its stored record names the address
+  // — and scopes to it from the first read, so the feed shows that person's follows before unlock and the
+  // one-time migration runs at boot rather than at the first write [F-22, 2026-09-09].
+  //
+  // ONE DERIVATION, personalPublicScopeAddress, for this gate AND for walletScopedStorageKey below. The round-10
+  // version asked walletIndexedDbSuffix() with its default argument — `plathoWallet?.address` — a second answer to
+  // "which wallet" beside the runtime's own, and the two drifted by exactly one line: every runtime prepare runs
+  // BEFORE `plathoWallet = wallet`, so the unlock hydration read the deployment bucket and every later write went
+  // to the wallet bucket. Note 'wallet-unknown' is a real wallet whose address sanitises to nothing, which must
+  // still be scoped. Only 'wallet-locked' means no wallet.
+  if (walletIndexedDbSuffix(personalPublicScopeAddress()) === 'wallet-locked') return scopedStorageKey(baseKey);
+  const scoped = walletScopedStorageKey(baseKey);
+  const storage = localStorageOrNull();
+  if (!storage) return scoped;
+  try {
+    if (storage.getItem(scoped) !== null) return scoped;
+    for (const legacy of [scopedStorageKey(baseKey), baseKey]) {
+      const held = storage.getItem(legacy);
+      if (held === null) continue;
+      storage.setItem(scoped, held);
+      storage.removeItem(legacy);
+      break;
+    }
+  } catch { /* private mode / blocked site data: the unscoped read below still works */ }
+  return scoped;
+}
+
 // Profile-avatar media now lives in IndexedDB (per-record writes, large quota) instead of localStorage —
 // whose iOS whole-store re-serialization on every write was the Vault-freeze root. Deployment-scoped (NOT
 // wallet-scoped): avatars are content-addressed (sha256) and the public feed needs them before unlock.
@@ -1866,6 +2206,230 @@ const publicCommentCacheStorePromise = (() => {
     return Promise.resolve(null);
   }
 })();
+
+// THE GIFTS A WALLET WAS LAST PROVEN TO HOLD, and their pictures — so a card opens onto what it showed last time
+// in milliseconds while the chain is asked again [owner, 2026-09-07]. Two KVs of the same shape as the comment
+// cache: one keyed by wallet (a small JSON list), one keyed by gift (a webp as a data URL, tens of KB).
+const telegramGiftListStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-telegram-gifts-v1'), cap: 64 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+const telegramGiftArtStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-telegram-gift-art-v1'), cap: 300 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+// THE NAMES, THE SAME WAY [owner, 2026-09-08: "the gifts are remembered and only updated by the chain read; the
+// names load from scratch every time — do it like the gifts"]. One record per wallet: the finished list, art and
+// all (the art is the registry's own SVG, a few kilobytes a name), so a card opens onto its names at once.
+const usernameNftListStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-username-nfts-v1'), cap: 64 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+// THE LATEST POST, THE SAME WAY [owner, 2026-09-08: "the latest post still loads every time"]. The discovery lane
+// keeps its answers in memory for the tab's life; a reload started every card from the shimmer. One record per
+// wallet — the preview line and its clock, or the fact that the channel has no post — painted at once and marked
+// STALE, so the lane reads the chain again behind it and paints over it if anything changed.
+// A CHANNEL'S DRESS, KEPT [2026-09-08]: the stops and the pattern tile cut from a gift's file were rebuilt every
+// session for every dressed channel a reader opened — one file read and a canvas pass each. One record per gift,
+// stamped with the tile recipe's version (a changed recipe must not be served from an old record).
+const channelGiftDressStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-channel-gift-dress-v1'), cap: 100 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+const latestPostStorePromise = (() => {
+  try {
+    return createProfileAvatarMediaStore({ dbName: scopedIndexedDbName('platho-latest-posts-v1'), cap: 200 }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
+  }
+})();
+
+async function readStoredTelegramGiftList(rawWallet) {
+  if (!rawWallet) return null;
+  try {
+    const store = await telegramGiftListStorePromise;
+    const record = await store?.get(rawWallet);
+    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
+    const parsed = JSON.parse(record.url);
+    // A list from last time is offered as what it is: complete THEN, unconfirmed NOW. `stored` lets the render
+    // say so, and `complete: true` keeps the note from calling a remembered wallet an incomplete read.
+    return Array.isArray(parsed?.gifts) ? { gifts: parsed.gifts, complete: true, stored: true } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Only a FINISHED read is worth remembering — the same rule the in-memory cache already keeps. */
+async function writeStoredTelegramGiftList(rawWallet, result) {
+  if (!rawWallet || !result?.complete || !Array.isArray(result.gifts)) return;
+  try {
+    const store = await telegramGiftListStorePromise;
+    // A projection, not the result: the result carries the indexer's Error object, which JSON turns into `{}`.
+    await store?.put(rawWallet, JSON.stringify({ at: Date.now(), gifts: result.gifts }));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
+
+async function deleteStoredTelegramGiftList(rawWallet) {
+  if (!rawWallet) return;
+  try {
+    const store = await telegramGiftListStorePromise;
+    await store?.delete(rawWallet);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function readStoredUsernameNftList(rawWallet) {
+  if (!rawWallet) return null;
+  try {
+    const store = await usernameNftListStorePromise;
+    const record = await store?.get(rawWallet);
+    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
+    const parsed = JSON.parse(record.url);
+    return Array.isArray(parsed?.owned) ? { owned: parsed.owned, complete: true, stored: true } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Only a FINISHED read is worth remembering — the gifts' rule, for the same reason.
+ *
+ * WHAT THE CARD PRINTS, AND NOTHING ELSE [owner, 2026-09-08: "the names are still not remembered"]. The first cut
+ * copied the item's nameHash along, and that is a BigInt: JSON.stringify throws on it, the catch below swallowed
+ * the throw, and nothing was ever written — the read "completed" every time and the store stayed empty. The card
+ * needs a label, an address and a picture; the hash is the chain's business.
+ */
+async function writeStoredUsernameNftList(rawWallet, result) {
+  if (!rawWallet || !result?.complete || !Array.isArray(result.owned)) return;
+  try {
+    const store = await usernameNftListStorePromise;
+    const owned = result.owned.map(({ label, itemAddress, image }) => ({ label, itemAddress, image }));
+    await store?.put(rawWallet, JSON.stringify({ at: Date.now(), owned }));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
+
+async function deleteStoredUsernameNftList(rawWallet) {
+  if (!rawWallet) return;
+  try {
+    const store = await usernameNftListStorePromise;
+    await store?.delete(rawWallet);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function readStoredChannelGiftDress(key) {
+  if (!key) return null;
+  try {
+    const store = await channelGiftDressStorePromise;
+    const record = await store?.get(key);
+    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
+    const parsed = JSON.parse(record.url);
+    const stop = (value) => Array.isArray(value) && value.length === 3 && value.every((channel) => Number.isFinite(channel));
+    if (parsed?.v !== GIFT_PATTERN_TILE_VERSION || !stop(parsed.inner) || !stop(parsed.edge)) return null;
+    return { inner: parsed.inner, edge: parsed.edge, pattern: typeof parsed.pattern === 'string' ? parsed.pattern : null };
+  } catch {
+    return null;
+  }
+}
+
+async function writeStoredChannelGiftDress(key, dress) {
+  if (!key || !dress) return;
+  try {
+    const store = await channelGiftDressStorePromise;
+    await store?.put(key, JSON.stringify({ v: GIFT_PATTERN_TILE_VERSION, inner: dress.inner, edge: dress.edge, pattern: dress.pattern ?? null }));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
+
+async function readStoredLatestPost(rawWallet) {
+  if (!rawWallet) return null;
+  try {
+    const store = await latestPostStorePromise;
+    const record = await store?.get(rawWallet);
+    if (typeof record?.url !== 'string' || record.url.length === 0) return null;
+    const parsed = JSON.parse(record.url);
+    if (parsed?.status === 'ready' && typeof parsed.preview === 'string' && Number.isFinite(parsed.createdAtMs)) {
+      return { status: 'ready', preview: parsed.preview, createdAtMs: parsed.createdAtMs, attempts: 0 };
+    }
+    return parsed?.status === 'empty' ? { status: 'empty', attempts: 0 } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A FINAL answer only — a post or the settled absence of one; never a read that gave up. */
+async function writeStoredLatestPost(rawWallet, state) {
+  if (!rawWallet || !state || (state.status !== 'ready' && state.status !== 'empty')) return;
+  try {
+    const store = await latestPostStorePromise;
+    await store?.put(rawWallet, JSON.stringify(state.status === 'ready'
+      ? { at: Date.now(), status: 'ready', preview: String(state.preview ?? ''), createdAtMs: Number(state.createdAtMs) || 0 }
+      : { at: Date.now(), status: 'empty' }));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
+
+async function readStoredTelegramGiftArt(key) {
+  if (!key) return null;
+  try {
+    const store = await telegramGiftArtStorePromise;
+    const record = await store?.get(key);
+    return typeof record?.url === 'string' && record.url.startsWith('data:image/') ? record.url : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readStoredTelegramGiftLottie(key) {
+  if (!key) return null;
+  try {
+    const store = await telegramGiftArtStorePromise;
+    const record = await store?.get(`lottie:${key}`);
+    return typeof record?.url === 'string' && record.url.startsWith('{') ? JSON.parse(record.url) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeStoredTelegramGiftLottie(key, lottie) {
+  if (!key || !lottie || typeof lottie !== 'object') return;
+  try {
+    const store = await telegramGiftArtStorePromise;
+    await store?.put(`lottie:${key}`, JSON.stringify(lottie));
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
+
+async function writeStoredTelegramGiftArt(key, dataUrl) {
+  if (!key || typeof dataUrl !== 'string') return;
+  try {
+    const store = await telegramGiftArtStorePromise;
+    await store?.put(key, dataUrl);
+  } catch {
+    /* ignore (quota / unavailable) */
+  }
+}
 
 async function readCachedPublicComments(cacheKey) {
   if (!cacheKey) return null;
@@ -2025,7 +2589,13 @@ async function persistPublicPostImageMedia() {
 // data-urls stripped to dodge the iOS freeze) and — SYMMETRICALLY — the heavy decoded image media goes to
 // IndexedDB, so the strip never costs a chain re-walk on reload. Every feed-cache write goes through here.
 function commitPublicChannelFeedCache() {
-  writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache);
+  // THE ANSWER IS NOT DISCARDED ANY MORE [audit 2026-09-01, round 9]. The writer trims and retries until the
+  // cache fits, so a false here means it could not be stored at ANY size — a browser refusing site data, not a
+  // full one. Silence over that let memory and storage diverge without a trace: the reader kept scrolling a feed
+  // the next reload would not have.
+  if (!writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache)) {
+    console.warn('[public] the feed cache could not be stored — this session\'s posts will not survive a reload');
+  }
   schedulePublicPostImageMediaPersist();
 }
 
@@ -2061,13 +2631,25 @@ function currentIntroReplayDbName(walletAddress = plathoWallet?.address) {
 
 // The direct-pay CONV lane's sealed K_root store lives in a WALLET-SCOPED IndexedDB so one wallet's conversation keys
 // never bleed into another's ([[cross-wallet-identity-bleed]]); the seal key is device-local within that DB.
+// The INTRO scan's CURSORS get their own wallet-scoped database for the same reason the guard above does, and it is
+// the more dangerous of the two to share: a cursor says how far a shard has been READ, so a second identity that
+// resumes from the first one's position never looks below it — and below it are that identity's own older first
+// contacts, on chain and paid for. [FOUND 2026-08-29 by audit; the store carries the one-time migration.]
+function currentIntroCursorDbName(walletAddress = plathoWallet?.address) {
+  return walletScopedIndexedDbName('platho-intro-cursors-v1', walletAddress);
+}
+
 function currentConvKeyDbName(walletAddress = plathoWallet?.address) {
   return walletScopedIndexedDbName('platho-conv-keys-v1', walletAddress);
 }
 
 function deploymentScopedStorage(storage, scopedKeys) {
   if (!storage) return storage;
-  const keyFor = (key) => (scopedKeys.has(key) ? scopedStorageKey(key) : key);
+  // A personal key takes the WALLET scope wherever it is reached from — this wrapper, or the JSON-map helpers
+  // below — so there is one answer to "where does the follow list live" rather than two that can drift.
+  const keyFor = (key) => (isWalletScopedPublicKey(key)
+    ? personalPublicStorageKey(key)
+    : (scopedKeys.has(key) ? scopedStorageKey(key) : key));
   return {
     getItem(key) {
       return storage.getItem(keyFor(key));
@@ -2081,8 +2663,11 @@ function deploymentScopedStorage(storage, scopedKeys) {
   };
 }
 
+// Only the CONTENT cache needs listing now: every personal key is routed by isWalletScopedPublicKey above,
+// including PREFS_DIRTY_STORAGE_KEY and PREFS_LAST_SYNCED_STORAGE_KEY, which reached this storage wrapper but
+// were absent from this set and so were written as BARE GLOBAL keys — shared by every wallet and every
+// deployment on the device [audit 2026-09-01, round 9].
 const PUBLIC_CHANNEL_STORAGE_KEYS = new Set([
-  PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY,
   PUBLIC_CHANNEL_FEED_CACHE_KEY,
 ]);
 
@@ -2336,7 +2921,7 @@ function composerHandleKeyboardVisibility() {
 /**
  * While the composer is open FULL SCREEN, re-read the viewport every frame instead of waiting to be told.
  *
- * [OWNER 2026-08-14] "Nail the composer down so it stops shuddering." The jitter is a reporting delay, not a layout
+ * [decided 2026-08-14] The jitter is a reporting delay, not a layout
  * bug: the browser announces a viewport change AFTER the frame that moved it, so a composer positioned from the
  * event handler is always one frame behind the finger — visible as a shudder on every scroll.
  *
@@ -2490,16 +3075,14 @@ function armPageDragRefusal(event) {
   if (!viewport) return;
   if (Math.round(window.innerHeight - viewport.height) < KEYBOARD_PRESENT_PX) return;   // no keyboard, no lock
   if (event.touches && event.touches.length > 1) return;                                // pinch is not ours
-  // THE GRIPS ARE A DRAG TOO, and the note below used to say otherwise. [OWNER 2026-08-24: "the text does get
-  // selected, but you cannot widen it using the grips"] — on the iPhone a long press still selects, but neither
+  // THE GRIPS ARE A DRAG TOO, and the note below used to say otherwise. [decided 2026-08-24] — on the iPhone a long press still selects, but neither
   // grip will widen the selection. "Selection on iOS starts from a long press, not a drag, so nothing is taken away" was
   // half true: it covers MAKING a selection and stops there. EXTENDING one is a drag, and WebKit defers its
   // handle gesture until the page has said whether it prevents the touchmove — we prevent it, so the gesture is
   // failed and the grip never moves. That is also why making a selection still works: the long press is decided
   // by a timer, and WebKit hands us a touchcancel the moment it wins, so no touchmove of ours is in the way.
   //
-  // THIS IS NOT THE OLD BLANKET EXEMPTION FOR EDITABLES [OWNER 2026-08-15: "you can still pull the page out by
-  // the text field"], which waved a field through for BEING a field and left the one surface the keyboard is open
+  // THIS IS NOT THE OLD BLANKET EXEMPTION FOR EDITABLES [decided 2026-08-15], which waved a field through for BEING a field and left the one surface the keyboard is open
   // for handing its gestures to the browser. The condition here is a LIVE selection — two ends, in the field that
   // has focus — which exists only in the seconds after the user has selected something, and is what the grips
   // need. The honest cost: for those seconds a drag inside that field can carry the page again. A selection that
@@ -2511,8 +3094,7 @@ function armPageDragRefusal(event) {
     const style = getComputedStyle(node);
     const scrollable = /(auto|scroll)/.test(`${style.overflowY} ${style.overflow}`);
     if (scrollable && node.scrollHeight > node.clientHeight) return;
-    // NO BLANKET EXEMPTION FOR TEXT FIELDS. [OWNER 2026-08-15] "You can still pull the page out by the text
-    // field. Dragging anywhere else and it does not move." One line here used to wave through anything editable, on
+    // NO BLANKET EXEMPTION FOR TEXT FIELDS. [decided 2026-08-15] One line here used to wave through anything editable, on
     // the theory that a drag there belongs to the caret — and the composer IS an editable, so the one surface the
     // keyboard is open for was the one still handing the gesture to the browser. That is also textbook for the
     // WebKit defect above: the escalation happens precisely when the element under the finger has nothing to
@@ -2528,13 +3110,11 @@ function armPageDragRefusal(event) {
 function refusePageDragWhileKeyboardIsUp(event) {
   if (!pageDragRefusalArmed) return;
   if (event.touches && event.touches.length > 1) { pageDragRefusalArmed = false; return; }   // became a pinch
-  // A HELD FINGER IN A TEXT FIELD IS SELECTING [OWNER 2026-08-24: "on the iPhone I cannot select text in the
-  // composer by the standard means — something intercepts it and resets it"]. The exemption used to require a LIVE
+  // A HELD FINGER IN A TEXT FIELD IS SELECTING [decided 2026-08-24]. The exemption used to require a LIVE
   // selection, i.e. two ends already placed. But on iOS the gesture that PLACES them starts with the loupe, and the
   // loupe carries a COLLAPSED caret — no second end, no exemption, and the very move that would make a selection
   // was the one refused. The hold answers for all of it: loupe, word grab and both grips begin with one, a page
-  // drag never does, and an immediate drag from the field stays refused [OWNER 2026-08-15: "you can still pull the
-  // page out by the text field"].
+  // drag never does, and an immediate drag from the field stays refused [decided 2026-08-15].
   if (pageDragRefusalInText && Date.now() - pageDragRefusalStartedAt >= EDITABLE_SELECTION_HOLD_MS) {
     pageDragRefusalArmed = false;
     return;
@@ -2553,7 +3133,7 @@ function releasePageDragRefusal() {
 /**
  * IS THE PAGE CARRYING AN OFFSET THAT ONLY THE KEYBOARD COULD HAVE GIVEN IT?
  *
- * [OWNER 2026-08-24: an empty dark strip along the bottom, BELOW the tab bar, appearing "sometimes" when the
+ * [decided 2026-08-24] when the
  * message field is tapped.] The strip is bare <body> — the shell is position:fixed against the LAYOUT viewport
  * (WebKit 191204: a fixed element does not stay fixed while the keyboard is up), so a page scrolled by N draws
  * the whole shell N higher and leaves N pixels of nothing under the bar. It is the same defect as "the interface
@@ -2598,9 +3178,7 @@ function keepViewportVarsLiveWhileComposerIsOpen() {
 }
 
 /**
- * THE KEYBOARD MUST NOT SWALLOW THE END OF THE THREAD [OWNER 2026-08-23: "it really annoys me that when I tap the
- * composer, the keyboard that slides up covers the last messages — they should scroll, so I can see what I am even
- * replying to"], with a screenshot showing the two newest messages cut off above the composer.
+ * THE KEYBOARD MUST NOT SWALLOW THE END OF THE THREAD [decided 2026-08-23], with a screenshot showing the two newest messages cut off above the composer.
  *
  * The shell already shrinks to the visible height when the keyboard opens, which is why the composer stays above
  * it. What nothing did was move the SCROLLER: a reader sitting at the end of a conversation loses exactly a
@@ -2624,9 +3202,7 @@ function pinOpenThreadsToEndAfterViewportChange() {
 /**
  * FOCUS A COMPOSER FIELD WITHOUT LETTING THE PAGE MOVE.
  *
- * [OWNER 2026-08-24: "there is still an iPhone bug. We treated it and thought it was cured, but it still shows up
- * sometimes — the interface flies up, it accounts for the keyboard the way Android does, and on iPhone that must not
- * be done. We fixed it, but it looks like some branch was missed."] Their memory is exact, and so is the miss: the
+ * [decided 2026-08-24] Their memory is exact, and so is the miss: the
  * cure is focus({ preventScroll: true }), and it had been applied in ONE place — the maximize toggle — while the
  * other sixteen composer focus calls used a plain focus().
  *
@@ -2647,9 +3223,7 @@ function focusComposerField(field) {
 /**
  * AND THE OTHER HALF — THE TAP, which is the one the owner actually sees.
  *
- * [OWNER 2026-08-24, on being shown the above: "toggleComposerMaximize is the composer's maximize, isn't it? But
- * our problem was that I TAP the composer and the interface flies up, and that is where we fixed it — you are
- * talking about the maximize, not the place with the problem."] Exactly right, and preventScroll cannot help
+ * [decided 2026-08-24] Exactly right, and preventScroll cannot help
  * there: on a tap nothing of ours calls focus() at all. The browser focuses the field itself, and iOS then scrolls
  * the PAGE to bring it into view — the app ends up shoved off the top with the composer at the screen's edge.
  *
@@ -2824,9 +3398,7 @@ function telegramPlatform() {
 // Telegram reports viewportChanged while the window is still animating — minimise and restore both send it with
 // isStateStable false — and viewportStableHeight can still be catching up when the "stable" one arrives. Reading
 // once and stopping latches a height measured half-way through the move, and nothing ever asks again: the shell
-// stays built to that number [OWNER 2026-08-25: "the interface flew almost off the screen ... it happened when I
-// minimised the mini-app window and then restored it. I cannot reach it with a finger, the whole interface seems
-// to have collapsed into a narrow strip."]
+// stays built to that number [decided 2026-08-25]
 //
 // So the event starts a short ladder instead of a single read. Each rung is the same idempotent sync — it writes
 // the number it measures and nothing else — so a rung that lands on the settled value simply writes it again.
@@ -2837,12 +3409,10 @@ let viewportSettleResyncTimers = [];
  * ONE SETTLE LADDER FOR EVERY "THE WINDOW JUST MOVED" SOURCE.
  *
  * Built for the Telegram container (viewportChanged arrives mid-animation) and then found to be the same disease
- * on the plain iPhone [OWNER 2026-08-26: "Android resizes the app window when the keyboard appears; the iPhone
- * just draws the keyboard OVER the window — and the message repositioning does not account for that"]. The
+ * on the plain iPhone [decided 2026-08-26]. The
  * owner's model is exact: on iOS the window never resizes, so this app rebuilds the shell from the VISUAL
  * viewport by hand — and iOS settles the real geometry LAZILY, after the one resize event, with no further
- * events. A one-shot pin therefore runs against numbers that are still moving [OWNER: "there are many messages
- * in the dialog, they are just above the screen"], and nothing ever asks again.
+ * events. A one-shot pin therefore runs against numbers that are still moving [decided], and nothing ever asks again.
  *
  * Every rung is idempotent, which is what makes re-running free: the sync writes the number it measures, the
  * zero undoes only a scroll the SYSTEM made (the user cannot scroll the page — html/body are overflow:hidden and
@@ -3797,7 +4367,7 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
       tone: 'error',
       cancellable: false,
       dismissOnBackdrop: false,
-      // [OWNER 2026-08-10] Plain "Continue", not "I wrote it down": the typed SAVED below is what confirms it,
+      // [decided 2026-08-10], not "I wrote it down": the typed SAVED below is what confirms it,
       // so a second claim on the button was one assertion too many. Reuses the shared Continue label.
       submitLabel: t('common.continue'),
       fields: seedBackupFieldSpecs(phrase),
@@ -3810,7 +4380,29 @@ async function enforceTelegramSeedBackupGate(wallet, { force = false } = {}) {
   }
 }
 
-function showTelegramManualExportDialog(filename, content) {
+/**
+ * Can a file actually be SAVED from here?
+ *
+ * `<a download>.click()` fails silently in a WebView that does not honour it — no exception, no event, nothing to
+ * catch — so a backup the app believes it wrote may never have existed. That is the worst possible failure for
+ * this particular file, and the reason the answer is taken conservatively.
+ *
+ * On iOS every browser is a WKWebView and only Safari reliably saves. There is no feature test worth having:
+ * `'download' in document.createElement('a')` is a property and is true in every one of them. So the ones that
+ * name themselves in the user agent are named here — which is the reported case (Chrome on iPhone) and every other
+ * iOS browser and in-app viewer built the same way. Safari, a home-screen app and anything unrecognised keep the
+ * download; being wrong there costs a copy dialog, while being wrong the other way costs a wallet.
+ */
+const WEBVIEWS_THAT_CANNOT_SAVE_FILES = /CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|YaBrowser|DuckDuckGo|FBAN|FBAV|Instagram|Line\/|Snapchat|MicroMessenger/i;
+
+function fileDownloadsCanBeSaved() {
+  if (isTelegramEnv()) return false;
+  if (!isIosDevice()) return true;
+  if (isStandaloneApp()) return true;
+  return !WEBVIEWS_THAT_CANNOT_SAVE_FILES.test(navigator.userAgent || '');
+}
+
+function showManualExportDialog(filename, content) {
   return openActionDialog({
     title: t('wallet.exportBackupTitle'),
     hint: t('wallet.exportBackupHint'),
@@ -3824,7 +4416,9 @@ function showTelegramManualExportDialog(filename, content) {
       required: false,
     }],
     summary: [t('wallet.exportBackupSummary')],
-  }).catch(() => {});
+  })
+    .then((result) => result !== null)   // ✕ resolves null: that is NOT an acknowledgement
+    .catch(() => false);
 }
 
 // Mark the root as early as the module runs so the install-UI is hidden by CSS
@@ -3892,8 +4486,16 @@ async function refreshInstalledRelatedPwaState() {
   }
 }
 
-function profileAvatarStorageKey(owner = plathoWallet?.address) {
-  return owner ? `${PROFILE_AVATAR_POINTER_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${owner}` : null;
+/**
+ * ONE KEY PER WALLET, whatever spelling arrives. The loader reaches this with the raw `0:…` form and the own-profile
+ * refresh with the user-friendly one, and until 2026-09-07 each spelling had a key of its own — two records for one
+ * wallet, each blind to the other's, which is one of the ways a face already on the device failed to be found.
+ * `canonical: false` names the pre-canonical key, for the one-time move in readStoredProfileAvatarPointer.
+ */
+function profileAvatarStorageKey(owner = plathoWallet?.address, { canonical = true } = {}) {
+  if (!owner) return null;
+  const spelling = canonical ? (rawWalletAddress(owner) ?? owner) : owner;
+  return `${PROFILE_AVATAR_POINTER_STORAGE_PREFIX}:${deploymentStorageSuffix()}:${spelling}`;
 }
 
 function zeroAvatarHashHex() {
@@ -3911,13 +4513,34 @@ function readStoredProfileAvatarPointer(owner = plathoWallet?.address) {
   const key = profileAvatarStorageKey(owner);
   if (!key) return null;
   try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(key) ?? 'null');
+    const storage = localStorageOrNull();
+    let held = storage?.getItem(key) ?? null;
+    // A record filed under the spelling this caller happens to use, before the key was canonical: moved, not
+    // re-read from the chain — it is exactly the read the canonical key exists to avoid.
+    const legacyKey = profileAvatarStorageKey(owner, { canonical: false });
+    if (held === null && legacyKey !== key) {
+      held = storage?.getItem(legacyKey) ?? null;
+      if (held !== null) {
+        storage?.setItem(key, held);
+        storage?.removeItem(legacyKey);
+      }
+    }
+    const parsed = JSON.parse(held ?? 'null');
     if (!parsed || typeof parsed !== 'object') return null;
     const profileVersion = Number(parsed.profileVersion ?? parsed.profile_version ?? 0);
     const avatarHash = normalizeAvatarHashHex(parsed.avatarHash ?? parsed.avatar_hash ?? zeroAvatarHashHex());
     if (!Number.isSafeInteger(profileVersion) || profileVersion <= 0) return null;
     if (avatarHash === zeroAvatarHashHex()) return null;
-    return { profileVersion, profile_version: profileVersion, avatarHash, avatar_hash: avatarHash };
+    // A record written before this was remembered has no timestamp, which reads as "confirm it once" — not as
+    // "throw it away". The pointer is still good; only its age is unknown.
+    const checkedAt = Number(parsed.checkedAt ?? 0);
+    return {
+      profileVersion,
+      profile_version: profileVersion,
+      avatarHash,
+      avatar_hash: avatarHash,
+      checkedAt: Number.isFinite(checkedAt) ? checkedAt : 0,
+    };
   } catch {
     return null;
   }
@@ -3929,19 +4552,32 @@ function writeStoredProfileAvatarPointer(pointer, owner = plathoWallet?.address)
   const normalized = pointer ? {
     profileVersion: Number(pointer.profileVersion ?? pointer.profile_version ?? 0),
     avatarHash: normalizeAvatarHashHex(pointer.avatarHash ?? pointer.avatar_hash),
+    checkedAt: Date.now(),
   } : null;
+  // ONLY THE LOCAL WALLET'S POINTER IS THE LOCAL ONE. This mirrored into `localProfileAvatarPointer` whatever
+  // owner it was handed, which was harmless only for as long as nothing passed a peer's — and remembering peers'
+  // pointers is precisely what now does. A peer with no KeyShard would otherwise have erased the user's own face.
+  // Compared as ADDRESSES, not as strings: this function is reached with the raw form from the loader and with
+  // the user-friendly one from the own-profile refresh, and a plain !== would call the user a stranger.
+  const isLocal = Boolean(owner) && Boolean(plathoWallet?.address) && sameWalletAddress(owner, plathoWallet.address);
   if (!normalized || normalized.profileVersion <= 0) {
     localStorageOrNull()?.removeItem(key);
-    localProfileAvatarPointer = null;
+    if (isLocal) localProfileAvatarPointer = null;
     return;
   }
   localStorageOrNull()?.setItem(key, JSON.stringify(normalized));
+  if (!isLocal) return;
   localProfileAvatarPointer = {
     profileVersion: normalized.profileVersion,
     profile_version: normalized.profileVersion,
     avatarHash: normalized.avatarHash,
     avatar_hash: normalized.avatarHash,
   };
+}
+
+/** A pointer nobody has confirmed for a day is served, and then confirmed. */
+function profileAvatarPointerIsStale(pointer) {
+  return (Date.now() - Number(pointer?.checkedAt ?? 0)) > PROFILE_AVATAR_POINTER_TTL_MS;
 }
 
 function currentProfileAvatarPointer() {
@@ -4041,8 +4677,21 @@ function legacyAvatarMediaUrlFromLocalStorage(avatarHash) {
   }
 }
 async function warmPublicChannelAvatarsFromCache() {
+  let changed = false;
   try {
     const byWallet = new Map(); // raw wallet -> avatarHash, for authors not already in the in-memory map
+    // THE REMEMBERED CURRENT POINTER FIRST [2026-09-07]. Posts carry the hash their author wore when they were
+    // written; a channel whose author has since changed the avatar, or whose only cached items are comments with
+    // no pointer at all, found nothing here — and stayed a letter tile until the chain sync succeeded and the
+    // channel-level hydrator ran. The pointer the loader remembered for the wallet names the face that is actually
+    // in the store, so it is seeded first and a post-time hash fills in only where no current one is known.
+    for (const channel of feedSourcePublicChannels()) {
+      const raw = rawWalletAddress(channel?.authorWallet);
+      if (!raw || publicChannelAvatarUrlByWallet.has(raw) || byWallet.has(raw)) continue;
+      const remembered = readStoredProfileAvatarPointer(raw);
+      const hash = remembered ? profileAvatarMediaHashKey(remembered.avatarHash) : null;
+      if (hash) byWallet.set(raw, hash);
+    }
     for (const record of Object.values(publicChannelFeedCache ?? {})) {
       // A cached channel record is { feed: { posts: [...] } } (sometimes the feed object directly, or just an
       // array). Extract the posts array robustly — iterating the wrong shape silently warmed NOTHING.
@@ -4050,27 +4699,30 @@ async function warmPublicChannelAvatarsFromCache() {
       const posts = Array.isArray(feed?.posts) ? feed.posts : (Array.isArray(feed) ? feed : []);
       for (const post of posts) collectCachedAvatarPointers(post, byWallet);
     }
-    if (byWallet.size === 0) return;
+    if (byWallet.size === 0) return changed;
     // 1) Legacy localStorage (pre-v512) — synchronous + instant, so the FIRST boot after the upgrade is clean
     //    before the deferred IndexedDB migration runs.
     const pending = new Map();
     for (const [raw, hash] of byWallet) {
       const url = legacyAvatarMediaUrlFromLocalStorage(hash);
-      if (url) publicChannelAvatarUrlByWallet.set(raw, url);
+      if (url) { publicChannelAvatarUrlByWallet.set(raw, url); changed = true; }
       else pending.set(raw, hash);
     }
     // 2) IndexedDB — migrated + freshly-cached avatars.
-    if (pending.size === 0) return;
+    if (pending.size === 0) return changed;
     const store = await profileAvatarMediaStore();
-    if (!store) return;
+    if (!store) return changed;
     const urls = await store.getMany([...pending.values()]);
     for (const [raw, hash] of pending) {
       const url = urls.get(hash);
-      if (url && !publicChannelAvatarUrlByWallet.has(raw)) publicChannelAvatarUrlByWallet.set(raw, url);
+      if (url && !publicChannelAvatarUrlByWallet.has(raw)) { publicChannelAvatarUrlByWallet.set(raw, url); changed = true; }
     }
   } catch {
     // Best effort: a wallet whose avatar is not cached just hydrates from chain as before.
   }
+  // WHETHER IT DID ANYTHING, because the boot render does not wait for it past 400 ms — and a warm that lands
+  // after that must repaint, or the faces sit in the map behind a feed already drawn with letters [2026-09-07].
+  return changed;
 }
 
 // One-time migration of any avatars left in the OLD localStorage cache (platho.profile.avatar.media.v1:*) into
@@ -4135,8 +4787,7 @@ function setAvatarNode(node, fallback, imageUrl = null) {
 /**
  * A contact who has neither a name nor a picture wears an ANONYMITY MASK, not two letters.
  *
- * [OWNER 2026-08-23: "I don't like that everyone has this UQ. For contacts with no username and no avatar, put an
- * anonymity icon in the contact's picture — an anonymous sort of thing."] The letters came from the first two
+ * [decided 2026-08-23] The letters came from the first two
  * characters of whatever labelled the row, and for a bare wallet that is the ADDRESS — every basechain address a
  * user sees starts with the same "UQ", so every unnamed contact wore the same monogram. A monogram that is identical
  * for everyone is worse than none: it looks like an identity and identifies nobody.
@@ -4160,8 +4811,7 @@ const SAVED_MESSAGES_AVATAR_SVG =
 // wallet-letter fallback. The nodes are REUSED across threads (activeAvatar in the conversation header), so both
 // branches fully undo the other's state.
 /**
- * THE TIER, ON THE PICTURE AS WELL AS THE NAME [OWNER 2026-08-24: "let's colour the icon for silver and gold too.
- * Make the background so it's immediately clear it's silver."]
+ * THE TIER, ON THE PICTURE AS WELL AS THE NAME [decided 2026-08-24]
  *
  * Same source of truth as the name's colour — the tone identityTone hands out — so a name and its avatar can never
  * disagree about a tier. An attribute rather than a class because the avatar's content is rewritten by both
@@ -4192,8 +4842,23 @@ function setThreadAvatarNode(node, thread) {
   const muted = isThreadMuted(thread) && !isSavedMessagesThread(thread);
   if (muted) node.dataset.muted = 'true';
   else delete node.dataset.muted;
+  // AND THE GROUP MARK, in the corner the other two leave free [OWNER 2026-09-05]. Same reasoning again: one
+  // place, so a group cannot look like a group in the list and like a person in the header. It is not a setting
+  // the user turned on — it says WHAT this conversation is — so it takes the top-left corner rather than sitting
+  // beside the pin, and it is a child node for the same reason the mute badge is (::before is the glow layer,
+  // ::after is the pin's).
+  const isGroup = isGroupThread(thread);
+  if (isGroup) node.dataset.group = 'true';
+  else delete node.dataset.group;
   const restoreMuteBadge = () => {
     node.querySelector(':scope > .avatar-mute-badge')?.remove();
+    node.querySelector(':scope > .avatar-group-badge')?.remove();
+    if (isGroup) {
+      const mark = document.createElement('span');
+      mark.className = 'avatar-group-badge';
+      mark.setAttribute('aria-hidden', 'true');
+      node.append(mark);
+    }
     if (!muted) return;
     const badge = document.createElement('span');
     badge.className = 'avatar-mute-badge';
@@ -4380,8 +5045,7 @@ function isContactPinned(counterpartyWallet) {
 /**
  * "MUTE CONTACT" — the fourth per-counterparty local flag, and it silences rather than blocks.
  *
- * [OWNER 2026-08-24: "add mute to the chevron, so a user can choose not to receive messages from a contact. And
- * unmute too."] What it can honestly do is stop them COUNTING: a message is published to the chain by its sender,
+ * [decided 2026-08-24] What it can honestly do is stop them COUNTING: a message is published to the chain by its sender,
  * and nothing on this device can prevent it being written or read. So a muted contact's messages still arrive and
  * are still there when the dialog is opened — they raise no unread count, which is what feeds both the row's badge
  * and the Private tab's. The hint says exactly that, rather than promising a delivery block we cannot perform.
@@ -4409,6 +5073,15 @@ function setContactMuted(counterpartyWallet, muted) {
   }
   renderThreads();
   refreshChatsRailBadge();
+}
+
+/** A group's thread id is `group:<group id>` — the one place that shape is decided. */
+const GROUP_THREAD_PREFIX = 'group:';
+function isGroupThread(thread) {
+  return String(thread?.id ?? '').startsWith(GROUP_THREAD_PREFIX);
+}
+function groupIdOfThread(thread) {
+  return isGroupThread(thread) ? String(thread.id).slice(GROUP_THREAD_PREFIX.length) : null;
 }
 
 function isThreadMuted(thread) {
@@ -4575,13 +5248,28 @@ function walletScopedRuntimeChanged(nextWallet) {
 }
 
 function prepareWalletScopedRuntimeForWallet(wallet, reason = 'wallet replaced') {
-  if (walletScopedRuntimeChanged(wallet)) {
+  const hadWallet = Boolean(activeWalletRuntimeAddress());
+  const changed = walletScopedRuntimeChanged(wallet);
+  if (changed) {
     clearWalletScopedRuntimeState(reason);
   }
   if (wallet?.address) activeRuntimeWalletAddress = wallet.address;
+  // THE PERSONAL PUBLIC STATE IS READ FOR THE WALLET BEING PREPARED, AFTER ITS ADDRESS IS RECORDED [F-22, 2026-09-09].
+  // Two cases need it. A FIRST unlock is not a wallet CHANGE — walletScopedRuntimeChanged answers false while there
+  // is no current address — and it is the path every device takes [audit 2026-09-01, round 10]. A SWITCH tore the
+  // old wallet's runtime down just above, and its follow list must not be the one left on screen.
+  // The read keys on personalPublicScopeAddress(), i.e. the address recorded one line up. Reading it inside the
+  // teardown, or keying it on `plathoWallet`, took the PREVIOUS wallet's answer: every caller assigns plathoWallet
+  // only after this function returns, so a first unlock hydrated the deployment bucket while every later write
+  // went to the wallet bucket — a follow made while unlocked was gone on the next reload (measured on stage).
+  if ((!hadWallet || changed) && wallet?.address) {
+    hydratePersonalPublicState();
+    rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
+  }
 }
 
 function clearWalletScopedRuntimeState(reason = 'wallet changed') {
+  moderationRuntime = null;   // the seat, the standings and the ledger are read again for the next wallet
   for (const job of privateSendRetryJobs.values()) {
     if (job?.timer) window.clearTimeout(job.timer);
   }
@@ -4607,6 +5295,14 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   publicAuthorRoundCovered.clear();
   publicAuthorRoundStartHead = null;
   publicFeedShownCap = PUBLIC_FEED_RENDER_CAP;
+  // The fee vault is per OWNER — a different wallet has a different vault, and inheriting this one would stake
+  // the new wallet's ATH into the old wallet's account, where only the old wallet can reach it.
+  // REPAINT, not just reset: clearing the state alone left the OLD wallet's "100.00%" and its withdraw row on
+  // screen until some later refresh happened to reach the vault — and refreshAthProtocolStatsRun returns early
+  // on any ATH-master read failure, before it ever gets there [audit 2026-09-02].
+  feeVaultState = { wallet: null, address: null, snapshot: null };
+  try { resetReactionRuntimeState(); } catch { /* before the reaction state exists in the module order */ }
+  renderFeeDiscountRows();
   invalidatePublicSyncFastPath(); // epoch bump: an in-flight walk of the OLD account must not re-commit the cursor
   lastSyncedPublicSyncWindow = null;
   activeRuntimeWalletAddress = null;
@@ -4616,6 +5312,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // firing later and racing the next boot's reads (one of the concurrent-connection sources on iOS WebKit).
   clearNavVaultBalanceRetryTimer();
   privateChainSyncPromise = null;
+  privateChainSyncIsFull = false;
   messageAutoSyncAt = 0;
   messageAutoSyncPhase = 'idle';
   messageAutoSyncLastResult = null;
@@ -4635,7 +5332,17 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   // ever suppress a re-read — but "could only skip work" is precisely how the identity-bleed class starts, and the
   // marks cost nothing to rebuild: one full pass.
   convReadLaneInstance = null;
+  dropGroupRuntime();   // its records hold epoch keys, the one thing here that cannot be re-derived
   convBucketSeqMarks.clear();
+  convDeepWalkPending.clear();
+  // THE PERSONAL PUBLIC STATE BELONGS TO THE WALLET THAT LEFT [audit 2026-09-01, round 9]. Its keys are wallet-
+  // scoped, but these bindings were filled once at boot and survived every switch — so without a re-read the new
+  // wallet would still be looking at the old one's follow list, read positions and unsaved-prefs flag until a
+  // reload, and buildPrefsSnapshot would publish that list into the NEW wallet's on-chain slot. The re-read lives in
+  // prepareWalletScopedRuntimeForWallet (this function's only caller), AFTER the new address is recorded: done here,
+  // it keyed on the wallet that was leaving and hydrated ITS bucket for the newcomer [F-22, 2026-09-09].
+  // The shard plan is DERIVED FROM THIS IDENTITY'S KEYS — one wallet's routing must not stay warm for the next.
+  convShardPlanner.clear();
   // The own-send time index is derived from THIS wallet's history headers (restoreHistoryWindows rebuilds it for the
   // next one); an inherited entry could only suppress an insert in the next wallet's dialog — the bleed class again.
   storedOwnSendTimes = new Map();
@@ -4645,6 +5352,7 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
   convRecoveryBackupAllowed = false;      // block backups until the new wallet's restore proves the local map is complete
+  prefsBackupAllowed = false;             // and the same for prefs — a new wallet's blob is not this one's
   if (recoveryBackupTimer) { clearTimeout(recoveryBackupTimer); recoveryBackupTimer = null; }
   // NOTE: convRecoveryDirtySlots deliberately survives — backups deferred by a background-lock are re-armed on unlock
   // (a stale slot from a switched-away wallet self-clears: the new wallet's partition for it is empty, so it is skipped).
@@ -4679,6 +5387,8 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   setPublicShareDraft(null);
   localProfileAvatarPointer = null;
   profileAvatarLoadPromises.clear();
+  profileAvatarAbsentUntil.clear();   // one wallet's "no KeyShard" is not an answer about another's
+  profileAvatarVersionMissUntil.clear();
   delete globalThis.plathoVaultBinding;
   clearPlathoActivationReread();   // the re-read ladder was climbing for the wallet being torn down (PWA-ACTIVATION-04)
   delete globalThis.plathoLastEncryptedHistoryRestore;
@@ -4713,26 +5423,6 @@ function displayIdentityLabel(identity) {
   }
   // PLATHO_NFT (and any future name type) is shown canonically — never with the ".ath" suffix.
   return canonicalUsernameDisplay(identity.label ?? identity.value ?? '');
-}
-
-async function verifyWalletDisplayIdentity(mode, label, wallet = plathoWallet) {
-  const normalizedMode = normalizeWalletDisplayMode(mode);
-  if (normalizedMode === WALLET_DISPLAY_MODES.ADDRESS) {
-    return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-  }
-  const owner = requireBasechainAddress(wallet?.address, 'Connected wallet');
-  if (normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
-    const identity = await resolvePlathoUsernameOwner(label);
-    if (!sameWalletAddress(identity.ownerWallet, owner)) {
-      // CODED, so the dialog can say it in the reader's language. The sentence itself stays English for the
-      // console: it is a diagnostic, and the screen no longer prints it — see usernameLinkErrorText.
-      const error = new Error(`${identity.label} belongs to another wallet`);
-      error.code = 'PLATHO_USERNAME_OTHER_WALLET';
-      throw error;
-    }
-    return { mode: normalizedMode, label: identity.label, verified_at: Date.now() };
-  }
-  return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
 }
 
 function readWalletDisplayIdentity(owner = plathoWallet?.address) {
@@ -4884,8 +5574,7 @@ function knownPlathoUsernamesStorageKey(owner = plathoWallet?.address) {
 // Always unions the currently-linked name. A picked name is still re-verified on submit (it could have been
 // transferred away since it was last seen).
 function readKnownPlathoUsernames(owner = plathoWallet?.address) {
-  // DE-DUPED BY NAME, NOT BY SPELLING [OWNER 2026-08-24: "the app periodically lies about how many usernames I have.
-  // I have one and always had one, and it periodically decides there are two"]. One name has two written forms here —
+  // DE-DUPED BY NAME, NOT BY SPELLING [decided 2026-08-24]. One name has two written forms here —
   // "platho" and "platho.ath" — and this list is built from sources that do not agree on which: the linked name is
   // always normalised to the suffixed form, the chain reconcile writes the suffixed form, but a quick-pick entry
   // stored by an older build, or restored from a prefs snapshot one of them published, can still be bare. A plain
@@ -4963,49 +5652,26 @@ function writeWalletDisplayIdentity(identity, owner = plathoWallet?.address) {
   }
 }
 
-function walletDisplayName(wallet = plathoWallet) {
-  const identity = readWalletDisplayIdentity(wallet?.address);
-  if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
-    return canonicalUsernameDisplay(readLinkedPlathoUsername(wallet?.address)?.label) || shortAddress(walletAddressForCopy(wallet));
-  }
-  return shortAddress(walletAddressForCopy(wallet));
-}
-
-function walletDisplaySubtitle(wallet = plathoWallet) {
-  const identity = readWalletDisplayIdentity(wallet?.address);
-  if (identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && readLinkedPlathoUsername(wallet?.address)) return t('wallet.plathoName');
-  return t('wallet.ready');
-}
-
 function renderWalletIdentity(status = null) {
   try { refreshWalletBackupWarning(); } catch { /* UI not ready */ }
+  // The corner follows the wallet: locked or absent it is a plain logo and refuses the tap, unlocked it is a door.
+  // Called BEFORE the early return below, because the no-wallet path is exactly the state it has to reflect.
+  renderBrandGift();
+  // THE HEADER'S LEAD IS THE STATUS LINE NOW [owner, 2026-09-08: the identity block under it repeated the card's
+  // hero and went]. A flash lands on it for a moment, then the lead comes back.
+  setText(profileHandle, status ?? t('profile.settingsLead'));
   if (!plathoWallet) {
     const storedRecord = storedPlathoWalletRecord();
     const hasStored = Boolean(storedRecord);
     const storedAddress = storedWalletAddressForCopy(storedRecord);
     const storedLabel = storedAddress ? shortAddress(storedAddress) : storedWalletShortLabel();
-    setText(identityName, hasStored ? storedLabel : t('wallet.noWallet'));
-    setText(identitySubtitle, status ?? (hasStored ? t('wallet.unlockLocal') : t('wallet.createOrImport')));
     setText(walletAddressStatus, hasStored ? storedLabel : t('wallet.notCreated'));
-    setText(walletDisplayModeStatus, t('wallet.addressMode'));
-    setText(linkedUsernameStatus, t('wallet.verify'));
-    renderMyUsernamesStatus();
-    if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.ADDRESS;
-    if (copyWalletAddressButton) copyWalletAddressButton.disabled = !storedAddress;
     return;
   }
-  const identity = readWalletDisplayIdentity(plathoWallet.address);
-  const linkedUsername = readLinkedPlathoUsername(plathoWallet.address);
-  setText(identityName, walletDisplayName(plathoWallet));
-  setText(identitySubtitle, status ?? walletDisplaySubtitle(plathoWallet));
   setText(walletAddressStatus, shortAddress(walletAddressForCopy(plathoWallet)));
-  setText(walletDisplayModeStatus, identity.mode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional')
-    : t('wallet.addressMode'));
-  setText(linkedUsernameStatus, canonicalUsernameDisplay(linkedUsername?.label) || t('wallet.optional'));
-  renderMyUsernamesStatus();
-  if (walletDisplayModeSelect) walletDisplayModeSelect.value = identity.mode;
-  if (copyWalletAddressButton) copyWalletAddressButton.disabled = false;
+  // The session's one real read of the owned names, behind this first paint — it used to hang off the "My .ath
+  // names" row, which went on 2026-09-08 (the profile card lists the names, with Transfer under each).
+  scheduleOwnedUsernameNftsSessionCheck();
 }
 
 function setProfileActionStatus(node, text, state = '') {
@@ -5036,7 +5702,8 @@ function setProfileAvatarStatus(text, state = 'busy') {
 }
 
 function setUsernameMintStatus(text, state = 'busy') {
-  setProfileActionStatus(mintUsernameStatus, text, state);
+  setProfileActionStatus(profileCardMintNameStatus, text, state);
+  if (profileCardMintNameStatus) profileCardMintNameStatus.hidden = !text;
 }
 
 function flashWalletIdentityStatus(status, durationMs = 1400) {
@@ -5047,7 +5714,7 @@ function flashWalletIdentityStatus(status, durationMs = 1400) {
   renderWalletIdentity(status);
   walletIdentityFlashTimer = setTimeout(() => {
     walletIdentityFlashTimer = null;
-    if (identitySubtitle?.textContent === status) renderWalletIdentity();
+    if (profileHandle?.textContent === status) renderWalletIdentity();
   }, durationMs);
 }
 
@@ -5135,7 +5802,19 @@ async function liveAppBuildId() {
     });
     if (!response.ok) return null;
     const html = await response.text();
-    const match = html.match(/src="\.\/app\.js\?v=([A-Za-z0-9]+)"/);
+    // BOTH SPELLINGS OF THE PATH [audit 2026-09-01, round 9]. This required `./app.js` and the shell has shipped
+    // `/app.js` since 1.0.18, when a CSP that blocked <base> made every path root-absolute. So this returned null
+    // on every real shell, handleServiceWorkerControllerChange always took its "cannot tell" branch, and
+    // pendingServiceWorkerAppShellReload — whose ONLY writer of `true` is that function — could never become true.
+    // Everything behind it was unreachable: the signed-send block, the "update ready, reload" status, and the
+    // reload taken at wallet lock. Measured against the shipped web/index.html: `./` form -> null, `/` form ->
+    // b9085b189. scripts/web_cache_ids.mjs has carried the two-spelling pattern all along, with a comment saying
+    // "Both spellings" — this is the same rule, restated where it is read rather than written.
+    //
+    // It is load-bearing for clean-18: CUTOVER.md items 6/7 rest on the forced reload already existing, and accept
+    // as residual only the sliver of installs that send before the new worker takes the page. Nothing shrank that
+    // sliver — an open session on the boundary build kept writing generation-17 records for its whole lifetime.
+    const match = html.match(/src="(?:\.\/|\/)app\.js\?v=([A-Za-z0-9]+)"/);
     return match ? match[1] : null;
   } catch {
     return null;
@@ -5180,6 +5859,9 @@ function closeSessionOverlays() {
   closeAppearanceDialog();
   closeDocsDialog();
   hideIdentityPopover();
+  // the moderation surfaces too [audit 2026-09-05, round 1]: a report sheet or the queue must not sit on a locked app
+  closeReportDialog();
+  if (moderationQueueDialog && !moderationQueueDialog.hidden) hideDialogAnimated(moderationQueueDialog);
 }
 
 function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
@@ -5192,8 +5874,7 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
     // the lock outright: an open action dialog satisfies shouldIgnoreTransientWalletLock for as long as it is on
     // screen, so backgrounding with a modal up left the keys in memory and the app unmasked until the 30-minute
     // idle backstop — and on a platform that SUSPENDS timers (iOS), not even then.
-    // [OWNER 2026-08-19] "Backgrounded the app with the modal open, came back and saw the modal. Closed it and
-    // saw the lock screen." The modal outliving the lock and the missing mask are the same missing deadline.
+    // [decided 2026-08-19] The modal outliving the lock and the missing mask are the same missing deadline.
     scheduleWalletAutoLock();
     scheduleBackgroundGraceLock(WALLET_TRANSIENT_LOCK_GRACE_MS);
     return;
@@ -5210,15 +5891,17 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   // Only reachable with a live wallet (the guard on the first line of this function), so the dialog is by
   // definition of the unlocked session — never the password dialog, which only runs while locked.
   //
-  // ALL OF THEM, NOT THE ACTION DIALOG ALONE [OWNER 2026-08-24: "I was looking at an image, then closed the window
-  // and saw the lock screen. The image lightbox definitely ignores the app lock — it behaves differently from
-  // every other modal. Put it on the common mechanism."] Exactly the defect the note above describes, one window
+  // ALL OF THEM, NOT THE ACTION DIALOG ALONE [decided 2026-08-24] Exactly the defect the note above describes, one window
   // over: the lock closed the action dialog, and the action dialog closes the lightbox — but a lightbox opened
   // straight from a message has no action dialog above it, so nothing closed it and the picture stayed on top of
   // a locked app. Naming every overlay in one place is what stops the next window being forgotten too.
   closeSessionOverlays();
   plathoWallet = null;
   localIdentity = null;
+  // THE GROUP RUNTIME HOLDS THE ROOT SEED [audit 2026-09-05, round 1]: its identity closure keeps `wallet.seed`, the
+  // X25519 and ML-KEM secrets and every epoch key of every group. A lock drops the wallet and the identity, so it
+  // drops this too — a locked device must hold nothing that unlocks anything.
+  dropGroupRuntime();
   ownedUsernameNftsVerified = null;   // the chain count belongs to the wallet being torn down, not the next one
   clearPlathoActivationReread();      // no wallet to re-read for; the re-unlock reads activation fresh (PWA-ACTIVATION-04)
   localVaultAuthKeyPair = null;
@@ -5233,6 +5916,7 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   introReplayGuard = null;
   convRecoveryRestoreAttempted = false;   // a new wallet must restore its OWN conversations from recovery
   convRecoveryBackupAllowed = false;      // block backups until the new wallet's restore proves the local map is complete
+  prefsBackupAllowed = false;             // and the same for prefs — a new wallet's blob is not this one's
   if (recoveryBackupTimer) { clearTimeout(recoveryBackupTimer); recoveryBackupTimer = null; }
   // NOTE: convRecoveryDirtySlots deliberately survives — backups deferred by a background-lock are re-armed on unlock
   // (a stale slot from a switched-away wallet self-clears: the new wallet's partition for it is empty, so it is skipped).
@@ -5240,8 +5924,7 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   resetVaultPocketState();
   // THE LOCK TAKES THE CONVERSATIONS WITH IT. Everything above tears down the KEYS; what those keys already
   // decrypted stayed behind — the dialog list, every loaded message, the open conversation — in memory and on
-  // screen. [OWNER 2026-08-25: "on the desktop, if you do not unlock and just close the window, everything is
-  // clean, there are no conversations. On mobile I can close the window and read conversations."]
+  // screen. [decided 2026-08-25]
   //
   // The difference was never the app, it was the platform: closing a desktop window destroys the page, so the
   // leak could not be seen there, while a phone freezes the page and hands it back intact. And the unlock prompt
@@ -5273,9 +5956,7 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   reloadForPendingServiceWorkerAppShellUpdate();
 }
 
-// FIVE MINUTES OF GRACE, EVERYWHERE [OWNER 2026-08-25: "5 minutes is more adequate. We have things like
-// getting an RPC key, which can take a while. 5 minutes is not critical in my view, and it makes the app much
-// easier to work with."] It used to be Telegram's alone, because Telegram backgrounds its WebView on the smallest
+// FIVE MINUTES OF GRACE, EVERYWHERE [decided 2026-08-25] It used to be Telegram's alone, because Telegram backgrounds its WebView on the smallest
 // interaction and locking on each one made the wallet unusable. The same is true of any app you leave to fetch
 // something and come straight back to.
 //
@@ -5431,7 +6112,7 @@ function resumeWalletUnlockPrompt() {
  *   3. readStoredPlathoWallet caught an exception and returned null (its catch swallows everything) — likewise.
  *
  * Reading "declined" off the null would have marked all three as a decision, which is exactly the complaint:
- * [OWNER 2026-08-13] "I never pressed the ✕." He did not have to. Cases 2 and 3 need no user at all.
+ * [decided 2026-08-13] He did not have to. Cases 2 and 3 need no user at all.
  *
  * walletUnlockPromise is live exactly while an unlock is being awaited, so it identifies the password dialog
  * without the dialog machinery needing to know anything about wallets — the same signal
@@ -5500,14 +6181,6 @@ function armWalletUnlockPrompt() {
   scheduleWalletUnlockPrompt();
 }
 
-function suppressProfileAvatarPicker(durationMs = 1000) {
-  profileAvatarPickerSuppressedUntil = Math.max(profileAvatarPickerSuppressedUntil, Date.now() + durationMs);
-}
-
-function isProfileAvatarPickerSuppressed() {
-  return Date.now() < profileAvatarPickerSuppressedUntil;
-}
-
 async function copyTextToClipboard(text) {
   const value = String(text ?? '');
   if (!value) throw new Error('Nothing to copy');
@@ -5534,7 +6207,7 @@ function renderPaneHeaders() {
   setText(chatCountLabel, t('nav.privateChats'));
   setText(publicSubtitle, t('nav.publicChannels'));
   setText(walletSubtitle, t('common.wallet'));
-  setText(profileHandle, t('nav.profile'));
+  setText(profileHandle, t('profile.settingsLead'));
 }
 
 // Pane status lines are logged only when they CHANGE: renderPublicSurface re-runs several times per background
@@ -5682,8 +6355,7 @@ function applyContactDisplaySelection(counterpartyWallet, { displayIdentity = nu
  * A private dialog learns the peer's .ath from ONE source only: the senderUsername the sender stamps on a message,
  * verified against the chain. The public side learns it independently — it proves a channel's .ath against the
  * chain and remembers it — and when it builds a name it already looks INTO the private threads first. Nothing ever
- * looked the other way [OWNER 2026-08-24: "the counterparty's username gets lost in the app — this contact has one
- * and I don't see it"], so one person could be a name on the Public surface and a bare address on the Private one,
+ * looked the other way [decided 2026-08-24], so one person could be a name on the Public surface and a bare address on the Private one,
  * with the name sitting in the app the whole time.
  *
  * This is the one answer both surfaces ask, so they cannot disagree again.
@@ -6104,6 +6776,21 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
       openPublicChannelView({ authorWallet });
     });
     body.append(openChannelButton);
+    // A DEVICE-LOCAL MUTE [CUTOVER item 15]: this channel leaves THIS device's feed and catalogue, no chain, and
+    // comes back from the same place. Never offered on your own channel; needs no ledger, so it works before one.
+    if (!isOwn) {
+      const muteButton = document.createElement('button');
+      muteButton.type = 'button';
+      muteButton.className = 'discovery-cta-action channel-about-open';
+      muteButton.textContent = t(localMuteStore.has(authorWallet) ? 'moderation.unmute' : 'moderation.mute');
+      muteButton.addEventListener('click', () => {
+        if (localMuteStore.has(authorWallet)) localMuteStore.remove(authorWallet); else localMuteStore.add(authorWallet);
+        hideIdentityPopover();
+        renderPublicSurface({ anchorUnread: false });
+        if (publicDiscoveryOpen) renderPublicDiscovery();   // the catalogue card leaves (or returns) at once
+      });
+      body.append(muteButton);
+    }
     if (isOwn) {
       const editButton = document.createElement('button');
       editButton.type = 'button';
@@ -6151,7 +6838,135 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
 // publishes on submit via publishChannelProfile (errors surface inline, the dialog stays open), and updates the
 // local cache so the owner sees their new description immediately. Tags are entered comma/newline-separated and
 // normalized (lowercase/trim/dedupe/cap) by the wire codec.
-async function openEditChannelProfileDialog() {
+// THE SLIDERS' STEPS, in the sliders' own order — the Appearance dialog's `step` attributes; the bounds and the
+// defaults are the codec's tables, so the wire and the editor cannot disagree.
+const CHANNEL_LOOK_STEPS = Object.freeze({ plasma: [5, 1, 25, 10], nodes: [10, 10, 5, 10] });
+const CHANNEL_LOOK_SETTING_LABELS = Object.freeze({
+  plasma: ['profile.auroraBrightness', 'profile.auroraCount', 'profile.auroraSpeed', 'profile.auroraEnergy'],
+  nodes: ['appearance.nodesBrightness', 'appearance.nodesRunners', 'appearance.nodesSpeed', 'appearance.nodesLights'],
+});
+const CHANNEL_LOOK_BACKGROUND_LABELS = Object.freeze({ none: 'appearance.backgroundNone', plasma: 'appearance.backgroundPlasma', nodes: 'appearance.backgroundNodes' });
+
+/** What this device wears right now, in the look's own shape — the editor's default when nothing is on chain. */
+function ownLookNow() {
+  return {
+    theme: currentEffectiveTheme(),
+    background: PROFILE_LOOK_BACKGROUNDS.includes(backgroundMode) ? backgroundMode : 'none',
+    settings: {
+      plasma: [auroraLevel, auroraCount, auroraSpeed, auroraEnergy],
+      nodes: [nodesLevel, nodesRunners, nodesSpeed, nodesLights],
+    },
+    gift: wornGiftTheme?.itemAddress ? 'gift' : 'none',
+  };
+}
+
+/**
+ * The look editor [decided 2026-09-09]: the Appearance dialog's rows (theme, background, the four sliders of the
+ * background chosen, the gift) inside the description dialog, so a channel's look is edited where it is priced and
+ * published. `read()` gives the codec's record, or null when the look is off; `wantsGift()` says whether the gift
+ * row asks for one, so the dialog can refuse a gift nobody wears. The gift the wallet WEARS is a separate claim on
+ * the block (wornGiftClaimAddress) — the profile card's, whatever the channel chooses [owner, 2026-09-09].
+ * `onEdit` hears every change, so the dialog can wear the look as it stands (previewChannelLook) [2026-09-10].
+ */
+function buildChannelLookEditor({ preset = null, current = null, onEdit = null } = {}) {
+  const mine = ownLookNow();
+  const onChain = current?.kind === 'look' ? current : null;
+  const state = {
+    enabled: preset === 'custom' ? true : preset === 'none' ? false : Boolean(current),
+    theme: onChain?.theme ?? mine.theme,
+    background: onChain?.background ?? mine.background,
+    settings: { plasma: [...mine.settings.plasma], nodes: [...mine.settings.nodes] },
+    // THE CHANNEL'S GIFT IS ITS OWN CHOICE [owner, 2026-09-09: "wearing a gift does not have to show on the channel"]:
+    // what the look on chain says, else none. The gift the wallet WEARS rides the block as its own claim.
+    gift: (onChain ? Boolean(onChain.itemAddress) : current?.kind === 'telegram-gift') ? 'gift' : 'none',
+  };
+  if (onChain?.background && Array.isArray(onChain.settings) && onChain.settings.length === state.settings[onChain.background]?.length) {
+    state.settings[onChain.background] = [...onChain.settings];
+  }
+  const box = document.createElement('div');
+  box.className = 'settings-list channel-look-editor';
+  const refreshCost = () => { try { renderActionSummary(activeActionDialog?.summary, collectActionDialogValues()); } catch { /* the summary is best-effort */ } };
+  const selectRow = (labelKey, options, value, onChange) => {
+    const label = document.createElement('label');
+    label.className = 'settings-select-row compact-select-row';
+    const caption = document.createElement('span');
+    caption.textContent = t(labelKey);
+    const select = document.createElement('select');
+    for (const [optionValue, optionKey] of options) {
+      const option = document.createElement('option');
+      option.value = optionValue;
+      option.textContent = t(optionKey);
+      select.append(option);
+    }
+    select.value = value;
+    select.addEventListener('change', () => { onChange(select.value); sync(); refreshCost(); onEdit?.(); });
+    label.append(caption, select);
+    return { row: label, select };
+  };
+  const rangeRow = (labelKey, [min, max], step, value, onInput) => {
+    const label = document.createElement('label');
+    label.className = 'settings-select-row compact-select-row settings-range-row';
+    const caption = document.createElement('span');
+    caption.textContent = t(labelKey);
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.min = String(min);
+    range.max = String(max);
+    range.step = String(step);
+    range.value = String(value);
+    range.addEventListener('input', () => { onInput(Math.max(min, Math.min(max, Math.round(Number(range.value) || 0)))); onEdit?.(); });
+    label.append(caption, range);
+    return label;
+  };
+  const enabledRow = selectRow('public.channelAppearance', [['none', 'public.channelAppearanceNone'], ['custom', 'public.channelAppearanceCustom']],
+    state.enabled ? 'custom' : 'none', (value) => { state.enabled = value === 'custom'; });
+  const themeRow = selectRow('appearance.theme', PROFILE_LOOK_THEMES.map((theme) => [theme, theme === 'light' ? 'appearance.themeLight' : 'appearance.themeDark']),
+    state.theme, (value) => { state.theme = value; });
+  const backgroundRow = selectRow('appearance.background', PROFILE_LOOK_BACKGROUNDS.map((mode) => [mode, CHANNEL_LOOK_BACKGROUND_LABELS[mode]]),
+    state.background, (value) => { state.background = value; });
+  const groups = {};
+  for (const mode of ['plasma', 'nodes']) {
+    const group = document.createElement('div');
+    group.className = 'settings-list channel-look-settings';
+    PROFILE_LOOK_SETTING_RANGES[mode].forEach((range, index) => {
+      group.append(rangeRow(CHANNEL_LOOK_SETTING_LABELS[mode][index], range, CHANNEL_LOOK_STEPS[mode][index], state.settings[mode][index],
+        (value) => { state.settings[mode][index] = value; }));
+    });
+    groups[mode] = group;
+  }
+  const giftRow = selectRow('profileCard.gifts', [['none', 'public.channelAppearanceNone'], ['gift', 'public.channelAppearanceGift']],
+    state.gift, (value) => { state.gift = value; });
+  // THE PREVIEW IS THE APP ITSELF [owner, 2026-09-10]: one line says so, since a window that changes what is behind
+  // it owes a word of explanation the first time.
+  const previewHint = document.createElement('p');
+  previewHint.className = 'channel-look-preview-hint';
+  previewHint.textContent = t('public.channelLookPreviewHint');
+  const sync = () => {
+    themeRow.row.hidden = !state.enabled;
+    backgroundRow.row.hidden = !state.enabled;
+    giftRow.row.hidden = !state.enabled;
+    previewHint.hidden = !state.enabled;
+    for (const [mode, group] of Object.entries(groups)) group.hidden = !state.enabled || state.background !== mode;
+  };
+  box.append(enabledRow.row, themeRow.row, backgroundRow.row, groups.plasma, groups.nodes, giftRow.row, previewHint);
+  sync();
+  return {
+    node: box,
+    wantsGift: () => state.enabled && state.gift === 'gift',
+    // The channel's look, with the worn gift on it only when the gift row asks for it; the look off means no channel
+    // gift at all. The gift the wallet WEARS goes into the block as its own claim (wornGiftClaimAddress) whatever
+    // this says — that is the profile card's business, not the channel's [owner, 2026-09-09].
+    read: () => (state.enabled ? normalizeProfileAppearance({
+      kind: 'look',
+      theme: state.theme,
+      background: state.background,
+      settings: state.settings[state.background] ?? [],
+      itemAddress: state.gift === 'gift' ? wornGiftClaimAddress() : null,
+    }) : null),
+  };
+}
+
+async function openEditChannelProfileDialog({ appearance: presetAppearance = null } = {}) {
   const wallet = rawWalletAddress(plathoWallet?.address);
   if (!wallet) { setPublicStatus('channel description needs a wallet'); return; }
   if (!hasActivePlathoAccount()) { setPublicStatus('channel description needs an active account'); return; }
@@ -6159,6 +6974,16 @@ async function openEditChannelProfileDialog() {
   if (!current || !current.fetchedAt) {
     try { current = await resolveChannelProfile(wallet); } catch { current = cachedChannelProfile(wallet); }
   }
+  // The look is a field of the same dialog — it rides the same paid post as the description, so it is edited and
+  // priced where the description is. The Settings row opens this dialog with the choice preset. [2026-09-09] The
+  // look is the WHOLE appearance a visitor gets — the guests' theme, the background animation with its settings,
+  // and the gift if one is worn — edited here in the Appearance dialog's own rows, prefilled with the look this
+  // device wears now, or with what is on chain.
+  const editor = buildChannelLookEditor({ preset: presetAppearance, current: current?.appearance ?? null, onEdit: () => previewChannelLook(editor) });
+  const appearanceOf = () => editor.read();
+  // THE APP BEHIND THE DIALOG IS THE PREVIEW [owner, 2026-09-10]: worn from the first frame, re-worn on every knob,
+  // taken off when the dialog closes whichever way — see previewChannelLook.
+  previewChannelLook(editor);
   const result = await openActionDialog({
     title: t('public.channelDescriptionTitle'),
     hint: t('public.channelDescriptionHint'),
@@ -6170,13 +6995,14 @@ async function openEditChannelProfileDialog() {
       // Shares the generic GRAM-cost strings with the mint dialog. Best-effort: a pricing hiccup must never blank
       // the dialog.
       try {
-        const charge = estimatedChannelProfileChargeNanotons(values.description, values.tags);
-        return [{ label: t('common.cost'), value: t('common.gramCostValue', { amount: formatTonNanotons(charge) }) }];
+        const charge = estimatedChannelProfileChargeNanotons(values.description, values.tags, appearanceOf(values), wornGiftClaimAddress());
+        return [{ label: t('common.cost'), value: t('common.gramCostValue', { amount: formatTonNanotonsUp(charge) }) }];
       } catch {
         return [];
       }
     },
     fields: [
+      { type: 'custom', className: 'action-custom-field channel-look-field', render: () => editor.node },
       {
         id: 'description',
         label: t('public.descriptionLabel'),
@@ -6208,11 +7034,15 @@ async function openEditChannelProfileDialog() {
     ],
     validateSubmit: async (values) => {
       if (tonRpcLimited()) return { ok: false, error: t('sync.rpcBusy') };
+      // A look that asks for a gift with none worn is refused HERE, in the open dialog, not published as nothing.
+      if (editor.wantsGift() && !wornGiftClaimAddress()) {
+        return { ok: false, error: t('public.channelAppearanceNeedsGift') };
+      }
       try {
         const description = String(values.description ?? '').trim();
         const tags = String(values.tags ?? '').split(/[,\n]+/);
-        const published = await publishChannelProfile(description, tags);
-        const meta = { description: published.description, tags: published.tags, ownerUsername: published.ownerUsername };
+        const published = await publishChannelProfile(description, tags, appearanceOf(values), wornGiftClaimAddress());
+        const meta = { description: published.description, tags: published.tags, ownerUsername: published.ownerUsername, appearance: published.appearance ?? null, wornGift: published.wornGift ?? null };
         // clean-17 direct pay: the profile IS the wallet transfer. publishPublicLaneParts throws on a failed
         // broadcast and returns { parts, result } — no Vault status, no publishState. So a RETURN means broadcast:
         // report success and show the edit immediately from the in-memory overlay. The durable cache is committed
@@ -6220,6 +7050,9 @@ async function openEditChannelProfileDialog() {
         // id). Reading `published.result.status` here was the clean-15 protocol: it is always undefined under
         // direct pay, so a SUCCEEDED save reported "could not save" and never surfaced the new description.
         setChannelProfileOptimistic(wallet, meta, published.createdAtSec);
+        // STAY OPEN AND SAY SO. The transfer has left the wallet; the profile shows up in the channel once the
+        // shard confirms it (about a minute). Closing silently here left the user reading the balance to learn
+        // that anything happened [owner, 2026-09-09].
         return { ok: true, result: { status: 'submitted' } };
       } catch (error) {
         if (noteTonRpcRateLimit(error)) return { ok: false, error: t('sync.rpcBusy') };
@@ -6227,7 +7060,7 @@ async function openEditChannelProfileDialog() {
         return { ok: false, error: t('public.descriptionSaveFailed') };
       }
     },
-  });
+  }).finally(() => endChannelLookPreview());
   if (result) {
     setPublicStatus('channel description saved');
     if (isPublicViewActive()) renderPublicSurface({ anchorUnread: false });
@@ -6239,7 +7072,7 @@ async function openEditChannelProfileDialog() {
 // option / the local-name action is picked.
 function renderDisplayAsPopover({
   options, selectedKey, localLabelExists, anchor, onSelect, onSetLocalName,
-  pinned = null, onTogglePin = null, muted = null, onToggleMute = null,
+  pinned = null, onTogglePin = null, muted = null, onToggleMute = null, onOpenProfile = null, onOpenChannel = null,
 }) {
   if (!anchor) return;
   const popover = ensureIdentityPopover();
@@ -6379,11 +7212,50 @@ function renderDisplayAsPopover({
       onSelect(selected);
     }));
   }
-  // ACTIONS ARE NOT A DISPLAY CHOICE [OWNER 2026-08-24: "the items need grouping properly. 'Display as' is only
-  // about the way the contact is SHOWN, and we have mute going in there and pin already in there"]. Correct: the
+  // ACTIONS ARE NOT A DISPLAY CHOICE [decided 2026-08-24]. Correct: the
   // title covers the local name and the identity options above, and neither pinning nor muting is a way of showing
   // anybody. So they get their own heading, after the list they never belonged to.
-  const actionRows = [pinRow, muteRow].filter(Boolean);
+  // "Open profile" — the KEYBOARD route to the card the contact's avatar opens on a tap. The avatar cannot be
+  // focusable (it lives inside the row's own <button>), so without this row the profile card would be a
+  // pointer-only feature. Offered ONLY where a caller passes the callback, which today is the Private conversation
+  // chevron: the three public chevrons open a channel's author, whose card is reachable from its own surfaces.
+  let profileRow = null;
+  if (typeof onOpenProfile === 'function') {
+    profileRow = document.createElement('button');
+    profileRow.type = 'button';
+    profileRow.className = 'identity-variant identity-variant-action';
+    profileRow.setAttribute('role', 'menuitem');
+    profileRow.setAttribute('aria-haspopup', 'dialog');
+    const profileLabel = document.createElement('strong');
+    profileLabel.textContent = t('profileCard.open');
+    const profileHint = document.createElement('span');
+    profileHint.textContent = t('profileCard.openHint');
+    profileRow.append(profileLabel, profileHint);
+    profileRow.addEventListener('click', () => {
+      hideIdentityPopover();
+      onOpenProfile();
+    });
+  }
+  // "Open channel" — the way from a conversation to what the counterparty PUBLISHES. Offered where a caller passes
+  // the callback (the Private chevron); the public chevrons already sit inside the channel [owner, 2026-09-09: no
+  // path from a thread or a card to the blog].
+  let channelRow = null;
+  if (typeof onOpenChannel === 'function') {
+    channelRow = document.createElement('button');
+    channelRow.type = 'button';
+    channelRow.className = 'identity-variant identity-variant-action';
+    channelRow.setAttribute('role', 'menuitem');
+    const channelLabel = document.createElement('strong');
+    channelLabel.textContent = t('public.openChannel');
+    const channelHint = document.createElement('span');
+    channelHint.textContent = t('chat.openChannelHint');
+    channelRow.append(channelLabel, channelHint);
+    channelRow.addEventListener('click', () => {
+      hideIdentityPopover();
+      onOpenChannel();
+    });
+  }
+  const actionRows = [profileRow, channelRow, pinRow, muteRow].filter(Boolean);
   if (actionRows.length > 0) {
     const actionsTitle = document.createElement('div');
     actionsTitle.className = 'identity-popover-title';
@@ -6418,6 +7290,10 @@ function showIdentityPopover(thread, anchor) {
     onTogglePin: pinWallet ? (next) => setContactPinned(pinWallet, next) : null,
     muted: pinWallet ? isContactMuted(pinWallet) : null,
     onToggleMute: pinWallet ? (next) => setContactMuted(pinWallet, next) : null,
+    // Same gate as the pin and the mute: a peer wallet, so "My notes" and a group never offer it.
+    onOpenProfile: pinWallet ? () => { openProfileCardDialog({ wallet: pinWallet, thread }).catch((error) => console.error(error)); } : null,
+    // The channel view lives in the Public pane — switch the tab, then open (see the card's Channel action).
+    onOpenChannel: pinWallet ? () => { setView('public'); openPublicChannelView({ authorWallet: pinWallet }); } : null,
     anchor,
     onSelect: (selected) => {
       thread.displayIdentity = selected.identity ?? null;
@@ -6594,10 +7470,6 @@ function syncNowForCurrentScreen() {
       setVaultStatus(rateLimited ? 'RPC busy, retrying' : 'sync blocked');
       if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
     });
-    return;
-  }
-  if (view === 'profile') {
-    refreshProfilePaneReads();
     return;
   }
   // Public feed / post detail (and any future view): run the unified private+public sync cycle now
@@ -7175,9 +8047,7 @@ function blobFromDataUrl(dataUrl) {
 }
 
 /**
- * SAVE THE PICTURE — and on iPhone that is not a download [OWNER 2026-08-24: "on the iPhone the image from the
- * viewer doesn't save. Something flickers and that's it … the download isn't visible anywhere. On Android it saves
- * with no problem."]
+ * SAVE THE PICTURE — and on iPhone that is not a download [decided 2026-08-24]
  *
  * `<a download>` is what every other platform wants and what iOS Safari IGNORES: the attribute does nothing there,
  * so the click navigated for an instant and came back — the flicker, and no file. The platform's own way to put a
@@ -7189,8 +8059,7 @@ function blobFromDataUrl(dataUrl) {
 async function saveImageOutOfPlatho(src, filename) {
   if (!src) return 'failed';
   const blob = src.startsWith('data:') ? blobFromDataUrl(src) : null;
-  // THE PROVEN PATH, and it was already in this file [OWNER 2026-08-24: "but we do download things on the iPhone
-  // somehow — the wallet key, for instance"]. Right, and that is the whole answer: downloadJsonFile makes a BLOB
+  // THE PROVEN PATH, and it was already in this file [decided 2026-08-24]. Right, and that is the whole answer: downloadJsonFile makes a BLOB
   // URL and clicks an <a download> at it, and that works on iPhone.
   //
   // So the first diagnosis was wrong. iOS does not ignore the download attribute; it refuses a `data:` URL — which
@@ -7332,6 +8201,10 @@ async function openActionDialog(config = {}) {
     renderActionSummary(config.summary, collectActionDialogValues());
     renderActionFootnotes(config.footnotes);
     actionDialog.classList.remove('is-closing'); actionDialog.hidden = false;
+    // The entrance (fadeIn + popIn, both from opacity 0) is a CSS animation too: opened while the page is not
+    // producing frames it stays at 0 — an invisible modal whose backdrop still swallows clicks. Same remedy as the
+    // theme fade: whatever has not moved by the time it should have finished is cancelled, and the dialog lands.
+    window.setTimeout(() => { if (!actionDialog.hidden) cancelFrozenAnimations(actionDialog); }, 400);
     requestAnimationFrame(() => actionFields.querySelector('textarea, input:not([readonly]):not([type="hidden"]):not(.password-manager-username), select')?.focus());
   });
 }
@@ -7339,6 +8212,15 @@ async function openActionDialog(config = {}) {
 function updateActiveActionSummary() {
   if (!activeActionDialog) return;
   renderActionSummary(activeActionDialog.summary, collectActionDialogValues());
+}
+
+/**
+ * A live summary may close the door: while a name is known to be taken, still being checked, or unaffordable, the
+ * submit waits. Called from inside a summary render, so it is a no-op once the dialog is gone.
+ */
+function setActiveActionSubmitEnabled(enabled) {
+  if (!activeActionDialog || !actionSubmitButton) return;
+  actionSubmitButton.disabled = !enabled;
 }
 
 function appDocById(id) {
@@ -7687,6 +8569,24 @@ function selectOrCreateRecipientThread(input, options = {}) {
   }
   appShell.dataset.chatOpen = 'true';
   closeNewChatDialog();
+  // A name this app has ALREADY PROVEN for the counterparty (the public side's chain-verified channel .ath, and the
+  // own linked name) dresses the dialog the moment it OPENS — not only when the peer's first message arrives.
+  // walletKnownIdentityVariants is the one answer both surfaces ask (PWA-CONFIG-01H); until now only
+  // applyThreadDisplayFields consulted it, through a read-only VIEW, while the header and the row read the raw
+  // thread — so a dialog whose only variant was the address kept showing the address. MEASURED 2026-09-09: the
+  // channel author opened from the feed showed the bare address for two minutes, until his first inbound landed.
+  //
+  // VARIANTS ONLY — never thread.displayIdentity: that field means "the user chose this" (PEERNAME-SEL-04), and
+  // refreshThreadIdentityFromVariants leaves an existing thread.identity alone, so a proven transfer
+  // (dropThreadIdentityVariant / revalidateThreadUsernameVariants) still takes the name off. The Saved thread is
+  // skipped: the own linked name is not a counterparty, and purgeNamedIdentityFromSavedThread would fight it.
+  const opened = threads.find((thread) => thread.id === activeThreadId);
+  const openedWallet = opened && !isSavedMessagesThread(opened) ? ownerWalletFromThread(opened) : null;
+  const knownNames = openedWallet ? walletKnownIdentityVariants(openedWallet) : [];
+  if (opened && knownNames.length > 0) {
+    refreshThreadIdentityFromVariants(opened, knownNames);
+    applyThreadDisplayFields(opened);
+  }
   hydrateThreadAvatarFromPointer(
     threads.find((thread) => thread.id === activeThreadId),
     ownerWalletFromThread(threads.find((thread) => thread.id === activeThreadId)),
@@ -7699,7 +8599,7 @@ function selectOrCreateRecipientThread(input, options = {}) {
 
 function readCustomPublicChannels() {
   try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY) ?? '[]');
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(personalPublicStorageKey(PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY)) ?? '[]');
     if (!Array.isArray(parsed) || parsed.length === 0) return [];
     const candidates = parsed.filter((item) => (
       item
@@ -7715,7 +8615,7 @@ function readCustomPublicChannels() {
 
 function writeCustomPublicChannels() {
   try {
-    localStorageOrNull()?.setItem(PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY, JSON.stringify(customPublicChannels));
+    localStorageOrNull()?.setItem(personalPublicStorageKey(PUBLIC_CUSTOM_CHANNELS_STORAGE_KEY), JSON.stringify(customPublicChannels));
   } catch {
     // Non-persistent mode still keeps custom channels in memory for this tab.
   }
@@ -7864,13 +8764,22 @@ function isPublicChannelSubscribed(channelId) {
 function setPublicChannelSubscribed(channelId, subscribed) {
   const id = String(channelId ?? '').trim();
   if (!id) return false;
+  return setPublicChannelsSubscribed([id], subscribed);
+}
+
+// N channels, ONE write, ONE thread rebuild, ONE render, ONE sync kick [F-23, 2026-09-09]. The restore path follows
+// every restored conversation at once, and fifty follows must not mean fifty feed rebuilds and fifty walks — the
+// single-channel form above is this with a list of one.
+function setPublicChannelsSubscribed(channelIds, subscribed) {
+  const ids = [...new Set((channelIds ?? []).map((value) => String(value ?? '').trim()).filter(Boolean))];
+  if (ids.length === 0) return false;
   const subscribedById = new Map((publicChannelSubscriptions?.channels ?? []).map((item) => [item.id, item]));
-  subscribedById.set(id, { id, subscribed: subscribed === true });
+  for (const id of ids) subscribedById.set(id, { id, subscribed: subscribed === true });
   const channels = publicChannelRegistry.map((item) => ({
     id: item.id,
     subscribed: subscribedById.get(item.id)?.subscribed === true,
   }));
-  const nextActive = subscribed === false && publicChannelSubscriptions?.activeChannelId === id
+  const nextActive = subscribed === false && ids.includes(publicChannelSubscriptions?.activeChannelId)
     ? channels.find((item) => item.subscribed)?.id ?? null
     : publicChannelSubscriptions?.activeChannelId ?? channels.find((item) => item.subscribed)?.id ?? null;
   publicChannelSubscriptions = {
@@ -7905,7 +8814,7 @@ function setPublicChannelSubscribed(channelId, subscribed) {
  */
 function readScopedJsonMap(storageKey) {
   try {
-    const parsed = JSON.parse(localStorageOrNull()?.getItem(scopedStorageKey(storageKey)) ?? '{}');
+    const parsed = JSON.parse(localStorageOrNull()?.getItem(personalPublicStorageKey(storageKey)) ?? '{}');
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -7914,24 +8823,32 @@ function readScopedJsonMap(storageKey) {
 
 function writeScopedJsonMap(storageKey, value) {
   try {
-    localStorageOrNull()?.setItem(scopedStorageKey(storageKey), JSON.stringify(value));
+    localStorageOrNull()?.setItem(personalPublicStorageKey(storageKey), JSON.stringify(value));
   } catch {
     // Non-persistent mode still keeps the state for the current tab.
   }
 }
 
-function publicEntryIdBigInt(value) {
-  if (value === undefined || value === null || value === '') return null;
-  try {
-    const bigint = BigInt(value);
-    return bigint >= 0n ? bigint : null;
-  } catch {
-    return null;
-  }
+// [REMOVED 2026-08-31, round 7] `publicEntryIdBigInt` used to parse a feed id into a BigInt for the unread
+// comparison. It answered null for every SHARD id — the composite `epochTag.seq.entryId[.generation]` is not a
+// number — and its bare catch made that look like a legitimate "no id" rather than a parse failure, so the two
+// callers silently treated every chain post as read and never wrote a cursor. Both now compare the post's own
+// chain-stamped time, which is the order the feed already uses; nothing needs a numeric id any more, so the
+// helper is gone rather than left as a working-looking answer to a question that cannot be asked.
+
+/** The moment this channel was last read up to, in ms, or null when it has never been read [round 7].
+ *  NULL IS NOT ZERO: an unseen channel has no baseline yet, and treating that as "the epoch" would call its
+ *  whole history unread. The first pass over the feed sets the baseline instead — see markVisiblePublicFeedRead. */
+function publicChannelReadAt(channelId) {
+  const at = Number(publicReadCursors?.[channelId]);
+  return Number.isFinite(at) ? at : null;
 }
 
-function publicChannelCursor(channelId) {
-  return publicEntryIdBigInt(publicReadCursors?.[channelId]) ?? -1n;
+/** A feed item's own time, in ms — the same value the feed is ordered by. Null when it cannot be parsed, which
+ *  the callers treat as "not newer than anything", exactly as the sort sinks an unknown time to the old end. */
+function publicItemReadAt(item) {
+  const at = Date.parse(String(item?.createdAt ?? ''));
+  return Number.isFinite(at) ? at : null;
 }
 
 /**
@@ -8019,9 +8936,11 @@ function applyPublicPostDetailOpenScroll() {
 }
 
 function isUnreadPublicItem(item) {
-  const entryId = publicEntryIdBigInt(item?.readEntryId ?? item?.entryId);
-  if (entryId === null) return false;
-  return entryId > publicChannelCursor(item.channelId ?? 'platho.app');
+  const at = publicItemReadAt(item);
+  if (at === null) return false;                       // unknown time is not new — the sort makes the same call
+  const readAt = publicChannelReadAt(item.channelId ?? 'platho.app');
+  if (readAt === null) return false;                   // no baseline yet: nothing is unread until one is set
+  return at > readAt;
 }
 
 // ONE LIST BY TIME. publicChannelThreadsToFeedItems returns the posts grouped by channel (reversed, in subscription
@@ -8035,19 +8954,63 @@ function publicFeedItemsChronological() {
 function markVisiblePublicFeedRead(items = publicFeedItemsChronological()) {
   let changed = false;
   for (const item of items) {
-    const entryId = publicEntryIdBigInt(item.readEntryId ?? item.entryId);
-    if (entryId === null) continue;
+    const at = publicItemReadAt(item);
+    if (at === null) continue;
     const channelId = item.channelId ?? 'platho.app';
-    if (entryId > publicChannelCursor(channelId)) {
+    // Advances the mark, and on a channel with no mark at all this is what ESTABLISHES the baseline — which is
+    // why a first run after the v1→v2 bump shows no unread flood: everything already in the feed is what the
+    // reader is looking at, and only what arrives afterwards is new.
+    const readAt = publicChannelReadAt(channelId);
+    if (readAt === null || at > readAt) {
       publicReadCursors = {
         ...publicReadCursors,
-        [channelId]: entryId.toString(),
+        [channelId]: String(at),
       };
       changed = true;
     }
   }
   if (changed) writeScopedJsonMap(PUBLIC_READ_CURSORS_STORAGE_KEY, publicReadCursors);
   return changed;
+}
+
+/**
+ * THE MARK IS TAKEN WHEN THE READER LEAVES, NOT WHILE THEY ARE LOOKING [audit 2026-08-31, round 8].
+ *
+ * Both surfaces used to mark their rendered window read INSIDE the render and then schedule the clearing
+ * re-render with requestAnimationFrame. A rAF callback runs at the START of the next frame — before style,
+ * layout and paint of that frame — so the browser resolved style exactly once for those rows, and by then the
+ * `.is-unread` class was already gone. MEASURED in Chromium with a CSS-animation detector (an animation
+ * declared on `.is-unread` is created only at the first style resolution that sees the class): shipped rAF form
+ * = 1 row built unread, 0 animations ever started, 0 rows still unread two frames later; the same code with the
+ * re-render deferred = 1 animation, 1 row still unread. `.feed-item.is-unread` (web/styles.css) could not be
+ * seen by anyone. The `"N unread"` count had the same shape — renderPublicSurface counts AFTER renderPublicFeed
+ * had already cleared the window, so it read 0 on every render where the mark ran.
+ *
+ * So the render now only REMEMBERS what it painted, and the cursor advances at the moments the reader stops
+ * looking at it: the tab switch, an overlay opening over the surface, the app going to the background, and the
+ * explicit "jump to newest" gesture. That is also the honest reading of "since I last looked" — the badge
+ * survives the whole visit, which is what makes it useful while scrolling, and is gone on the next one.
+ *
+ * ONE holder for both surfaces: the reader looks at exactly one of them at a time, and each render replaces it.
+ */
+let publicUnreadPaintedItems = null;
+
+function holdPublicFeedPainted(items) {
+  publicUnreadPaintedItems = Array.isArray(items) && items.length > 0 ? items : null;
+}
+
+function flushPublicFeedRead() {
+  const painted = publicUnreadPaintedItems;
+  publicUnreadPaintedItems = null;
+  if (!painted) return false;
+  if (!markVisiblePublicFeedRead(painted)) return false;
+  // The reader has left this surface, so re-rendering it now cannot wipe a badge out from under them. Only
+  // needed on the background-lock door: every other one (tab switch, overlay close) renders on the way back,
+  // and rendering there would repaint a surface that is about to be covered or hidden.
+  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen) {
+    renderPublicSurface({ anchorUnread: false });
+  }
+  return true;
 }
 
 // The "History sync — short / long" setting was REMOVED (owner, 2026-08-07). It had been inert for some time:
@@ -8338,7 +9301,7 @@ function buildPublicCommentRow(comment, surfacing) {
     if (isPendingPublicFeedItem(comment) && comment.publishStatus) {
       const statusBadge = document.createElement('span');
       statusBadge.className = `public-publish-status${String(comment.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
-      statusBadge.textContent = (comment.publishState ? publishStateMeta(comment.publishState) : null) || comment.publishStatus;
+      statusBadge.textContent = publishStatusDisplayText((comment.publishState ? publishStateMeta(comment.publishState) : null) || comment.publishStatus);
       // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
       if (comment.id) statusBadge.dataset.publishLocalId = String(comment.id);
       commentMeta.append(statusBadge);
@@ -8348,6 +9311,8 @@ function buildPublicCommentRow(comment, surfacing) {
     appendPublicItemContent(row, comment);
     appendRowReplyButton(row, beginPublicCommentReplyForRow);
     appendRowCopyButton(row, copyTextFromContent(comment));
+    appendRowReportButton(row, comment);
+    appendReactionBar(row, comment, 1);
     return row;
   }
 }
@@ -8360,7 +9325,7 @@ function buildPublicCommentRow(comment, surfacing) {
  * rows anyway — the wipe, not the loop, is what made this quadratic.
  */
 function appendPublicItemComments(article, item, keptList = null) {
-  const comments = Array.isArray(item?.comments) ? item.comments : [];
+  const comments = (Array.isArray(item?.comments) ? item.comments : []).filter((comment) => publicItemVisibleUnderModeration(comment, 1));
   if (comments.length === 0) return;
   const commentList = keptList ?? document.createElement('div');
   commentList.className = 'comment-list';
@@ -8442,6 +9407,926 @@ function publicItemDescriptionButton(item) {
   return aboutButton;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+// MODERATION — reports, verdicts, the two lookups [CUTOVER item 15, rebuilt 2026-09-04; round two the same day]
+//
+// Every public surface reads through ONE predicate (publicItemVisibleUnderModeration): the HIDDEN BIT the shard
+// row carries (refreshed on held rows by the lane's get_hidden when a shard moves), the author's standing in the
+// SANCTION CACHE (read from the wallet's SanctionShard for the authors on screen — feed, registry, catalogue, open
+// thread — ten minutes at a time), and a device-local mute. No client folds a ledger log any more — the first
+// design's page log put forty verdicts a day at the account ceiling and made every fresh device replay it (audit,
+// measured). Your own words stay in your own view, badged when hidden; the notice above the feed is what says
+// others do not see them. A report or a verdict is called SENT only when the chain shows its effect (the house
+// rule: green means chain). Before the gate's address is in the config nothing here is offered and nothing is
+// read: `moderationSupported()` is the one switch.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+let moderationRuntime = null;   // { gateAddress, ledgerAddress, ledgerReadAt, ledgerView, reader, sanctions, moderatorFor: Map<addrKey, {seat, readAt}>, runGetMethod }
+let pendingReport = null;       // { item, kind, parentPost } while the reason dialog is open
+const reportsInFlight = new Set();   // target coordinates of reports between signing and confirmation
+const reportFlightKey = (target) => [target.generation, target.kind, target.epochTag, target.shardSeq, target.entryId, target.partitionKey].map(String).join('.');
+let moderationStatusTimer = null;
+let moderationQueueRows = [];   // the last sweep, for paging
+let moderationQueueShown = 0;
+const localMuteStore = createLocalMuteStore();
+const MODERATION_LEDGER_TTL_MS = 600_000;
+const MODERATION_SEAT_TTL_MS = 600_000;
+const MODERATION_QUEUE_PAGE = 40;
+const MODERATION_QUEUE_EAGER_PREVIEWS = 8;
+const MODERATION_CONFIRM_MS = 90_000;
+const MODERATION_CONFIRM_STEP_MS = 4_000;
+
+function moderationTransport() {
+  return globalThis.plathoTonRpcTransport ?? null;
+}
+
+function moderationRuntimeFor() {
+  if (!moderationSupported()) return null;
+  const gateAddress = moderationGateAddress();
+  if (moderationRuntime?.gateAddress === gateAddress) return moderationRuntime;
+  // the transport is resolved on every call (an API key change replaces the global), never closed over
+  const runGetMethod = (call) => {
+    const transport = moderationTransport();
+    if (typeof transport?.runGetMethod !== 'function') throw new Error('no chain transport');
+    return transport.runGetMethod(call);
+  };
+  moderationRuntime = {
+    gateAddress, ledgerAddress: null, ledgerReadAt: 0, ledgerView: null,
+    reader: createModerationLedgerReader(runGetMethod),
+    sanctions: createSanctionCache({ runGetMethod, gateAddress }),
+    moderatorFor: new Map(),
+    runGetMethod,
+  };
+  return moderationRuntime;
+}
+
+/** The wallets whose standing the surfaces on screen need: the reader's own, every author in the feed, the
+ *  registry and the catalogue, and the commenters of the open post. */
+function moderationAuthorsOnScreen() {
+  const wallets = new Set();
+  const add = (w) => { const raw = w ? rawWalletAddress(w) ?? w : null; if (raw) wallets.add(raw); };
+  add(plathoWallet?.address);
+  for (const item of publicSurfaceItems()) add(publicItemAuthor(item));
+  for (const channel of publicChannelRegistry) add(channel?.authorWallet ?? channel?.author_wallet);
+  for (const channel of publicDiscoveryResults ?? []) add(channel?.authorWallet ?? channel?.author_wallet);   // the catalogue's cards are not in the registry
+  if (publicPostDetailOpen) for (const comment of publicPostDetailMergedComments()) add(publicItemAuthor(comment));
+  return [...wallets];
+}
+
+/** The ledger the gate currently seats, and its published minimums — read again after the TTL, or on demand
+ *  before a verdict (a handover lands without a release). Both halves succeed or neither is remembered. */
+async function refreshModerationLedger(runtime, { force = false } = {}) {
+  if (!force && runtime.ledgerAddress && runtime.ledgerView && Date.now() - runtime.ledgerReadAt < MODERATION_LEDGER_TTL_MS) return;
+  const ledgerAddress = await runtime.reader.ledgerOf(runtime.gateAddress);
+  const ledgerView = ledgerAddress ? await runtime.reader.view(ledgerAddress) : null;
+  if (runtime.ledgerAddress && ledgerAddress !== runtime.ledgerAddress) runtime.moderatorFor.clear();   // a new ledger, a new roster
+  runtime.ledgerAddress = ledgerAddress;
+  runtime.ledgerView = ledgerView;
+  runtime.ledgerReadAt = Date.now();
+}
+
+/** Refresh the ledger, the standings of the authors on screen and the reader's own seat. FAIL-OPEN: a read that
+ *  does not run keeps the last answers; the feed is never blanked because a background read failed — and it says
+ *  so in the console, never silently. */
+async function refreshModeration() {
+  const runtime = moderationRuntimeFor();
+  if (!runtime) { renderModerationNotice(); return null; }
+  try {
+    await refreshModerationLedger(runtime);
+    await runtime.sanctions.lookup(moderationAuthorsOnScreen());
+    const wallet = plathoWallet?.address ?? null;
+    if (wallet && runtime.ledgerAddress) {
+      const key = publicAddrKey(wallet);
+      const seat = runtime.moderatorFor.get(key);
+      if (!seat || Date.now() - seat.readAt > MODERATION_SEAT_TTL_MS) {
+        runtime.moderatorFor.set(key, { seat: await runtime.reader.isModerator(runtime.ledgerAddress, wallet), readAt: Date.now() });
+      }
+    }
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] refresh failed; the last answers stay', error);
+  }
+  renderModerationNotice();
+  return runtime;
+}
+
+/** The chain coordinates of a public item: from the fields the lane attached (a comment carries its thread's), or
+ *  derived from a post's composite feed id. The KIND is the epoch tag's, never the caller's guess. Null while the
+ *  item has no chain row. */
+function publicItemCoordinates(item, kind = null) {
+  const derived = item?.entryId !== undefined && item?.entryId !== null ? sharedPostShardCoordinates(item.entryId) : null;
+  const entryId = item?.shardEntryId ?? derived?.shardEntryId ?? null;
+  const shardSeq = item?.threadShardSeq ?? item?.channelShardSeq ?? derived?.shardSeq ?? null;
+  const epochTag = item?.epochTag ?? item?.channelEpochTag ?? derived?.epochTag ?? null;
+  if (entryId === null || entryId === undefined || shardSeq === null || epochTag === null) return null;
+  try {
+    const tag = BigInt(epochTag);
+    const tagKind = Number(tag >> 32n);
+    if (kind !== null && kind !== tagKind) return null;
+    return { generation: Number(item?.generation ?? derived?.generation ?? 17), kind: tagKind, epochTag: tag, shardSeq: BigInt(shardSeq), entryId: BigInt(entryId) };
+  } catch {
+    return null;
+  }
+}
+
+function publicItemAuthor(item) {
+  return item?.channelWallet ?? item?.authorWallet ?? item?.author_wallet ?? null;
+}
+
+function publicItemVisibleUnderModeration(item, kind = 0) {
+  void kind;
+  const wallet = publicItemAuthor(item);
+  if (wallet && isOwnPublicAuthor(wallet)) return true;
+  if (wallet && localMuteStore.has(wallet)) return false;
+  if (item?.hidden === true) return false;
+  return !(wallet && moderationRuntime?.sanctions?.isRestricted(wallet));
+}
+
+function publicChannelVisibleUnderModeration(channel) {
+  const wallet = channel?.authorWallet ?? channel?.author_wallet ?? null;
+  if (!wallet || isOwnPublicAuthor(wallet)) return true;
+  if (localMuteStore.has(wallet)) return false;
+  return !moderationRuntime?.sanctions?.isRestricted(wallet);
+}
+
+/** The report target: the coordinates plus the PARTITION KEY of the shard the item lives in — a comment carries
+ *  its thread's, a post's is derived from its author and channel shard seq. */
+async function publicItemModerationTarget(item, kind = null) {
+  const coords = publicItemCoordinates(item, kind);
+  if (!coords) return null;
+  let partitionKey = item?.partitionKey ?? null;
+  if (partitionKey === null || partitionKey === undefined) {
+    if (coords.kind !== 0) return null;
+    const author = publicItemAuthor(item);
+    if (!author) return null;
+    partitionKey = await publicChannelPartitionKey(publicWalletHash(author), Number(coords.shardSeq));
+  }
+  return { ...coords, partitionKey: BigInt(partitionKey) };
+}
+
+/** A user-visible line: above the feed, and inside the queue while it is open (the queue is opened from the profile
+ *  screen, where the feed's notice is not on screen). Then the standing banner again. */
+function showModerationStatus(text, { ttlMs = 6000 } = {}) {
+  if (moderationQueueStatus && moderationQueueDialog && !moderationQueueDialog.hidden) {
+    moderationQueueStatus.textContent = text;
+    moderationQueueStatus.hidden = !text;
+  }
+  if (!moderationNotice) { setPublicStatus(text); return; }
+  if (moderationStatusTimer) clearTimeout(moderationStatusTimer);
+  moderationNotice.textContent = text;
+  moderationNotice.hidden = !text;
+  setPublicStatus(text);
+  moderationStatusTimer = setTimeout(() => { moderationStatusTimer = null; renderModerationNotice(); }, ttlMs);
+}
+
+/** GREEN MEANS CHAIN: poll `check` until it reports the effect, for at most MODERATION_CONFIRM_MS. Returns true
+ *  when seen; false when the minute passed without it (the send may still land — the person is told exactly that). */
+async function awaitModerationEffect(check) {
+  const until = Date.now() + MODERATION_CONFIRM_MS;
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, MODERATION_CONFIRM_STEP_MS));
+    try {
+      if (await check()) return true;
+    } catch (error) {
+      if (!noteTonRpcRateLimit(error)) console.warn('[moderation] confirm read failed; asking again', error);
+    }
+  }
+  return false;
+}
+
+function openReportDialog(item, kind, parentPost = null) {
+  if (!moderationSupported() || !reportPostDialog) return;
+  pendingReport = { item, kind, parentPost };
+  renderReportReasonList();
+  reportPostDialog.classList.remove('is-closing');
+  reportPostDialog.hidden = false;
+}
+
+function closeReportDialog() {
+  pendingReport = null;
+  hideDialogAnimated(reportPostDialog);
+}
+
+function renderReportReasonList() {
+  if (!reportReasonList) return;
+  reportReasonList.replaceChildren(...REPORT_REASONS.map((name, code) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'share-target-row';
+    row.textContent = t(`moderation.reason.${name}`);
+    row.addEventListener('click', () => { void submitReport(code); });
+    return row;
+  }));
+}
+
+/** One report: the shard's OWN price at its current fill (read fresh, never mirrored; the deploy figure until the
+ *  shard holds a row), the squat cushion, the send fee — asserted before signing, one wallet message; called sent
+ *  only when the row's count has moved on the chain. */
+async function submitReport(reason) {
+  const pending = pendingReport;
+  if (!pending) return;
+  closeReportDialog();
+  if (!plathoWallet?.address) { showModerationStatus(t('moderation.walletRequired')); return; }
+  let flight = null;
+  try {
+    const target = await publicItemModerationTarget(pending.item, pending.kind);
+    if (!target) throw new Error('the item has no chain coordinates yet');
+    // ONE REPORT IN FLIGHT PER TARGET [audit 2026-09-05, round 2]. The shard keeps no per-reporter dedup by design
+    // (every report pays its fee), so a second press while the first was still confirming filed — and paid for —
+    // a second row on the same post.
+    if (reportsInFlight.has(reportFlightKey(target))) { showModerationStatus(t('moderation.sending'), { ttlMs: 6000 }); return; }
+    flight = reportFlightKey(target);
+    reportsInFlight.add(flight);
+    // ONE instant, read once and handed in: the era of the report shard derives from it (CUTEPOCH-07's rule).
+    const reportedAt = Math.floor(Date.now() / 1000);
+    const runtime = moderationRuntimeFor();
+    const fresh = (call) => runtime.runGetMethod({ ...call, cacheTtlMs: 0 });
+    const draft = await buildReportMessage({ target, reason, nowUnix: reportedAt });
+    const prices = await reportShardPrices(fresh, draft.to);
+    // THE ROW FIRST, THEN THE PRICE [audit round 3]: a row that is already there is a REPEAT, and the shard
+    // charges the flat repeat figure for it — no target endowment, no ladder premium. Attaching the fresh-row
+    // price would ask the second reporter of a post for the whole ladder (it doubles every 512 rows past 2,048),
+    // which on a busy shard is more GRAM than an ordinary wallet holds: the report would be refused before it was
+    // signed. This read is the one the confirmation needs anyway.
+    const countBefore = await reportRowCount(fresh, draft.to, draft.key, target.partitionKey);
+    // THE LADDER PREMIUM IS SAID BEFORE IT IS PAID [audit 2026-09-05, round 1]. Past 2,048 rows a report shard's
+    // fresh-row price doubles every 512 rows and reaches about 1.03 GRAM at the cap, sunk to the protocol; the dialog
+    // promised "a small fee" and the client signed whatever the shard asked. A fresh row that carries a premium is
+    // now confirmed with the exact figure on screen, or not sent.
+    // A FULL SHARD IS SAID, NOT DISCOVERED BY A BOUNCE [audit 2026-09-05, round 2]: a fresh row into a shard at its
+    // safe cap is refused at 13808 and bounced; the client used to sign it and then report "not confirmed within a
+    // minute" — the wrong story. A repeat row on an already-reported post is not bound by the cap.
+    if (countBefore === 0 && prices.live && prices.safeCap > 0 && prices.targetCount >= prices.safeCap) {
+      showModerationStatus(t('moderation.reportShardFull'), { ttlMs: 15_000 });
+      return;
+    }
+    const premium = countBefore > 0 ? 0n : BigInt(prices.live ? (prices.ladderPremium ?? 0n) : 0n);
+    if (premium > 0n) {
+      const price = reportAttachValue(prices, false);
+      const proceed = await openActionDialog({
+        title: t('moderation.reportPriceTitle'),
+        hint: t('moderation.reportPriceHint', { price: formatGramNanotons(price), premium: formatGramNanotons(premium) }),
+        submitLabel: t('moderation.reportPriceSubmit'),
+        fields: [],
+        summary: () => [{ label: t('moderation.reportPriceTitle'), value: `${formatGramNanotons(price)} GRAM` }],
+      });
+      if (!proceed) return;
+    }
+    // "sending" only once the price is settled and the send is really about to happen
+    showModerationStatus(t('moderation.sending'), { ttlMs: MODERATION_CONFIRM_MS + 10_000 });
+    const built = await buildReportMessage({ target, reason, nowUnix: reportedAt, value: reportAttachValue(prices, countBefore > 0) });
+    const prepared = [{ to: built.to, value: built.value, message: built.message }];
+    const { cushion } = await applyShardSurcharge(LANE_REPORT, prepared, {});
+    // the shard's figure, the cushion, anything the surcharge added above them, and the send fee — asserted as one sum
+    const reportNeed = built.value + cushion + surchargeExtraNanotons({ prepared, budgeted: [built.value], cushion })
+      + walletSendFeeReserveNanotons([1]);
+    await assertWalletGramAtLeast(reportNeed, 'report');
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    try {
+      await sendPlathoWalletTransaction(plathoWallet, { messages: [prepared[0].message] }, { transport });
+    } catch (error) {
+      // the bytes may have left the device: the confirm below reads the row and decides, as it would for a clean send
+      if (!broadcastMayHaveLanded(error)) throw error;
+    }
+    const seen = await awaitModerationEffect(async () => (await reportRowCount(fresh, built.to, built.key, target.partitionKey)) > countBefore);
+    showModerationStatus(t(seen ? 'moderation.sent' : 'moderation.unconfirmed'), { ttlMs: seen ? 6000 : 15_000 });
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] report failed', error);
+    showModerationStatus(t('moderation.sendFailed', { error: error?.message ?? String(error) }), { ttlMs: 12_000 });
+  } finally {
+    if (flight) reportsInFlight.delete(flight);
+  }
+}
+
+/** The report row's count, 0 when the shard or the row is not there — what a report is confirmed against. */
+async function reportRowCount(runGetMethod, shardAddress, targetKey, partitionKey) {
+  const raw = await callGetter(runGetMethod, shardAddress, 'get_row', [
+    { type: 'num', value: `0x${BigInt(targetKey).toString(16)}` }, { type: 'num', value: `0x${BigInt(partitionKey).toString(16)}` }]);
+  if (!raw) return 0;
+  // THROUGH THE NORMALISER, like every other read in the app [audit round 3]: `.value` reads a v3 answer's
+  // objects and silently answers undefined for a v2 endpoint's ['num', '0x..'] pairs, which extractStack/readInt
+  // have handled all along. These two were the only raw stack reads left in the file.
+  return Number(readInt(extractStack(raw), 2, 'count'));
+}
+
+function appendRowReportButton(row, comment) {
+  if (!moderationSupported() || !publicPostDetailItem) return;
+  if (isOwnPublicAuthor(publicItemAuthor(comment)) || !publicItemCoordinates(comment, 1)) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'row-reply-button row-report-button';
+  button.title = t('moderation.reportTitle');
+  button.setAttribute('aria-label', t('moderation.report'));
+  button.textContent = '⚑';
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openReportDialog(comment, 1, publicPostDetailItem);
+  });
+  rowActionsCluster(row).append(button);
+}
+
+/** The detail screen's own report control — the surface a permalink visitor lands on has to offer it too. */
+function appendDetailReportButton(postNode, item) {
+  if (!moderationSupported() || !item || isOwnPublicAuthor(publicItemAuthor(item)) || !publicItemCoordinates(item, 0)) return;
+  const row = document.createElement('div');
+  row.className = 'feed-actions public-detail-actions';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = t('moderation.report');
+  button.title = plathoWallet?.address ? t('moderation.reportTitle') : t('moderation.walletRequired');
+  button.addEventListener('click', () => openReportDialog(item, 0));
+  row.append(button);
+  postNode.append(row);
+}
+
+function renderModerationNotice() {
+  if (moderationStatusTimer) return;   // a transient outcome is on screen; the banner returns when it ends
+  const wallet = plathoWallet?.address ?? null;
+  const sanctions = moderationRuntime?.sanctions ?? null;
+  if (moderationNotice) {
+    let text = '';
+    if (sanctions && wallet) {
+      if (sanctions.isRestricted(wallet)) {
+        text = t('moderation.restrictedBanner');
+      } else {
+        const warnings = sanctions.warningsOf(wallet);
+        if (warnings > 0) text = t('moderation.warningBanner', { count: warnings, limit: WARNINGS_TO_RESTRICT });
+      }
+    }
+    moderationNotice.textContent = text;
+    moderationNotice.hidden = !text;
+  }
+  if (moderationQueueButton) {
+    moderationQueueButton.hidden = !(wallet && moderationRuntime?.moderatorFor?.get(publicAddrKey(wallet))?.seat === true);
+  }
+}
+
+/** A restricted wallet's own client refuses to publish public posts and comments — the honest half of a ban that
+ *  every other client enforces by not showing what it writes. The chain is asked for THIS wallet first: a cache
+ *  that is empty after a wallet switch is not an answer. */
+async function assertNotRestrictedForPublicPublishing() {
+  const wallet = plathoWallet?.address ?? null;
+  const runtime = moderationRuntimeFor();
+  if (!wallet || !runtime) return;
+  try {
+    await runtime.sanctions.lookup([wallet]);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] own standing read failed; the last answer stays', error);
+  }
+  if (runtime.sanctions.isRestricted(wallet)) {
+    const error = new Error(t('moderation.restricted'));
+    error.code = 'PLATHO_MODERATION_RESTRICTED';
+    throw error;
+  }
+}
+
+function moderationTextRow(text) {
+  const row = document.createElement('div');
+  row.className = 'share-target-row moderation-queue-row';
+  row.textContent = text;
+  return row;
+}
+
+const firstReportReason = (mask) => { for (let i = 0; i < REPORT_REASONS.length; i += 1) if (mask & (1 << i)) return i; return REPORT_REASONS.length - 1; };
+
+/** The moderators' queue: this era and the last, 64 shards each in one accountStates batch, pages from the live
+ *  ones, rows with the most UNREVIEWED reports first; painted a page at a time. */
+async function openModerationQueue() {
+  const runtime = moderationRuntimeFor();
+  if (!runtime || !moderationQueueDialog || !moderationQueueList) return;
+  moderationQueueDialog.classList.remove('is-closing');
+  moderationQueueDialog.hidden = false;
+  if (moderationQueueStatus) { moderationQueueStatus.textContent = ''; moderationQueueStatus.hidden = true; }
+  moderationQueueList.replaceChildren(moderationTextRow(t('moderation.loading')));
+  try {
+    await refreshModerationLedger(runtime, { force: true });
+    const sweep = createReportQueueReader({
+      readStates: (addresses) => readAccountStates(addresses, { request: createShardStatesRequest({ strict: true, requestOptions: { skipIfRateLimited: false } }) }),
+      runGetMethod: (call) => runtime.runGetMethod({ ...call, cacheTtlMs: 0 }),
+    });
+    const era = reportEraOf(Math.floor(Date.now() / 1000));
+    // a report shard of era e retires at (e+2) eras + 91 days, so eras e-4..e are on chain now — FIVE sweeps, the shard's
+    // whole life [round 3: three left a backlog older than ~60 days invisible until retire]; 320 addresses, one batch.
+    // ONE order across the sweeps: each sweep sorts its own rows, and a concatenation put last month's 300-report
+    // row under this month's single one — the dialog promises "most reported first" [round 2].
+    moderationQueueRows = [...(await sweep(era)), ...(await sweep(era - 1)), ...(await sweep(era - 2)), ...(await sweep(era - 3)), ...(await sweep(era - 4))]
+      .sort((a, b) => b.unreviewed - a.unreviewed || b.count - a.count || b.lastAt - a.lastAt);
+    moderationQueueShown = 0;
+    renderModerationQueue();
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] queue sweep failed', error);
+    moderationQueueList.replaceChildren(moderationTextRow(t('moderation.verdictFailed', { error: error?.message ?? String(error) })));
+  }
+}
+
+function moderationRowLabel(row) {
+  // every kind a report may name [round 3: a channel card and a profile picture were both called "post"]
+  const kindLabel = row.target.kind === 1 ? t('moderation.kindComment')
+    : row.target.kind === 2 ? t('moderation.kindChannel')
+      : row.target.kind === 3 ? t('moderation.kindAvatar')
+        : t('moderation.kindPost');
+  const id = row.target.generation === 17
+    ? `${row.target.epochTag}.${row.target.shardSeq}.${row.target.entryId}`
+    : `${row.target.epochTag}.${row.target.shardSeq}.${row.target.entryId}.${row.target.generation}`;
+  const fresh = row.unreviewed > 0 ? ` · ${t('moderation.queueNew', { count: row.unreviewed })}` : '';
+  return `${kindLabel} ${id} — ${t('moderation.queueReports', { count: row.count })}${fresh}`;
+}
+
+function renderModerationQueue() {
+  if (!moderationQueueList) return;
+  const rows = moderationQueueRows;
+  if (rows.length === 0) { moderationQueueList.replaceChildren(moderationTextRow(t('moderation.queueEmpty'))); return; }
+  const upTo = Math.min(rows.length, moderationQueueShown + MODERATION_QUEUE_PAGE);
+  const cards = [];
+  for (let i = 0; i < upTo; i += 1) {
+    const row = rows[i];
+    const card = document.createElement('div');
+    card.className = 'share-target-row moderation-queue-row';
+    card.dataset.rowKey = row.rowKeyString;
+    const text = document.createElement('span');
+    text.className = 'share-target-text';
+    text.textContent = moderationRowLabel(row);
+    card.append(text);
+    const preview = document.createElement('div');
+    preview.className = 'moderation-queue-preview';
+    // the words behind a row cost three chain reads: the first few rows load at once, the rest on demand
+    const loadPreview = () => {
+      preview.textContent = t('moderation.loading');
+      void moderationEntryPreview(row).then((line) => { preview.textContent = line; }).catch(() => { preview.textContent = t('moderation.previewUnavailable'); });
+    };
+    if (i < MODERATION_QUEUE_EAGER_PREVIEWS) loadPreview();
+    else {
+      const show = document.createElement('button');
+      show.type = 'button';
+      show.textContent = t('moderation.showText');
+      show.addEventListener('click', () => { show.remove(); loadPreview(); });
+      preview.append(show);
+    }
+    card.append(preview);
+    // a pre-flip row (generation 17) lives in a sealed shard with no hide door: only the author can be sanctioned —
+    // and a profile picture (kind 3) has a bit no reader honours [round 3]: a hide there spends the moderator's GRAM
+    // and a quota unit for nothing visible; the wallet sanctions are the tool
+    const canHide = row.target.generation >= MODERATION_GENERATION && row.target.kind !== 3;
+    const actions = [
+      [t('moderation.open'), () => openModerationTarget(row)],
+      ...(canHide ? [
+        [t('moderation.hide'), () => sendEntryVerdict(row, VERDICT_ACTION.HIDE_ENTRY)],
+        [t('moderation.unhide'), () => sendEntryVerdict(row, VERDICT_ACTION.UNHIDE_ENTRY)],
+      ] : []),
+      [t('moderation.warn'), () => sendWalletVerdict(row, VERDICT_ACTION.WARN_WALLET)],
+      [t('moderation.unwarn'), () => sendWalletVerdict(row, VERDICT_ACTION.UNWARN_WALLET)],
+      [t('moderation.restrict'), () => sendWalletVerdict(row, VERDICT_ACTION.RESTRICT_WALLET)],
+      // AND THE WAY BACK [audit round 3]: an explicit RESTRICT clears `auto`, so no number of unwarns lifts it —
+      // without this row a restriction, including one made by mistake, could not be undone from any shipped surface.
+      [t('moderation.unrestrict'), () => sendWalletVerdict(row, VERDICT_ACTION.UNRESTRICT_WALLET)],
+      [t('moderation.dismiss'), () => sendReviewVerdict(row)],
+    ];
+    for (const [caption, onClick] of actions) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = caption;
+      button.addEventListener('click', () => { void onClick(); });
+      card.append(button);
+    }
+    if (!canHide) {
+      const note = document.createElement('div');
+      note.className = 'moderation-queue-preview';
+      note.textContent = t(row.target.kind === 3 ? 'moderation.cannotHideAvatar' : 'moderation.cannotHideOld');
+      card.append(note);
+    }
+    cards.push(card);
+  }
+  if (upTo < rows.length) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'share-target-row moderation-queue-row';
+    more.textContent = t('moderation.more', { count: rows.length - upTo });
+    more.addEventListener('click', () => { moderationQueueShown = upTo; renderModerationQueue(); });
+    cards.push(more);
+  }
+  moderationQueueList.replaceChildren(...cards);
+}
+
+/** The reported entry's publisher and hidden bit, from the shard the row names — read fresh. */
+async function moderationEntryOf(row) {
+  const runtime = moderationRuntimeFor();
+  return readPublicEntry({ runGetMethod: (call) => runtime.runGetMethod({ ...call, cacheTtlMs: 0 }), generation: row.target.generation,
+    partitionKey: row.partitionKey, epochTag: row.target.epochTag, entryId: row.target.entryId });
+}
+
+/** The PublicShard the row's coordinates and key derive — what an entry verdict names. */
+async function moderationShardOf(row) {
+  return rawShardAddress(await publicShardAddressBytesFor(Number(row.target.generation), BigInt(row.partitionKey), BigInt(row.target.epochTag)));
+}
+
+/** A line of the reported text, read from the shard row itself — a moderator judges words, not coordinates. */
+async function moderationEntryPreview(row) {
+  const lane = directPublicLaneReader();
+  if (!lane) return t('moderation.previewUnavailable');
+  const posts = await lane.readEntryAt({ generation: row.target.generation, partitionKey: row.partitionKey, epochTag: row.target.epochTag, entryId: row.target.entryId });
+  const post = posts?.[0] ?? null;
+  if (!post) return t('moderation.previewUnavailable');
+  let payload;
+  try { payload = readPublicPostPayloadV2({ header: post.header, body: post.body }); } catch { return t('moderation.previewUnavailable'); }
+  const line = String(payload?.text ?? '').replace(/\s+/g, ' ').trim();
+  const who = post.publisher ? publicAuthorLabel(rawWalletAddress(publicAddrKey(post.publisher)) ?? publicAddrKey(post.publisher)) : '';
+  const hidden = post.hidden === true ? ` [${t('moderation.hiddenBadge')}]` : '';
+  return `${who}${who ? ': ' : ''}${line.slice(0, 240) || (payload?.type ?? '')}${hidden}`;
+}
+
+async function openModerationTarget(row) {
+  try {
+    const entry = await moderationEntryOf(row);
+    if (!entry?.publisher) throw new Error('the entry is not on chain');
+    if (row.target.kind !== 0) { showModerationStatus(`${t('moderation.kindComment')}: ${entry.publisher}`); return; }
+    // THE COORDINATES MUST NAME THE SHARD THE KEY NAMES [audit 2026-09-05, round 2]. The preview and the hide read the
+    // entry through the reporter's partition key; this permalink is built from the reporter's shard seq. A crafted
+    // report with a seq of another shard would open a different post than the one previewed and hidden. A channel
+    // shard's key is a function of its publisher and seq, so the two are checked against each other here.
+    const expectedKey = await publicChannelPartitionKey(publicWalletHash(rawWalletAddress(publicAddrKey(entry.publisher)) ?? publicAddrKey(entry.publisher)), row.target.shardSeq);
+    if (BigInt(expectedKey) !== BigInt(row.partitionKey)) { showModerationStatus(t('moderation.previewUnavailable')); return; }
+    // the composite id exactly as the feed mints it: three parts for generation 17, four from 18 on
+    const composite = row.target.generation === 17
+      ? `${row.target.epochTag}.${row.target.shardSeq}.${row.target.entryId}`
+      : `${row.target.epochTag}.${row.target.shardSeq}.${row.target.entryId}.${row.target.generation}`;
+    const post = await fetchPermalinkPostFromChain(composite, entry.publisher);
+    if (!post) throw new Error('the post could not be read');
+    hideDialogAnimated(moderationQueueDialog);
+    setView('public');
+    // the queue opens what readers cannot see: the guard in openPublicPostDetail is bypassed on purpose here
+    openPublicPostDetailUnfiltered(post);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] open failed', error);
+    showModerationStatus(t('moderation.verdictFailed', { error: error?.message ?? String(error) }), { ttlMs: 12_000 });
+  }
+}
+
+/** The far shard's arrear, if someone pre-created it: read off its newest transaction and carried through the
+ *  ledger, which forwards everything above its own gas. A read that fails brings nothing extra (the cushion of a
+ *  lazily-deployed lane is not this: these shards exist, or the verdict has nothing to land on). */
+async function moderationArrearOf(shardAddress, lane) {
+  try {
+    const verdict = await defaultShardDebtResolver()(shardAddress, lane, Math.floor(Date.now() / 1000));
+    return BigInt(verdict?.debt ?? 0n);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] arrear read failed; sending without it', error);
+    return 0n;
+  }
+}
+
+/** A verdict as ONE wallet message to the ledger the gate seats RIGHT NOW (re-read before every send — a handover
+ *  lands without a release, and a stale ledger swallows what it forwards): the ledger's published minimum for the
+ *  action plus what the far shard may demand, asserted before signing; called sent only when `confirm` sees the
+ *  effect on the chain. */
+async function sendVerdict({ action, reason = 0, shard = null, entryId = 0n, key = 0n, extra = 0n, confirm = null }) {
+  const runtime = moderationRuntimeFor();
+  if (!runtime || !plathoWallet?.address) return;
+  try {
+    showModerationStatus(t('moderation.sending'), { ttlMs: MODERATION_CONFIRM_MS + 10_000 });
+    await refreshModerationLedger(runtime, { force: true });
+    if (!runtime.ledgerAddress || !runtime.ledgerView) throw new Error('no ledger is seated in the gate');
+    const view = runtime.ledgerView;
+    const a = Number(action);
+    const entryAction = a <= VERDICT_ACTION.UNHIDE_ENTRY;
+    const walletAction = (a >= VERDICT_ACTION.WARN_WALLET && a <= VERDICT_ACTION.UNRESTRICT_WALLET) || a === VERDICT_ACTION.UNWARN_WALLET;
+    const minimum = entryAction ? view.entry_min_value : (walletAction ? view.wallet_min_value : view.review_min_value);
+    const message = buildVerdictMessage(runtime.ledgerAddress, { action: a, reason, shard, entryId, key, value: BigInt(minimum) + BigInt(extra) });
+    await assertWalletGramAtLeast(BigInt(message.amount) + walletSendFeeReserveNanotons([1]), 'moderate');
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    await sendPlathoWalletTransaction(plathoWallet, { messages: [message] }, { transport });
+    const seen = typeof confirm === 'function' ? await awaitModerationEffect(confirm) : true;
+    showModerationStatus(t(seen ? 'moderation.verdictSent' : 'moderation.unconfirmed'), { ttlMs: seen ? 6000 : 15_000 });
+    return seen;
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] verdict failed', error);
+    showModerationStatus(t('moderation.verdictFailed', { error: error?.message ?? String(error) }), { ttlMs: 12_000 });
+    return false;
+  }
+}
+
+async function sendEntryVerdict(row, action) {
+  try {
+    // a pre-flip shard has no hide door: the forward would bounce into the gate and the moderator would pay for nothing
+    if (row.target.generation < MODERATION_GENERATION) { showModerationStatus(t('moderation.cannotHideOld')); return; }
+    // THE CHAIN IS ASKED FIRST [round 2, measured]: a forward the far shard refuses bounces into the GATE, not back
+    // to the moderator (the bounce carries no refund address), so a hide of an entry that is not there costs the
+    // moderator ~0.005 GRAM for nothing; and a hide of an already-hidden entry lands, spends a quota unit and
+    // changes nothing. Both are answered here, for free.
+    const entry = await moderationEntryOf(row);
+    if (!entry?.exists) { showModerationStatus(t('moderation.entryMissing')); return; }
+    const wantHidden = action === VERDICT_ACTION.HIDE_ENTRY;
+    if (entry.hidden === wantHidden) { showModerationStatus(t('moderation.alreadySo')); return; }
+    const shard = await moderationShardOf(row);
+    const extra = await moderationArrearOf(shard, LANE_PUBLIC);
+    await sendVerdict({ action, reason: firstReportReason(row.reasons), shard, entryId: BigInt(row.target.entryId), extra,
+      confirm: async () => (await moderationEntryOf(row))?.hidden === wantHidden });
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] entry verdict failed', error);
+    showModerationStatus(t('moderation.verdictFailed', { error: error?.message ?? String(error) }), { ttlMs: 12_000 });
+  }
+}
+
+/** A wallet's leaf in its bucket shard, read fresh: { exists, warnings, restricted } or null when the shard is not there. */
+async function moderationWalletStanding(runtime, wallet) {
+  const shardAddress = await sanctionShardAddressFor(runtime.gateAddress, Number(walletHashOf(wallet) % 64n));
+  const raw = await callGetter((call) => runtime.runGetMethod({ ...call, cacheTtlMs: 0 }), shardAddress, 'get_wallet',
+    [{ type: 'num', value: `0x${walletHashOf(wallet).toString(16)}` }]);
+  return { shardAddress, standing: raw ? decodeSanctionWallet(raw) : { exists: false, warnings: 0, restricted: false } };
+}
+
+async function sendWalletVerdict(row, action) {
+  try {
+    const entry = await moderationEntryOf(row);
+    if (!entry?.publisher) throw new Error('the publisher is not on chain');
+    const runtime = moderationRuntimeFor();
+    const { shardAddress, standing } = await moderationWalletStanding(runtime, entry.publisher);
+    // a lift with nothing to lift is refused by the shard (29208/29209) — and would strand the forward in the gate
+    if ((action === VERDICT_ACTION.UNRESTRICT_WALLET && !standing.exists)
+      || (action === VERDICT_ACTION.UNWARN_WALLET && standing.warnings === 0)
+      || (action === VERDICT_ACTION.RESTRICT_WALLET && standing.restricted)) { showModerationStatus(t('moderation.alreadySo')); return; }
+    // A FRESH LEAF INTO A FULL SHARD IS SAID, NOT STRANDED [audit 2026-09-06, round 3]: the shard refuses it at 29206
+    // after the ledger and the gate took their legs, and the 14,800,000 forward strands in the gate (the MG-03 class).
+    if (!standing.exists && (action === VERDICT_ACTION.WARN_WALLET || action === VERDICT_ACTION.RESTRICT_WALLET)) {
+      const room = await sanctionShardRoom((call) => runtime.runGetMethod({ ...call, cacheTtlMs: 0 }), shardAddress);
+      if (room.live && room.safeCap > 0 && room.count >= room.safeCap) { showModerationStatus(t('moderation.sanctionShardFull'), { ttlMs: 15_000 }); return; }
+    }
+    const extra = await moderationArrearOf(shardAddress, LANE_SANCTION);
+    const expect = (after) => {
+      if (action === VERDICT_ACTION.WARN_WALLET) return after.warnings > standing.warnings;
+      if (action === VERDICT_ACTION.UNWARN_WALLET) return after.warnings < standing.warnings;
+      if (action === VERDICT_ACTION.RESTRICT_WALLET) return after.restricted === true;
+      return !after.exists;
+    };
+    const seen = await sendVerdict({ action, reason: firstReportReason(row.reasons), key: walletHashOf(entry.publisher), extra,
+      confirm: async () => expect((await moderationWalletStanding(runtime, entry.publisher)).standing) });
+    if (seen) runtime.sanctions.invalidate(entry.publisher);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[moderation] wallet verdict failed', error);
+    showModerationStatus(t('moderation.verdictFailed', { error: error?.message ?? String(error) }), { ttlMs: 12_000 });
+  }
+}
+
+/** "Looked at it, leaving it": the row's count folds into reviewed_count and it sinks in every moderator's queue. */
+async function sendReviewVerdict(row) {
+  const runtime = moderationRuntimeFor();
+  const extra = await moderationArrearOf(row.shard, LANE_REPORT);
+  const fresh = (call) => runtime.runGetMethod({ ...call, cacheTtlMs: 0 });
+  const seen = await sendVerdict({ action: VERDICT_ACTION.REVIEW_REPORT, shard: row.shard, key: BigInt(row.rowKey), extra,
+    confirm: async () => {
+      const raw = await callGetter(fresh, row.shard, 'get_row', [
+        { type: 'num', value: `0x${BigInt(row.key).toString(16)}` }, { type: 'num', value: `0x${BigInt(row.partitionKey).toString(16)}` }]);
+      return raw ? Number(readInt(extractStack(raw), 3, 'reviewed_count')) >= row.count : false;
+    } });
+  if (seen) { row.reviewedCount = row.count; row.unreviewed = 0; renderModerationQueue(); }
+}
+
+// ── REACTIONS [decided 2026-09-05] ──────────────────────────────────────────────────────────────────────────
+// A reaction is a counter in the shard that holds the target (web/public-reactions.mjs). The bar under a post or a
+// comment shows the non-zero counters and a button; the counters are read lazily — one get_reactions per shard
+// page, for the targets on screen — and this device remembers what it pressed, because the chain does not.
+const reactionCounts = new Map();          // `${shard}|${target}` -> the sixteen counters
+const reactionHydrationQueue = new Map();  // shard -> Set<target> waiting for a read
+let reactionHydrationTimer = null;
+let ownReactionState = null;
+
+function ownReactions() {
+  const wallet = plathoWallet?.address ?? null;
+  if (!ownReactionState || ownReactionState.wallet !== wallet) {
+    ownReactionState = { wallet, store: createOwnReactionStore({ storage: localStorageOrNull(), wallet }) };
+  }
+  return ownReactionState.store;
+}
+
+function reactionKey(shard, target) { return `${String(shard).toLowerCase()}|${BigInt(target)}`; }
+
+/** The shard that holds `item` and its entry id there: a post in its channel shard, a comment in its thread shard. */
+async function reactionTargetFor(item, kind) {
+  const target = await publicItemModerationTarget(item, kind);
+  if (!target) return null;
+  const shard = rawShardAddress(await publicShardAddressBytesFor(Number(target.generation), BigInt(target.partitionKey), BigInt(target.epochTag)));
+  return { shard, entryId: BigInt(target.entryId), generation: Number(target.generation) };
+}
+
+function appendReactionBar(node, item, kind) {
+  // clean-17 shards have no React receiver: a post of that generation gets no bar — decided from the coordinates the
+  // item already carries, BEFORE any node is appended or any hash is computed [audit 2026-09-05, round 1: the live
+  // feed derived the shard address of every generation-17 item and removed a bar it had already laid out].
+  const known = publicItemCoordinates(item, null);
+  if (known && Number(known.generation ?? 17) < 18) return;
+  // a hidden entry collects no reactions (gate 13743): its author sees it, badged, and gets no bar to press for a fee
+  if (item?.hidden === true) return;
+  const bar = document.createElement('div');
+  bar.className = 'reaction-bar';
+  bar.dataset.reactionBar = '';
+  node.append(bar);
+  void reactionTargetFor(item, kind).then((target) => {
+    // clean-17 shards have no React receiver: a post of that generation shows no bar at all
+    if (!target || target.generation < 18) { bar.remove(); return; }
+    bar.dataset.shard = target.shard;
+    bar.dataset.target = String(target.entryId);
+    renderReactionBar(bar);
+    queueReactionHydration(target.shard, target.entryId);
+  }).catch(() => bar.remove());
+}
+
+function renderReactionBar(bar) {
+  const shard = bar.dataset.shard;
+  const target = bar.dataset.target;
+  if (!shard || target === undefined) return;
+  const counters = reactionCounts.get(reactionKey(shard, target)) ?? null;
+  const mine = ownReactions().mine(shard, target);
+  bar.replaceChildren();
+  for (const r of reactionsShown(counters ?? [], 8)) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `reaction-chip${mine.includes(r.index) ? ' is-mine' : ''}`;
+    chip.textContent = `${r.glyph} ${r.count}`;
+    chip.title = mine.includes(r.index) ? t('public.reactedAlready') : t('public.reactTitle');
+    // A chip this device already pressed stays an ENABLED control marked pressed — reactTo refuses the second
+    // press itself. Disabling it would dim the one chip that is the user's by the shared disabled token
+    // (MODALGEO-04: every :disabled control dims by that token and none by its own number).
+    chip.setAttribute('aria-pressed', mine.includes(r.index) ? 'true' : 'false');
+    chip.disabled = !plathoWallet?.address;
+    chip.addEventListener('click', () => { void reactTo(bar, r.index); });
+    bar.append(chip);
+  }
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'reaction-add';
+  add.textContent = counters ? t('public.react') : '…';
+  add.title = plathoWallet?.address ? t('public.reactTitle') : t('public.walletRequiredToReact');
+  add.disabled = !plathoWallet?.address;
+  add.addEventListener('click', () => { void openReactionPicker(bar); });
+  bar.append(add);
+}
+
+function refreshReactionBars(key = null) {
+  for (const bar of document.querySelectorAll('[data-reaction-bar]')) {
+    if (!bar.dataset.shard) continue;
+    if (key === null || reactionKey(bar.dataset.shard, bar.dataset.target) === key) renderReactionBar(bar);
+  }
+}
+
+function queueReactionHydration(shard, target, { force = false } = {}) {
+  const key = reactionKey(shard, target);
+  const fresh = reactionCounts.has(key) && Date.now() - (reactionReadAt.get(key) ?? 0) < REACTION_COUNTS_TTL_MS;
+  if (!force && fresh && !reactionsOwedFor(key)) return;
+  if (!reactionHydrationQueue.has(shard)) reactionHydrationQueue.set(shard, new Set());
+  reactionHydrationQueue.get(shard).add(Number(target));
+  if (reactionHydrationTimer) return;
+  reactionHydrationTimer = setTimeout(() => { reactionHydrationTimer = null; void runReactionHydration(); }, 150);
+}
+
+/** One get_reactions per shard PAGE: the lowest asked target opens a page of PS_REACTION_PAGE_CAP, which covers
+ *  every asked target inside it — a feed of one channel's posts is one call. */
+async function runReactionHydration() {
+  const transport = globalThis.plathoTonRpcTransport;
+  if (typeof transport?.runGetMethod !== 'function') return;
+  const batches = [...reactionHydrationQueue.entries()];
+  reactionHydrationQueue.clear();
+  for (const [shard, targets] of batches) {
+    const sorted = [...targets].sort((a, b) => a - b);
+    let i = 0;
+    while (i < sorted.length) {
+      const from = sorted[i];
+      const to = from + PUBLIC_REACTION_PAGE_CAP - 1;
+      try {
+        const page = decodePublicReactions(await transport.runGetMethod(reactionsGetterCall(shard, from, PUBLIC_REACTION_PAGE_CAP)));
+        for (const row of page.rows) {
+          reactionCounts.set(reactionKey(shard, row.target), reconcileUnsettledReactions(shard, row.target, row.counters));
+          reactionReadAt.set(reactionKey(shard, row.target), Date.now());
+          refreshReactionBars(reactionKey(shard, row.target));
+        }
+      } catch (error) {
+        // an uninitialised shard (a post still pending) or a transient read: the bar simply stays as it was
+        if (!noteTonRpcRateLimit(error)) console.warn('[reactions] read', error);
+      }
+      while (i < sorted.length && sorted[i] <= to) i += 1;
+    }
+  }
+}
+
+/** Two rows of eight; a tap selects, the dialog's button sends. The price is on the screen before anything is signed. */
+async function openReactionPicker(bar) {
+  const shard = bar.dataset.shard;
+  const target = bar.dataset.target;
+  if (!shard || !plathoWallet?.address) return;
+  const mine = ownReactions().mine(shard, target);
+  const grid = document.createElement('div');
+  grid.className = 'reaction-picker';
+  let chosen = null;
+  PUBLIC_REACTION_GLYPHS.forEach((glyph, index) => {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = `reaction-picker-cell${mine.includes(index) ? ' is-mine' : ''}`;
+    cell.textContent = glyph;
+    cell.disabled = mine.includes(index);
+    cell.title = mine.includes(index) ? t('public.reactedAlready') : glyph;
+    cell.addEventListener('click', () => {
+      chosen = index;
+      for (const n of grid.querySelectorAll('.reaction-picker-cell')) n.classList.remove('is-selected');
+      cell.classList.add('is-selected');
+    });
+    grid.append(cell);
+  });
+  // the composer's convention: what the send COSTS (value, cushion, the measured wallet fee), not the pre-flight's floored reserve
+  const price = formatGramNanotons(PUBLIC_REACT_VALUE + squatCushionNanotons(LANE_PUBLIC) + walletSendFeeNanotons([1]));
+  const result = await openActionDialog({
+    title: t('public.reactTitle'),
+    hint: t('public.reactHint', { price }),
+    submitLabel: t('public.react'),
+    fields: [{ type: 'custom', render: () => grid }],
+  });
+  if (!result || chosen === null) return;
+  await reactTo(bar, chosen);
+}
+
+/** The press: one wallet message to the shard, remembered here the moment it is signed, shown at once, re-read later. */
+// A press in flight: (shard|target|emoji) -> the moment it was signed. Checked and set SYNCHRONOUSLY before the first
+// await, so a double tap signs one message, not two [audit 2026-09-05, round 1].
+const reactionsInFlight = new Map();
+// Presses whose chain copy is still awaited: key -> { since, emoji }. The hydration reconciles them against the
+// shard's counters: a press the chain shows is settled; one it does not show after REACTION_SETTLE_MS is forgotten
+// and its optimistic +1 withdrawn, so a refused React (13745 at the leaf cap, a hidden target, a bounce) does not
+// leave the emoji marked pressed for ever on this device.
+const reactionsUnsettled = new Map();
+const REACTION_SETTLE_MS = 120_000;
+// The chain lands a hop in p50 27 s / max 39 s through a shard split (measured 2026-09-04), and the getter answers
+// the pre-landing counters until then — so the re-reads step 15 s, 45 s, 90 s rather than once at 12 s, AND once
+// more PAST the settle window [audit 2026-09-05, round 2]: with every read younger than the window, the branch that
+// forgets a press the chain never showed could not fire at all.
+const REACTION_REREAD_DELAYS_MS = [15_000, 45_000, 90_000, 150_000];
+// How long a page of counters is trusted before a render asks the shard again. Counters were read once per target per
+// session and never refreshed [audit 2026-09-05, round 2]; a card open for an hour showed the count it opened with.
+const REACTION_COUNTS_TTL_MS = 5 * 60_000;
+const reactionReadAt = new Map();
+/** A wallet change forgets the presses, the pending re-reads and the counters read for the departed wallet [round 3]. */
+function resetReactionRuntimeState() {
+  reactionsInFlight.clear(); reactionsUnsettled.clear(); reactionCounts.clear(); reactionReadAt.clear();
+}
+/** A press this device still waits on, older than the settle window — a read is owed whatever the cache says. */
+function reactionsOwedFor(key) {
+  for (const press of reactionsUnsettled.values()) {
+    if (reactionKey(press.shard, press.target) === key && Date.now() - press.since >= REACTION_SETTLE_MS) return true;
+  }
+  return false;
+}
+
+async function reactTo(bar, emoji) {
+  const shard = bar.dataset.shard;
+  const target = bar.dataset.target;
+  if (!shard || !plathoWallet?.address) return;
+  const store = ownReactions();
+  if (store.has(shard, target, emoji)) return;
+  const flight = `${reactionKey(shard, target)}|${Number(emoji)}`;
+  if (reactionsInFlight.has(flight)) return;
+  reactionsInFlight.set(flight, Date.now());
+  try {
+    // the squat cushion rides along as on every public publish; a healthy shard returns it as change
+    const message = buildReactMessage({ shardAddress: shard, target, emoji, extra: squatCushionNanotons(LANE_PUBLIC) });
+    await assertWalletGramAtLeast(BigInt(message.amount) + walletSendFeeReserveNanotons([1]), 'react');
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    try {
+      await sendPlathoWalletTransaction(plathoWallet, { messages: [message] }, { transport });
+    } catch (error) {
+      // the bytes may have left the device: mark the press and let the re-reads confirm it or forget it
+      if (!broadcastMayHaveLanded(error)) throw error;
+    }
+    store.note(shard, target, emoji);
+    const key = reactionKey(shard, target);
+    const counters = [...(reactionCounts.get(key) ?? new Array(PUBLIC_REACTION_COUNT).fill(0))];
+    counters[Number(emoji)] += 1;
+    reactionCounts.set(key, counters);
+    // the chain must still show it: until it does, hydration keeps the optimistic figure and asks again
+    reactionsUnsettled.set(flight, { since: Date.now(), shard, target: String(target), emoji: Number(emoji), floor: counters[Number(emoji)] });
+    refreshReactionBars(key);
+    for (const delay of REACTION_REREAD_DELAYS_MS) setTimeout(() => { queueReactionHydration(shard, target, { force: true }); }, delay);
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[reactions] failed', error);
+    showModerationStatus(error?.code === 'PLATHO_WALLET_GRAM_REQUIRED' ? String(error.message) : t('public.reactionFailed'));
+  } finally {
+    reactionsInFlight.delete(flight);
+  }
+}
+
+/**
+ * A page of counters just read, against the presses this device still waits on. A counter at or above what the press
+ * expected settles it; one still short keeps the optimistic figure on screen while the press is young, and forgets
+ * the press — optimistic +1 withdrawn, the mark cleared so the emoji can be pressed again — once it is old.
+ */
+function reconcileUnsettledReactions(shard, target, counters) {
+  const key = reactionKey(shard, target);
+  const shown = [...counters];
+  let changed = false;
+  for (const [flight, press] of reactionsUnsettled) {
+    if (reactionKey(press.shard, press.target) !== key) continue;
+    if (shown[press.emoji] >= press.floor) { reactionsUnsettled.delete(flight); continue; }
+    if (Date.now() - press.since < REACTION_SETTLE_MS) { shown[press.emoji] = press.floor; changed = true; continue; }
+    reactionsUnsettled.delete(flight);
+    ownReactions().forget(press.shard, press.target, press.emoji);
+    showModerationStatus(t('public.reactionFailed'));
+  }
+  return changed ? shown : counters;
+}
+
 function appendPublicItemActions(article, item) {
   const actions = document.createElement('div');
   actions.className = 'feed-actions';
@@ -8490,6 +10375,17 @@ function appendPublicItemActions(article, item) {
     shareButton.title = t('public.sharePostTitle');
     shareButton.addEventListener('click', () => openSharePostDialog(item));
     actions.append(shareButton);
+  }
+
+  // "Report" [CUTOVER item 15] — hidden on your own post, and before the moderation ledger exists in this build.
+  if (!isOwnPost && moderationSupported() && publicItemCoordinates(item, 0)) {
+    const reportButton = document.createElement('button');
+    reportButton.type = 'button';
+    reportButton.textContent = t('moderation.report');
+    reportButton.title = plathoWallet?.address ? t('moderation.reportTitle') : t('moderation.walletRequired');
+    reportButton.disabled = !plathoWallet?.address;
+    reportButton.addEventListener('click', () => openReportDialog(item, 0));
+    actions.append(reportButton);
   }
 
   // "Private chat" — open the author in Private. HIDDEN on your own post: a dialog with yourself is meaningless.
@@ -8769,6 +10665,9 @@ function chooseShareCopyToClipboard() {
 }
 
 sharePostCloseButton?.addEventListener('click', () => closeSharePostDialog());
+reportPostCloseButton?.addEventListener('click', () => closeReportDialog());
+moderationQueueCloseButton?.addEventListener('click', () => hideDialogAnimated(moderationQueueDialog));
+moderationQueueButton?.addEventListener('click', () => { void openModerationQueue(); });
 // v794: X-only — the share dialog closes ONLY via its ✕ (an outside/backdrop tap no longer dismisses it).
 
 // Ids the feed has already painted (session-long, see surfaceRow): only a post new to the screen rises in.
@@ -8776,7 +10675,8 @@ const publicFeedSurfacedIds = new Map();
 function renderPublicFeed(items, options = {}) {
   if (!publicFeed) return;
   publicFeed.dataset.publicMode = 'feed';
-  const allItems = items ?? [];
+  // THE MODERATION FILTER, at the one door every feed render passes through [CUTOVER item 15].
+  const allItems = (items ?? []).filter((item) => publicItemVisibleUnderModeration(item, 0));
   if (allItems.length === 0) {
     publicFeed.replaceChildren();
     // The discovery CTA sits at the very top for a newcomer (no channels followed) — shown ABOVE the posts, and also
@@ -8871,9 +10771,8 @@ function renderPublicFeed(items, options = {}) {
   // background sync does not pre-clear unread). NOT while an overlay (post detail / discovery / channel view)
   // covers the feed — it is display:none then and the user cannot see the posts being marked. Re-render once to
   // drop the unread badges.
-  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen
-    && markVisiblePublicFeedRead(windowItems)) {
-    requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
+  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen && !publicChannelViewOpen) {
+    holdPublicFeedPainted(windowItems);
   }
 }
 
@@ -9060,11 +10959,24 @@ function normalizeBodyHashHex(value) {
 const sharedPostChainReads = new Map();   // feed entryId -> Promise<post|null>
 const SHARED_POST_CHAIN_READ_LIMIT = 256;
 
-/** epochTag.shardSeq.entryId -> the three coordinates, or null for a v1 share (a bare uint64, pre-shard). */
+/**
+ * epochTag.shardSeq.entryId[.generation] -> the coordinates, or null for a v1 share (a bare uint64, pre-shard).
+ *
+ * THREE PARTS OR FOUR [round 5]. Three is generation 17 — the form every id minted so far carries, and the one
+ * every stored feed entry, share block and permalink in the wild uses; it keeps meaning exactly what it always
+ * meant. A fourth part names a later generation, which only exists after the flip. `generation` is null for the
+ * three-part form rather than 17, so a reader can tell "this id predates the split" from "this id says 17" — the
+ * straddling era is where the difference matters, and there readPostAt probes both rather than guessing.
+ */
 function sharedPostShardCoordinates(entryId) {
   const parts = String(entryId ?? '').split('.');
-  if (parts.length !== 3 || !parts.every((part) => /^\d+$/.test(part))) return null;
-  return { epochTag: parts[0], shardSeq: Number(parts[1]), shardEntryId: parts[2] };
+  if (parts.length < 3 || parts.length > 4 || !parts.every((part) => /^\d+$/.test(part))) return null;
+  return {
+    epochTag: parts[0],
+    shardSeq: Number(parts[1]),
+    shardEntryId: parts[2],
+    generation: parts.length === 4 ? Number(parts[3]) : null,
+  };
 }
 
 /**
@@ -9095,6 +11007,9 @@ function publicPostChainCoordinates(item) {
       epochTag: BigInt(epochTag),
       shardSeq: Number(shardSeq),
       shardEntryId: BigInt(shardEntryId),
+      // The FOURTH coordinate [round 5]. A post read this session carries it; an id minted before the split says
+      // nothing, and 17 is what that means — the generation every existing post was written by.
+      generation: Number(item.generation ?? derived?.generation ?? 17),
     };
   } catch {
     return null;   // a malformed id is not a thread address; the caller decides what to say about it
@@ -9116,7 +11031,10 @@ async function fetchPublicPostFromChain(entryId, authorWallet, selectPost) {
   // into a follow. The id is only needed to key the post in the feed cache.
   const channelId = ensurePublicChannelForAuthorWallet(wallet, { activate: false });
   if (!channelId) return null;
-  const shardPosts = await lane.readPostAt(wallet, coords.epochTag, coords.shardSeq, coords.shardEntryId);
+  // A four-part id names its generation and addresses ONE shard; a three-part one predates the split, so the
+  // straddling era's two candidates are both read and `selectPost` decides between them [round 5].
+  const shardPosts = await lane.readPostAt(wallet, coords.epochTag, coords.shardSeq, coords.shardEntryId,
+    { generation: coords.generation });
   if (shardPosts.length === 0) return null;
   const parts = await publicPostPartsFromShardPosts(shardPosts, { id: channelId, authorWallet: wallet });
   const post = assemblePublicParts(parts).find((item) => selectPost(item)) ?? null;
@@ -9214,15 +11132,22 @@ function resolveSharedPostOriginal(entryId, expectedBodyHash, authorWallet) {
 // so somebody could register them. Reserving them keeps the door open for serving those pages extensionless later
 // without a link that used to open a channel silently changing meaning.
 const PERMALINK_RESERVED_SEGMENTS = new Set(['assets', 'vendor', 'privacy', 'terms']);
-// Second segment is the feed entryId (epochTag.shardSeq.entryId) — all digits, so it can never be mistaken for a
-// username (which is [a-z0-9_-]{4,16}, no dots) and the two segments cannot swap places.
+// Second segment is the feed entryId (epochTag.shardSeq.entryId[.generation]) — all digits, so it can never be
+// mistaken for a username (which is [a-z0-9_-]{4,16}, no dots) and the two segments cannot swap places.
 // `~` joins the name to the author fingerprint (see permalinkWalletFingerprint). It cannot be confused with either
 // half: a username is [a-z0-9_-] and a wallet address is base64url, so neither can contain one.
-const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:~-]{4,90})\/(\d+\.\d+\.\d+)\/?$/;
+//
+// THREE GROUPS OR FOUR [audit 2026-08-31, round 6 — found by three independent facets]. Round 5 made the
+// generation the fourth coordinate of a post's identity and widened `sharedPostShardCoordinates` to match; this
+// regex was missed, and it is the ONE consumer of a feed id with a parser of its own. The result was the sharpest
+// shape a client bug can take: the app MINTED a link its own router then refused. Every post published after the
+// flip lives in a generation-18 shard forever, so every share link the product emits — the only way a public post
+// leaves Platho to someone who is not here yet — resolved to null, the boot chain fell through both branches, and
+// the visitor landed on the home screen with no post and no error. Permanent, not window-limited.
+const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:~-]{4,90})\/(\d+\.\d+\.\d+(?:\.\d+)?)\/?$/;
 
 /**
- * A NAME CAN CHANGE HANDS; A POST CANNOT [OWNER 2026-08-24: "if someone shares a link with a username and then
- * passes the username to another person, the link can be substituted for a post by the NEW owner"].
+ * A NAME CAN CHANGE HANDS; A POST CANNOT [decided 2026-08-24].
  *
  * A post link resolves its name to a wallet AT OPEN TIME, so after a transfer the same URL points at whoever holds
  * the name now. Two outcomes, and the second is the dangerous one: either that account has no entry with this id
@@ -9237,8 +11162,7 @@ const PUBLIC_POST_PERMALINK_RE = /^\/([A-Za-z0-9_.:~-]{4,90})\/(\d+\.\d+\.\d+)\/
  * SYNCHRONOUS on purpose — the link is built inside a render, and an async digest there would mean either a
  * pending link or plumbing a promise through the feed. The vendored sha256 is synchronous.
  *
- * A CHANNEL link deliberately has NO fingerprint [OWNER: "a channel link should lead to the channel of whoever
- * owns the username, that's normal"]. A channel link names an IDENTITY, and the identity is the name; a post link
+ * A CHANNEL link deliberately has NO fingerprint [decided]. A channel link names an IDENTITY, and the identity is the name; a post link
  * names a piece of CONTENT, and content belongs to whoever wrote it.
  */
 const PERMALINK_FINGERPRINT_CHARS = 8;
@@ -9433,6 +11357,12 @@ async function openPublicPostFromPermalink(link) {
     if (!wallet) throw new Error('permalink author does not resolve to a wallet');
     const post = await fetchPermalinkPostFromChain(link.entryId, wallet);
     if (!post) throw new Error('permalink post not found on chain');
+    if (!publicItemVisibleUnderModeration(post, 0)) {
+      // A hidden post is answered by name, not opened: the link is real, the moderators said no. The address bar
+      // keeps the link — it resolves; a reload lands on the same answer.
+      setPublicStatus(t('moderation.hiddenPost'));
+      return false;
+    }
     renderPublicSurface({ anchorUnread: false });   // the fetch cached the post; put it in the feed first
     openPublicPostDetail(post);
     setPublicStatus('feed');
@@ -9543,11 +11473,15 @@ function buildSharedPostEmbed(block, embedDepth = 0) {
   body.className = 'feed-post-body';
   const inner = document.createElement('div');
   inner.className = 'feed-post-body-inner';
+  // The sender's TITLE is part of the claim, so it must go when chain truth replaces the body [round 8]. It sits
+  // outside `snapshot` — the node the resolved original replaces — so a verified card used to keep displaying the
+  // sender-authored title above the real post. Held in a local so the success path below can drop it.
+  let titleNode = null;
   if (block.title) {
-    const title = document.createElement('div');
-    title.className = 'shared-post-embed-title';
-    title.textContent = block.title;
-    inner.append(title);
+    titleNode = document.createElement('div');
+    titleNode.className = 'shared-post-embed-title';
+    titleNode.textContent = block.title;
+    inner.append(titleNode);
   }
   // The SENDER'S SNAPSHOT paints first, always. It is a 4KB excerpt that already travelled inside the message, so
   // the card is complete the instant it is built — the chain read below is a round trip, and without this every
@@ -9593,16 +11527,62 @@ function buildSharedPostEmbed(block, embedDepth = 0) {
   // AND IT REPLACES THE BODY WHOLE, through the SAME renderer the feed and the post detail use — so the post appears
   // in the order its author wrote it: text, picture where they put it, more text. Rebuilding it out of a snippet plus
   // a trailing image could only ever produce one layout, and it was the wrong one.
-  if (embedDepth === 0 && block.entryId && (block.hasImage || block.textTruncated)) {
+  // VERIFICATION IS NOT THE SENDER'S TO SWITCH OFF [audit 2026-08-31, round 8 — the crypto/hostile-input pass].
+  //
+  // This used to read `&& (block.hasImage || block.textTruncated)`. Those are two BITS IN A BYTE THE SENDER
+  // ENCODES (capsule-part-policy SHARE_FLAG_*), and nothing on the wire binds them to the post being referenced —
+  // so a hostile share block with flags = 0 skipped the chain read entirely and the card kept the sender's text
+  // while wearing the referenced author's identity: the reader's own registry-verified `.ath` name, their
+  // hash-verified avatar, and a header tap that navigates to their real channel. MEASURED: zero chain reads, and
+  // the same block with hasImage = 1 read the chain once — the flag was the only gate. It is reachable on the
+  // PUBLIC feed, so it is broadcast impersonation, not a private-thread nuisance.
+  //
+  // The paragraph above states the rule correctly — "chain truth displaces the claim; the claim never displaces
+  // chain truth" — and the flag test was the one thing standing between that sentence and the code. Verification
+  // now runs whenever the card CLAIMS a chain row; the flags remain a hint about what to expect, never a gate.
+  const claimsChainRow = Boolean(block.entryId);
+  if (claimsChainRow) snapshot.classList.add('shared-post-embed-unverified');
+  // A NESTED CARD SAYS SO UP FRONT [pre-stage security review 2026-09-08]. The chain read below is bounded to
+  // depth 0 on purpose — each nesting level would otherwise cost another read — but a bound on READING must not
+  // become a bound on HONESTY: a share inside a verified post used to wear the referenced author's verified name,
+  // avatar and channel link with nothing but a quiet left rule to say nobody had checked, which is exactly the
+  // two-publish impersonation the depth-0 branch closes. The note is the same one a failed resolve appends.
+  if (claimsChainRow && embedDepth > 0) {
+    const note = document.createElement('span');
+    note.className = 'shared-post-embed-unverified-note';
+    note.textContent = t('public.sharedPostUnverified');
+    snapshot.append(note);
+  }
+  if (embedDepth === 0 && claimsChainRow) {
     resolveSharedPostOriginal(block.entryId, block.bodyHash, wallet).then(async (post) => {
-      if (!post || !snapshot.isConnected) return;
+      // AND AN UNVERIFIED CLAIM SAYS SO. A failed resolve is not always an attack — an old post, a retired shard,
+      // a bad minute on the network — but the reader cannot tell those apart from a forgery, and the card is
+      // attributed. So the snapshot stays (blanking it would lose an honest quote) and is labelled instead.
+      if (!post || !snapshot.isConnected) {
+        if (snapshot.isConnected && !snapshot.querySelector('.shared-post-embed-unverified-note')) {
+          const note = document.createElement('span');
+          note.className = 'shared-post-embed-unverified-note';
+          note.textContent = t('public.sharedPostUnverified');
+          snapshot.append(note);
+        }
+        return;
+      }
       // Warm FIRST: the persisted feed cache holds the post's text without its image (the data-urls are stripped on
       // write), and this puts the picture back onto the post object the renderer is about to read.
       await sharedPostImageUrlWarm(post);
       if (!snapshot.isConnected) return;
       const real = document.createElement('div');
-      appendPublicItemContent(real, post, embedDepth + 1);
+      if (!publicItemVisibleUnderModeration(post, 0)) {
+        // the chain copy is hidden by moderation: the sender's snapshot gives way to the notice, not to the text
+        const notice = document.createElement('p');
+        notice.className = 'public-detail-status';
+        notice.textContent = t('moderation.hiddenPost');
+        real.append(notice);
+      } else {
+        appendPublicItemContent(real, post, embedDepth + 1);
+      }
       if (real.childNodes.length === 0) return;   // nothing renderable — keep the snapshot rather than blank the card
+      titleNode?.remove();                        // the sender's title was a claim; the chain copy speaks for itself
       snapshot.replaceWith(real);
     }).catch(() => {});
   }
@@ -9653,7 +11633,8 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
   setAvatarNode(authorAvatar, String(publicFeedItemAuthorLabel(item)).slice(0, 1), item.avatarImageUrl ?? publicAvatarUrlForWallet(item.authorWallet, avatarUrlMemo));
   const meta = document.createElement('div');
   meta.className = 'feed-meta';
-  for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null].filter(Boolean)) {
+  const hiddenBadge = item.hidden === true && isOwnPublicAuthor(item.authorWallet) ? t('moderation.hiddenBadge') : null;
+  for (const label of [...(item.meta ?? []), unread ? t('public.unread') : null, hiddenBadge].filter(Boolean)) {
     const span = document.createElement('span');
     span.textContent = displayMetaLabel(label);
     meta.append(span);
@@ -9684,7 +11665,7 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
     statusBadge.className = `public-publish-status${String(item.publishStatus).endsWith('failed') ? ' public-publish-status--failed' : ''}`;
     // Private-style live status ('sending 2 parts' / 'submitted 1/2, confirming' / …) when a publishState is
     // streaming; the machine-readable publishStatus marker is the fallback.
-    statusBadge.textContent = (item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus;
+    statusBadge.textContent = publishStatusDisplayText((item.publishState ? publishStateMeta(item.publishState) : null) || item.publishStatus);
     // Patch anchor for the status-only fast path (a publish tick updates this text in place, no rebuild).
     if (item.id) statusBadge.dataset.publishLocalId = String(item.id);
     meta.append(statusBadge);
@@ -9719,6 +11700,7 @@ function buildPublicFeedArticle(item, avatarUrlMemo) {
   // Comments are no longer rendered inline in the feed — they load on demand on the post detail screen
   // (openPublicPostDetail). appendPublicItemComments is reused there.
   appendPublicItemActions(article, item);
+  appendReactionBar(article, item, 0);
   return article;
 }
 
@@ -9781,16 +11763,29 @@ function refreshEditChannelProfileButton() {
   editChannelProfileButton.hidden = !(ownPublicChannel() && hasActivePlathoAccount());
 }
 
+/**
+ * WHAT THE PUBLIC SURFACE SHOWS — one definition, because two of them drifted [audit 2026-09-01, round 9].
+ *
+ * A transient preview channel (open in the channel view, not followed) is excluded from the MAIN feed and its
+ * unread/status counts: its posts show only inside the channel view until the user follows. That rule lived
+ * inline in renderPublicSurface, so the "N unread" COUNT applied it and the jump-down gesture — the one control
+ * whose entire job is to clear that count — did not. Round 8 then narrowed the gesture to the painted window to
+ * dodge the mismatch, which made it worse: MEASURED with 409 items over 10 channels at a 150-item render cap,
+ * the gesture left 9 posts unread and no other gesture in the app could clear them, so the badge stayed lit.
+ * Counted and cleared over the same set, by construction.
+ */
+function publicSurfaceItems() {
+  const allItems = publicFeedItemsChronological();
+  return publicChannelPreviewChannelId
+    ? allItems.filter((item) => item.channelId !== publicChannelPreviewChannelId)
+    : allItems;
+}
+
 function renderPublicSurface(options = {}) {
   updatePublicModeButtons();
   refreshEditChannelProfileButton();
   if (publicChannelSearchRow) publicChannelSearchRow.hidden = false;
-  const allItems = publicFeedItemsChronological();
-  // A transient preview channel (open in the channel view, not followed) is excluded from the MAIN feed and its
-  // unread/status counts — its posts show only inside the channel view until the user follows.
-  const surfaceItems = publicChannelPreviewChannelId
-    ? allItems.filter((item) => item.channelId !== publicChannelPreviewChannelId)
-    : allItems;
+  const surfaceItems = publicSurfaceItems();
   const items = surfaceItems.filter((item) => publicFeedItemMatchesSearch(item, publicChannelSearchQuery));
   renderPublicFeed(items, options);
   // Keep the open post detail (per-post comments) in sync with the cache too — a just-published local-pending
@@ -9800,6 +11795,7 @@ function renderPublicSurface(options = {}) {
   if (publicChannelViewOpen) renderPublicChannelView();
   const unread = surfaceItems.filter(isUnreadPublicItem).length;
   setPublicStatus(publicChannelSearchQuery ? `${items.length} found` : (unread > 0 ? `${unread} unread` : 'feed'));
+  renderModerationNotice();   // the wallet may have changed since the last sync; the banner follows every render
 }
 
 function setPublicCommentTarget(item = null, { focus = true, showContext = true } = {}) {
@@ -10086,7 +12082,11 @@ function retireConfirmedLocalPublicComments(item, chainComments) {
     if (!sameCachedPublicPost(post, item)) return post;
     const comments = post.comments ?? [];
     const kept = comments.filter((comment) => !(
-      isPendingPublicFeedItem(comment) && chainComments.some((chainComment) => samePublicBodyHash(comment, chainComment))
+      // …AND BY THE SAME AUTHOR [audit 2026-09-01, round 9]. Body-hash alone let a STRANGER's identical comment
+      // retire this device's pending one as confirmed: the pending record vanished, the UI went green, and the
+      // entry it stood for was never published. Two people writing "ok" is all it took.
+      isPendingPublicFeedItem(comment) && chainComments.some((chainComment) => samePublicBodyHash(comment, chainComment)
+        && sameWalletAddress(comment.authorWallet, chainComment.authorWallet))
     ));
     if (kept.length === comments.length) return post;
     changed = true;
@@ -10185,9 +12185,7 @@ function renderPublicPostDetail() {
   // READING-POSITION ANCHOR (stability): every rebuild snapshots the topmost visible comment row and its
   // viewport offset, and restores it after the rebuild, because iOS/WebKit has no overflow-anchor.
   //
-  // AT scrollTop 0 AS WELL [OWNER 2026-08-24: "I scrolled up, comments started loading, a page appeared, filled the
-  // screen and immediately loaded another one. I'd like the position not to jump like that — for older comments to
-  // load above, and to be able to scroll up calmly to the next load"]. The guard used to skip the snapshot at the
+  // AT scrollTop 0 AS WELL [decided 2026-08-24]. The guard used to skip the snapshot at the
   // very top, which is a leftover from the newest-first layout: there the top held the FRESHEST comments and a
   // reader sitting at 0 wanted to be shown what had just arrived. Reading runs oldest-first now, so the top is the
   // PAST — and 0 is exactly where a reader ends up after scrolling back through history.
@@ -10241,11 +12239,13 @@ function renderPublicPostDetail() {
   }
   appendPublicItemContent(post, item);
   publicPostDetailBody.append(post);
+  appendDetailReportButton(post, publicPostDetailItem);
+  appendReactionBar(post, publicPostDetailItem, 0);
 
   // Comments section.
   const section = document.createElement('section');
   section.className = 'public-detail-comments';
-  const comments = publicPostDetailMergedComments();
+  const comments = publicPostDetailMergedComments().filter((comment) => publicItemVisibleUnderModeration(comment, 1));
   const heading = document.createElement('h3');
   heading.className = 'public-detail-comments-heading';
   heading.textContent = comments.length > 0 ? t('public.commentsWithCount', { count: comments.length }) : t('public.comments');
@@ -10257,8 +12257,7 @@ function renderPublicPostDetail() {
     publicPostDetailBody.append(section);
     return;
   }
-  // OLDEST FIRST — a thread, not a feed [OWNER 2026-08-23: "the developer made our comments backwards … people
-  // could be replying to each other, reading it in reverse is perverse"]. The redesign had them newest-first like
+  // OLDEST FIRST — a thread, not a feed [decided 2026-08-23]. The redesign had them newest-first like
   // the feed, and a feed is a list of unrelated posts where the freshest matters most; a comment thread is a
   // CONVERSATION, where a reply means nothing before the comment it answers. So the oldest sits at the top and
   // reading runs downward, exactly like the private conversation.
@@ -10321,8 +12320,7 @@ function renderPublicPostDetail() {
   }
 }
 
-// [OWNER 2026-08-13] "the thread should scroll when I write a public comment on a post — right now the new comment
-// shows up below the composer." Exactly: comments append at the bottom and the scroll position stayed put, so the
+// [decided 2026-08-13] Exactly: comments append at the bottom and the scroll position stayed put, so the
 // one comment the author is certain to want to see — their own, just written — landed below the fold.
 let publicPostDetailScrollToLatest = false;
 // Armed on opening a thread this reader has been in before; consumed by the first render that has comment rows
@@ -10409,10 +12407,20 @@ function publicPostHasChainCommentTarget(item) {
 
 function openPublicPostDetail(item) {
   if (!item || item.entryId === undefined || item.entryId === null) return;
+  // every road into a post — the feed, a permalink, a shared embed — passes here: a hidden one stops. The
+  // moderators' queue is the one caller that must see what readers cannot, and it uses the unfiltered twin.
+  if (!publicItemVisibleUnderModeration(item, 0)) { showModerationStatus(t('moderation.hiddenPost')); return; }
+  openPublicPostDetailUnfiltered(item);
+}
+
+function openPublicPostDetailUnfiltered(item) {
+  if (!item || item.entryId === undefined || item.entryId === null) return;
   closePublicDiscovery();
   publicCommentSurfacedKeys.clear();   // this thread's comments rise in afresh
   publicPostDetailItem = item;
+  flushPublicFeedRead();   // an overlay covers the surface: the reader is done looking at it
   publicPostDetailOpen = true;
+  applyGiftAppearance();   // the post's channel may dress the app — presentedGiftTheme
   // Stale-while-revalidate: paint the cached comments immediately (no re-download flash) if we have them, then
   // let refreshPublicPostDetailComments silently reload in the background.
   const cacheKey = publicPostCommentsCacheKey(item);
@@ -10477,6 +12485,7 @@ function closePublicPostDetail() {
   if (!publicPostDetailOpen && publicPane?.dataset?.postOpen !== 'true') return;
   publicPostDetailOpen = false;
   publicPostDetailItem = null;
+  applyGiftAppearance();   // the channel's dress comes off with the post
   publicPostDetailScrollToLatest = false;
   publicPostDetailChainComments = [];
   publicPostDetailLoadState = 'idle';
@@ -10598,12 +12607,11 @@ const AURORA_COUNT_KEY = 'platho.auroraCount.v1';
 const AURORA_SPEED_KEY = 'platho.auroraSpeed.v1';
 const AURORA_ENERGY_KEY = 'platho.auroraEnergy.v1';
 
-// ── WHICH ANIMATION PAINTS BEHIND THE APP [OWNER 2026-08-23: "background animation: none, plasma, nodes. Nodes is
-// the one on the loading screen — I want it on the app background too, if the user picks it"]. One persisted choice,
+// ── WHICH ANIMATION PAINTS BEHIND THE APP [decided 2026-08-23]. One persisted choice,
 // read at boot BEFORE anything is started, so the boot screen can obey it as well ("if the user picks plasma, let it
 // slosh on the loading screen too; if they turned the background off, there must be none there either").
 //
-// NONE IS THE DEFAULT [OWNER 2026-08-23: "set the default for users to 'none'"]. A background animation is a
+// NONE IS THE DEFAULT [decided 2026-08-23]. A background animation is a
 // preference, and the one thing it costs — a full-screen canvas repainting forever — is paid by every device that
 // never asked for it. So the app arrives quiet and the user turns it on; a device that already chose keeps its
 // choice, because the absence of the key is what means "not chosen", not the value of it.
@@ -10617,8 +12625,7 @@ function readBackgroundMode() {
 }
 let backgroundMode = readBackgroundMode();
 
-// THE NODES FIELD'S KNOBS, as PERCENTAGES of the boot screen's own field [OWNER: "for the nodes, set the defaults to
-// exactly what we have on the loading screen now"]. 100 means "the shipped field", on every screen size — the runner
+// THE NODES FIELD'S KNOBS, as PERCENTAGES of the boot screen's own field [decided]. 100 means "the shipped field", on every screen size — the runner
 // count is derived from the area inside the field itself, so a percentage keeps that and reads as "more/fewer than
 // usual" rather than an absolute nobody can calibrate.
 const NODES_LEVEL_KEY = 'platho.nodesLevel.v1';       // the lattice's brightness
@@ -10648,6 +12655,9 @@ function nodesFieldOptions() {
     runners: nodesRunners / 100,
     speed: nodesSpeed / 100,
     lights: nodesLights / 100,
+    // Under the gift theme the lattice wears the gift. Null every other time, which is the field's own default.
+    mark: giftNodeMark(),
+    ink: bootFieldInk(),
   };
 }
 function bindAuroraRange(id, key, min, max, apply) {
@@ -10728,9 +12738,29 @@ function createAuroraView(layer, stage, kind) {
   canvas.className = 'aurora-canvas';
   canvas.setAttribute('aria-hidden', 'true');
   layer.append(canvas);
-  const view = { layer, kind, canvas, ctx: canvas.getContext('2d'), w: 96, h: 64, measuredAt: 0, stage, rect: null, bornAt: stage.bornAt };
+  // THE PATTERN'S OWN CANVAS, and it is the same painting twice rather than one painting used twice: the same
+  // suns, the same gift colour, four times the strength, masked by the gift's pattern in styles.css. So the glow
+  // is a soft wash of the gift's colour on the theme's own ground, and inside it the gift's symbols surface — the
+  // pattern exists nowhere the light has not reached. The mask is what keeps it cheap: the canvas holds nothing
+  // but soft blobs at the plasma's own low resolution, and the compositor cuts them into crisp symbols at the
+  // device's, so no full-screen composite runs per frame.
+  const patternCanvas = document.createElement('canvas');
+  patternCanvas.className = 'aurora-canvas aurora-pattern';
+  patternCanvas.setAttribute('aria-hidden', 'true');
+  layer.append(patternCanvas);
+  const view = {
+    layer, kind, canvas, ctx: canvas.getContext('2d'),
+    patternCanvas, patternCtx: patternCanvas.getContext('2d'),
+    w: 96, h: 64, measuredAt: 0, stage, rect: null, bornAt: stage.bornAt,
+  };
   stage.views.push(view);
   return view;
+}
+
+/** Is there a gift pattern to light right now? Both halves are set elsewhere; this only reads them. */
+function giftPatternLightOn(view) {
+  return Boolean(view.patternCanvas) && !view.patternCanvas.hidden
+    && document.documentElement.getAttribute('data-gift-pattern') === 'true';
 }
 function measureAuroraStage(stage, now) {
   stage.measuredAt = now;
@@ -10835,16 +12865,36 @@ function auroraLevelFor(holder, t) {
   const warm = holder.bornAt === null ? 1 : Math.min(1, Math.max(0, (t - holder.bornAt) / 2));
   return (auroraLevel / AURORA_LEVEL_UNIT) * warm;
 }
+/**
+ * How much brighter the plasma paints on the pattern than on the ground.
+ *
+ * The suns are authored at about 0.13 alpha at their centre, which is what "barely there" means on a wallpaper and
+ * is exactly why they disappear on a gift's backdrop. On the pattern they are the only light there is, so they are
+ * allowed to be light: the ambient wash below is a tenth, and a sun passing over lifts a symbol to about a half.
+ *
+ * DECLARED HERE, ABOVE ITS FIRST READER [owner, 2026-09-08: a console full of "Cannot access
+ * 'GIFT_PATTERN_LIGHT_GAIN' before initialization"]. It sat with the other gift constants twenty-five thousand
+ * lines down — past the module's top-level await — while startAuroraLoop arms the frame loop long before that
+ * point; with the gift pattern on from the boot guard, every frame drawn during the await read a `const` still in
+ * its temporal dead zone. A const the boot's loops read lives above the loops.
+ */
+const GIFT_PATTERN_LIGHT_GAIN = 4;
+
 // Plain scene: its own suns, normalised to its own canvas (the shell and the public/wallet/profile panes).
 function drawAuroraScene(scene, t, rgb) {
-  const { ctx, canvas } = scene;
+  paintAuroraScene(scene, t, rgb, scene.ctx, scene.canvas, 1);
+  if (giftPatternLightOn(scene)) {
+    paintAuroraScene(scene, t, rgb, scene.patternCtx, scene.patternCanvas, GIFT_PATTERN_LIGHT_GAIN);
+  }
+}
+function paintAuroraScene(scene, t, rgb, ctx, canvas, gain) {
   const w = canvas.width;
   const h = canvas.height;
   ctx.globalCompositeOperation = 'source-over';
   ctx.clearRect(0, 0, w, h);
   const level = auroraLevelFor(scene, t);
   if (level <= 0) return;
-  const glow = auroraGlowPainter(ctx, w, rgb, level);
+  const glow = auroraGlowPainter(ctx, w, rgb, level * gain);
   auroraSpawnAndPruneFlares(scene, t);
   for (const sun of scene.suns) {
     const s = auroraSunAt(sun, t);
@@ -10865,7 +12915,13 @@ function drawAuroraScene(scene, t, rgb) {
 }
 // Stage view: paints the stage's suns/flares in shared viewport coordinates, clipped by its own box, with the lens.
 function drawAuroraView(view, t, rgb) {
-  const { ctx, canvas, stage } = view;
+  paintAuroraView(view, t, rgb, view.ctx, view.canvas, 1);
+  if (giftPatternLightOn(view)) {
+    paintAuroraView(view, t, rgb, view.patternCtx, view.patternCanvas, GIFT_PATTERN_LIGHT_GAIN);
+  }
+}
+function paintAuroraView(view, t, rgb, ctx, canvas, gain) {
+  const { stage } = view;
   const w = canvas.width;
   const h = canvas.height;
   ctx.globalCompositeOperation = 'source-over';
@@ -10875,7 +12931,7 @@ function drawAuroraView(view, t, rgb) {
   if (!R || !V) return;
   const level = auroraLevelFor(stage, t);
   if (level <= 0) return;
-  const glow = auroraGlowPainter(ctx, w, rgb, level);
+  const glow = auroraGlowPainter(ctx, w, rgb, level * gain);
   const kx = w / V.width;    // canvas px per viewport px
   const ky = h / V.height;
   const toX = (nx) => (R.left + nx * R.width - V.left) * kx;
@@ -10910,8 +12966,7 @@ function auroraTick(now) {
   if (document.hidden) { auroraLoopArmed = false; return; }   // resumed by visibilitychange below
   // ANOTHER BACKGROUND IS ON (or none): the loop STOPS, it does not idle. Returning early after re-arming would
   // still wake the main thread on every frame forever to decide to do nothing — which is exactly the cost the
-  // "none" setting exists to avoid [OWNER 2026-08-23: "the plasma and the nodes really aren't drawn when the
-  // background is set to none? or are you just hiding it while it keeps loading the processor"]. applyBackgroundMode
+  // "none" setting exists to avoid [decided 2026-08-23]. applyBackgroundMode
   // arms it again when the plasma is chosen.
   if (backgroundMode !== 'plasma') { auroraLoopArmed = false; return; }
   requestAnimationFrame(auroraTick);
@@ -10932,7 +12987,7 @@ function auroraTick(now) {
       scene.measuredAt = now;
       const lw = scene.layer.clientWidth || 1;
       const lh = scene.layer.clientHeight || 1;
-      // RIPPLE, SECOND PASS [OWNER 2026-08-24: "the plasma has a ripple, small, but it is there" — and, pointing at
+      // RIPPLE, SECOND PASS [decided 2026-08-24] — and, pointing at
       // the cause: "it ripples because of px"]. Right, and the first pass only halved it.
       //
       // The canvas is small and stretched, so what the eye catches is not OUR gradient but Skia's own dither inside
@@ -10947,6 +13002,10 @@ function auroraTick(now) {
       const cw = Math.max(160, Math.min(auroraCanvasBlurWorks() ? 360 : 560, Math.round(lw / budget)));
       const ch = Math.max(64, Math.min(1200, Math.round(cw * lh / lw)));
       if (scene.canvas.width !== cw || scene.canvas.height !== ch) { scene.canvas.width = cw; scene.canvas.height = ch; }
+      if (scene.patternCanvas && (scene.patternCanvas.width !== cw || scene.patternCanvas.height !== ch)) {
+        scene.patternCanvas.width = cw;
+        scene.patternCanvas.height = ch;
+      }
     }
     if (scene.stage) drawAuroraView(scene, t, rgb);
     else drawAuroraScene(scene, t, rgb);
@@ -10971,7 +13030,13 @@ function startAuroraLoop() {
       if (backgroundMode !== 'plasma') return;   // nothing to paint — see applyBackgroundMode
       const rgb = auroraRgb(performance.now());
       for (const stage of auroraStages) { stage.bornAt = null; measureAuroraStage(stage, performance.now()); }
-      for (const scene of auroraScenes) { scene.bornAt = null; scene.canvas.width = 240; scene.canvas.height = 160; if (scene.stage) drawAuroraView(scene, 0, rgb); else drawAuroraScene(scene, 0, rgb); }
+      for (const scene of auroraScenes) {
+        scene.bornAt = null;
+        scene.canvas.width = 240;
+        scene.canvas.height = 160;
+        if (scene.patternCanvas) { scene.patternCanvas.width = 240; scene.patternCanvas.height = 160; }
+        if (scene.stage) drawAuroraView(scene, 0, rgb); else drawAuroraScene(scene, 0, rgb);
+      }
     };
     auroraRedrawStill();
     return;
@@ -11073,10 +13138,16 @@ window.addEventListener('resize', () => { if (backgroundMode === 'nodes') measur
  */
 function applyBackgroundMode({ rebuildNodes = false } = {}) {
   const plasmaOn = backgroundMode === 'plasma';
+  // THE CHOICE, WHERE CSS CAN SEE IT. The gift's pattern is a wallpaper under the plasma and belongs to the plasma:
+  // the lattice draws the same symbols at its own nodes, so showing both would double them, and "no background" is
+  // a request for a quiet app rather than for a different picture.
+  document.documentElement.setAttribute('data-background', backgroundMode);
   for (const scene of auroraScenes) {
     scene.canvas.hidden = !plasmaOn;
+    if (scene.patternCanvas) scene.patternCanvas.hidden = !plasmaOn;
     // A canvas that is about to be hidden keeps its last frame; clear it so a later re-show cannot flash the old one.
     if (!plasmaOn && scene.ctx) scene.ctx.clearRect(0, 0, scene.canvas.width, scene.canvas.height);
+    if (!plasmaOn && scene.patternCtx) scene.patternCtx.clearRect(0, 0, scene.patternCanvas.width, scene.patternCanvas.height);
   }
   if (plasmaOn) { auroraLastFrameAt = 0; startAuroraLoop(); }
   if (backgroundMode === 'nodes') {
@@ -11121,7 +13192,11 @@ function refreshAppearanceUi() {
   }
   if (appearancePlasmaGroup) appearancePlasmaGroup.hidden = backgroundMode !== 'plasma';
   if (appearanceNodesGroup) appearanceNodesGroup.hidden = backgroundMode !== 'nodes';
-  if (appearanceThemeSelect) appearanceThemeSelect.value = currentEffectiveTheme();
+  // The gift theme is a RULE, not a palette: html[data-theme] still says light or dark, so the effective theme
+  // cannot name it. The select shows what the user CHOSE, which is remembered beside the worn gift.
+  // IN EFFECT, not merely chosen: with the preference standing but nothing worn, the app IS plainly dark or light,
+  // and a control claiming otherwise is the same lie this read from the other side before it was asked twice.
+  if (appearanceThemeSelect) appearanceThemeSelect.value = giftThemeInEffect() ? 'gift' : currentEffectiveTheme();
   if (appearanceBackgroundSelect) appearanceBackgroundSelect.value = backgroundMode;
 }
 
@@ -11140,7 +13215,28 @@ document.querySelector('#appearanceCloseButton')?.addEventListener('click', clos
 closeOnBackdropClick(appearanceDialog, closeAppearanceDialog);
 
 appearanceThemeSelect?.addEventListener('change', () => {
-  applyForcedTheme(appearanceThemeSelect.value === 'light' ? 'light' : 'dark');
+  if (appearanceThemeSelect.value === 'gift') {
+    // Nothing to derive a theme FROM until a gift is worn, and silently falling back to dark would look like the
+    // control is broken. Say what is missing, put the select back where it was, and leave the theme alone.
+    if (!selectGiftTheme()) {
+      if (appearanceStatus) {
+        appearanceStatus.textContent = t('appearance.themeGiftNeedsGift');
+        appearanceStatus.dataset.i18n = 'appearance.themeGiftNeedsGift';
+      }
+      appearanceThemeSelect.value = currentEffectiveTheme();
+    }
+    return;
+  }
+  clearGiftThemeChoice();
+  const chosen = appearanceThemeSelect.value === 'light' ? 'light' : 'dark';
+  if (channelDressActive) {
+    // Chosen while a channel dresses the app [2026-09-08]: it is the theme to come back to, persisted by hand
+    // because the dress keeps applyForcedTheme from persisting, and the channel's palette stays on for the visit.
+    channelDressRestore = chosen;
+    try { localStorage.setItem(THEME_STORAGE_KEY, chosen); } catch { /* best-effort persist */ }
+  } else {
+    applyForcedTheme(chosen);
+  }
   refreshAppearanceUi();
 });
 appearanceBackgroundSelect?.addEventListener('change', () => {
@@ -11252,6 +13348,7 @@ async function openPublicDiscovery() {
   closePublicPostDetail();
   // reopenReturnTo:false — discovery is being opened EXPLICITLY here; the close must not re-open it (loop).
   closePublicChannelView({ reopenReturnTo: false });
+  flushPublicFeedRead();   // an overlay covers the surface: the reader is done looking at it
   publicDiscoveryOpen = true;
   publicDiscoveryTagFilter = null;
   publicDiscoveryProgress = null;
@@ -11308,7 +13405,8 @@ function publicChannelViewChannel() {
 
 function publicChannelViewItems() {
   if (!publicChannelViewChannelId) return [];
-  return publicFeedItemsChronological().filter((item) => item.channelId === publicChannelViewChannelId);
+  // the channel screen reads through the same filter as the feed [audit 2026-09-04: it did not]
+  return publicFeedItemsChronological().filter((item) => item.channelId === publicChannelViewChannelId && publicItemVisibleUnderModeration(item, 0));
 }
 
 function openPublicChannelView(source = {}) {
@@ -11325,6 +13423,7 @@ function openPublicChannelView(source = {}) {
   if (publicChannelViewOpen && publicChannelViewChannelId === channelId) { renderPublicChannelView(); return; }
   closePublicPostDetail();
   closePublicDiscovery();
+  flushPublicFeedRead();   // an overlay covers the surface: the reader is done looking at it
   publicChannelViewOpen = true;
   publicChannelViewChannelId = channelId;
   publicChannelViewWallet = wallet
@@ -11351,6 +13450,7 @@ function openPublicChannelView(source = {}) {
   // "No posts yet" until an incidental later render happens to repaint it.
   publicChannelViewSyncPending = !followed;
   renderPublicChannelView();
+  applyGiftAppearance();   // the channel's gift dresses the app — presentedGiftTheme
   if (publicChannelViewBody) publicChannelViewBody.scrollTop = 0;
   if (!followed) {
     // The preview source just joined feedSourcePublicChannels — rebuild the threads around it and pull its posts
@@ -11379,6 +13479,14 @@ function openPublicChannelView(source = {}) {
 
 function closePublicChannelView(options = {}) {
   if (!publicChannelViewOpen && publicPane?.dataset?.channelOpen !== 'true') return;
+  // LEAVING IS A DOOR TOO [audit 2026-09-01, round 9]. The five leave doors round 8 wired were all ways of
+  // covering or hiding a surface; closing the channel view is how a reader leaves the only OTHER surface that
+  // holds a painted set, and it had none. The close re-renders the feed, whose own hold then overwrote the
+  // channel's set unconditionally — so every post read inside a channel view stayed unread forever, and the
+  // channel view was the only place posts outside the feed's newest window could be marked at all.
+  // Taken BEFORE the flag drops: flushPublicFeedRead skips its clearing re-render while an overlay is open, and
+  // the close re-renders anyway.
+  flushPublicFeedRead();
   publicChannelViewOpen = false;
   publicChannelViewOpenToken += 1; // invalidate any in-flight preview sync's finally
   publicChannelViewSyncPending = false;
@@ -11386,6 +13494,7 @@ function closePublicChannelView(options = {}) {
   publicChannelPreviewChannelId = null;
   publicChannelViewChannelId = null;
   publicChannelViewWallet = null;
+  applyGiftAppearance();   // the channel's dress comes off with the view
   const returnTo = publicChannelViewReturnTo;
   publicChannelViewReturnTo = null;
   if (publicPane) {
@@ -11402,6 +13511,40 @@ function closePublicChannelView(options = {}) {
 // Posts the channel view has already painted (cleared when a channel opens): a post new to the screen — the first
 // paint after the panel opens, a post landing from the sync, a revealed older one — surfaces (owner).
 const publicChannelViewSurfacedIds = new Map();
+// ── The channel view in its owner's gift ───────────────────────────────────────────────────────────────────────
+// THE CHANNEL'S GIFT, CUT FROM ITS OWN FILE: the two backdrop stops and the pattern tile — the pieces the worn
+// gift's theme is made of. Built once per gift from the same Lottie and the same cut the worn gift uses (the file
+// is cached; the pieces are cached here) and worn by the WHOLE app while the channel is on screen — see
+// presentedGiftTheme. [owner, 2026-09-08: no separate paint on the header; one seamless background across the app.]
+const channelGiftDressCache = new Map();   // `${slug}-${number}` -> { inner, edge, pattern } | null
+
+async function buildChannelGiftDress(gift) {
+  const key = `${gift.slug}-${gift.number}`;
+  if (channelGiftDressCache.has(key)) return channelGiftDressCache.get(key);
+  // Last time's cut first — the same stops and tile, without the file read; a recipe that moved on is not served.
+  const stored = await readStoredChannelGiftDress(key);
+  if (stored) {
+    channelGiftDressCache.set(key, stored);
+    return stored;
+  }
+  let dress = null;
+  try {
+    const drawing = await readGiftPatternDrawing(gift);
+    if (drawing?.backdrop) {
+      const subject = await cutGiftSubjectForDrawing(gift, drawing).catch(() => null);
+      const tile = composeGiftPatternTile(drawing, subject);
+      dress = {
+        inner: drawing.backdrop.inner,
+        edge: drawing.backdrop.outer,
+        pattern: tile ? tile.toDataURL('image/png') : null,
+      };
+    }
+  } catch { dress = null; }
+  channelGiftDressCache.set(key, dress);
+  if (dress) void writeStoredChannelGiftDress(key, dress);
+  return dress;
+}
+
 function renderPublicChannelView() {
   if (!publicChannelViewOpen || !publicChannelViewBody) return;
   const channel = publicChannelViewChannel();
@@ -11551,8 +13694,8 @@ function renderPublicChannelView() {
   }
   // Reading the channel marks its rendered posts read — the same rule the feed applies to its window. NOT while
   // the post detail / discovery is stacked on top (the view is display:none then; the user never saw the posts).
-  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen && markVisiblePublicFeedRead(capped)) {
-    requestAnimationFrame(() => renderPublicSurface({ anchorUnread: false }));
+  if (isPublicViewActive() && !publicPostDetailOpen && !publicDiscoveryOpen) {
+    holdPublicFeedPainted(capped);
   }
 }
 
@@ -11661,6 +13804,7 @@ function renderPublicDiscovery(options = {}) {
     build: () => node,
   });
   for (const channel of shown) {
+    if (!publicChannelVisibleUnderModeration(channel)) continue;   // restricted or muted: not in the catalogue
     const key = rawWalletAddress(channel.authorWallet);
     for (const ghost of ghostsBefore.get(key) ?? []) entries.push(ghostEntry(ghost));
     entries.push({
@@ -11834,10 +13978,12 @@ function buildDiscoveryCard(channel) {
 }
 
 // Adding a contact implies interest in the person, so the add-contact dialog also follows their public
-// channel (owner request). Deliberately called ONLY from that dialog — NOT inside selectOrCreateRecipientThread,
-// which also serves the "Private chat" button on public posts (auto-(re)following there would fight a
-// deliberate unfollow). Re-adding an existing contact re-follows on purpose: addressing the person again IS
-// a fresh expression of interest. Skipped for the Saved self-thread (publishing already handles own-channel).
+// channel (owner request). Called from that dialog, from the first-contact send, from the first reply
+// (followPeerChannelOnFirstReply) and, in batch form, from the restore (followRestoredContactChannels) — NOT inside
+// selectOrCreateRecipientThread, which also serves the "Private chat" button on public posts (auto-(re)following
+// there would fight a deliberate unfollow). Re-adding an existing contact re-follows on purpose: addressing the
+// person again IS a fresh expression of interest. Skipped for the Saved self-thread (publishing already handles
+// own-channel).
 function followContactPublicChannel(recipientWallet) {
   try {
     // rawWalletAddress (NOT the strict Vault-action address gate): the dialog hands over user-friendly
@@ -11869,7 +14015,7 @@ function followContactPublicChannel(recipientWallet) {
  * my first answer. No new persisted field, and it cannot fire twice — so a deliberate unfollow later is never undone
  * by simply continuing to talk.
  */
-function followPeerChannelOnFirstReply(thread, peerWallet) {
+function countThreadDirections(thread) {
   const messages = Array.isArray(thread?.messages) ? thread.messages : [];
   let outgoing = 0;
   let incoming = 0;
@@ -11877,8 +14023,75 @@ function followPeerChannelOnFirstReply(thread, peerWallet) {
     if (message?.type === 'out' || message?.d === 'out') outgoing += 1;
     else if (message?.type === 'in' || message?.d === 'in') incoming += 1;
   }
+  return { outgoing, incoming };
+}
+
+function followPeerChannelOnFirstReply(thread, peerWallet) {
+  const { outgoing, incoming } = countThreadDirections(thread);
   if (outgoing !== 1 || incoming === 0) return;
   followContactPublicChannel(peerWallet);
+}
+
+/**
+ * THE SAME CHOICE, RESTORED [F-23, 2026-09-09]. A conversation that arrives COLD on this device (no scan cursor: a
+ * recovery import on a new device, a cleared store) carries no memory of the follow the two rules above made when
+ * it was live — and the follow list itself comes back only from a saved subscriptions snapshot. So a person who
+ * chatted with fifty people restored fifty dialogs and a feed of nobody (owner report, stage, 2026-09-09).
+ *
+ * Re-derived, not stored, from exactly the evidence the live rules used: at least one OUTGOING message in the
+ * restored history means I wrote to them — as the initiator or as the one who replied — and either way the live
+ * path had followed them. Nothing follows on receipt (an INTRO can be sent to anyone: that door stays shut, see
+ * FOLLOW-03), and a channel already followed is left alone, so a routine pass never re-does a deliberate unfollow.
+ *
+ * QUEUED DURING THE SCAN, APPLIED AFTER THE PREFS RESTORE HAS SPOKEN. A saved snapshot is the user's own word on
+ * what they follow; these are an inference. drainRestoredPrefsSnapshots applies a snapshot only to a device with no
+ * local follows, so an inference applied first would have silenced the snapshot for good. The queue therefore
+ * waits for the named recovery slot to answer cleanly (restorePrefsFromRecoveryIfFresh) — and if that answer was a
+ * snapshot, on this pass or on any earlier one (prefsLastSyncedAt set), the inference is dropped entirely.
+ */
+let restoredConversationFollowQueue = new Map();   // raw peer wallet -> short peer key id (diagnostics)
+let prefsRestoreSettled = false;                    // the named recovery slot has answered cleanly this session
+
+function noteRestoredConversationFollow(plan, thread, ownCopiesOpened) {
+  if (plan?.cold !== true) return;
+  if (ownCopiesOpened === 0 && countThreadDirections(thread).outgoing === 0) return;
+  const wallet = rawWalletAddress(plan.peerWallet ?? ownerWalletFromThread(thread));
+  if (!wallet) return;
+  if (plathoWallet?.address && sameWalletAddress(wallet, plathoWallet.address)) return;
+  restoredConversationFollowQueue.set(wallet, introKeyIdString(plan.peerKeyId).slice(0, 8));
+}
+
+function peerChannelAlreadyFollowed(wallet) {
+  const channel = publicChannelRegistry.find((item) => publicChannelMatchesAuthorWallet(item, wallet));
+  return Boolean(channel) && isPublicChannelSubscribed(channel.id);
+}
+
+// The batch form of followContactPublicChannel: every channel is registered without its own thread rebuild, then
+// all of them are subscribed in one write / one rebuild / one sync kick (setPublicChannelsSubscribed).
+function followRestoredContactChannels(wallets) {
+  const ids = [];
+  for (const wallet of wallets) {
+    if (peerChannelAlreadyFollowed(wallet)) continue;
+    try {
+      ids.push(ensurePublicChannelForAuthorWallet(wallet, { activate: false, rebuild: false }));
+    } catch (error) {
+      console.warn('[platho] restored contact channel skipped', error?.message ?? error);
+    }
+  }
+  if (ids.length > 0) setPublicChannelsSubscribed(ids, true);
+  return ids.length;
+}
+
+function applyRestoredConversationFollows() {
+  if (restoredConversationFollowQueue.size === 0 || !prefsRestoreSettled) return;
+  const queued = restoredConversationFollowQueue;
+  restoredConversationFollowQueue = new Map();
+  const snapshotGoverns = prefsLastSyncedAt !== null;
+  const followed = snapshotGoverns ? 0 : followRestoredContactChannels([...queued.keys()]);
+  globalThis.plathoLastRestoredConversationFollows = { at: new Date().toISOString(), queued: queued.size, followed, snapshotGoverns };
+  console.info('[conv] restored conversations', snapshotGoverns
+    ? { queued: queued.size, followed, why: 'a saved subscriptions snapshot governs' }
+    : { queued: queued.size, followed });
 }
 
 function followDiscoveredChannel(authorWallet) {
@@ -12013,6 +14226,9 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null, onPart
     // shardEntryId is the RAW per-shard entry_id post_uid folds; item.entryId is the collision-safe composite.
     read = await lane.readThreadComments(coords.authorWallet, coords.epochTag, coords.shardEntryId, {
       channelShardSeq: coords.shardSeq,
+      // The parent's generation picks its thread — the same fold the comment WRITE uses, so a reader and a
+      // commenter always address the same shard [round 5].
+      generation: coords.generation,
       olderThan,
       ...(onProgress ? { onProgress } : {}),
     });
@@ -12026,6 +14242,9 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null, onPart
   await partialChain;
   const comments = await publicThreadPostsToComments(item, read.posts, hashMemo);
   globalThis.plathoLastPublicCommentLoad = { mode: 'shard', entryId: String(item.entryId), comments: comments.length, degraded: false, hasMore: read.hasMore === true };
+  // The hidden ids of every thread shard that moved and this device held [round 3]: the comments BELOW the window
+  // just read live in the merged list, and this is what lets a hide reach them there.
+  const hiddenIds = Array.isArray(read.hidden) ? read.hidden : [];
   // parentExists = "somebody has commented on this post", and it is asked so the empty screen can tell the ordinary
   // case from a failed one. It used to be DERIVED FROM THE COUNT (comments.length > 0), which cannot tell those
   // apart at all: a thread whose entries were all unreadable came back empty and was announced as "no comments yet",
@@ -12038,12 +14257,35 @@ async function loadPublicPostCommentsFromShards(item, { olderThan = null, onPart
     latestLink: String(comments.length),
     cursors: read.cursors ?? null,
     hasMore: read.hasMore === true,
+    hidden: hiddenIds,
   };
 }
 
 // Thread-shard posts -> feed comments, assembled (multipart) and oldest-first. ONE converter for the whole read and
 // for each partial frame of it (loadPublicPostCommentsFromShards onPartial), so the two can never disagree.
 // `hashMemo` (Map keyed by the lane's post object) lets the frames and the final pass share one sha256 per body.
+/**
+ * A STABLE, SHORT ID FOR A COMMENT'S CHAIN SEAT. The seat itself ("<shard address key>.<row>") is long and would
+ * make the feed id unwieldy; hashing it keeps the id the same shape the body-hash form had, so every consumer
+ * that treats it as an opaque string (the assembler's group key, the saved reading position, the snapshot on
+ * disk) is unaffected. Deterministic, so a re-read of the same row produces the same id and dedups itself.
+ */
+const publicCommentSeatUids = new Map();
+async function publicCommentSeatUid(seat) {
+  const held = publicCommentSeatUids.get(seat);
+  if (held) return held;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`platho.comment.seat.v1|${seat}`));
+  const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  // Bounded: one entry per comment row the session has rendered, evicted oldest-first like every other memo here.
+  publicCommentSeatUids.set(seat, hex);
+  while (publicCommentSeatUids.size > 4096) {
+    const oldest = publicCommentSeatUids.keys().next();
+    if (oldest.done) break;
+    publicCommentSeatUids.delete(oldest.value);
+  }
+  return hex;
+}
+
 async function publicThreadPostsToComments(item, threadPosts, hashMemo = null) {
   const commentParts = [];
   for (const tp of threadPosts) {
@@ -12057,12 +14299,29 @@ async function publicThreadPostsToComments(item, threadPosts, hashMemo = null) {
       bodyHashHex = await publicShardBodyHashHex(tp.body);
       hashMemo?.set(tp, bodyHashHex);
     }
-    // A thread's comments now come from MULTIPLE era shards (the era-window fix), whose entry_ids collide (0-based
-    // per shard). A comment is a leaf (nothing derives from its id), so its feed identity is its unique body hash —
-    // which also dedups the same comment on re-read. Multipart comments still group by streamId, not this id.
+    // A comment's identity is WHERE IT SITS, not what it says [audit 2026-09-01, round 9].
+    //
+    // This used to be the body hash alone, on the reasoning that entry_ids are 0-based per era shard and collide
+    // across them. They do — but the shard KEY is on the row and resolves it, and a hash of the body alone is not
+    // an identity at all: the PPH2 body cell carries only the document bytes, while the timestamp, the streamId
+    // and the publisher live in the header. MEASURED, two people commenting "ok" under the same post produced
+    // ONE key from two chain rows, with the header hashes differing. The later commenter paid ~0.022 GRAM for a
+    // comment assemblePublicParts then dropped as a duplicate and no reader ever saw — and their pending record
+    // was retired as "confirmed" by a stranger's identical text, so the UI turned green over an entry that will
+    // never appear. "ok", "+1" and an emoji make that routine rather than exotic.
+    //
+    // (shard_key, entry_id) is exactly the coordinate a POST already uses, it dedups a re-read of the same row by
+    // construction, and it is carried into the comment below anyway. The body hash stays as the FALLBACK for a
+    // row with no coordinates — a local-pending comment, which is precisely the case that has no chain seat yet.
+    // Multipart comments still group by streamId, not this id.
+    const commentSeat = tp.shard_key !== undefined && tp.shard_key !== null
+      && tp.entry_id !== undefined && tp.entry_id !== null
+      ? `${String(tp.shard_key)}.${Number(tp.entry_id)}`
+      : null;
+    const commentUid = commentSeat ? await publicCommentSeatUid(commentSeat) : bodyHashHex.slice(2);
     commentParts.push({
-      id: `pshard-c-${bodyHashHex.slice(2, 18)}`,
-      entryId: `c-${bodyHashHex.slice(2)}`,
+      id: `pshard-c-${commentUid.slice(0, 16)}`,
+      entryId: `c-${commentUid}`,
       channelId: item.channelId ?? publicChannelIdForAuthorWallet(authorWallet),
       type: payload.type,
       text: payload.text ?? '',
@@ -12072,12 +14331,21 @@ async function publicThreadPostsToComments(item, threadPosts, hashMemo = null) {
       author: publicAuthorLabel(authorWallet),
       authorWallet,
       bodyHash: bodyHashHex,
-      entryUid: bodyHashHex.slice(2),
+      entryUid: commentUid,
       // WHERE THIS COMMENT LIVES: its era shard and 0-based row in it — what a saved reading position points at.
       // Strings/numbers only (comments persist to the IndexedDB snapshot); a multipart comment keeps its FIRST
       // part's row via the assembler's ...first spread, which is the group's first row by construction.
       shardKey: tp.shard_key ?? null,
       shardRow: tp.entry_id === undefined || tp.entry_id === null ? null : Number(tp.entry_id),
+      // THE COMMENT'S CHAIN COORDINATES [CUTOVER item 15, audit 2026-09-04]: the thread shard's partition key,
+      // epoch tag, seq and generation, stamped by the lane's thread reader. Without them a comment could be
+      // neither reported nor hidden — publicItemCoordinates read fields no comment ever carried (measured).
+      shardEntryId: tp.entry_id === undefined || tp.entry_id === null ? null : String(tp.entry_id),
+      threadShardSeq: tp.thread_seq ?? null,
+      epochTag: tp.thread_epoch_tag ?? null,
+      generation: tp.thread_generation ?? null,
+      partitionKey: tp.thread_pk ?? null,
+      hidden: tp.hidden === true,
       streamId: payload.stream_id,
       partIndex: payload.partIndex ?? 0,
       partCount: payload.partCount ?? 1,
@@ -12256,9 +14524,9 @@ async function readPublicCommentWindow(item, cursors, shardKey, endRow, probeCac
  * JUMP THE OPEN THREAD TO A PLACE — a shard row — and hand the reader to the window machinery in BOTH directions.
  *
  * Two callers, one mechanism:
- *   · FIRST VISIT [OWNER 2026-08-26: "I opened comments from a new profile and landed in the last batch"] — no
+ *   · FIRST VISIT [decided 2026-08-26] — no
  *     place given: row 0 of the OLDEST era shard, older sentinel off (nothing precedes the first comment).
- *   · CONTINUATION [OWNER 2026-08-26: "finish it properly"] — the saved mark's place, however deep:
+ *   · CONTINUATION [decided 2026-08-26] — the saved mark's place, however deep:
  *     the window is read around it, older pages continue above, newer pages continue below.
  *
  * The synthesized cursors cover EVERY live shard, or the older sentinel would pull wrong-direction content: eras
@@ -12508,13 +14776,14 @@ async function refreshPublicPostDetailComments() {
         // Date-jump mode: a clean tail read replaces the jumped window and exits forward paging. The frame
         // changes wholesale — invalidate in-flight page reads from the jumped frame.
         publicCommentsPagingGeneration += 1;
-        publicPostDetailChainComments = result.comments;
+        publicPostDetailChainComments = applyHiddenBitmaps(result.comments, result.hidden ?? []);
         publicPostDetailCommentCursors = result.cursors ?? null;
       } else {
         // MERGE, never wipe (stability): the reader may hold pages of history below the tail window from
         // auto-paging; replacing the list on every own-comment confirmation threw that history away
         // mid-scroll. Cursors keep the DEEPEST read per shard for the same reason.
-        publicPostDetailChainComments = mergePublicComments(publicPostDetailChainComments, result.comments);
+        publicPostDetailChainComments = applyHiddenBitmaps(
+          mergePublicComments(publicPostDetailChainComments, result.comments), result.hidden ?? []);
         const mergedCursors = { ...(result.cursors ?? {}) };
         for (const [key, prev] of Object.entries(publicPostDetailCommentCursors ?? {})) {
           const fresh = mergedCursors[key];
@@ -12700,13 +14969,17 @@ function renderConfiguredShell() {
   const ui = appConfig.ui ?? {};
   setText(brandNetworkLabel, ui.brandNetworkLabel ?? appConfig.network?.label ?? appConfig.mode);
   setText(appVersionLabel, PLATHO_APP_RUNTIME_VERSION);
+  // A DOT SAYING "mainnet" ON MAINNET SAYS NOTHING. It is worth the room only where this build points somewhere
+  // else, so it is hidden by DEPLOYMENT and not by whether a gift is worn — the corner is then the same shape in
+  // both states, which is the point, and a preview build still cannot be mistaken for production at a glance.
+  // The elements stay: #appVersionLabel is what the version bumper writes into and what the release gates read,
+  // and the diagnostic a tap on it copies has its twin on the Profile pane.
+  if (brandMeta) brandMeta.hidden = String(appConfig.network?.chain ?? appConfig.mode ?? '').toLowerCase() === 'mainnet';
   // Mirrored on the Profile pane because the rail (and its badge) is hidden on the narrow mobile / TG Mini App
   // layout. Both show the VERSION, not the build: the build id is not something to read off a screen, so it rides
   // the diagnostic that tapping either badge copies to the clipboard.
   setText(profileVersionLabel, PLATHO_APP_RUNTIME_VERSION);
   renderPaneHeaders();
-  setText(identityName, ui.identityName);
-  setText(identitySubtitle, ui.identitySubtitle);
   setText(walletRuntimeLabel, ui.walletLabel);
   setText(localStateLabel, ui.localStateLabel);
   setText(networkRuntimeLabel, ui.networkLabel ?? appConfig.network?.label);
@@ -12950,12 +15223,46 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
   const requestedPointer = pointer ? avatarPointerFromFields(pointer.profileVersion ?? pointer.profile_version, pointer.avatarHash ?? pointer.avatar_hash) : null;
   const cached = requestedPointer ? await readProfileAvatarMediaCache(requestedPointer.avatarHash) : null;
   if (cached) return cached;
+  // NO POINTER FROM THE CALLER, BUT MAYBE ONE FROM LAST TIME. Without it the wallet's hash is unknown and the
+  // image sitting in IndexedDB cannot be found, which is why every launch used to spend a registry read per face
+  // before reaching a cache it already had. A remembered pointer turns that into a lookup.
+  if (!requestedPointer) {
+    const remembered = readStoredProfileAvatarPointer(ownerWallet);
+    if (remembered && !profileAvatarPointerIsStale(remembered)) {
+      const known = await readProfileAvatarMediaCache(remembered.avatarHash);
+      if (known) return known;
+    }
+  }
+  // Proven to have no KeyShard a moment ago: do not spend a chain read to be told again.
+  const absentUntil = profileAvatarAbsentUntil.get(ownerWallet) ?? 0;
+  if (absentUntil > Date.now()) return null;
+  if (absentUntil) profileAvatarAbsentUntil.delete(ownerWallet);
   const key = `${ownerWallet}:${requestedPointer?.profileVersion ?? 'current'}:${requestedPointer?.avatarHash ?? 'current'}`;
   if (profileAvatarLoadPromises.has(key)) return profileAvatarLoadPromises.get(key);
   // WHY IT RETURNED NULL. Six separate returns hand back the same `null`, and from the outside they are one symptom:
   // the dialog keeps the letter tile. Three rounds of chasing the owner's missing avatar were spent proving the chain
   // healthy link by link because nothing said WHICH step gave up. The dump carries the last outcome from here on.
-  const note = (step, extra = {}) => { globalThis.plathoLastAvatarLoad = { at: new Date().toISOString(), wallet: String(ownerWallet).slice(0, 12), step, ...extra }; };
+  const note = (step, extra = {}) => {
+    globalThis.plathoLastAvatarLoad = { at: new Date().toISOString(), wallet: String(ownerWallet).slice(0, 12), step, ...extra };
+    // …and the LAST HUNDRED, because "how many chain reads did this launch spend on faces" is the question the
+    // owner keeps asking [2026-09-07], and the last one alone cannot answer it. Every entry here is one chain read.
+    const log = (globalThis.plathoAvatarChainReads ??= []);
+    log.push({ ...globalThis.plathoLastAvatarLoad, key });
+    if (log.length > 100) log.splice(0, log.length - 100);
+  };
+  if (requestedPointer) {
+    // VERSIONS ONLY MOVE FORWARD. A pointer OLDER than one this wallet has already been confirmed to wear cannot be
+    // on the shard any more — the shard keeps one current record — so the read would only come back "no record".
+    // Answered here, for free; the post shows the wallet's current face from the per-wallet map instead.
+    const remembered = readStoredProfileAvatarPointer(ownerWallet);
+    if (remembered && remembered.profileVersion > requestedPointer.profileVersion) {
+      note('superseded', { want: requestedPointer.profileVersion, have: remembered.profileVersion });
+      return null;
+    }
+    const missUntil = profileAvatarVersionMissUntil.get(key) ?? 0;
+    if (missUntil > Date.now()) return null;
+    if (missUntil) profileAvatarVersionMissUntil.delete(key);
+  }
   const promise = enqueueAvatarChainRead(async () => {
     const resolved = await resolveProfileAvatarProvider();
     if (!resolved) { note('no-provider'); return null; }
@@ -12964,11 +15271,24 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
       ? await resolved.provider.getAvatarVersion(ownerWallet, requestedPointer.profileVersion, readOptions)
       : await resolved.provider.getAvatar(ownerWallet, readOptions);
     const recordPointer = profileAvatarPointerFromRecord(record);
+    // REMEMBERED, so the next launch can find the image without asking. A record the shard ANSWERS WITH is the
+    // wallet's current one whether or not somebody asked for it by number: getAvatarVersion answers only when the
+    // version matches what the shard holds. (What must not be filed as current is the pointer that was ASKED for —
+    // a message names some particular past version — and that one is never written here.)
+    if (recordPointer && (!requestedPointer || recordPointer.profileVersion === requestedPointer.profileVersion)) {
+      writeStoredProfileAvatarPointer(recordPointer, ownerWallet);
+    }
     // A version mismatch lands here too: getAvatarVersion returns exists:false when the shard holds a different
     // version than the message asked for, which is indistinguishable from "no avatar" without this label.
-    if (!recordPointer) { note('no-record', { wantVersion: requestedPointer?.profileVersion ?? null }); return null; }
+    if (!recordPointer) {
+      note('no-record', { wantVersion: requestedPointer?.profileVersion ?? null });
+      // The shard has said no to THIS version. Worth a day of not asking again — see profileAvatarVersionMissUntil.
+      if (requestedPointer) profileAvatarVersionMissUntil.set(key, Date.now() + PROFILE_AVATAR_POINTER_TTL_MS);
+      return null;
+    }
     if (requestedPointer && recordPointer.avatarHash.toLowerCase() !== requestedPointer.avatarHash.toLowerCase()) {
       note('hash-mismatch', { want: requestedPointer.avatarHash.slice(2, 14), got: recordPointer.avatarHash.slice(2, 14) });
+      profileAvatarVersionMissUntil.set(key, Date.now() + PROFILE_AVATAR_POINTER_TTL_MS);
       return null;
     }
     const url = await readAvatarPartsFromShard(ownerWallet, recordPointer);
@@ -12977,6 +15297,14 @@ async function loadProfileAvatarImage(ownerWallet, pointer = null) {
     note(url ? 'ok' : 'shard-empty');
     return url;
   }).catch((error) => {
+    // A wallet with no KeyShard has no avatar — an answer, and one worth REMEMBERING. Only successes were cached,
+    // so every feed render asked the chain again about every author who has never registered keys, forever, on the
+    // endpoint everything else is queuing for. It expires, because a wallet can register keys at any time.
+    if (isUninitializedAccountError(error)) {
+      note('no-account');
+      profileAvatarAbsentUntil.set(ownerWallet, Date.now() + PROFILE_AVATAR_ABSENT_TTL_MS);
+      return null;
+    }
     note('threw', { error: String(error?.message ?? error).slice(0, 120) });
     if (!noteTonRpcRateLimit(error)) console.error(error);
     return null;
@@ -13300,7 +15628,8 @@ function ensurePublicChannelForAuthorWallet(authorWallet, options = {}) {
     })),
   };
   writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
-  rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
+  // A batch caller (followRestoredContactChannels) registers many channels and rebuilds ONCE at its end [F-23].
+  if (options.rebuild !== false) rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
   return id;
 }
 
@@ -13380,7 +15709,7 @@ function assemblePublicParts(items) {
         continue;
       }
     }
-    // THE AUTHOR'S NAME, OFF THE POST ITSELF [OWNER 2026-08-26: the feed card and its "Display as" menu showed
+    // THE AUTHOR'S NAME, OFF THE POST ITSELF [decided 2026-08-26] menu showed
     // only the wallet address for an author who owns a name]. Until now the only public carrier of the claim was
     // the channel-profile block, so an author without a saved profile could not be named at all. Guarded on the
     // claim EXISTING: a legacy post carries no tag, and calling the verifier with an empty claim would strip a
@@ -13391,17 +15720,20 @@ function assemblePublicParts(items) {
       documentBlocks = documentBlocks.filter((block) => block?.type !== 'sender');
       adoptPostSenderUsernameClaim(first?.authorWallet, senderClaim);
     }
-    const readEntryId = ordered.reduce((max, item) => {
-      const value = publicEntryIdBigInt(item.entryId) ?? -1n;
-      return value > max ? value : max;
-    }, -1n);
+    // THE GROUP IS NAMED BY ITS FIRST PART, and that is the whole rule [audit 2026-08-31, round 7]. This used to
+    // reduce over the parts for the numerically largest entry id — dead arithmetic since the feed identity became
+    // a dotted composite: every `BigInt("20800.0.5")` throws into the parse helper's catch, so the reduce always
+    // returned -1n and always fell through to `first.entryId`. Keeping the fold would be a check on a value it
+    // can never compute. The fallback was also the RIGHT answer: a SHARE block references a multipart post by its
+    // FIRST part, which is what the addressed read and the permalink lookup then resolve.
+    const readEntryId = null;
     const item = {
       ...first,
       text: documentBlocks.length > 0
         ? messagePreviewFromBlocks(documentBlocks)
         : ordered.filter((part) => !part.imageBytes?.length && !part.documentBytes?.length).map((part) => part.text ?? '').join(''),
       blocks: documentBlocks.length > 0 ? documentBlocks : undefined,
-      readEntryId: readEntryId >= 0n ? readEntryId.toString() : first.entryId,
+      readEntryId: readEntryId ?? first.entryId,
       partCount: group.expected,
       avatarImageUrl: null,
     };
@@ -13440,6 +15772,16 @@ function persistChannelProfileCache() {
 }
 
 // Latest-wins ordering: newer createdAt beats older, ties broken by the higher entryId.
+/** The same profile, whichever copy: what the owner wrote, the name and the gift they claimed. */
+function sameChannelProfileContent(a, b) {
+  const tags = (profile) => (Array.isArray(profile?.tags) ? profile.tags : []).join('\u0000');
+  return String(a?.description ?? '').trim() === String(b?.description ?? '').trim()
+    && tags(a) === tags(b)
+    && String(a?.ownerUsername ?? '') === String(b?.ownerUsername ?? '')
+    && JSON.stringify(a?.appearance ?? null) === JSON.stringify(b?.appearance ?? null)
+    && String(a?.wornGift ?? '') === String(b?.wornGift ?? '');
+}
+
 function compareProfileRecency(a, b) {
   const ac = Number(a?.createdAtSec ?? 0) || 0;
   const bc = Number(b?.createdAtSec ?? 0) || 0;
@@ -13461,10 +15803,22 @@ function setChannelProfileFromWalk(authorWallet, profileBlock, entryId, createdA
     description: profileBlock?.description ?? '',
     tags: profileBlock?.tags ?? [],
     ownerUsername: profileBlock?.ownerUsername ?? '',
+    appearance: profileBlock?.appearance ?? null,
+    wornGift: profileBlock?.wornGift ?? null,
     entryId: entryId === null || entryId === undefined ? '' : String(entryId),
     createdAtSec: Number(createdAtSec) || 0,
     fetchedAt: nowSec(),
   });
+  // THE OPTIMISTIC OVERLAY COMES OFF ONCE THE CHAIN HAS IT [2026-09-08]. It was never dropped, so for the whole
+  // session cachedChannelProfile kept answering with the just-published copy — and an edit made on another device
+  // stayed invisible here. A walked profile that is the overlay's own (same content) or newer retires it; the
+  // durable copy is then what every reader sees, and the open surfaces are painted again.
+  const overlay = pendingChannelProfileOverlay.get(key) ?? null;
+  if (overlay && (sameChannelProfileContent(overlay, incoming) || compareProfileRecency(incoming, overlay) >= 0)) {
+    pendingChannelProfileOverlay.delete(key);
+    if (publicChannelViewOpen && channelProfileCacheKey(publicChannelViewWallet) === key) renderPublicChannelView();
+    redressProfileCardAboutIfOpen(authorWallet);
+  }
   const prev = publicChannelProfileCache[key] ?? null;
   // Latest-wins by created_at (ties by entryId). Guard on recency ALONE (not entryId) so a just-published
   // optimistic edit (entryId '', createdAt now) can't be clobbered by a STALE older profile the walk surfaces
@@ -13476,9 +15830,15 @@ function setChannelProfileFromWalk(authorWallet, profileBlock, entryId, createdA
   if (prev?.verifiedUsername && prev.ownerUsername === incoming.ownerUsername) {
     incoming.verifiedUsername = prev.verifiedUsername;
   }
+  // The same carry for the look: a proven gift survives a re-walk that repeats the same claim.
+  if (prev?.verifiedGift && prev.appearance?.itemAddress === incoming.appearance?.itemAddress) {
+    incoming.verifiedGift = prev.verifiedGift;
+  }
   publicChannelProfileCache = { ...publicChannelProfileCache, [key]: incoming };
   persistChannelProfileCache();
+  redressProfileCardAboutIfOpen(authorWallet);
   verifyChannelUsernameClaim(authorWallet, incoming.ownerUsername);
+  verifyChannelGiftClaim(authorWallet, incoming.appearance);
 }
 
 /**
@@ -13537,6 +15897,75 @@ function verifyChannelUsernameClaim(authorWallet, claimedName) {
     if (cached && cached.value === null) applyVerifiedChannelUsername(key, '');
   });
 }
+
+/**
+ * Prove a channel's look the way its name is proven — and by the very proof the profile card runs on its own gifts.
+ *
+ * collectOwnedTelegramGifts on ONE address, with the channel's wallet as the owner: collection anchor, the item's
+ * own content (which is where the slug and number come from — chain facts, not the publisher's word), owner. Three
+ * answers, three actions: proven → dressed in what the chain says; definitively somebody else's (`transferred`) →
+ * stripped; the read did not finish (`complete: false`) → the last proven look stays. The third is the anti-strip
+ * rule the name path enforces: a busy minute must not undress a channel.
+ */
+function verifyChannelGiftClaim(authorWallet, appearance) {
+  const key = channelProfileCacheKey(authorWallet);
+  if (!key) return;
+  // Either kind of appearance may carry a gift; a look without one is a look, not a claim to prove.
+  const claimedAddress = normalizeProfileAppearance(appearance)?.itemAddress ?? null;
+  const rawWallet = rawWalletAddress(authorWallet);
+  if (!claimedAddress || !rawWallet) { applyVerifiedChannelGift(key, null); return; }
+  const claim = { itemAddress: claimedAddress };
+  const known = publicChannelProfileCache[key]?.verifiedGift ?? null;
+  // A proof this fresh is not asked for again: a gift changes hands rarely, and the walk repeats the claim on every
+  // sync of every subscribed channel.
+  if (known?.itemAddress === claim.itemAddress && (nowSec() - Number(known.verifiedAt || 0)) < CHANNEL_GIFT_VERIFY_TTL_SEC) return;
+  queueUsernameHygiene(async () => {
+    let result = null;
+    try {
+      result = await collectOwnedTelegramGifts({
+        ownerWallet: rawWallet,
+        indexerItems: [claim.itemAddress],
+        indexerError: null,
+        verifyItem: (address) => enqueueGiftChainRead(() => verifyTelegramGiftItemOnChain(address)),
+        verifyCollection: (address) => enqueueGiftChainRead(() => verifyTelegramGiftCollectionOnChain(address)),
+      });
+    } catch { result = null; }
+    const proven = result?.gifts?.find((gift) => gift.itemAddress === claim.itemAddress) ?? null;
+    if (proven) {
+      applyVerifiedChannelGift(key, { itemAddress: claim.itemAddress, slug: proven.slug, number: proven.number, verifiedAt: nowSec() });
+      return;
+    }
+    // Only a DEFINITIVE answer undresses: the item is authentic and held by somebody else, or the read finished and
+    // found nothing of the kind at that address. An unfinished read proves nothing either way.
+    const definitive = result?.complete === true || (result?.transferred ?? []).some((gift) => gift.itemAddress === claim.itemAddress);
+    if (definitive) applyVerifiedChannelGift(key, null);
+  });
+}
+
+function applyVerifiedChannelGift(profileKey, verifiedGift) {
+  const next = verifiedGift ?? null;
+  const differs = (entry) => Boolean(entry)
+    && ((entry.verifiedGift?.itemAddress ?? null) !== (next?.itemAddress ?? null) || Boolean(entry.verifiedGift) !== Boolean(next));
+  // THE OVERLAY TOO [owner, 2026-09-08: "I applied my worn gift to the channel… the channel did not take it"]. The
+  // profile just published sits in the optimistic overlay, which cachedChannelProfile prefers over the durable
+  // copy; the proof was written under it, into the durable copy alone — a verified gift the view could not see
+  // until a reload dropped the overlay. Whichever copies exist take the verdict.
+  const overlay = pendingChannelProfileOverlay.get(profileKey) ?? null;
+  const prev = publicChannelProfileCache[profileKey] ?? null;
+  const overlayChanged = differs(overlay);
+  const durableChanged = differs(prev);
+  if (!overlayChanged && !durableChanged) return;
+  if (overlayChanged) pendingChannelProfileOverlay.set(profileKey, { ...overlay, verifiedGift: next });
+  if (durableChanged) {
+    publicChannelProfileCache = { ...publicChannelProfileCache, [profileKey]: { ...prev, verifiedGift: next } };
+    persistChannelProfileCache();
+  }
+  if (publicChannelViewOpen && channelProfileCacheKey(publicChannelViewWallet) === profileKey) renderPublicChannelView();
+  refreshChannelAppearanceUi();
+  applyGiftAppearance();   // the channel on screen may have just been proven — or disproven
+}
+
+const CHANNEL_GIFT_VERIFY_TTL_SEC = 24 * 60 * 60;
 
 function applyVerifiedChannelUsername(profileKey, verifiedUsername) {
   const prev = publicChannelProfileCache[profileKey];
@@ -13605,12 +16034,15 @@ function setChannelProfileOptimistic(authorWallet, profile, createdAtSec) {
     description: profile?.description ?? '',
     tags: normalizeProfileTags(profile?.tags),
     ownerUsername: profile?.ownerUsername ?? '',
+    appearance: profile?.appearance ?? null,
+    wornGift: profile?.wornGift ?? null,
     entryId: '',
     createdAtSec: Number(createdAtSec) || nowSec(),
     fetchedAt: nowSec(),
   }));
   // Verify your OWN just-published username so your own channel shows it immediately (the overlay isn't walked).
   verifyChannelUsernameClaim(authorWallet, profile?.ownerUsername);
+  verifyChannelGiftClaim(authorWallet, profile?.appearance ?? null);
 }
 
 // Decode a resolved single-part document body and, if it carries a PROFILE block, return it plus whether the
@@ -13629,6 +16061,10 @@ function readProfileDocument(documentBytes) {
       description: String(profile.description ?? ''),
       tags: Array.isArray(profile.tags) ? profile.tags : [],
       ownerUsername: typeof profile.ownerUsername === 'string' ? profile.ownerUsername : '',
+      // The look's claim, carried the way the name's is: stored, proven, and only the proven form drawn.
+      appearance: normalizeProfileAppearance(profile.appearance ?? null),
+      // And the WORN gift's claim — the profile card's, apart from the channel's look [2026-09-09].
+      wornGift: normalizeProfileWornGift(profile.wornGift ?? null),
     },
     isProfileOnly: blocks.length > 0 && blocks.every((block) => block?.type === 'profile'),
   };
@@ -13754,7 +16190,11 @@ async function discoverChannelsFromBeacon({ onPartial = null } = {}) {
     let catalog;
     try {
       catalog = await lane.sweepChannelCatalog({
-        topBuckets: Infinity,   // EVERY live bucket — the lane orders them, this paints as they come
+        // THE LANE'S OWN CAP, not Infinity [2026-08-29]. Asking for every live bucket made this screen's cost
+        // grow linearly with the number of channels in the network: MEASURED, one cold sweep is 10.6 MiB at
+        // 10,000 channels and 89.7 MiB at 91,000 — past the whole day's budget for a phone. The lane orders
+        // buckets newest-first and reads a bounded few, so the sweep costs the same at any network size; this
+        // paints them as they come exactly as before.
         onProgress: (partial, progress) => {
           paint(results, { added: absorb(partial), done: Number(progress?.done ?? 0), total: Number(progress?.total ?? 0) });
         },
@@ -13951,8 +16391,32 @@ function claimedPeerUsernameFromOpened(opened) {
 // Bounded so a long-lived session cannot grow it without limit — epochs advance, and old buckets fall out of the
 // read window but would otherwise keep their entry forever. Eviction is safe by construction: the worst case is
 // re-reading a bucket once.
+// The per-conversation shard plan, derived once per (keys, epoch, window) instead of once per pass — see
+// createRecordShardPlanner for the measurement that put it here. Cleared with every other wallet-scoped cache.
+const convShardPlanner = createRecordShardPlanner();
 const convBucketSeqMarks = new Map();
 const CONV_BUCKET_SEQ_MARK_LIMIT = 512;
+
+/**
+ * CONVERSATIONS OWED A DEEP WALK, because a routine pass came back short of what they hold.
+ *
+ * [audit 2026-09-01, round 9.] A routine pass reads the newest 128 bodies of a shard and pages back at most four
+ * more (CONV_MAX_OLDER_BODY_PAGES = 4, i.e. 640) to reach the device's mark. Past that the lane warned once and
+ * returned what it had — and this function then advanced the shard's high-water to the TOP of the window and its
+ * scan cursor past the epoch, because nothing had failed. The bodies in between are on chain, paid for, and never
+ * read again: the pre-decrypt gate skips everything at or below the mark, and the mark is rebuilt at boot as the
+ * MAX of stored messages, so a reload re-derives it above the same hole. Permanent, silent loss of private
+ * messages — the one failure this lane exists to prevent.
+ *
+ * Barring the mark alone would not heal it: the next pass restarts from the newest window and gaps identically,
+ * forever, with the cursor frozen and the shard re-read every twelve seconds. So a gap ESCALATES the conversation
+ * to the deep walk the manual Sync already performs (knownSeqOf 0 + fullWalk, 32 pages = the 4,096 a shard-day can
+ * hold), which closes any single shard-day in ONE pass. It fires once per gap rather than every pass, so the
+ * four-page spam bound the routine pass exists to keep is untouched.
+ *
+ * Wallet-scoped: keyed by peer keyId, so it is cleared with every other conversation cache on a switch.
+ */
+const convDeepWalkPending = new Set();
 
 function convBucketSeqHighWater(bucketAddress) {
   return convBucketSeqMarks.get(bucketAddress) ?? -1;
@@ -14006,7 +16470,11 @@ function seedConvSeqMarksFromHistory(messages) {
 }
 
 function advanceConvBucketSeqHighWater(bucketAddress, seq) {
-  if (!bucketAddress || !Number.isFinite(seq)) return;
+  // SAFE INTEGER, not merely finite [audit 2026-09-01, round 9]. The mark is compared with `<=` before every
+  // decryption, so a value past 2^53 does not merely sit high — it makes neighbouring seqs indistinguishable and
+  // skips honest records unseen. The lane already refuses such a row; this is the second writer (the boot seed,
+  // rebuilt from stored messages) saying the same thing.
+  if (!bucketAddress || !Number.isSafeInteger(seq)) return;
   if (seq <= convBucketSeqHighWater(bucketAddress)) return;
   // Re-insert so the Map's insertion order doubles as a recency list for the eviction below.
   convBucketSeqMarks.delete(bucketAddress);
@@ -14062,8 +16530,7 @@ function queueRestoredConvIdentityResolution(thread) {
   // point, because both are dialogs where nothing is arriving:
   //  · ANONYMOUS — no peer wallet at all yet (a snapshot written before the identity resolved).
   //  · KNOWN PEER WHO CLAIMED A NAME WE NEVER PROVED — the verifying read failed once, and the retry was pinned to
-  //    the next message. A quiet contact stayed a bare wallet address for ever [OWNER 2026-08-24: "the counterparty's
-  //    username gets lost — this contact has one and I don't see it"].
+  //    the next message. A quiet contact stayed a bare wallet address for ever [decided 2026-08-24].
   const claim = thread.claimedSenderUsername ?? null;
   if (!isAnonymousPeerThread(thread) && !(claim && !threadWearsUsername(thread, claim))) return;
   if (convThreadIdentityAttempted.has(thread.id)) return;
@@ -14148,7 +16615,10 @@ async function handleIntroFirstContact(opened, capsule = null) {
 
 // Build + start the scan (idempotent). Safe to call on unlock and on every return-to-visible.
 async function armIntroReceiveLane() {
-  if (!privateLaneDirectPayEnabled()) return;
+  // Past the cutover boundary this build sweeps clean-17 intro addresses that no new sender writes any more —
+  // 10,240 RPC reads a pass for an inbox that can only be empty. The update screen is already up (the gate
+  // refresher owns it); not arming is the scan half of CUTOVER.md item 7's ruling.
+  if (cutoverUpdateRequired()) return;
   if (introReceiveLane || !localIdentity || !localRecipientKeyPair) return;
   const transport = globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return;
@@ -14163,6 +16633,7 @@ async function armIntroReceiveLane() {
   try {
     introReceiveLane = await createIntroLane({
       scanSecretKey: localIdentity.scanSecretKey,
+      cursorDbName: currentIntroCursorDbName(),
       runGetMethod: (call) => transport.runGetMethod(call),
       onIntro,
       onError: (error) => {
@@ -14221,7 +16692,16 @@ async function publicPostPartsFromShardPosts(shardPosts, channel) {
     // corrupted record. So the FEED identity (entryId) is made globally unique with the shard's coordinates, while
     // the RAW per-shard entry_id is kept as shardEntryId for the comment thread derivation (post_uid needs it).
     const shardEntryId = sp.entry_id.toString();
-    const globalEntryId = `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`;
+    // …AND THE GENERATION IS THE FOURTH COORDINATE [audit 2026-08-31, round 5]. The flip gave a shard address a
+    // generation dimension, and in the era that straddles the boundary the gen-17 and gen-18 shards of a channel
+    // share an epoch_tag AND a seq while both number their entries from 0 — so the three coordinates above
+    // stopped naming one entry, and the merge this comment warns about came back for two posts of the same
+    // author. Generation 17 keeps the EXACT three-part id it has always had (every stored id, share block and
+    // permalink in the wild stays valid); only 18 appends, and its posts are born after the flip.
+    const postGeneration = Number(sp.generation ?? 17);
+    const globalEntryId = postGeneration === 17
+      ? `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}`
+      : `${sp.channelEpochTag}.${sp.channelShardSeq ?? 0}.${shardEntryId}.${postGeneration}`;
     postParts.push({
       id: `pshard-${channel.id}-${globalEntryId}`,
       entryId: globalEntryId,
@@ -14245,9 +16725,60 @@ async function publicPostPartsFromShardPosts(shardPosts, channel) {
       // find the THREAD shard for this post's comments.
       channelEpochTag: sp.channelEpochTag != null ? String(sp.channelEpochTag) : undefined,
       channelShardSeq: sp.channelShardSeq ?? 0,
+      // THE MODERATION BIT rides the row it was read from [CUTOVER item 15]: a hidden entry is skipped by every
+      // surface (publicItemVisibleUnderModeration) and badged on its author's own screen.
+      hidden: sp.hidden === true,
     });
   }
   return postParts;
+}
+
+// HOW DEEP THE OPEN CHANNEL IS READ, in pages of 96 entries below its newest window.
+//
+// A channel's era shard is read one page deep by default, which is what the background pass over EVERY followed
+// channel can afford. That is not what the channel screen promises: a post is retained for a year, and until this
+// existed everything below the newest 96 entries of an era was on chain, paid for, and unreachable — MEASURED at
+// 260 entries in, 96 out (PL-WINDOW-03). So the channel the reader actually has OPEN asks for more, and only it.
+//
+// EIGHT, and the arithmetic is the transport's: one page costs two requests (get_page plus the /messages window
+// that carries its bodies), and the shared pump spaces requests at TONCENTER_KEYLESS_REQUEST_SPACING_MS = 1100 ms
+// without an API key. Eight pages are 16 requests = 17.6 s, the largest budget that still lands inside one
+// PUBLIC_BACKGROUND_SYNC_MS (30 s) period on the slowest transport; with a key (125 ms) the same walk is 2 s.
+// That is 768 entries a pass, so a shard filled to PS_SAFE_CAP = 4096 finishes in six passes of a screen left open.
+const PUBLIC_CHANNEL_BACKFILL_PAGES = 8;
+
+// WHAT THE DURABLE FEED CACHE ALREADY HOLDS for each (epoch tag, shard seq) of one channel, as the lowest and
+// highest entry id — the same shape the CONV lane takes as `knownSeqOf`, widened to both ends because a shard can
+// be missing entries below what is held (its history) and above it (a burst that arrived faster than one page).
+// Reading it from the DURABLE cache rather than the lane's own snapshot is what makes the walk cost once per
+// device instead of once per launch: the lane's snapshot dies with the tab, this survives it.
+function publicChannelKnownEntryRange(channelId) {
+  const cached = publicChannelFeedCache?.[channelId]?.feed ?? publicChannelFeedCache?.[channelId];
+  const ranges = new Map();
+  for (const post of cached?.posts ?? []) {
+    const coords = sharedPostShardCoordinates(post?.entryId);
+    if (!coords) continue;                                  // a local pending post, or a pre-shard v1 share
+    const entry = Number(coords.shardEntryId);
+    if (!Number.isFinite(entry)) continue;
+    // THE GENERATION IS PART OF THE KEY, because it is part of the SHARD [audit 2026-08-31, round 6 — found by
+    // three independent facets]. This mark says "entries min..max of that shard are already held, do not walk
+    // them again". In the era that straddles the flip, one (epoch_tag, seq) names TWO shard accounts and both
+    // number their entries from 0 — so a generation-blind key merged them into one range, and the lane's planner
+    // (public-lane.mjs, deepTop = min(walked, holds.min)) then collapsed to 0 and pushed NO deep segment at all.
+    // MEASURED: with gen-17 holding 0..299 and gen-18 holding 405..500, the merged mark {0,500} produced ZERO
+    // deep pages against five for the truthful {405,500} — 405 gen-18 entries on chain, paid for, inside the
+    // reader's promised year, silently never fetched. The cache is merge-only, so it never healed.
+    // `generation` is null for an id minted before the split, which IS generation 17 — the same normalisation
+    // publicPostChainCoordinates applies, so a pre-flip cache keys exactly as it always did.
+    const key = `${coords.epochTag}.${coords.shardSeq}.${coords.generation ?? 17}`;
+    const held = ranges.get(key);
+    if (held === undefined) ranges.set(key, { min: entry, max: entry });
+    else {
+      if (entry < held.min) held.min = entry;
+      if (entry > held.max) held.max = entry;
+    }
+  }
+  return (epochTag, seq, generation = 17) => ranges.get(`${epochTag}.${seq}.${generation}`) ?? null;
 }
 
 // clean-17 feed sync (gated): for each feed-source channel, read its posts from the author's CHANNEL PublicShard and
@@ -14286,21 +16817,57 @@ async function syncPublicChannelFromShards() {
     try { renderPublicSurface({ anchorUnread: false }); }
     catch (error) { console.warn('[public] progressive feed paint failed', error); }
   };
+  // ONE BATCHED STATE READ FOR THE WHOLE FEED, not one per channel.
+  //
+  // MEASURED 2026-08-29 over the shipping lane: a pass across 100 followed channels issued ONE HUNDRED
+  // accountStates requests — 56 addresses each, one request per channel — and the shared pump spaces requests at
+  // 1100 ms without an API key. The pass took 149.7 s against its own 30-second period: it could never finish
+  // before the next one was due, and it got worse with every channel followed. The addresses were never the
+  // problem (5,600 of them fit six requests at ACCOUNT_STATES_MAX_PER_CALL); only the CALLER was per-channel.
+  // The same fixture through readChannelPostsMany: 6 requests, 7.8 s. Progressive paint is unaffected — the
+  // states arrive together, then each channel's bodies are read and painted in turn, as before.
+  const walletOfChannel = new Map();
+  for (const channel of feedChannels) {
+    if (channel.authorWallet) walletOfChannel.set(String(channel.authorWallet), channel);
+  }
+  let postsByWallet = new Map();
+  try {
+    postsByWallet = await lane.readChannelPostsMany([...walletOfChannel.keys()], {
+      // THE OPEN CHANNEL IS READ DEEP, every other one at the old one-page cost. A reader looking at a channel is
+      // the reader owed its whole year; a background pass over a follow list is not the place to spend that.
+      deep: (wallet) => {
+        const channel = walletOfChannel.get(wallet);
+        const open = channel && publicChannelViewOpen && channel.id === publicChannelViewChannelId;
+        // WHAT THIS DEVICE HOLDS IS PASSED FOR EVERY CHANNEL [audit round 3], not just the open one: it is a read
+        // of the feed cache already in memory, and it is what tells the lane a hide may have landed below the
+        // window it is about to read. Without it the refresh ran only where a snapshot from THIS session stood —
+        // so after a reload a post hidden while the app was closed stayed in the feed until its channel was
+        // opened. The deep backfill (a year of pages) stays the open channel's alone.
+        return {
+          ...(open ? { backfillPages: PUBLIC_CHANNEL_BACKFILL_PAGES } : {}),
+          knownRange: channel ? publicChannelKnownEntryRange(channel.id) : null,
+        };
+      },
+      onChannelError: (wallet, error) => {
+        console.warn('[public] shard channel read failed', walletOfChannel.get(wallet)?.id ?? wallet, error);
+      },
+    });
+  } catch (error) {
+    // The batch itself could not be answered (offline, rate-limited, an endpoint that refused): every channel keeps
+    // its cached posts, exactly as a per-channel failure used to leave them.
+    noteTonRpcRateLimit(error);
+    console.warn('[public] feed state batch failed', error);
+    return false;
+  }
   for (const channel of feedChannels) {
     if (!channel.authorWallet) continue;
-    let shardPosts;
-    try {
-      shardPosts = await lane.readChannelPosts(channel.authorWallet);
-    } catch (error) {
-      console.warn('[public] shard channel read failed', channel.id, error);
-      continue;
-    }
+    const shardPosts = postsByWallet.get(String(channel.authorWallet)) ?? [];
     const postParts = await publicPostPartsFromShardPosts(shardPosts, channel);
     const posts = assemblePublicParts(postParts);
     posts.reverse();
     const cachedFeed = publicChannelFeedCache?.[channel.id]?.feed ?? publicChannelFeedCache?.[channel.id];
     const existing = (cachedFeed?.posts ?? []).filter(publicFeedPostHasChainAnchor);
-    const merged = upsertPublicChainPosts(existing, posts);
+    const merged = applyHiddenBitmaps(upsertPublicChainPosts(existing, posts), shardPosts.hidden);
     const withPending = mergeLocalPendingPublicFeed(channel.id, merged);
     if (publicSyncInvalidationEpoch !== invalidationEpochAtStart) {
       globalThis.plathoLastPublicSync = { mode: 'shard', channels: touched, at: updatedAt, discarded: 'invalidated' };
@@ -14338,6 +16905,26 @@ function publicFeedPostHasChainAnchor(post) {
 
 // Union two comment lists by entryId (fallback bodyHash), keeping the fresh copy on collision, sorted oldest
 // first. Lets a degraded walk that re-read only SOME of a post's comments keep the rest instead of dropping them.
+/**
+ * A COMMENT ID MINTED BY A BUILD THAT KEYED ON THE BODY ALONE.
+ *
+ * [audit 2026-09-01, round 9.] A comment's feed identity moved from the hash of its BODY cell to its chain SEAT
+ * (shard + row), because a body hash is not an identity: the PPH2 body carries only the document bytes, so two
+ * people commenting "ok" produced one id from two rows and the later one was dropped unseen. But comments are
+ * PERSISTED, and normalizeFeedComment does not keep the seat — so a comment cached by an older build cannot have
+ * its new id recomputed, and merging it with its freshly-read twin would show the SAME comment twice in every
+ * thread the reader already had cached.
+ *
+ * A legacy id is recognisable from its own formula (`c-` + the body hash without its 0x), so it can be told from
+ * a seat id without guessing. This is a migration, and it retires itself: once a thread has been re-read, no
+ * legacy id remains in it.
+ */
+function isLegacyBodyHashCommentId(comment) {
+  const entryId = String(comment?.entryId ?? '');
+  const hash = String(comment?.bodyHash ?? '').replace(/^0x/i, '');
+  return Boolean(hash) && entryId === `c-${hash}`;
+}
+
 function mergePublicComments(existing = [], fresh = []) {
   const byKey = new Map();
   const order = [];
@@ -14349,8 +16936,19 @@ function mergePublicComments(existing = [], fresh = []) {
   };
   for (const comment of existing) add(comment);
   for (const comment of fresh) add(comment);
+  // …and a cached comment whose id came from the OLD rule steps aside for the same comment read under the new
+  // one. Matched on body AND author, so two people's identical words are still two comments — the very thing the
+  // seat identity exists to keep apart.
+  const seated = [...byKey.values()].filter((comment) => !isLegacyBodyHashCommentId(comment));
+  const supersededByHash = new Set();
+  for (const comment of seated) {
+    const hash = String(comment?.bodyHash ?? '').toLowerCase();
+    if (hash) supersededByHash.add(`${hash}|${rawWalletAddress(comment?.authorWallet) ?? ''}`);
+  }
   return order
     .map((key) => byKey.get(key))
+    .filter((comment) => !(isLegacyBodyHashCommentId(comment)
+      && supersededByHash.has(`${String(comment?.bodyHash ?? '').toLowerCase()}|${rawWalletAddress(comment?.authorWallet) ?? ''}`)))
     .sort((a, b) => new Date(a?.createdAt ?? 0).getTime() - new Date(b?.createdAt ?? 0).getTime());
 }
 
@@ -14358,6 +16956,25 @@ function mergePublicComments(existing = [], fresh = []) {
 // matching posts are refreshed (newer fields win) with their comments UNIONED; posts the walk did not return
 // this cycle are kept. Result is sorted oldest-first to match the feed order. This is the public analogue of the
 // private sync's idempotent append (appendOpenedCapsuleMessage) — merge into existing, never rebuild from empty.
+/** The hidden bits a lane read for a shard that moved (get_hidden), applied to every post of that shard the cache
+ *  holds — the rows below the newest window, which no page read refreshes [CUTOVER item 15, round 2]. */
+function applyHiddenBitmaps(posts, bitmaps) {
+  if (!Array.isArray(bitmaps) || bitmaps.length === 0) return posts;
+  const byCoord = new Map(bitmaps.map((b) => [`${b.epochTag}.${b.seq}.${b.generation ?? 17}`,
+    { ids: new Set((b.ids ?? []).map(Number)), complete: b.complete !== false }]));
+  return posts.map((post) => {
+    const coords = publicItemCoordinates(post, null);
+    if (!coords) return post;
+    const answer = byCoord.get(`${coords.epochTag}.${coords.shardSeq}.${coords.generation}`);
+    if (!answer) return post;
+    const hidden = answer.ids.has(Number(coords.entryId));
+    // A TRUNCATED ANSWER ONLY ADDS [round 3]: the index is read a page at a time, and a shard that hides more
+    // than the pages asked for did not name them all — absence is then "not said", not "not hidden".
+    if (!hidden && !answer.complete) return post;
+    return hidden === (post.hidden === true) ? post : { ...post, hidden };
+  });
+}
+
 function upsertPublicChainPosts(existing = [], fresh = []) {
   const byKey = new Map();
   const order = [];
@@ -14389,6 +17006,8 @@ async function syncPublicChannelsRun() {
   setPublicSyncPhase('syncing');
   let chainSyncError = null;
   try {
+    // The moderation fold first, so the very first render is already filtered; fail-open inside.
+    await refreshModeration();
     // First cycle on a fresh load pays the verifier failure that parks a dead
     // verifier (e.g. region-blocked toncenter); retry unverified in the same
     // call so the public feed loads immediately instead of next tick.
@@ -14544,7 +17163,7 @@ async function hydratePublicChannelAvatars() {
   return changed;
 }
 
-// [OWNER 2026-08-13] "avatars do not load in the Find channels screen. Open the channel and they do." Exactly so: a
+// [decided 2026-08-13] Exactly so: a
 // discovery result is NOT a feed source — it is a wallet the beacon sweep just named, with no registry channel and
 // no posts pulled — so the sweep above never covered it, and the face only appeared once opening the channel made
 // it a preview source. Discovery is precisely where a face carries the most information, since the name and one
@@ -14692,10 +17311,32 @@ function observeDiscoveryLatestCards() {
 
 // `retry` is the rate-limit timer's door: a wallet parked as 'loading' while it waits may re-enter the queue; nothing
 // else may re-ask for a wallet the map already knows.
+/**
+ * Is anyone looking at a latest-post line right now?
+ *
+ * The lane used to ask `publicDiscoveryOpen`, which was the right rule aimed at the wrong subject: it exists so
+ * nothing reads the chain for an answer nobody will see, and the Discover list is no longer the only place that
+ * shows one. The profile card shows the same block, built by the same function.
+ */
+function discoveryLatestHasAnAudience() {
+  if (publicDiscoveryOpen) return true;
+  // GUARDED, because `profileCardSubject` is declared twenty thousand lines below this and the discovery lane can
+  // reach here. A read inside its temporal dead zone throws, and a throw at top level abandons the REST of the
+  // module — this app has booted to a DOM with no runtime behind it that way before. Nothing is worn yet at that
+  // moment anyway, so "no audience" is also the correct answer.
+  try {
+    return profileCardSubject !== null;
+  } catch {
+    return false;
+  }
+}
+
 function queueDiscoveryLatestPost(wallet, { retry = false } = {}) {
-  if (!publicDiscoveryOpen || !wallet) return;
+  if (!discoveryLatestHasAnAudience() || !wallet) return;
   const state = discoveryLatestState(wallet);
-  if (state && (!retry || state.status !== 'loading')) return;
+  // A STALE answer — last time's, read back from the store — is shown, but it is not an answer to keep: it is
+  // queued like a read in flight, and the fresh one paints over it.
+  if (state && !state.stale && (!retry || state.status !== 'loading')) return;
   if (publicDiscoveryLatestInFlight.has(wallet) || publicDiscoveryLatestQueue.includes(wallet)) return;
   if (!state) publicDiscoveryLatestPosts.set(wallet, { status: 'loading', attempts: 0 });
   publicDiscoveryLatestQueue.push(wallet);
@@ -14703,10 +17344,11 @@ function queueDiscoveryLatestPost(wallet, { retry = false } = {}) {
 }
 
 function pumpDiscoveryLatestPosts() {
-  if (!publicDiscoveryOpen) return;
+  if (!discoveryLatestHasAnAudience()) return;
   while (publicDiscoveryLatestInFlight.size < PUBLIC_DISCOVERY_LATEST_CONCURRENCY && publicDiscoveryLatestQueue.length > 0) {
     const wallet = publicDiscoveryLatestQueue.shift();
-    if (discoveryLatestState(wallet)?.status !== 'loading' || publicDiscoveryLatestInFlight.has(wallet)) continue;
+    const queued = discoveryLatestState(wallet);
+    if ((queued?.status !== 'loading' && !queued?.stale) || publicDiscoveryLatestInFlight.has(wallet)) continue;
     publicDiscoveryLatestInFlight.add(wallet);
     void loadDiscoveryLatestPost(wallet, publicDiscoveryLatestGeneration).finally(() => {
       publicDiscoveryLatestInFlight.delete(wallet);
@@ -14727,6 +17369,9 @@ async function loadDiscoveryLatestPost(wallet, generation) {
     if (!stillWanted()) return;                   // a reset happened underneath: this answer belongs to the old list
     publicDiscoveryLatestPosts.set(wallet, state);  // stored even while the panel is closed — a reopen within the cache TTL shows it
     if (publicDiscoveryOpen) applyDiscoveryLatestToCard(wallet);
+    if (profileCardSubject === wallet) renderProfileCardLatestPost(wallet);
+    if (state.status !== 'loading') markProfileCardLaneDone(wallet, 'latest');
+    void writeStoredLatestPost(wallet, state);   // a post, or the settled absence of one; a read that gave up is not kept
   };
   const lane = directPublicLaneReader();
   if (!lane) { settle({ status: 'error', attempts: 0 }); return; }
@@ -14741,7 +17386,7 @@ async function loadDiscoveryLatestPost(wallet, generation) {
       const parts = await publicPostPartsFromShardPosts(posts, { id: `wallet:${wallet}`, authorWallet: wallet });
       const items = assemblePublicParts(parts)
         .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
-      const latest = items[0] ?? null;
+      const latest = items.find((candidate) => publicItemVisibleUnderModeration(candidate, 0)) ?? null;   // a hidden post is not a preview
       if (latest) {
         settle({
           status: 'ready',
@@ -14762,7 +17407,8 @@ async function loadDiscoveryLatestPost(wallet, generation) {
     // backoff themselves, but get_page still refuses while it lasts); anything else is given up on until the next
     // refresh — the card simply keeps its description.
     if (noteTonRpcRateLimit(error) && attempts <= PUBLIC_DISCOVERY_LATEST_RETRIES) {
-      publicDiscoveryLatestPosts.set(wallet, { status: 'loading', attempts });
+      const shown = discoveryLatestState(wallet);
+      publicDiscoveryLatestPosts.set(wallet, shown?.stale ? { ...shown, attempts } : { status: 'loading', attempts });
       const delayMs = Math.max(2_000, tonRpcLimitBackoffMs(error)) * attempts;
       window.setTimeout(() => { if (stillWanted()) queueDiscoveryLatestPost(wallet, { retry: true }); }, delayMs);
       return;
@@ -15506,6 +18152,10 @@ function setOwnPublicFeedAvatar(owner, imageUrl) {
     return;
   }
   renderPublicSurface({ anchorUnread: false });
+  // THE OPEN CARD TOO [owner, 2026-09-08: "the settings show the avatar" while the card sat on its letters]. The
+  // settings face is dressed by the caller the moment this map is fed; the card read the map once, when it
+  // opened, and never again.
+  redressProfileCardFaceIfOpen(raw);
 }
 
 // Restore the own avatar from the local media store IMMEDIATELY (no chain wait) using the persisted current
@@ -15517,7 +18167,6 @@ async function restoreOwnAvatarFromCacheFast(owner = plathoWallet?.address) {
   if (!pointer) return null;
   const cachedUrl = await readProfileAvatarMediaCache(pointer.avatarHash);
   if (!cachedUrl) return null;
-  setAvatarNode(profileAvatar, 'P', cachedUrl);
   setOwnPublicFeedAvatar(owner, cachedUrl);
   return cachedUrl;
 }
@@ -15528,20 +18177,33 @@ async function refreshOwnProfileAvatar() {
 async function refreshOwnProfileAvatarRun() {
   const owner = plathoWallet?.address;
   if (!owner) {
-    setAvatarNode(profileAvatar, 'P', null);
     return null;
   }
   // Cache-first: show the cached avatar at once so it never flashes the letter tile, then confirm from chain.
   await restoreOwnAvatarFromCacheFast(owner).catch(() => {});
+  // BEFORE ACTIVATION THERE IS NOTHING TO READ. bootCrypto runs refreshVaultActivationStatus first, so by the time
+  // this runs the answer is already in hand — spending a second critical chain read to rediscover it is the read
+  // this gate exists to remove (and the one that surfaced as a stray HTTP 500 when a fallback door answered it).
+  if (ownKeyShardKnownAbsent(owner)) {
+    profileAvatarAbsentUntil.set(rawWalletAddress(owner) ?? owner, Date.now() + PROFILE_AVATAR_ABSENT_TTL_MS);
+    setOwnPublicFeedAvatar(owner, null);
+    return null;
+  }
   const onChain = await readCurrentProfileAvatarPointerResultFromChain(owner, { required: false });
+  // NO KEYSHARD IS AN ANSWER, AND IT IS WORTH REMEMBERING (PWA-AVATAR-ABSENT-01). The feed loader has cached this
+  // since 2026-09-06; the OWN path threw the same answer away, so every boot and every Profile open spent a fresh
+  // verify:true critical read to be told again that a wallet which has not activated has no avatar.
+  if (onChain.absent === true) {
+    profileAvatarAbsentUntil.set(rawWalletAddress(owner) ?? owner, Date.now() + PROFILE_AVATAR_ABSENT_TTL_MS);
+    setOwnPublicFeedAvatar(owner, null);
+    return null;
+  }
   const pointer = onChain.ok ? onChain.pointer : readStoredProfileAvatarPointer(owner);
   if (!pointer) {
-    setAvatarNode(profileAvatar, 'P', null);
     setOwnPublicFeedAvatar(owner, null);
     return null;
   }
   const imageUrl = await loadProfileAvatarImage(owner, pointer);
-  setAvatarNode(profileAvatar, 'P', imageUrl);
   setOwnPublicFeedAvatar(owner, imageUrl);
   return imageUrl;
 }
@@ -15557,12 +18219,21 @@ async function readCurrentProfileAvatarPointerResultFromChain(ownerWallet, optio
     const record = await resolved.provider.getAvatar(ownerWallet, {
       profileRegistryAddress: resolved.address,
       ...criticalChainReadOptions(),
+      // The own shard's -13 is a settled answer: stop at the first door instead of asking every fallback.
+      stopOnUninitializedAccount: true,
     });
     const pointer = profileAvatarPointerFromRecord(record);
     if (pointer) writeStoredProfileAvatarPointer(pointer, ownerWallet);
     else writeStoredProfileAvatarPointer(null, ownerWallet);
     return { ok: true, pointer, record };
   } catch (error) {
+    // NO KEYSHARD IS AN ANSWER: the account has no code, so this wallet has never registered keys and cannot have
+    // an avatar. Reporting it as a failed READ made the caller fall back to whatever pointer was stored locally —
+    // a pointer that can never load — and printed a stack trace for the most ordinary state a new wallet has.
+    if (isUninitializedAccountError(error)) {
+      writeStoredProfileAvatarPointer(null, ownerWallet);
+      return { ok: true, pointer: null, record: null, absent: true };
+    }
     if (options.required === false) {
       if (!noteTonRpcRateLimit(error)) console.error(error);
       return { ok: false, pointer: null, error };
@@ -15715,6 +18386,13 @@ function insertThreadMessage(thread, message) {
   if (!Array.isArray(thread.messages)) thread.messages = [];
   thread.messages.push(message);
   sortThreadMessages(thread);
+  // A JOIN TOKEN arriving in a private conversation is a newcomer's group key coming back to whoever invited them.
+  // Noted HERE because this is the one funnel every message enters a thread through — the CONV scan, a restore,
+  // an INTRO first contact — so an admin's device cannot miss it on any path. Idempotent: the runtime ignores a
+  // key it already holds, and a device that is not an admin of that group does nothing with it.
+  if (message?.type === 'in' && typeof message.text === 'string' && message.text.startsWith(GROUP_JOIN_PREFIX)) {
+    void noteGroupJoinFromText(message.text, thread);
+  }
 }
 
 // When this dialog was last ACTIVE = the newest message's timestamp (messages are kept ascending, so scan from the
@@ -15863,13 +18541,27 @@ function messageFromOpenedPrivateParts(parts, meta) {
   return message;
 }
 
+/** A group token in the list row reads as the card it is drawn as in the bubble — never as its bytes [audit 2026-09-05]. */
+function groupTokenPreviewText(message) {
+  const text = typeof message?.text === 'string' ? message.text : '';
+  if (!text) return '';
+  const invite = parseGroupInviteToken(text);
+  if (invite) return message.type === 'out' ? t('group.inviteSentTo', { name: invite.name ?? t('group.untitled') }) : t('group.inviteReceived', { name: invite.name ?? t('group.untitled') });
+  const join = parseGroupJoinToken(text);
+  if (join) {
+    const name = groupRuntimeInstance?.get(String(join.groupId))?.name ?? t('group.untitled');
+    return message.type === 'out' ? t('group.joinSent', { name }) : t('group.joinReceived', { name });
+  }
+  return '';
+}
+
 function refreshThreadAfterMessageChange(thread) {
   if (!thread) return;
   sortThreadMessages(thread);
   const last = thread.messages?.[thread.messages.length - 1] ?? null;
   const status = messageStatusKey(last);
   thread.preview = last
-    ? (messagePreviewFromBlocks(last.blocks) || messagePreviewText(last.text) || (last.attachment ? t('chat.previewImage') : ''))
+    ? (messagePreviewFromBlocks(last.blocks) || groupTokenPreviewText(last) || messagePreviewText(last.text) || (last.attachment ? t('chat.previewImage') : ''))
     : t('chat.previewNoMessages');
   // No thread.time write: the list's side label is computed at render from the last message's real timestamp
   // (formatThreadListTimestamp) — the old constant 'now'/'new' words carried no information.
@@ -16162,6 +18854,12 @@ function isPrivateOpenKeyMismatchError(error) {
 }
 
 function isPrivateUnreadableCapsuleError(error) {
+  // A CODE BEFORE A SENTENCE [audit 2026-09-01, round 9]. Everything the compact-payload decoder raises is tagged
+  // at its one entry point, because matching English wordings missed all eight of its real failures — and an
+  // unplaced failure is treated as TRANSIENT, which bars the bucket's seq mark, drops the lane's change marker,
+  // freezes the scan cursor, and leaves the shard's whole history re-read and re-decrypted every twelve seconds
+  // for good. A body that will not decode will never decode: those bytes are on chain and cannot change.
+  if (error?.code === PLATHO_CAPSULE_UNREADABLE_CODE) return true;
   if (isPrivateOpenKeyMismatchError(error)) return true;
   const message = String(error?.message ?? error ?? '');
   return /private capsule|platho private capsule|capsulehub private entry|compact body|header0|header1|sender signature|magic mismatch|body size mismatch|suite mismatch|hash mismatch|invalid platho private capsule/i.test(message);
@@ -16284,7 +18982,23 @@ function resolveConvReceiveThread(peerKeyIdB64) {
 // capsule id, so re-reading the acceptance window on the next tick adds nothing. An incomplete multipart (some parts
 // not yet on chain / not yet in the window) is held for a later tick rather than rendered as fragments.
 async function appendConvOpenedCapsules(collected, targetThread) {
-  if (collected.length === 0) return 0;
+  // RETURNS { appended, held } — and `held` is the half that was missing until 2026-08-29.
+  //
+  // A multipart message whose parts have not all reached the chain yet is deliberately not rendered as fragments:
+  // the group is skipped and picked up on a later tick. But the caller advanced its per-shard seq mark to the
+  // highest seq it OPENED, held parts included, and the next pass skips everything at or below that mark BEFORE
+  // decrypting — so the parts already in hand were never opened again, the group could never be completed, and a
+  // paid message vanished in silence. Nothing healed it: a reload rebuilds the mark from stored history, and a
+  // message that was never stored contributes nothing, while any later message in the same shard puts the mark
+  // back above the lost parts. Only a manual full rescan (forceFull, which bypasses the mark) could recover it.
+  //
+  // The split is ordinary, not exotic: the parts of one message are separate externals seconds apart, and the
+  // receive pass runs every 12s, so a pass landing between part 3 and part 4 is the normal case for a large one.
+  //
+  // So every entry this function does not store is reported back, and the caller keeps its mark BELOW it. An
+  // append that THREW is reported the same way — that is the "known and unchanged" gap named in the comment on
+  // seedConvSeqMarksFromHistory, and it is the same one line to close.
+  if (collected.length === 0) return { appended: 0, held: [] };
   const groups = new Map();
   for (const item of collected) {
     const payload = item.opened?.payload;
@@ -16293,6 +19007,14 @@ async function appendConvOpenedCapsules(collected, targetThread) {
     groups.get(key).push(item);
   }
   let appended = 0;
+  const held = [];
+  const hold = (parts) => {
+    for (const part of parts) {
+      const address = part?.entry?.address;
+      const seq = Number(part?.entry?.entry_id);
+      if (typeof address === 'string' && address !== '' && Number.isFinite(seq)) held.push({ address, seq });
+    }
+  };
   for (const parts of groups.values()) {
     const partCount = Number(parts[0]?.opened?.payload?.partCount ?? 1);
     // MY OWN COPY, read back from my outgoing shard, is a message that LANDED: its status is the green 'published',
@@ -16301,16 +19023,46 @@ async function appendConvOpenedCapsules(collected, targetThread) {
     const meta = parts[0]?.opened?.openedAs === 'sender' ? 'published' : 'received';
     try {
       if (partCount > 1) {
-        if (parts.length < partCount) continue; // incomplete — wait for the remaining parts on a later tick
+        // Incomplete — wait for the remaining parts on a later tick, and hold the mark below the ones in hand so
+        // that later tick can still see them.
+        // A HELD FLOOR EXPIRES [audit 2026-09-01, round 9]. `partCount` is a peer-controlled uint16 inside the
+        // encrypted payload, and the honest sealer will happily produce `partIndex: 0, partCount: 2` with no
+        // sibling ever published. Holding the shard's seq mark below such a part pins it at floor-1 FOREVER, so
+        // every capsule above it is re-decrypted on every 12-second pass for the life of the account — MEASURED
+        // at 1.87 ms per capsule here and 3-5x that on a phone, bounded only by the lane's 640-body backfill cap.
+        // One publish, once per epoch-day, buys that.
+        //
+        // It is reachable without malice too: the confirm path's own note says "a middle part can bounce while a
+        // later one lands", so an honest multipart send that loses a middle part leaves the RECIPIENT here.
+        //
+        // The bound is the sender's own give-up point. PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS is when a partial
+        // send stops being retried by the device that made it; past that no sibling is coming, from anyone. The
+        // parts stay in hand (a late arrival still assembles) — only the FLOOR is released, so the mark can move
+        // and the shard stops being re-read from the bottom.
+        if (parts.length < partCount) {
+          // THE TIMESTAMP LIVES IN header1, NOT ON THE CAPSULE [audit 2026-09-01, round 10 — a defect this
+          // expiry introduced hours earlier]. A capsule read back off the chain carries
+          // version/kind/id/header0/header1/body/hashes/chainCells/chainSource and NO `createdAt`, so
+          // Date.parse(undefined ?? '') was NaN, `sealedAt` was 0, and `abandoned` was structurally always false.
+          // The expiry could never fire and the floor was as permanent as before the fix.
+          // Already MILLISECONDS: the decoder reads a uint32 of seconds off the wire and multiplies
+          // (platho-crypto `createdAt: readUint32(...) * 1000`). Multiplying again here would push every capsule
+          // 31,000 years into the future and make `abandoned` false for a second, different reason.
+          const sealedAt = Number(parts[0]?.opened?.capsule?.header1?.createdAt ?? 0) || 0;
+          const abandoned = sealedAt > 0 && (Date.now() - sealedAt) > PRIVATE_SEND_PARTIAL_RETRY_DEADLINE_MS;
+          if (!abandoned) hold(parts);
+          continue;
+        }
         if (await appendOpenedPrivatePartsMessage(parts, targetThread, meta)) appended += 1;
       } else if (await appendOpenedCapsuleMessage(parts[0].opened, targetThread, meta, parts[0].entry)) {
         appended += 1;
       }
     } catch (error) {
+      hold(parts);   // stored nothing, so the mark may not pass it either
       console.warn('[conv] append failed', error);
     }
   }
-  return appended;
+  return { appended, held };
 }
 
 // clean-17 CONV receive (gated). For every conversation whose K_root is in the store, read its incoming RecordShards
@@ -16351,14 +19103,844 @@ function convBirthEpoch(record, epochNow) {
 // which is the whole point on a slow single-thread device. Used between synchronous-crypto iterations.
 const cooperativeYield = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-// A RecordShard address is derived from the conversation's K_root, so a stranger cannot address it and cannot grief
-// this window the way a public or intro shard can be griefed. The opcode filter still earns its place: the shard's
-// own fee deposits and top-ups stop consuming the 128-row budget, so the window holds 128 CAPSULES.
+// A STRANGER CAN ADDRESS THIS SHARD, and this comment used to say they could not [audit 2026-09-01, round 15].
+// contracts/RecordShard.tact settled it by measurement and wrote it in capitals: the bucket key goes into the
+// contract's ADDRESS, and the address is public the instant anyone publishes, because it is the destination of
+// that transaction. ADDRESS PRIVACY IS NOT AUTHORIZATION. The contract's gates are sound — a forged capsule is
+// refused 13654 and stores nothing — but a refused message is still an inbound message of the account, and the
+// indexer returns it (MEASURED on live toncenter: 19 of 19 compute-failed transactions had theirs in /messages).
+// So this window CAN be griefed, exactly the way a public shard's can, and it was: 128 refused messages hid
+// three paid capsules from both the routine pass AND the manual full rescan, with both reporting clean.
+// What holds it now is in the lane itself (web/conv-lane.mjs): only a capsule this conversation SIGNED may
+// decide how far to page, and a page carrying none of ours is paged PAST rather than read as the end of the
+// history. The opcode filter still earns its place — the shard's own fee deposits and top-ups stop consuming
+// the 128-row budget — but it is a budget saver, never a defence: the opcode is chosen by the sender.
 //
 // ONE INSTANCE FOR THE SESSION, not one per pass. The lane now carries the per-shard change marks that let a quiet
 // conversation cost nothing, and a lane rebuilt every 12 seconds would throw them away every 12 seconds. Dropped by
 // the lock/account-switch teardown along with the rest of the per-wallet state.
 let convReadLaneInstance = null;
+
+// ── PRIVATE GROUPS [contracts18/docs/DESIGN-private-groups.md] ─────────────────────────────────────────────
+//
+// A group is an ordinary CONV lane whose write key is a member's BLINDED identity key, so everything below is
+// the private lane's own machinery pointed at a different set of addresses: the same message reader, the same
+// batched accountStates, the same vault routing, the same publish value. NOTHING on chain knows what a group is.
+//
+// ONE INSTANCE FOR THE SESSION, dropped with the rest of the per-wallet state: its records hold the EPOCH KEYS of
+// the window this device can still read, and the ratchet is forward-only — a second identity must never inherit
+// them, and this wallet must not keep them decrypted past a lock.
+let groupRuntimeInstance = null;
+
+async function ensureGroupRuntime() {
+  if (groupRuntimeInstance) return groupRuntimeInstance;
+  const wallet = plathoWallet;
+  const keys = localIdentity?.encryptionKeyPair ?? null;
+  // No wallet seed, no group: the member's own signing key is derived from it, which is what makes a restored
+  // wallet the same member again and keeps the inviter unable to sign as the invitee.
+  if (!wallet?.seed || !keys?.x25519SecretKey || !keys?.mlKem768SecretKey) return null;
+  const store = await createGroupRecordStore({
+    dbName: walletScopedIndexedDbName(GROUP_RECORD_DB_NAME),
+    // a blob the device key cannot open (another device's export, a key store wiped under the records) is a room
+    // that has silently vanished from the list unless somebody says so [round 3]
+    onUnreadable: (id) => console.warn('[groups] a stored room cannot be opened under this device key', id),
+  });
+  groupRuntimeInstance = createGroupRuntime({
+    store,
+    identity: {
+      vaultSeed: wallet.seed,
+      wallet: wallet.address,
+      keyId: keys.keyId ?? null,
+      name: null,
+      x25519SecretKey: keys.x25519SecretKey,
+      x25519PublicKey: keys.x25519PublicKey,
+      mlKem768SecretKey: keys.mlKem768SecretKey,
+      mlKem768PublicKey: keys.mlKem768PublicKey,
+    },
+    // The wallet carries several writes in ONE signature — which is what makes an invite atomic at the wallet.
+    // AND THE WALLET IS ASKED FIRST, like every other lane that signs a value-carrying send: the sum of what the
+    // parts carry plus the fee reserve for that many messages. A group send is not special, and an invite is two.
+    send: async (messages, route = {}) => {
+      const parts = messages.filter(Boolean);
+      // THE SAME MONEY A PRIVATE MESSAGE CARRIES [audit 2026-09-05, round 1]. The group path built its messages and
+      // signed them as they were, skipping the private funnel's two additions: the squat cushion and debt of the
+      // lane's account (web/shard-debt.mjs — every clean-18 shard demands its storage due at the gate, 13660 for a
+      // RecordShard, and refuses a publish that cannot cover it), and the vault's DEPLOY when the payer has none
+      // yet. The dialogs quoted the cushion all along; now it is attached. `shard` rides beside each message for
+      // exactly this: the lane's own account on either door.
+      const prepared = parts.map((message) => ({
+        to: message.address, shard: message.shard ?? message.address, value: BigInt(message?.amount ?? 0n), message,
+      }));
+      await applyShardSurcharge(LANE_CONV, prepared, {});
+      const deploy = route?.door === 'vault' && route?.deployVault && route?.vaultAddress
+        ? buildVaultDeployMessage(feeVaultCodeBoc(), plathoWallet.address, route.vaultAddress)
+        : null;
+      const values = prepared.map((p) => BigInt(p.message?.amount ?? 0n));
+      // The reserve is sized by SIZE CLASS, as the private lane sizes it (wallet-send-fee.mjs). The first draft
+      // handed it the VALUES, which the helper read as classes and rounded up to the largest — a reserve for a
+      // 32 KiB part on every one-line message. Fail-closed, so nothing was lost; still wrong.
+      const need = values.reduce((sum, value) => sum + value, 0n) + (deploy ? BigInt(deploy.amount) : 0n)
+        + walletSendFeeReserveNanotons(parts.map((message) => Number(message?.sizeClass ?? 1)));
+      await assertWalletGramAtLeast(need, 'group');
+      // `sizeClass`, `seq`, `wireBytes` and `shard` rode beside each message for exactly that; the wallet gets the
+      // message alone. The deploy goes FIRST: one source, one destination, delivered in order (prepareConvLaneParts).
+      const wire = prepared.map(({ message: { sizeClass, seq, wireBytes, shard, ...message } }) => message);
+      const result = await sendPlathoWalletTransaction(plathoWallet, { messages: [...(deploy ? [deploy] : []), ...wire] },
+        { transport: globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport });
+      if (deploy) noteFeeVaultDeployed(plathoWallet.address, route.vaultAddress);
+      return result;
+    },
+    // THE CHAIN'S SEQ FLOOR, read once per lane-day before this device's first claim in it — the private lane's
+    // cold-start reader, lent to the group path [audit 2026-09-05, round 1: two devices of one wallet each counted
+    // alone, the second's claims were refused 13653 with the message shown as sent].
+    readLastSeq: (address) => {
+      const transport = globalThis.plathoTonRpcTransport;
+      if (typeof transport?.runGetMethod !== 'function') throw new Error('no transport to read the lane floor from');
+      return createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(address);
+    },
+    vaultRouting: convVaultRouting,
+    readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CAPSULE_PUBLISH_OPCODE, strict: true }),
+    readStates: (addresses) => readAccountStates(addresses, { request: createShardStatesRequest({ strict: true }) }),
+    publishValue: CONV_PUBLISH_VALUE,
+    onError: (where, error) => { if (!noteTonRpcRateLimit(error)) console.warn('[groups]', where, error); },
+  });
+  await groupRuntimeInstance.load();
+  return groupRuntimeInstance;
+}
+
+function dropGroupRuntime() {
+  groupRuntimeInstance = null;
+}
+
+// Which group a picture was just chosen for, and which hashes are already being fetched. The second one is what
+// keeps a render-path hydration from starting the same fetch on every frame.
+let pendingGroupAvatarId = null;
+const groupAvatarFetches = new Set();
+
+/**
+ * THE ROOM'S FACE. The pointer comes from the roster; the bytes come from the chain ONCE and then from the media
+ * store the profile avatars already use — which re-checks the sha-256 on every read, so a cached picture can
+ * never be one the roster did not name.
+ */
+async function hydrateGroupAvatar(record, thread) {
+  const hash = record?.avatar?.hash ?? null;
+  if (!hash || !thread) return;
+  if (thread.groupAvatarHash === hash && thread.avatarImageUrl) return;
+  if (groupAvatarFetches.has(hash)) return;
+  groupAvatarFetches.add(hash);
+  try {
+    let url = await readProfileAvatarMediaCache(hash);
+    if (!url) {
+      const runtime = await ensureGroupRuntime();
+      const picture = await runtime?.avatar(groupIdOfThread(thread.id));
+      if (!picture) return;
+      url = bytesToImageDataUrl(picture.bytes, 'image/webp');
+      await writeProfileAvatarMediaCache(hash, url);
+    }
+    thread.avatarImageUrl = url;
+    thread.groupAvatarHash = hash;
+    renderThreads();
+    renderConversation();
+  } catch (error) {
+    console.warn('[groups] avatar', error);
+  } finally {
+    groupAvatarFetches.delete(hash);
+  }
+}
+
+/**
+ * What the wallet will be asked for to sign the capsules of one plan (groupCapsulePlan): the private lane's own
+ * pre-flight arithmetic — value plus squat cushion per capsule, plus the wallet fee for parts of those classes.
+ */
+function groupCapsulesChargeNanotons(plan) {
+  const classes = (plan?.parts ?? []).map((part) => Number(part.sizeClass ?? 1));
+  return (CONV_PUBLISH_VALUE + squatCushionNanotons(LANE_CONV)) * BigInt(plan?.count ?? 1) + walletSendFeeReserveNanotons(classes);
+}
+
+/** What setting the picture will cost: its capsules, plus the roster that must follow it (published whole). */
+function groupAvatarChargeNanotons(groupId, byteLength) {
+  const plan = groupRuntimeInstance?.avatarPlan(groupId, byteLength);
+  return plan ? groupCapsulesChargeNanotons(plan) : 0n;
+}
+
+/** The admin's own file, through the ladder every other picture in this client goes through. */
+async function requestGroupAvatarImage(file, groupId) {
+  return requestCompressedImageFile(file, {
+    title: t('group.avatarTitle'),
+    hint: t('group.avatarHint'),
+    submitLabel: t('group.avatarSubmit'),
+    extraRows: (attachment) => [
+      {
+        label: t('avatar.gramFee'),
+        value: attachment
+          ? formatGramNanotons(groupAvatarChargeNanotons(groupId, attachment.bytes.length))
+          : t('avatar.estimatedAfterCompression'),
+      },
+      { label: t('avatar.visibility'), value: t('group.avatarVisibility') },
+    ],
+  });
+}
+
+groupAvatarInput?.addEventListener('change', async () => {
+  const file = groupAvatarInput.files?.[0];
+  const groupId = pendingGroupAvatarId;
+  pendingGroupAvatarId = null;
+  if (groupAvatarInput) groupAvatarInput.value = '';
+  if (!file || !groupId) return;
+  try {
+    const picture = await requestGroupAvatarImage(file, groupId);
+    if (!picture) return;
+    const runtime = await ensureGroupRuntime();
+    if (!runtime) return;
+    const record = await runtime.setAvatar(groupId, {
+      bytes: picture.bytes, width: picture.width, height: picture.height,
+    });
+    // The bytes are already here; caching them now means the room's own admin never re-reads them from the chain.
+    await writeProfileAvatarMediaCache(record.avatar.hash, picture.dataUrl);
+    const thread = ensureGroupThread(record);
+    thread.avatarImageUrl = picture.dataUrl;
+    thread.groupAvatarHash = record.avatar.hash;
+    renderThreads();
+    renderConversation();
+  } catch (error) {
+    console.warn('[groups] set avatar failed', error);
+    flashWalletIdentityStatus(String(error?.message ?? t('group.avatarFailed')));
+  }
+});
+
+/** The name a member is shown under: what the roster knows, else the wallet, else the key. */
+function groupMemberLabel(record, groupKey) {
+  const key = [...groupKey].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const member = (record.members ?? []).find((m) => [...m.groupKey].map((b) => b.toString(16).padStart(2, '0')).join('') === key);
+  if (member?.name) return member.name;
+  if (member?.wallet) return shortAddress(member.wallet);
+  return `${key.slice(0, 6)}…`;
+}
+
+/**
+ * A group's row. It IS a thread — the same object a private conversation is — so the list, its order, its search,
+ * its unread counting and the conversation view need to know nothing about groups. What marks it as one is the
+ * id's prefix, which is also what the corner badge and the composer branch read.
+ */
+function ensureGroupThread(record) {
+  const id = `${GROUP_THREAD_PREFIX}${[...record.groupId].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  let thread = threads.find((item) => item.id === id);
+  if (!thread) {
+    thread = { id, name: record.name || t('group.untitled'), subtitle: '', avatar: 'G', preview: t('chat.previewNoMessages'), state: '', time: '', messages: [] };
+    threads.push(thread);
+  }
+  thread.name = record.name || t('group.untitled');
+  thread.avatar = (thread.name.trim()[0] ?? 'G').toUpperCase();
+  // A group this device has LEFT keeps its history and stops taking input — the honest state, and the one the
+  // design insists on: leaving does not take the key away, so the words are still here to read.
+  thread.readOnly = Boolean(record.leftAt);
+  // The picture, if the roster named one. Fire and forget: this runs on a render path, and hydrateGroupAvatar
+  // holds the guard that keeps it from asking the chain again on the next frame.
+  if (record.avatar?.hash) void hydrateGroupAvatar(record, thread);
+  return thread;
+}
+
+/** Fold the capsules a pass read into the row, ignoring what is already there. */
+function applyGroupMessagesToThread(thread, record, messages) {
+  let added = 0;
+  const selfKey = record.self ? [...record.self].map((b) => b.toString(16).padStart(2, '0')).join('') : null;
+  for (const row of messages ?? []) {
+    const senderKey = [...row.senderGroupKey].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const chainKey = `${row.epoch}.${row.generation}.${senderKey}.${row.seq}`;
+    const held = thread.messages.find((message) => message.groupChainKey === chainKey);
+    if (held) {
+      // the chain copy of an echo this device sent: the send is confirmed, once, and no second bubble is drawn — and
+      // an echo that had been called not delivered (the own lane unreadable for ten minutes) is put right when its
+      // copy finally arrives [audit 2026-09-05, round 2]
+      if (held.type === 'out' && (held.meta === 'sending' || held.meta === 'not delivered')) {
+        held.meta = ''; delete held.groupSentAtMs; added += 1;
+        updateMessageInEncryptedHistory(thread, held).catch((error) => console.warn('[groups] history', error));
+      }
+      continue;
+    }
+    const mine = selfKey !== null && senderKey === selfKey;
+    const sentAtMs = Number(row.payload?.sentAt ?? 0) * 1000;
+    const message = {
+      type: mine ? 'out' : 'in',
+      text: String(row.payload?.text ?? ''),
+      meta: mine ? '' : groupMemberLabel(record, row.senderGroupKey),
+      groupChainKey: chainKey,
+      ...localMessageOrderFields(Number.isFinite(sentAtMs) && sentAtMs > 0 ? sentAtMs : Date.now()),
+    };
+    insertThreadMessage(thread, message);
+    // INTO THE ENCRYPTED HISTORY, like every private message [audit 2026-09-06, round 3]. Group rows lived in memory
+    // alone: a lock empties the threads (rightly — the words are secrets), the unlock rebuilt them from the pass, and
+    // a pass can only read the days still in the window. A room's visible past was three days, for ever, while the
+    // chain kept a year. Persisted, the rows come back the way every other dialog's do; `groupChainKey` rides along
+    // (serializeMessageForHistory) so the next pass recognises them instead of drawing them twice.
+    persistMessageToEncryptedHistory(thread, message).catch((error) => console.warn('[groups] history', error));
+    added += 1;
+  }
+  return added;
+}
+
+/** One pass over every group this device is in — turned by the private sync, on the same tick. */
+// ONE PASS AT A TIME [audit 2026-09-06, round 3]. Every private tick fired a group pass with no guard; a pass slower
+// than the tick (a room of 1,024 derives thousands of lane keys) queued one more full pass per tick behind the
+// per-group lock, without bound. A tick that finds a pass running skips — the running one reads the same chain.
+let groupSyncInFlight = false;
+const groupControlFailureShownAt = new Map();   // groupId -> the `at` of the last reverted control write already said
+async function syncGroupsFromChain() {
+  if (groupSyncInFlight) return [];
+  groupSyncInFlight = true;
+  try {
+    return await syncGroupsFromChainUnguarded();
+  } finally {
+    groupSyncInFlight = false;
+  }
+}
+async function syncGroupsFromChainUnguarded() {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime) return [];
+  let passes = [];
+  try {
+    passes = await runtime.sync();
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[groups] pass failed', error);
+    return [];
+  }
+  let touched = 0;
+  for (const pass of passes) {
+    const thread = ensureGroupThread(pass.record);
+    // A CONTROL WRITE THE CHAIN NEVER SHOWED WAS TAKEN BACK (group-store settlePendingControl): say so, once per event
+    const failure = pass.record.lastControlFailure;
+    if (failure && Number(failure.at ?? 0) > Number(groupControlFailureShownAt.get(pass.groupId) ?? 0)) {
+      groupControlFailureShownAt.set(pass.groupId, Number(failure.at ?? 0));
+      flashWalletIdentityStatus(t('group.controlNotDelivered'));
+    }
+    let added = applyGroupMessagesToThread(thread, pass.record, pass.messages);
+    // AN ECHO NOBODY CONFIRMED IS NOT DELIVERED [audit 2026-09-05, round 1]. The pass reads this device's own lane
+    // too, so a capsule the shard stored comes back under the echo's key within a pass or two of landing; one that
+    // never comes back was refused or dropped, and the screen must say so instead of "sent".
+    // ...but only on a pass that really READ this device's own lane [audit 2026-09-05, round 2]: a lane whose
+    // /messages read was declined for ten minutes (a 429 park) proves nothing about the echo.
+    const stale = Date.now() - GROUP_ECHO_CONFIRM_MS;
+    for (const message of (pass.ownLaneRead === false ? [] : thread.messages ?? [])) {
+      if (message.type === 'out' && message.meta === 'sending' && Number(message.groupSentAtMs ?? 0) > 0 && message.groupSentAtMs < stale) {
+        message.meta = 'not delivered';
+        added += 1;
+      }
+    }
+    if (added > 0) { refreshThreadAfterMessageChange(thread); touched += added; }
+  }
+  if (passes.length > 0) renderThreads();
+  if (touched > 0) renderConversation();
+  return passes;
+}
+
+/** How long a group echo may stay "sending" before it is called not delivered: the chain lands a hop in well under a
+ *  minute even through a shard split (p50 27 s, max 39 s measured 2026-09-04), and the private tick reads the lane
+ *  every twelve seconds — ten minutes is a dead send, not a slow one. */
+const GROUP_ECHO_CONFIRM_MS = 10 * 60_000;
+
+/** The offer as a person sees it: whose room, what it is called, and — on the receiving side — a way in. */
+function buildGroupInviteCard(secret, mine) {
+  const card = document.createElement('div');
+  card.className = 'message-text-block group-invite-card';
+  const title = document.createElement('div');
+  title.className = 'group-invite-title';
+  const name = secret.name ?? t('group.untitled');
+  title.textContent = mine ? t('group.inviteSentTo', { name }) : t('group.inviteReceived', { name });
+  card.append(title);
+  const note = document.createElement('div');
+  note.className = 'group-invite-note';
+  // The honest line the design insists on: a newcomer sees what is said from now on, never what came before.
+  note.textContent = Number(secret.sizeHint) >= GROUP_SIZE_ROOM ? t('group.inviteRoomNote') : t('group.inviteNote');
+  card.append(note);
+  if (!mine) {
+    const join = document.createElement('button');
+    join.type = 'button';
+    join.className = 'discovery-cta-action group-invite-join';
+    join.textContent = t('group.inviteJoin');
+    join.addEventListener('click', () => { void acceptGroupInvite(secret, join); });
+    card.append(join);
+  }
+  return card;
+}
+
+/**
+ * "I am here" as a person sees it. On the newcomer's side: the plain fact that the answer went. On the admin's
+ * side: who arrived, whether they are in yet, and — when they are still waiting — the button that admits them.
+ */
+function buildGroupJoinCard(join, mine) {
+  const card = document.createElement('div');
+  card.className = 'message-text-block group-invite-card';
+  const record = groupRuntimeInstance?.get(String(join.groupId)) ?? null;
+  const groupName = record?.name ?? t('group.untitled');
+  const title = document.createElement('div');
+  title.className = 'group-invite-title';
+  title.textContent = mine ? t('group.joinSent', { name: groupName }) : t('group.joinReceived', { name: groupName });
+  card.append(title);
+  if (!mine && record) {
+    const mineKey = record.self ? [...record.self].map((b) => b.toString(16).padStart(2, '0')).join('') : null;
+    const amAdmin = (record.admins ?? []).some((a) => [...a].map((b) => b.toString(16).padStart(2, '0')).join('') === mineKey);
+    const joinKey = [...join.groupKey].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const isMember = (record.members ?? []).some((m) => [...m.groupKey].map((b) => b.toString(16).padStart(2, '0')).join('') === joinKey);
+    const note = document.createElement('div');
+    note.className = 'group-invite-note';
+    note.textContent = isMember ? t('group.joinAdmitted') : t('group.candidateWaiting');
+    card.append(note);
+    if (amAdmin && !isMember) {
+      const admit = document.createElement('button');
+      admit.type = 'button';
+      admit.className = 'discovery-cta-action group-invite-join';
+      admit.textContent = t('group.admit');
+      admit.addEventListener('click', () => { void admitGroupCandidate(String(join.groupId), join, admit); });
+      card.append(admit);
+    }
+  }
+  return card;
+}
+
+/** The funnel's handler: hand a join token to the runtime, which admits the invited and lists the rest. */
+async function noteGroupJoinFromText(text, thread = null) {
+  const join = parseGroupJoinToken(text);
+  if (!join) return;
+  // THE TOKEN IS BOUND TO THE CONVERSATION IT ARRIVED IN [audit 2026-09-05, round 1]. Its `w` and `i` are written by
+  // whoever composed it; the invite was aimed at the PERSON on the other side of this private thread, and the thread
+  // knows who that is (the wallet the lane was built with, the key id the capsules opened under). A token whose
+  // self-declared identity is not this thread's counterparty is dropped — it was the one way a stranger, or a member
+  // about to be removed, could be admitted under a pending invitee's name with a key of their own.
+  const bound = groupJoinBoundToThread(join, thread);
+  if (!bound) return;
+  try {
+    const runtime = await ensureGroupRuntime();
+    if (!runtime?.get(String(join.groupId))) return;   // not our group, or the wallet is not open yet
+    const before = runtime.get(String(join.groupId));
+    const after = await runtime.noteCandidate(String(join.groupId), bound);
+    if (after && after !== before) { refreshThreadAfterMessageChange(ensureGroupThread(after)); renderThreads(); renderConversation(); }
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[groups] join token', error);
+  }
+}
+
+/** An admin pressing the button: one roster, and the person is in. */
+async function admitGroupCandidate(groupId, candidate, button) {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime) return;
+  if (button) button.disabled = true;
+  try {
+    const after = await runtime.admit(groupId, [candidate]);
+    refreshThreadAfterMessageChange(ensureGroupThread(after));
+    renderThreads();
+    renderConversation();
+  } catch (error) {
+    if (!noteTonRpcRateLimit(error)) console.warn('[groups] admit failed', error);
+    if (button) button.disabled = false;
+  }
+}
+
+/**
+ * A token as a private message — the invite one way, the join the other. The same path a typed message takes, so
+ * it is priced, queued and retried exactly like one; neither side is ever shown the token itself.
+ */
+async function sendGroupTokenMessage(peerThread, token) {
+  const message = {
+    type: 'out', text: token, meta: 'sending',
+    privateManualRetryAvailable: false, privateCancelAvailable: false,
+    ...localMessageOrderFields(),
+  };
+  insertThreadMessage(peerThread, message);
+  refreshThreadAfterMessageChange(peerThread);
+  renderThreads();
+  renderConversation();
+  await enqueueOutgoingPublish(() => attemptPrivateComposerMessagePublish({
+    thread: peerThread, message, text: token,
+    attachments: [], fileAttachments: [], replyDraft: null, shareDraft: null,
+    retryAttempt: 0, confirmAttempt: 0,
+  }));
+}
+
+function openGroupThread(thread) {
+  activeThreadId = thread.id;
+  if (appShell) appShell.dataset.chatOpen = 'true';
+  renderThreads();
+  renderConversation();
+}
+
+/** Taking an invite: adopt the key, answer with your own in this same conversation, open the room. */
+async function acceptGroupInvite(secret, button) {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime) return;
+  const held = runtime.get(String(secret.groupId));
+  // an old card is not an error — unless this device LEFT the group: then a fresh invite is a way back in, and the
+  // record it holds is history to be replaced [audit 2026-09-05, round 2]
+  if (held && !held.leftAt) { openGroupThread(ensureGroupThread(held)); return; }
+  if (button) { button.disabled = true; button.textContent = t('group.inviteJoining'); }
+  try {
+    const record = await runtime.adopt(secret);
+    // THE ANSWER GOES BACK THE WAY THE INVITE CAME: a join token in this same private conversation. Nothing is
+    // written to any group lane until an admin's roster names us — and that admin is the person we are talking to.
+    const peerThread = threads.find((item) => item.id === activeThreadId) ?? null;
+    if (peerThread && !isGroupThread(peerThread)) {
+      await sendGroupTokenMessage(peerThread, runtime.joinTokenFor(String(secret.groupId)));
+    }
+    const thread = ensureGroupThread(record);
+    refreshThreadAfterMessageChange(thread);
+    openGroupThread(thread);
+  } catch (error) {
+    console.warn('[groups] join failed', error);
+    if (button) { button.disabled = false; button.textContent = t('group.inviteJoinFailed'); }
+  }
+}
+
+/**
+ * Invite one contact: ONE private message carrying the key. Nothing goes into the roster here — a member's group
+ * key is derived from their own vault seed, so there is nobody to name until they answer with a join token here.
+ * The device remembers whom it invited, and the next pass admits exactly that person.
+ */
+async function inviteContactToGroup(groupId, peerThread) {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime || !peerThread) return;
+  // THE SNAPSHOT FIRST, when the last one is stale: the invite must point at a roster the newcomer can read, and
+  // the roster lanes after it carry every admission since. Fresh snapshots cost nothing here.
+  await runtime.ensureSnapshot(groupId);
+  await sendGroupTokenMessage(peerThread, encodeGroupInviteToken(runtime.secretFor(groupId)));
+  await runtime.noteInvite(groupId, {
+    wallet: threadPrimaryWalletRaw(peerThread) ?? null,
+    keyId: peerThread?.convPeerKeyId ?? null,
+    name: peerThread?.name ?? null,
+  });
+}
+
+/** The contacts an invite can reach: private dialogs with a wallet behind them, in the list's own order. */
+function groupInviteCandidates() {
+  return orderThreadsForList(
+    threads.filter((thread) => !isGroupThread(thread) && !isSavedMessagesThread(thread) && threadPrimaryWalletRaw(thread)),
+    { isSaved: isSavedMessagesThread, isPinned: isThreadPinned, lastActivityMs: threadLastActivityMs },
+  );
+}
+
+/**
+ * WHO IS IN THE ROOM, and what can be done about it. The removal price is on the screen before anything is
+ * signed, because in a room of a thousand the reading half of a removal costs real money and buys little — the
+ * key is already held by a thousand people.
+ */
+/**
+ * Join tokens this device holds in its private conversations for `groupId`, noted again. A token that arrived
+ * while the wallet was locked met no runtime at the funnel; opening the members dialog is when an admin looks,
+ * so it is when nothing may be missing. Idempotent, and a prefix check per message — cheap.
+ */
+async function rescanGroupJoinTokens(runtime, groupId) {
+  for (const thread of threads) {
+    if (isGroupThread(thread) || isSavedMessagesThread(thread)) continue;
+    for (const message of thread.messages ?? []) {
+      if (message?.type !== 'in' || typeof message.text !== 'string' || !message.text.startsWith(GROUP_JOIN_PREFIX)) continue;
+      const join = parseGroupJoinToken(message.text);
+      if (!join || String(join.groupId) !== String(groupId)) continue;
+      const bound = groupJoinBoundToThread(join, thread);   // the same binding the live funnel applies
+      if (!bound) continue;
+      try { await runtime.noteCandidate(groupId, bound); } catch (error) { console.warn('[groups] rescan', error); }
+    }
+  }
+}
+
+/**
+ * A join token as this device may trust it: the identity fields REPLACED by the thread's own knowledge of its
+ * counterparty, or null when they disagree. A thread whose counterparty is not known yet (no wallet, no key id)
+ * cannot vouch for anyone, and the token waits for a thread that can.
+ */
+function groupJoinBoundToThread(join, thread) {
+  if (!thread || isGroupThread(thread) || isSavedMessagesThread(thread)) return null;
+  const wallet = threadPrimaryWalletRaw(thread) ?? null;
+  const keyId = thread.convPeerKeyId ?? null;
+  if (!wallet && !keyId) return null;
+  if (join.wallet && wallet && String(join.wallet).toLowerCase() !== String(wallet).toLowerCase()) return null;
+  if (join.keyId && keyId && String(join.keyId) !== String(keyId)) return null;
+  // ONLY WHAT THE THREAD VOUCHES FOR travels on [audit 2026-09-05, round 2]. Round 1 fell back to the token's own `w`
+  // when the thread knew no wallet (a first-contact thread knows a key id alone), and a pending invite matches on
+  // wallet OR key id — so a token claiming a pending invitee's public wallet was auto-admitted from a stranger's
+  // thread. A field the thread cannot confirm is not carried at all.
+  return { ...join, wallet: wallet ?? null, keyId: keyId ?? null };
+}
+
+async function openGroupMembersDialog(groupId) {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime?.get(groupId)) return;
+  await rescanGroupJoinTokens(runtime, groupId);
+  const record = runtime.get(groupId);
+  if (!record) return;
+  const mine = record.self ? [...record.self].map((b) => b.toString(16).padStart(2, '0')).join('') : null;
+  const amAdmin = (record.admins ?? []).some((a) => [...a].map((b) => b.toString(16).padStart(2, '0')).join('') === mine);
+  // THE ROOM'S FACE, above the people in it. For an admin it is a button; for everyone else it is simply the
+  // picture, and a room without one shows the same letter tile the list does.
+  const face = document.createElement('div');
+  face.className = 'group-face-row';
+  const faceAvatar = document.createElement('div');
+  faceAvatar.className = 'avatar group-face-avatar';
+  const faceThread = threads.find((item) => item.id === `${GROUP_THREAD_PREFIX}${groupId}`) ?? null;
+  setAvatarNode(faceAvatar, record.name || t('group.untitled'), faceThread?.avatarImageUrl);
+  face.append(faceAvatar);
+  if (amAdmin) {
+    const change = document.createElement('button');
+    change.type = 'button';
+    change.className = 'discovery-cta-action group-face-action';
+    change.textContent = record.avatar ? t('group.avatarChange') : t('group.avatarSet');
+    change.addEventListener('click', () => {
+      pendingGroupAvatarId = groupId;
+      groupAvatarInput?.click();
+    });
+    face.append(change);
+  }
+
+  const list = document.createElement('div');
+  list.className = 'share-target-list group-member-list';
+  const rows = () => {
+    // Re-read: an admit from this very dialog changes the record, and the rows must say so at once.
+    const record = runtime.get(groupId) ?? {};
+    list.replaceChildren();
+    for (const member of record.members ?? []) {
+      const key = [...member.groupKey].map((b) => b.toString(16).padStart(2, '0')).join('');
+      const isAdmin = (record.admins ?? []).some((a) => [...a].map((b) => b.toString(16).padStart(2, '0')).join('') === key);
+      const row = document.createElement('div');
+      row.className = 'share-target-row group-member-row';
+      const text = document.createElement('span');
+      text.className = 'share-target-text';
+      const name = document.createElement('span');
+      name.className = 'share-target-name';
+      name.textContent = member.name || (member.wallet ? shortAddress(member.wallet) : `${key.slice(0, 6)}…`);
+      text.append(name);
+      const sub = document.createElement('span');
+      sub.className = 'share-target-sublabel';
+      sub.textContent = [key === mine ? t('group.you') : '', isAdmin ? t('group.admin') : ''].filter(Boolean).join(' · ');
+      if (sub.textContent) text.append(sub);
+      row.append(text);
+      if (amAdmin && key !== mine) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'discovery-cta-action';
+        remove.textContent = t('group.remove');
+        remove.addEventListener('click', () => { void removeGroupMember(groupId, member, remove); });
+        row.append(remove);
+      }
+      list.append(row);
+    }
+    for (const invite of record.pendingInvites ?? []) {
+      const row = document.createElement('div');
+      row.className = 'share-target-row group-member-row is-pending';
+      const text = document.createElement('span');
+      text.className = 'share-target-text';
+      const name = document.createElement('span');
+      name.className = 'share-target-name';
+      name.textContent = invite.name || (invite.wallet ? shortAddress(invite.wallet) : '—');
+      const sub = document.createElement('span');
+      sub.className = 'share-target-sublabel';
+      sub.textContent = t('group.invitePending');
+      text.append(name, sub);
+      row.append(text);
+      list.append(row);
+    }
+    // WHO ANSWERED WITH A KEY THIS DEVICE DID NOT INVITE — a forwarded token, a second admin's guest. They wait
+    // here for a person to look at them; holding the key is not a membership card.
+    for (const candidate of record.candidates ?? []) {
+      const row = document.createElement('div');
+      row.className = 'share-target-row group-member-row is-candidate';
+      const text = document.createElement('span');
+      text.className = 'share-target-text';
+      const name = document.createElement('span');
+      name.className = 'share-target-name';
+      name.textContent = candidate.name || (candidate.wallet ? shortAddress(candidate.wallet) : '—');
+      const sub = document.createElement('span');
+      sub.className = 'share-target-sublabel';
+      sub.textContent = t('group.candidateWaiting');
+      text.append(name, sub);
+      row.append(text);
+      if (amAdmin) {
+        const admit = document.createElement('button');
+        admit.type = 'button';
+        admit.className = 'discovery-cta-action';
+        admit.textContent = t('group.admit');
+        admit.addEventListener('click', async () => { await admitGroupCandidate(groupId, candidate, admit); rows(); });
+        row.append(admit);
+      }
+      list.append(row);
+    }
+  };
+  rows();
+  await openActionDialog({
+    title: record.name || t('group.untitled'),
+    hint: t('group.membersCount', { count: (record.members ?? []).length }),
+    submitLabel: amAdmin ? t('group.inviteAction') : t('common.close'),
+    cancellable: true,
+    fields: [{ type: 'custom', render: () => { const box = document.createElement('div'); box.append(face, list); return box; } }],
+  }).then(async (result) => {
+    if (!result || !amAdmin) return;
+    await openGroupInvitePicker(groupId);
+  });
+}
+
+/** Choosing whom to invite — the contacts this device already has, in the list's own order. */
+async function openGroupInvitePicker(groupId) {
+  const candidates = groupInviteCandidates();
+  if (candidates.length === 0) return;
+  const list = document.createElement('div');
+  list.className = 'share-target-list';
+  let chosen = null;
+  for (const thread of candidates) {
+    const row = buildShareTargetRow({
+      label: thread.name,
+      sublabel: threadPrimaryWalletRaw(thread) ? shortAddress(threadPrimaryWalletRaw(thread)) : '',
+      thread,
+      onChoose: () => {
+        chosen = thread;
+        for (const node of list.querySelectorAll('.share-target-row')) node.classList.remove('is-selected');
+        row.classList.add('is-selected');
+      },
+    });
+    list.append(row);
+  }
+  // If the roster snapshot is stale the invite publishes a fresh one first; the person sees that price here, not
+  // in a surprise on the wallet.
+  const snapshotPlan = groupRuntimeInstance?.snapshotPlan(groupId) ?? null;
+  const hint = snapshotPlan
+    ? `${t('group.inviteHint')} ${t('group.inviteSnapshotNote', { price: formatGramNanotons(groupCapsulesChargeNanotons(snapshotPlan)) })}`
+    : t('group.inviteHint');
+  const result = await openActionDialog({
+    title: t('group.inviteTitle'),
+    hint,
+    submitLabel: t('group.inviteSubmit'),
+    fields: [{ type: 'custom', render: () => list }],
+  });
+  if (!result || !chosen) return;
+  await inviteContactToGroup(groupId, chosen);
+}
+
+/** Removing someone: the two halves, both priced, and the expensive one is the person's own choice. */
+async function removeGroupMember(groupId, member, button) {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime) return;
+  const plan = runtime.plan(groupId, member.groupKey);
+  // THE PRICE IS THE CAPSULES: the removal with its envelope is `plan.capsules.count` private-shaped capsules
+  // (two at 50 members, 37 in a room), each at the private message's value plus the squat cushion, plus the
+  // wallet's own fee for that many parts of those classes — the same sum the send will demand.
+  const price = formatGramNanotons(groupCapsulesChargeNanotons(plan.capsules) - groupCapsulesChargeNanotons(plan.capsulesWithoutRekey));
+  const result = await openActionDialog({
+    title: t('group.removeTitle', { name: member.name || t('group.someone') }),
+    hint: t('group.removeHint'),
+    submitLabel: t('group.remove'),
+    fields: [{
+      id: 'cutReading',
+      type: 'checkbox',
+      label: t('group.cutReading'),
+      hint: t('group.cutReadingHint', { price }),
+      // Cheap enough to be the default in a group people know each other in; in a room of a thousand it costs
+      // real money and buys little, so there the person decides deliberately.
+      value: plan.wrappable.length <= GROUP_SIZE_GROUP,
+    }],
+  });
+  if (!result) return;
+  if (button) button.disabled = true;
+  try {
+    await runtime.remove(groupId, member.groupKey, { cutReading: result.cutReading === true });
+  } catch (error) {
+    console.warn('[groups] remove failed', error);
+    if (button) button.disabled = false;
+  }
+}
+
+/**
+ * Make a group. Two questions and no more: its name, and which of the two shapes it is — the second sets the
+ * defaults and, more importantly, what the interface will say about it afterwards. Neither is a limit: the
+ * caption is the honest part, and the code allows what it allows.
+ */
+async function openCreateGroupDialog() {
+  const runtime = await ensureGroupRuntime();
+  if (!runtime) {
+    // The same line the composer uses for "no wallet yet": one status surface, not a new one for groups.
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = t('group.walletRequired');
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+    return;
+  }
+  const result = await openActionDialog({
+    title: t('group.createTitle'),
+    hint: t('group.createHint'),
+    submitLabel: t('group.createSubmit'),
+    fields: [
+      {
+        id: 'name',
+        label: t('group.nameLabel'),
+        placeholder: t('group.namePlaceholder'),
+        value: '',
+        required: true,
+        autocomplete: 'off',
+      },
+      {
+        id: 'room',
+        type: 'checkbox',
+        label: t('group.roomLabel'),
+        hint: t('group.roomHint'),
+        value: false,
+      },
+    ],
+  });
+  if (!result) return;
+  const name = String(result.name ?? '').trim();
+  if (!name) return;
+  try {
+    const record = await runtime.create({ name, sizeHint: result.room ? GROUP_SIZE_ROOM : GROUP_SIZE_GROUP });
+    const thread = ensureGroupThread(record);
+    refreshThreadAfterMessageChange(thread);
+    activeThreadId = thread.id;
+    if (appShell) appShell.dataset.chatOpen = 'true';
+    renderThreads();
+    renderConversation();
+  } catch (error) {
+    console.warn('[groups] create failed', error);
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = t('group.createFailed');
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+  }
+}
+
+/** The composer's branch: a group row sends through the runtime, and is echoed the moment the chain took it. */
+async function sendGroupMessageFromComposer(thread, text) {
+  const runtime = await ensureGroupRuntime();
+  const groupId = groupIdOfThread(thread);
+  if (!runtime || !groupId) return;
+  const record = runtime.get(groupId);
+  if (!record) return;
+  messageInput.value = '';
+  try {
+    const sent = await runtime.say(groupId, text);
+    // THE ECHO CARRIES THE LANE KEY THE CHAIN COPY WILL ARRIVE UNDER, and says "sending" until it does [audit
+    // 2026-09-05, round 1]. It used to be keyed `local.<now>` with an empty meta: the chain copy then arrived under
+    // another key and drew a second bubble, and a refused publish (13653 from a sibling device's seq, a squatted
+    // lane's due) stayed "sent" for ever. Now the pass that reads this device's own lane confirms the echo by key,
+    // and an echo nobody confirms in GROUP_ECHO_CONFIRM_MS is marked not delivered.
+    const selfHex = sent.record?.self ? [...sent.record.self].map((b) => b.toString(16).padStart(2, '0')).join('') : 'self';
+    const echo = {
+      type: 'out',
+      text,
+      meta: 'sending',
+      groupChainKey: `${sent.epoch}.${sent.generation}.${selfHex}.${sent.firstSeq}`,
+      groupSentAtMs: Date.now(),
+      ...localMessageOrderFields(Date.now()),
+    };
+    insertThreadMessage(thread, echo);
+    persistMessageToEncryptedHistory(thread, echo).catch((error) => console.warn('[groups] history', error));   // round 3: the echo survives a lock too
+    refreshThreadAfterMessageChange(sent.record ? ensureGroupThread(sent.record) : thread);
+  } catch (error) {
+    // The text comes back rather than vanishing — the same rule the public composer learned the hard way.
+    messageInput.value = text;
+    if (!noteTonRpcRateLimit(error)) console.warn('[groups] send failed', error);
+    if (privateComposerCostStatus) {
+      privateComposerCostStatus.textContent = error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+        ? (error.message ?? t('errors.walletNeedsGram'))
+        : t('group.sendFailed');
+      privateComposerCostStatus.dataset.state = 'short';
+    }
+  }
+  renderThreads();
+  renderConversation();
+}
 
 function convReadLane() {
   if (!convReadLaneInstance) {
@@ -16410,6 +19992,11 @@ async function readConvShardStates(plans) {
 
 async function syncConvCapsulesFromShards(options = {}) {
   if (!localRecipientKeyPair || !convKeyStore) return privateSyncResult({ ok: false, reason: 'not_ready', scanComplete: false });
+  // A BLOCKED BUILD STOPS SYNCING, exactly as the intro lane already does [audit 2026-08-31, round 7]. Past its
+  // own boundary this build can address none of the current epochs, so every pass would spend the RPC budget to
+  // read nothing — behind a full-screen overlay the user cannot dismiss — and paint a red sync failure on top of
+  // the update screen. armIntroReceiveLane has had this guard since round 5; its twin never got one.
+  if (cutoverUpdateRequired()) return privateSyncResult({ ok: false, reason: 'update_required', scanComplete: false });
   // A MANUAL sync (the header indicator's tap — runManualPrivateMessageSync passes forceIndexRescan) is a FULL re-walk:
   // every conversation from its birth, every shard re-read whatever its change marker says, every capsule re-opened
   // whatever the seq high-water says (dedup is by capsule id / own echo). The cursor, the marker gate and the seq mark
@@ -16460,7 +20047,27 @@ async function syncConvCapsulesFromShards(options = {}) {
     const steadyFrom = epochNow - CONV_RECV_WINDOW_W;
     const cold = record.lastScannedEpoch == null;
     const birthEpoch = convBirthEpoch(record, epochNow);
-    const from = (forceFull || cold) ? (birthEpoch ?? steadyFrom) : Number(record.lastScannedEpoch);
+    // A CURSOR EARNED IN ANOTHER GENERATION DOES NOT COVER THIS ONE [audit 2026-08-31, round 6]. The mark is
+    // monotonic and carries no generation of its own, so a device that scanned epochs past E while running a
+    // boundary-less build (everything is generation 17 there) would, after the update, declare those same epochs
+    // done — while their generation-18 RecordShards, at completely different addresses, had never been read.
+    // Rewind to the first epoch whose generation this build disagrees about; epochs below the boundary are
+    // generation 17 under both builds and stay scanned. Cheap, precise, and it fires once per device.
+    // A MISSING STAMP MEANS SEVENTEEN, and that is exact rather than a guess [audit 2026-08-31, round 7 — found
+    // by two facets]. Requiring a non-null stamp made the rewind fire for nobody who mattered: the entire
+    // installed base runs builds that never wrote one (HEAD carries no such field and no cutover-epoch.mjs at
+    // all), so `1.3.13 → flip release` — the exact upgrade this rewind exists for — skipped it, and the first
+    // clean pass then STAMPED 18, cementing a claim of coverage the device never had.
+    // The inference is closed: a record can only reach this test with a cursor already set, and a cursor with no
+    // stamp can only have been written by a build in which every epoch was generation 17 (there was no other
+    // code path). Fresh records and restored ones both carry `lastScannedEpoch: null` and take the cold branch.
+    const scannedGeneration = record.lastScannedGeneration ?? 17;
+    const staleCursor = !cold
+      && scannedGeneration !== generationForEpoch(Number(record.lastScannedEpoch));
+    const cursorFrom = staleCursor && CUTOVER_EPOCH !== null
+      ? Math.min(Number(record.lastScannedEpoch), CUTOVER_EPOCH)
+      : Number(record.lastScannedEpoch);
+    const from = (forceFull || cold) ? (birthEpoch ?? steadyFrom) : cursorFrom;
     const scanFrom = Math.max(0, epochNow - CONV_SCAN_CATCHUP_CAP_EPOCHS, Math.min(steadyFrom, from));
     const windowW = Math.max(CONV_RECV_WINDOW_W, epochNow - scanFrom);
     // The current root plus any retired roots (a re-INTRO minted a new K_root; old messages still in the window
@@ -16472,10 +20079,17 @@ async function syncConvCapsulesFromShards(options = {}) {
     // Until now only the incoming group was ever derived, so a restore showed the peer's half of every dialog.
     const rootShards = [];
     for (const kRoot of roots) {
-      rootShards.push({ kRoot, group: 'incoming', shards: await incomingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
-      rootShards.push({ kRoot, group: 'outgoing', shards: await outgoingRecordShards({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
+      // THROUGH THE PLANNER, not the raw derivation. MEASURED 2026-08-29: deriving these six addresses costs
+      // 3.575 ms per conversation and the pass ran every 12 s, so the cost scaled with how many conversations a
+      // person HAS rather than with what arrived — 14.9% of a desktop's CPU at 500 conversations, several times
+      // that on a phone. The answer holds still for a whole day (see createRecordShardPlanner), so a warm pass now
+      // costs 0.0121 ms per conversation: 295x, measured on the same fixture.
+      rootShards.push({ kRoot, group: 'incoming', shards: await convShardPlanner.incoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
+      rootShards.push({ kRoot, group: 'outgoing', shards: await convShardPlanner.outgoing({ kRoot, selfKeyId, peerKeyId, epochNow, windowW }) });
     }
-    plans.push({ peerKeyId, windowW, rootShards });
+    // peerWallet rides along for the restore's follow (noteRestoredConversationFollow): the record learned it from the
+    // INTRO (the publish src / the send state) and the recovery blob carries it, so a restored record has it too.
+    plans.push({ peerKeyId, peerWallet: record.peerWallet ?? null, windowW, rootShards, cold });
     if (cold || forceFull) {
       // Loud on purpose: a cold walk is rare (once per conversation per device, or a manual sync) and is the whole
       // answer to "why did the first sync take a while" / "why are my old messages back". Named once per conversation.
@@ -16516,11 +20130,33 @@ async function syncConvCapsulesFromShards(options = {}) {
   for (const plan of plans) {
     if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
     const peerKeyId = plan.peerKeyId;
-    const targetThread = resolveConvReceiveThread(introKeyIdString(peerKeyId));
+    const convKey = introKeyIdString(peerKeyId);
+    const targetThread = resolveConvReceiveThread(convKey);
+    // HOW DEEP THIS CONVERSATION READS. A manual rescan and a COLD record are both full walks — `cold` means the
+    // device holds no cursor for this conversation at all (fresh, restored, history cleared), and every other
+    // branch in this function already treats it as a walk from birth. Only the DEPTH inside each shard-day was
+    // left out, so a restored device widened its epoch range to birth and then took the newest 128 bodies of each
+    // day and marked the day fully read — 128 of a shard-day the lane measured at up to 3,968 records. The third
+    // case is a conversation a previous pass came back short on (see convDeepWalkPending).
+    //
+    // THIS REVERSES A DELIBERATE DECISION, and the reason is worth stating rather than burying. conv-lane's own
+    // note kept the cold path shallow on OBSERVED evidence — the owner's 2026-08-21 reload, where two shards a
+    // farm bot had filled cost 640 spam bodies opened per shard. That trade was made without knowing what it
+    // spent: the shallow read does not merely skip those bodies, it lets the seq mark jump to the top of the day,
+    // so everything below is unreachable by any later routine pass and the mark is rebuilt at boot from stored
+    // messages — the loss is permanent.
+    //
+    // MEASURED 2026-09-01 on a 3,968-record shard-day: shallow = 1 page, 128 bodies; deep = 31 pages, 3,968
+    // bodies. So the deep walk costs +30 page reads and +3,840 decryptions, 7.18 s of desktop CPU (3-5x that on a
+    // phone), ONCE per conversation per device. And it is paid ONLY where it is already unavoidable: the descent
+    // runs only when the newest page came back FULL, which an ordinary conversation never reaches — a normal
+    // shard-day is far under one 128-body page, so a normal cold walk costs exactly what it always did.
+    const deepWalk = forceFull || plan.cold === true || convDeepWalkPending.has(convKey);
     const collected = [];
     const bucketMaxSeq = new Map();   // shard address -> highest seq handled THIS pass
     const bucketBlocked = new Set();  // shard address -> a transient failure: do not advance its mark at all
     let seqSkipped = 0;
+    let ownCopiesOpened = 0;   // my own capsules opened this pass — the restore's proof that I wrote to this person
     let convClean = true; // every shard read for this conversation succeeded — only then may the cursor advance
     for (const { kRoot, group, shards } of plan.rootShards) {
       // MY OWN DIRECTION goes through the same lane (my direction's write key is derived the same way, so the
@@ -16535,7 +20171,13 @@ async function syncConvCapsulesFromShards(options = {}) {
           // nothing of (new device, cleared history): then the lane reads the newest page only, silently.
           // A MANUAL full rescan lends 0 instead — "hold nothing, but DO descend": the lane then pages every full shard
           // down to its first record (within its per-pass page cap), which is what "walk everything" means.
-          knownSeqOf: forceFull ? () => 0 : convBucketSeqHighWater,
+          knownSeqOf: deepWalk ? () => 0 : convBucketSeqHighWater,
+          // AND TELL THE LANE IT IS A FULL WALK, not only that this device holds nothing [2026-08-29]. Lending 0
+          // makes the lane DESCEND; it did not make it descend FAR ENOUGH — its per-pass cap of four older pages
+          // stops at 640 bodies against the 4,096 a shard-day can hold, so on a shard measured at 3,968 records a
+          // manual rescan reached 640, returned clean, and the UI reported up to date. The lane now takes a
+          // deeper cap for the walk the user actually asked for; the routine pass keeps its spam bound.
+          fullWalk: deepWalk,
           // THE LANE SWALLOWS A FAILED SHARD (its own mark stays, the rest of the window is returned) — which is right
           // for the lane and wrong for the cursor below: a shard-day that was never read must not be advanced past,
           // or a cold/catch-up walk (restore, offline catch-up) loses that day for good while the UI says 'up to
@@ -16544,6 +20186,17 @@ async function syncConvCapsulesFromShards(options = {}) {
             convClean = false; allClean = false;
             if (noteTonRpcRateLimit(error)) rateLimited = true;
             else console.warn('[conv] incoming shard read failed', address, error);
+          },
+          // A SHORT READ IS AS BAD AS A FAILED ONE, and until round 9 it was not reported at all. Nothing threw:
+          // the shard answered and the descent simply ran out of pages before reaching what this device holds.
+          // Treated identically to a failure — the bucket's mark must not move over the hole, the cursor must not
+          // advance past the epoch — plus the one thing a failure does not need: come back DEEPER next pass, or
+          // the following pass restarts at the newest window and gaps in exactly the same place forever.
+          onShardGap: (address, info) => {
+            convClean = false; allClean = false;
+            bucketBlocked.add(address);
+            convDeepWalkPending.add(convKey);
+            console.warn('[conv] shard read came back short — deep walk queued', address, info);
           },
         });
       } catch (error) {
@@ -16598,6 +20251,7 @@ async function syncConvCapsulesFromShards(options = {}) {
         // The shard ADDRESS rides with the entry so the stored message remembers where it came from — that is what
         // lets the next boot rebuild the seq high-water without decrypting anything (seedConvSeqMarksFromHistory).
         collected.push({ opened, entry: { entry_id: found.seq, address: bucket || undefined } });
+        if (ownCopies) ownCopiesOpened += 1;
         // Cooperative yield after EVERY opened capsule: ML-KEM-768 decapsulation is SYNCHRONOUS CPU, and a burst
         // of them in a tight loop starves the main thread on a slow single-thread device (the measured iPhone SE2
         // freeze). An `await` on an already-resolved promise only drains microtasks — the browser cannot paint
@@ -16609,13 +20263,25 @@ async function syncConvCapsulesFromShards(options = {}) {
     // A teardown during the reads above: the opened capsules belong to an identity that no longer exists here. Drop
     // them (the cursor and marks stay where they were, so the next unlock re-reads the same range) — never append.
     if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
-    const appendedNow = await appendConvOpenedCapsules(collected, targetThread);
+    const { appended: appendedNow, held: heldEntries } = await appendConvOpenedCapsules(collected, targetThread);
     // Advance the per-shard marks ONLY here — after the append actually stored them. Moving the mark before this
     // line would lose every collected message if the append threw. And only for the identity still in place: the
     // marks are module state the teardown just cleared for the next wallet.
     if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
+    // THE MARK STOPS BELOW ANYTHING THE APPEND DID NOT STORE. See appendConvOpenedCapsules: a part whose siblings
+    // are not on chain yet is held, and the mark is what decides whether the next pass can still see it — entries at
+    // or below it are skipped before decryption. Barring the whole bucket (as a failed READ does) would be heavier
+    // than needed: everything below the held part really was stored, so the floor is the held part itself.
+    const heldFloor = new Map();
+    for (const entry of heldEntries) {
+      const previous = heldFloor.get(entry.address);
+      if (previous === undefined || entry.seq < previous) heldFloor.set(entry.address, entry.seq);
+    }
     for (const [bucket, seq] of bucketMaxSeq) {
-      if (!bucketBlocked.has(bucket)) advanceConvBucketSeqHighWater(bucket, seq);
+      if (bucketBlocked.has(bucket)) continue;
+      const floor = heldFloor.get(bucket);
+      const capped = floor === undefined ? seq : Math.min(seq, floor - 1);
+      if (capped >= 0) advanceConvBucketSeqHighWater(bucket, capped);
     }
     // A blocked bucket must be re-read next pass, and BOTH marks stand in the way of that: the seq high-water above
     // (barred) and the lane's change marker (dropped here). The lane already read those bytes successfully, so its
@@ -16623,6 +20289,9 @@ async function syncConvCapsulesFromShards(options = {}) {
     // capsule that failed to decrypt for a transient reason. One decision, two places to say it.
     for (const bucket of bucketBlocked) lane.forgetShard(bucket);
     imported += appendedNow;
+    // A COLD conversation with my own messages in it is one I chose to write to: the follow the live path made then
+    // is re-derived here — queued, and applied once the prefs restore has answered (applyRestoredConversationFollows).
+    noteRestoredConversationFollow(plan, targetThread, ownCopiesOpened);
     // Feed the on-device routing diagnostic (copyPrivateThreadDiagnostic). Under direct pay routing is no longer a
     // guess: the conversation record's keyId PAIR selects the thread, so the useful record is which pair mapped to
     // which thread and how much it carried. Same instrument, the fact it captures just got simpler.
@@ -16633,7 +20302,19 @@ async function syncConvCapsulesFromShards(options = {}) {
     }
     // Advance the cursor ONLY on a fully clean scan — a failed read must leave the cursor so those epochs are retried,
     // never silently skipped past. On the CAPTURED store: the global may already be null (or the next wallet's).
-    if (convClean && !tornDown()) await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
+    // …AND ONLY IF THIS BUILD COULD ADDRESS THE NEWEST EPOCH IT CLAIMS [audit 2026-08-31, round 7]. The
+    // derivation now SKIPS an epoch whose generation this build carries no cell for, so a pass can be "clean"
+    // while never having looked at the top of its own window. Advancing on that would write a cursor claiming
+    // coverage the device does not have — and the generation stamp beside it would then MATCH on the flip build,
+    // so the stale-cursor rewind would never fire: the skip would have re-created the very loss it prevents.
+    // Freeze instead. The round-6 audit named this trap in advance: "the fix must freeze the cursor, not skip
+    // past it."
+    if (convClean && !tornDown() && epochIsDerivable('record', epochNow)) {
+      // The deep walk it was owed has now happened and reached bottom, so it is off the list. Released only on a
+      // CLEAN pass: a deep pass that itself came back short (a shard-day past even the 32-page cap) stays queued.
+      convDeepWalkPending.delete(convKey);
+      await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow);
+    }
   }
   if (tornDown()) return privateSyncResult({ ok: false, reason: 'torn_down', scanComplete: false });
   if (imported > 0) { renderThreads(); renderConversation(); }
@@ -16653,6 +20334,10 @@ async function syncConvCapsulesFromShards(options = {}) {
 }
 
 async function syncPrivateCapsulesFromChain(options = {}) {
+  // GROUPS RIDE THE SAME TICK. Their lanes are CONV shards, their reader is the CONV reader, and a quiet group
+  // costs exactly what a quiet conversation costs: one row in a batched accountStates read. Failures are noted
+  // and swallowed inside — a group that cannot be read must never take the private pass down with it.
+  void syncGroupsFromChain();
   // clean-17 direct-pay: private receive reads the conversation's RecordShards by bucketKey (K_root ->
   // addresses, no index) and decrypts into the same thread seam (syncConvCapsulesFromShards). The removed
   // CapsuleHub walk read the recipient/sender INDEXES of one shared hub, a clean-15 concept with no
@@ -16661,15 +20346,39 @@ async function syncPrivateCapsulesFromChain(options = {}) {
 }
 
 async function syncPrivateCapsulesFromChainOnce(options = {}) {
-  if (privateChainSyncPromise) return privateChainSyncPromise;
+  const wantsFull = options?.forceIndexRescan === true;
+  // A MANUAL FULL RESCAN IS NOT ANSWERED BY A PASS ALREADY RUNNING [audit 2026-09-01, round 9].
+  //
+  // This used to return the in-flight promise and DISCARD the options, so a tap on Sync that arrived during any
+  // of the automatic passes (every 12-60 s) silently became that pass — and runManualPrivateMessageSync then fed
+  // its result to completeMessageSyncUi, so the user was told the full walk had been done. The two passes are not
+  // interchangeable: only the full one lends knownSeqOf = () => 0 and the deep page cap, bypasses the seq
+  // high-water gate, and drops every change marker. It is the ONE recovery lever for a shard whose history the
+  // routine pass could not reach, which the scan's own comment calls "the one recovery lever that must not be
+  // outsmarted by them" — and it could be outsmarted by a coincident tick, with no signal at all.
+  //
+  // Routine passes still coalesce, which is what this guard is for. A full rescan waits for the pass in flight
+  // and then runs for real; a second full rescan while a full one runs coalesces onto it, because that one
+  // already does everything the second would.
+  while (privateChainSyncPromise) {
+    if (!wantsFull || privateChainSyncIsFull) return privateChainSyncPromise;
+    await privateChainSyncPromise.catch(() => null);
+  }
   privateChainSyncPromise = syncPrivateCapsulesFromChain(options);
+  privateChainSyncIsFull = wantsFull;
   try {
     const result = await privateChainSyncPromise;
     // Apply any subscription snapshot diverted from this pass (restore on a fresh device / cleared data).
     try { drainRestoredPrefsSnapshots(); } catch (error) { console.error(error); }
+    // Follows re-derived from restored conversations wait for the named prefs slot to answer (a saved snapshot
+    // outranks an inference, see applyRestoredConversationFollows). Ask it now if it has not answered this session
+    // — a fixed-address read, no scan; it swallows its own failures and applies the queue itself when it settles.
+    if (restoredConversationFollowQueue.size > 0 && !prefsRestoreSettled) await restorePrefsFromRecoveryIfFresh();
+    try { applyRestoredConversationFollows(); } catch (error) { console.error(error); }
     return result;
   } finally {
     privateChainSyncPromise = null;
+    privateChainSyncIsFull = false;
   }
 }
 
@@ -16959,6 +20668,10 @@ function serializeMessageForHistory(message) {
     // The INTRO half of the same guarantee — see web/intro-send-state.mjs for what a reload used to cost.
     introDirectSend: serializeIntroDirectSend(message.introDirectSend),
     convDelivery: message.convDelivery ?? null,
+    // A GROUP ROW'S LANE COORDINATES [audit 2026-09-06, round 3]: what the next pass matches the chain copy by, so a
+    // restored room is not drawn twice; `groupSentAtMs` is what ages an unconfirmed echo to "not delivered".
+    groupChainKey: message.groupChainKey ?? null,
+    groupSentAtMs: message.groupSentAtMs ?? null,
     attachment: message.attachment ?? null,
     profileVersion: message.profileVersion ?? 0,
     avatarHash: message.avatarHash ?? zeroAvatarHashHex(),
@@ -17492,7 +21205,7 @@ async function bootEncryptedMessageHistory() {
 // is unavailable. Gated behind privateLane.directPay: the clean-15 private path does not use convKeyStore at all. Runs
 // BEFORE armIntroReceiveLane (unlock order) so the intro handler captures the persistent store, not a transient memory one.
 async function bootConvKeyStore() {
-  if (!privateLaneDirectPayEnabled() || !plathoWallet?.address) return;
+  if (!plathoWallet?.address) return;
   try {
     convKeyStore = await createIndexedDbConvKeyStore({ dbName: currentConvKeyDbName() });
   } catch (error) {
@@ -17511,6 +21224,19 @@ async function bootConvKeyStore() {
 // (and must never be backed up over the fuller on-chain blob). [RECOVERY restore; recovery-wiring review #1/#2]
 let convRecoveryRestoreAttempted = false;   // a CLEAN restore (or clean-empty scan) completed — do not re-scan
 let convRecoveryBackupAllowed = false;      // the local map is known ⊇ the on-chain blob → safe to overwrite it
+// THE SAME LATCH FOR PREFS, AND IT WAS MISSING [audit 2026-09-01, round 14]. restorePrefsSnapshot returns
+// { prefsBytes, clean } and its own docstring says in capitals that the caller "must not treat an unclean result
+// as 'no prefs' and must retry" — and the caller destructured `clean` away. Two of the three self lanes already
+// did this right (convRecoveryBackupAllowed here, selfNotesRestoreIncomplete below); prefs, the third, had no
+// flag at all and no check on its save path.
+// The loss it opens is total and silent: reinstall, a transient RPC error, nothing restored and nothing said,
+// then ONE follow arms the Save button and the on-chain blob — every subscription, every custom channel with its
+// author wallet and name, the wallet's .ath quick-picks and linked name — is overwritten by a snapshot built
+// from empty local state. One blob per slot, no archive. The anti-rollback seq does not help: the overwrite is a
+// FORWARD write at seq+1.
+// Default DENIED, like conv's twin and unlike notes': a lane that has not proved its local state complete must
+// not be the one writing.
+let prefsBackupAllowed = false;
 
 /**
  * The batched state reader the SELF lanes (recovery, notes) use to collapse a per-slot scan into ONE request.
@@ -17560,8 +21286,7 @@ let convRecoveryMergeCheckedAt = 0;   // session throttle for the visible-path c
  * RESTORE FROM THE RECOVERY SLOTS WHEN THIS DEVICE IS BEHIND — not only when it is empty.
  *
  * The "IfEmpty" latch this replaces treated any non-empty store as authoritative and never read the slots again.
- * That is exactly wrong for one wallet on TWO devices [OWNER 2026-08-26: "I talked to a NEW user on one client;
- * the other client showed none of it until the user wrote again" — and his sharper framing: "if I talk on the
+ * That is exactly wrong for one wallet on TWO devices [decided 2026-08-26] — and his sharper framing: "if I talk on the
  * phone and then open the desktop, losing messages IS a problem"]. A conversation BORN on device A lives in A's
  * store and in the on-chain backup A publishes; device B's conversation scan walks only B's own store, so the
  * dialog is structurally invisible to it — B's one remaining door is the INTRO scan, whose null-body backoff
@@ -17644,18 +21369,25 @@ async function restoreConvKeysFromRecoveryIfBehind() {
 // clean-15 CapsuleHub path uses (drainRestoredPrefsSnapshots auto-applies ONLY on a truly fresh device, never clobbering
 // in-session local follows). A wrong-seed/foreign/absent slot yields nothing and touches no local state.
 async function restorePrefsFromRecoveryIfFresh() {
-  if (!privateLaneDirectPayEnabled() || !plathoWallet?.seed) return;
+  if (!plathoWallet?.seed) return;
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return;   // no transport yet — retry on the next unlock/visible
   try {
     const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
     const readBody = createRecoveryBodyReader((call) => transport.runGetMethod(call));
-    const { prefsBytes } = await restorePrefsSnapshot({ seed: plathoWallet.seed, readView, readBody });
+    const { prefsBytes, clean } = await restorePrefsSnapshot({ seed: plathoWallet.seed, readView, readBody });
+    // A CLEAN read is authoritative — either the slot was never written, or we hold everything it holds — so a
+    // later save can only carry the blob forward. An unclean one leaves the latch shut and the button refuses.
+    prefsBackupAllowed = clean === true;
     if (prefsBytes) {
       collectRestoredPrefsSnapshot(prefsBytes);
       if (drainRestoredPrefsSnapshots()) { rebuildPublicChannelRegistry(); renderThreads(); }
     }
+    // The slot has answered cleanly — never written, or read in full — so a follow inferred from restored
+    // conversations (F-23) can no longer talk over a snapshot it had not seen. Apply whatever the scan queued.
+    if (clean === true) { prefsRestoreSettled = true; applyRestoredConversationFollows(); }
   } catch (error) {
+    prefsBackupAllowed = false;   // a throw is the unclean case too — see the latch's note
     if (!noteTonRpcRateLimit(error)) console.warn('[prefs] recovery restore failed', error);
   }
 }
@@ -17699,15 +21431,16 @@ async function restoreSelfNotesFromRecovery() {
     refreshThreadAfterMessageChange(thread);
     renderThreads();
     renderConversation();
-    // An unclean read means a chunk did not load: the local notepad is now a SUPERSET of what we could see, so the
-    // next save must not be built from it as if it were complete. It is not — a chunk we failed to read still holds
-    // notes, and prepareNotesBackup would rewrite that slot with a snapshot that omits them.
     // An unclean read means a chunk did not load. The local notepad is now a SUPERSET of what we could see, so a
-    // save built from it would rewrite the unread slot with a snapshot that omits its notes — the exact silent loss
-    // this lane exists to prevent. BLOCK saving until a clean read succeeds; the notes keep accumulating locally.
-    selfNotesRestoreIncomplete = !clean;
+    // save built from it would rewrite the unread slot with a snapshot that omits its notes — the exact silent
+    // loss this lane exists to prevent. BLOCK saving until a clean read succeeds; the notes keep accumulating
+    // locally. [The flag was set twice here, under two paragraphs saying the same thing twice — round 14.]
     if (!clean) console.warn('[notes] restore was incomplete — some chunks did not load; saving is held');
   } catch (error) {
+    // A THROW IS UNCLEAN TOO, and this lane used to leave the flag at whatever it already was — which on a fresh
+    // boot is `false`, i.e. saving allowed from a notepad that never loaded [round 14]. Conv's twin defaults to
+    // DENIED for exactly this reason; notes defaults to allowed, so the catch has to say so itself.
+    selfNotesRestoreIncomplete = true;
     if (!noteTonRpcRateLimit(error)) console.warn('[notes] recovery restore failed', error);
   }
 }
@@ -17722,7 +21455,7 @@ const RECOVERY_BACKUP_DEBOUNCE_MS = 45_000;
 let recoveryBackupTimer = null;
 const convRecoveryDirtySlots = new Set();
 function scheduleRecoveryBackup(convId, delayMs = RECOVERY_BACKUP_DEBOUNCE_MS) {
-  if (!privateLaneDirectPayEnabled() || !convKeyStore || !plathoWallet?.seed) return;
+  if (!convKeyStore || !plathoWallet?.seed) return;
   if (convId) convRecoveryDirtySlots.add(recoverySlotForConversation(convId));
   else for (const slot of partitionRecoveryMap(convKeyStore.snapshot()).keys()) convRecoveryDirtySlots.add(slot);
   if (recoveryBackupTimer) clearTimeout(recoveryBackupTimer);
@@ -17735,27 +21468,76 @@ function scheduleRecoveryBackup(convId, delayMs = RECOVERY_BACKUP_DEBOUNCE_MS) {
 function rearmRecoveryBackupIfDirty() {
   if (convRecoveryDirtySlots.size > 0 && convRecoveryBackupAllowed && !recoveryBackupTimer) scheduleRecoveryBackup(null, 3_000);
 }
+// ONE BACKUP RUN AT A TIME [audit 2026-09-06, round 3]. Two runs a hop apart both read a slot's seq N and both claim
+// N+1: the second is refused by the anti-rollback gate while the first's receipt shows N+1 — and, before the receipt
+// matched content, the second called itself landed and cleared the dirty flag over a K_root the chain never got. A
+// slot dirtied during a run is picked up by the re-arm, from a fresh read of the map.
+let recoveryBackupInFlight = false;
+let recoveryBackupRearm = false;
 async function runRecoveryBackup() {
+  if (recoveryBackupInFlight) { recoveryBackupRearm = true; return; }
+  recoveryBackupInFlight = true;
+  try {
+    await runRecoveryBackupUnguarded();
+  } finally {
+    recoveryBackupInFlight = false;
+    if (recoveryBackupRearm) { recoveryBackupRearm = false; scheduleRecoveryBackup(null, 3_000); }
+  }
+}
+async function runRecoveryBackupUnguarded() {
   if (!convKeyStore || !plathoWallet?.seed) return;
   if (!convRecoveryBackupAllowed) return;   // a partial/unknown local map must NOT overwrite the on-chain blob [#1]
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod || !transport?.sendBoc) return;   // no transport — keep the dirty slots, retry later
-  const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+  const readView = createRecoveryViewReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));   // fresh: the seq it reads is the one this write claims [audit 2026-09-05, round 2]
   const bySlot = partitionRecoveryMap(convKeyStore.snapshot());
   const slots = [...convRecoveryDirtySlots];
   let published = 0;
+  const sent = [];   // { slot, address, seq, h1 } — every slot broadcast this run, confirmed together below
   for (const slot of slots) {
     const partition = bySlot.get(slot);
     if (!partition || partition.size === 0) { convRecoveryDirtySlots.delete(slot); continue; }   // slot emptied — nothing to write
     try {
       const built = await prepareRecoveryBackup({ seed: plathoWallet.seed, slotIndex: slot, map: partition, readView, value: RECOVERY_PUBLISH_VALUE });
-      await sendPlathoWalletTransaction(plathoWallet, {
-        messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
-      }, { transport });
-      convRecoveryDirtySlots.delete(slot);   // cleared per-slot ONLY on a successful publish — a throw leaves it dirty [#6]
-      published += 1;
+      // CAN THE WALLET ACTUALLY PAY FOR THIS? [audit 2026-09-01, round 9.] It could not be asked before, and this
+      // is the lane where the answer matters most: storeOutList forces IGNORE_ERRORS on every action, so an
+      // underfunded publish is DROPPED while sendPlathoWalletTransaction resolves normally — and the line below
+      // then clears the slot's dirty flag, so nothing ever retries it. Every conversation in that slot is left
+      // with no K_root on chain and becomes permanently undecryptable after a reinstall. Nothing reads this lane
+      // back either: sealRecoveryBlob uses a random GCM nonce, so its h1 cannot be compared with the chain's the
+      // way the deterministic notes lane's can. The reserve is keyed to the body actually built — MEASURED, a
+      // full slot (28 conversations, 10,485 bytes) needs 52,040,098 held, which class 8 does not cover.
+      // INSIDE the try, so a refusal exits through the catch below and leaves the slot DIRTY.
+      await assertWalletGramAtLeast(
+        RECOVERY_PUBLISH_VALUE
+          + walletSendFeeReserveNanotons([walletSendSizeClassForPayloadBytes(tonCell.serializeBoc(built.body).length)]),
+        'recovery backup');
+      try {
+        await sendPlathoWalletTransaction(plathoWallet, {
+          messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
+        }, { transport });
+      } catch (error) {
+        if (!broadcastMayHaveLanded(error)) throw error;   // ambiguous: the slot's seq below is the receipt
+      }
+      sent.push({ slot, address: built.to, seq: built.seq, h1: built.h1 ?? null });
     } catch (error) {
       if (!noteTonRpcRateLimit(error)) console.warn('[recovery] backup slot', slot, 'failed', error);   // keep this slot dirty
+    }
+  }
+  // THE SLOTS' SEQ AND H1 ARE THE RECEIPT [audit 2026-09-05, round 2; content-matched and batched in round 3]: a queued
+  // external is not a landed blob, and a slot cleared on the queue alone had no retry left if the network dropped it —
+  // every conversation in it lost its K_root on chain. One ladder for the whole run (a 35-slot backup used to walk 35
+  // ladders in series, ~210 reads over up to an hour); a slot the chain does not show stays dirty for the next run.
+  if (sent.length > 0) {
+    const receipt = await confirmRecoverySlotWrites({ readView, writes: sent });
+    const missing = new Set(receipt.pending.map((w) => `${String(w.address).toLowerCase()}|${w.seq}`));
+    for (const write of sent) {
+      if (missing.has(`${String(write.address).toLowerCase()}|${BigInt(write.seq)}`)) {
+        console.warn('[recovery] backup slot', write.slot, 'not confirmed within the window; kept dirty');
+        continue;
+      }
+      convRecoveryDirtySlots.delete(write.slot);   // cleared ONLY on a CONFIRMED publish — a throw or a miss leaves it dirty [#6]
+      published += 1;
     }
   }
   globalThis.plathoLastConvRecoveryBackup = { slotsPublished: published, slotsRemaining: convRecoveryDirtySlots.size, at: new Date().toISOString() };
@@ -17770,7 +21552,7 @@ const RECOVERY_REFRESH_AFTER_S = 47_304_000;   // retention/2 = 1.5 years; freez
 let recoveryFreezeSweepDone = false;
 async function runRecoveryFreezeSweep() {
   if (recoveryFreezeSweepDone) return;
-  if (!privateLaneDirectPayEnabled() || !convKeyStore || !plathoWallet?.seed) return;
+  if (!convKeyStore || !plathoWallet?.seed) return;
   if (!convRecoveryBackupAllowed) return;   // never rewrite from an incomplete local map [same guard as the backup]
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return;     // no transport yet — retry on the next boot/visible
@@ -17798,7 +21580,7 @@ async function runRecoveryFreezeSweep() {
 // INTRO and have it accepted as new — a duplicate first message, and a second adoption of the same K_root.
 // Wallet-scoped like every other local store, so one wallet's nonces never answer for another's.
 async function bootIntroReplayGuard() {
-  if (!privateLaneDirectPayEnabled() || !plathoWallet?.address) return;
+  if (!plathoWallet?.address) return;
   try {
     introReplayGuard = await createIndexedDbReplayStore({ dbName: currentIntroReplayDbName() });
   } catch (error) {
@@ -18027,7 +21809,7 @@ async function decryptPlathoWalletRecord(record, password) {
  * The password fields, as data. ONE definition rendered in two places: the modal dialog below, and the quick-start
  * step-1 body, which builds the same nodes with createActionField instead of opening a dialog over the wizard.
  *
- * [OWNER 2026-08-10] "a modal on top of a modal" — asking for the password in a dialog stacked on the quick-start
+ * [decided 2026-08-10] — asking for the password in a dialog stacked on the quick-start
  * card is what he kept seeing; the answer is for step 1 to BE the form. Copying these specs into the
  * stepper would have been the easy version and would have drifted — the credential-username field and its
  * autocomplete hints are what make browser password managers offer to save the wallet password at all.
@@ -18217,14 +21999,28 @@ async function writeStoredPlathoWallet(wallet, password) {
   if (!sameWalletAddress(verificationWallet.address, wallet.address)) {
     throw new Error('Encrypted wallet self-check failed');
   }
-  try {
-    const storage = localStorageOrNull();
-    storage?.setItem(PLATHO_WALLET_STORAGE_KEY, JSON.stringify(record));
-    storage?.removeItem(PLATHO_WALLET_LEGACY_STORAGE_KEY);
-    await requestPersistentLocalStorage();
-  } catch {
-    // Without persistent storage the current tab still has a working wallet.
-  }
+  // THE DURABLE WRITE MUST FAIL LOUD; ONLY THE PERSISTENCE REQUEST MAY BE BEST-EFFORT
+  // [audit 2026-08-31, round 8 — pre-existing in production 1.3.13].
+  //
+  // This whole block used to sit inside one try/catch whose comment ("without persistent storage the current tab
+  // still has a working wallet") is about `requestPersistentLocalStorage()` — while the same try also covered the
+  // setItem that IS the wallet, and `storage?.` turned a missing localStorage into a silent no-op. MEASURED, three
+  // ways, all silent: a QuotaExceededError, a null accessor, and a SecurityError (site data blocked) each resolved
+  // with the store left EMPTY.
+  //
+  // What that costs: the caller shows "wallet ready", the quick-start then walks the user through FUNDING and
+  // ACTIVATING an address whose key exists nowhere but RAM, and it is gone at the next reload. On the
+  // change-password path it is worse — the app reports the new password while the stored record still carries the
+  // old one, so the next unlock rejects the password the app just told the user to use.
+  //
+  // The twin below, writeEncryptedPlathoWalletRecord, has always done this correctly (and the import path's gate
+  // depends on it throwing). One lane was right and its twin was not.
+  const storage = localStorageOrNull();
+  if (!storage) throw new Error('Local storage is unavailable');
+  storage.setItem(PLATHO_WALLET_STORAGE_KEY, JSON.stringify(record));
+  storage.removeItem(PLATHO_WALLET_LEGACY_STORAGE_KEY);
+  // Best-effort by nature: a browser may refuse the persistence PROMISE while still storing the value fine.
+  try { await requestPersistentLocalStorage(); } catch { /* the record is written; persistence is a request */ }
   mirrorWalletRecordToTelegramCloud(record);
 }
 
@@ -18257,8 +22053,7 @@ async function changeStoredPlathoWalletPassword() {
   });
   if (!newPassword) return false;
   await writeStoredPlathoWallet(wallet, newPassword);
-  // THE EXPORTED FILE IS A BACKUP OF THE OLD PASSWORD [OWNER 2026-08-24: "if a person changes the password in the
-  // app, they'll have to export the wallet key again, right?"]. exportEncryptedWalletKeyFile writes the stored
+  // THE EXPORTED FILE IS A BACKUP OF THE OLD PASSWORD [decided 2026-08-24]. exportEncryptedWalletKeyFile writes the stored
   // record AS IT STANDS, so a file saved earlier still opens — with the password that was just replaced. The key
   // inside is untouched, so nothing is lost; what is lost is the owner's ability to open their own backup with the
   // password they now know. That is precisely the state the backup-pending flag exists to keep asking about, so
@@ -18304,10 +22099,15 @@ async function loadPlathoWallet() {
     }
     return wallet;
   })();
+  // The app wears its own palette while the prompt is up (channelOnScreen answers null on walletUnlockPromise) and
+  // the channel's dress comes back with the answer, whichever it is. Guarded: boot reaches here before the gift
+  // runtime's block-scoped state exists.
+  if (globalThis.__plathoGiftRuntimeReady) applyGiftAppearance();
   try {
     return await walletUnlockPromise;
   } finally {
     walletUnlockPromise = null;
+    if (globalThis.__plathoGiftRuntimeReady) applyGiftAppearance();
   }
 }
 
@@ -18366,9 +22166,25 @@ function hasActivePlathoAccount() {
   return hasActiveVaultMessagingKeys();
 }
 
+/**
+ * Has a KeyShard read ANSWERED for this wallet, with "no record"?
+ *
+ * Not `!hasActivePlathoAccount()`: that is also false before the first read, and suppressing the avatar read then
+ * would hide a real avatar until the binding lands. refreshVaultActivationStatus writes the binding ONLY on a
+ * definitive answer (its transient catch preserves the old one), so `user.exists === false` in a WRITTEN binding for
+ * THIS wallet is the chain's own "there is no shard". The avatar pointer lives inside that shard, so no shard means
+ * provably no avatar — and a read that would only rediscover it is a read not worth making.
+ */
+function ownKeyShardKnownAbsent(owner = plathoWallet?.address) {
+  const binding = globalThis.plathoVaultBinding;
+  if (!owner || !binding?.user) return false;
+  if (!sameWalletAddress(binding.walletAddress ?? '', owner)) return false;
+  return binding.user.exists !== true;
+}
+
 // ── ACTIVATION IN FLIGHT, ACROSS A RELOAD ───────────────────────────────────────────────────────────────────────
 //
-// [OWNER 2026-08-13] He activated during the quick-start, the step said "Done", and the Profile tab went on
+// [decided 2026-08-13], and the Profile tab went on
 // offering to activate — with the fee still on the balance. The external HAD been accepted and did land minutes
 // later, so nothing was lost; what the app got wrong was claiming a settled fact it had not read.
 //
@@ -18422,8 +22238,7 @@ function plathoActivationPendingBoc() {
 /**
  * Keep knocking until the account reads active or the external is provably dead.
  *
- * OWNER, 2026-08-18: "force activation the same as messages — the carousel hammers everywhere it can and it all
- * happens fast." That is exactly what the message lane does and what this did not: the wallet re-broadcasts
+ * decided 2026-08-18 That is exactly what the message lane does and what this did not: the wallet re-broadcasts
  * across the three doors only while its send call is RUNNING, so a suspended tab or a closed app ended the
  * effort. Here the same bytes go back out on their own schedule, through a DIFFERENT door each time — the
  * external reaches one node and spreads from there, so knocking twice on the door that already has it is worth
@@ -18537,20 +22352,19 @@ async function waitForPlathoAccountActivation(stillWanted = () => true) {
   return hasActivePlathoAccount();
 }
 
-function plathoAccountActivationFeeNanotons(user = currentVaultUserSource()) {
+function plathoAccountActivationFeeNanotons() {
   // clean-17 direct-pay: a KeyShard register is a fixed wallet send of KEYSHARD_REGISTER_VALUE (the shard reserves its
-  // rent and refunds the surplus), NOT a Vault-estimated external. Gate so every fee-display site is correct at cutover.
-  // …plus what the network charges to SEND that register: it is a signed external carrying the shard's StateInit,
-  // and the quote named only the value it attaches. MEASURED 4,120,453 for a 1,399-byte register body — above the
-  // smallest class, hence KEYSHARD_REGISTER_SIZE_CLASS. Pinned by PWA-ACTIVATION-FEE-01.
-  if (privateLaneDirectPayEnabled()) return KEYSHARD_REGISTER_VALUE + walletSendFeeNanotons([KEYSHARD_REGISTER_SIZE_CLASS]);
-  return estimateVaultAttachedValueNanotons('RegisterMessagingKeys', localVaultDraft?.message ?? { crypto_suite_mask: VAULT_CRYPTO_SUITE.HYBRID }, {
-    userExists: user?.exists === true,
-  });
+  // rent and refunds the surplus). …plus what the network charges to SEND that register: it is a signed external
+  // carrying the shard's StateInit, and the quote named only the value it attaches. MEASURED 4,120,453 for a
+  // 1,399-byte register body — above the smallest class, hence KEYSHARD_REGISTER_SIZE_CLASS. PWA-ACTIVATION-FEE-01.
+  return KEYSHARD_REGISTER_VALUE + walletSendFeeNanotons([KEYSHARD_REGISTER_SIZE_CLASS]);
 }
 
-function plathoAccountActivationFeeLabel(user = currentVaultUserSource()) {
-  return t('common.gramAmount', { amount: formatTonNanotons(plathoAccountActivationFeeNanotons(user)) });
+function plathoAccountActivationFeeLabel() {
+  // "Up to": the shard refunds its surplus (MEASURED 2026-09-09: quoted 0.0641, charged 0.0539), so the figure is a
+  // ceiling, and a ceiling is printed rounded UP — a truncated one sat 30,000 nanotons under the real requirement on
+  // the one send a brand-new wallet makes funded to exactly the quoted figure.
+  return t('common.gramUpTo', { amount: formatTonNanotonsUp(plathoAccountActivationFeeNanotons()) });
 }
 
 function clearNavVaultBalanceRetryTimer() {
@@ -18670,11 +22484,6 @@ function connectedWalletAthBalanceAtomic() {
   return raw === null || raw === undefined ? null : nonNegativeBigInt(raw);
 }
 
-function vaultTonBalanceNanotons(user = currentVaultUserSource()) {
-  if (!user || typeof user !== 'object') return 0n;
-  return nonNegativeBigInt(user.ton_balance ?? user.tonBalance ?? user.ton);
-}
-
 function currentMessagingPricingOptions() {
   return appConfig.messaging?.pricing ?? {};
 }
@@ -18701,6 +22510,10 @@ function privateSendPreflightStatusText(error) {
   // arrives as a get-method exit code, so the passthrough printed `TON RPC get-method exit code -13` at the person
   // who had just picked an image and pressed send. It is not an RPC fault and it is not theirs.
   if (error?.code === RECIPIENT_NOT_ACTIVATED) return t('chat.recipientNotActivated');
+  // The cutover refusal speaks to the USER, not to whoever reads the source [round 7]. Both raisers carry the
+  // code; the derivation's own message names a build artifact and a register item, which is exactly what a
+  // person must never be shown in a send status.
+  if (error?.code === 'CUTOVER_UPDATE_REQUIRED') return t('cutover.updateRequiredTitle');
   if (isTonRpcVerificationSoftReadError(error)) return 'RPC verification pending';
   if (/TON RPC|sendBoc transport|provider is not configured/i.test(message)) return message;
   return message;
@@ -18725,8 +22538,7 @@ function privateSendBlockReason(thread = activeThread(), options = {}) {
     // This branch can only fire UNLOCKED: the lock nulls plathoWallet together with the keys, and the wallet
     // check above already returned. So the only state left is the seconds right after the password while the
     // messaging keys derive — and the line here used to say "Unlock and activate Platho account", a double lie
-    // for that window [OWNER 2026-08-27: "the ability to write comes back a few seconds later, but the line lies
-    // about unlocking and activation"]. Say what is actually happening.
+    // for that window [decided 2026-08-27]. Say what is actually happening.
     return t('send.preparingKeys');
   }
   // Activation gate, mirroring the public send button (refreshPublicSendButtonState): an unlocked-but-not-
@@ -18767,6 +22579,15 @@ function isTonRpcTransientError(error) {
     // Local queue congestion — the request never left the device; retrying next pass is safe and the
     // provider is fine (isTonRpcHardTransportError excludes it from transport-health parking too).
     || error?.code === 'QUEUE_TIMEOUT'
+    // THE SEQNO READ IS AN RPC READ [audit 2026-08-31, round 8]. Both of these are the transport failing to
+    // ANSWER, not the chain refusing: PLATHO_WALLET_SEQNO_UNAVAILABLE is raised when the get-method could not be
+    // read at all, and seqnoReadFailed marks a wait that gave up because its reads kept failing (a 429 park DROPS
+    // that read outright — it rides the background tier with skipIfRateLimited). Unclassified, they were fatal:
+    // settlePrivateComposerSendError skipped schedulePrivateSendRetry, so the 8-attempt ladder built for exactly
+    // this class never ran and a temporary RPC condition reddened the message permanently. Measured: a real 429
+    // and an HTTP 500 out of sendBoc were both already retried — the gap was specific to the seqno path.
+    || error?.code === 'PLATHO_WALLET_SEQNO_UNAVAILABLE'
+    || error?.seqnoReadFailed === true
     || error?.code === 'NETWORK_ERROR'
     || error?.code === 'RPC_VERIFICATION_UNAVAILABLE'
     || error?.code === 'RPC_DISAGREEMENT'
@@ -18792,14 +22613,27 @@ function isFatalPrivateSendError(error) {
     // (deletes notes) or a later restore reads cleanly. An auto-retry loop against either just burns RPC budget.
     || error?.code === 'PLATHO_NOTES_FULL'
     || error?.code === 'PLATHO_NOTES_RESTORE_INCOMPLETE'
+    // A conversation shard-day whose on-chain sequence has been driven past what a JS Number can advance is
+    // denied for that day BY THE CHAIN — gate 13653 refuses any seq that does not increase, and no retry can
+    // produce one. Deterministic until UTC midnight rolls the day over. [audit 2026-09-01, round 9]
+    || error?.code === 'CONV_SEQ_EXHAUSTED'
     // A recipient who has never set Platho up will not appear because we asked again. Retrying here spent RPC
     // budget on a question already answered and left the message churning instead of saying what happened.
     || error?.code === RECIPIENT_NOT_ACTIVATED
+    // A build past the cutover boundary cannot publish AT ALL until it is updated — the most deterministic
+    // refusal in the set [audit 2026-08-31, round 7]. It is raised from two places: the wallet send funnel and,
+    // earlier on every shard lane, the address derivation that has no cell for the new generation. Without this
+    // it was read as transient (its old prose contained the word "network") and retried eight times before
+    // reporting "retry limit reached" — a false reason, on the one error whose entire job is to say "update".
+    || error?.code === 'CUTOVER_UPDATE_REQUIRED'
     || isVaultPublishPartialError(error)
     || /not enough ath to|wallet needs ~.* gram to|activate platho account|recipient .*not activated|is not registered|ownership is not authoritative|local platho signing key is not ready|wallet required|provider is not configured|cannot price publish|deployment manifest/i.test(message);
 }
 
 function isRecoverablePrivateSendError(error) {
+  // A NOTES WRITE THE SLOT DID NOT SHOW is retried like a transient [audit 2026-09-05, round 2]: the retry re-packs
+  // the notes and writes only the chunks whose h1 the chain does not already hold, so a late landing costs nothing.
+  if (error?.code === 'PLATHO_NOTES_NOT_CONFIRMED') return true;
   return isTonRpcTransientError(error) && !isFatalPrivateSendError(error);
 }
 
@@ -18969,9 +22803,9 @@ function privateComposerRetrievalPartLimit() {
 // v648 (owner): ONE message is capped at 8 capsules on BOTH surfaces. Before this the private cap was the
 // RETRIEVAL bound (120 — the recipient index walk), which let a user compose a ~3.8MB monster whose serial
 // nonce-chain send would run for HOURS (and the public composer had NO cap at all — the symmetric-case miss).
-// 8 = MAX_BATCH_PARTS: matches the batch unit, bounds the worst-case send at the scaled ~21-minute terminal, and
+// 8 = MAX_MESSAGE_PARTS: bounds the worst-case send at the scaled ~21-minute terminal, and
 // still fits 4 Maximum-quality images or ~256KB of text per message.
-const COMPOSER_MAX_MESSAGE_PARTS = MAX_BATCH_PARTS;
+const COMPOSER_MAX_MESSAGE_PARTS = MAX_MESSAGE_PARTS;
 
 function privateComposerPartLimitMessage(partCount) {
   const parts = Number(partCount ?? 0);
@@ -19209,39 +23043,6 @@ function composerProfileKindLabel(profile) {
     : 'private';
 }
 
-// VPB2 batch hold. The contract post-accept-rejects RJ_UNDERPRICED any batch whose signed max_charge is
-// below canonical_total == SHARED_BASE + Σ perPartHold(kind,size). The protocol fee + per-part costs live
-// INSIDE perPartHold (sandbox-measured), so we no longer add profile.fixedCharge/protocolFee here — those
-// were the stale per-message model that under-quoted the batch and would strand a publish at RJ_UNDERPRICED.
-// The network-fee surcharge rides on top, per part. Passing an ARRAY prices the whole batch (SHARED_BASE
-// charged ONCE — amortized). Passing a single profile with `parts` prices `parts` independent SINGLE-capsule
-// batches (SHARED_BASE per part): a deliberate, SAFE over-estimate for affordability, since the real grouped
-// batch hold is never higher than the per-capsule sum.
-function composerEstimatedMaxChargeNanotons(profile, parts = 1) {
-  // [CORRECTED 2026-08-04] THE THIRD SITE OF THE SAME DEFECT, and this time fixed at the source instead of at the
-  // caller. Under direct pay there is no hold and no batch: the client attaches a flat per-publish value straight to
-  // the shard, so the MAXIMUM charge and the attached value are the same number. The model below — SHARED_BASE
-  // amortised over a batch, refunded by a mode-128 ACK — is the Vault's, and clean-17 deleted the Vault.
-  //
-  // MEASURED from the owner's screen: the channel-description dialog quoted 0.1698 GRAM (127.8M Vault batch base +
-  // per-part) where the publish actually attaches 20.3M + surcharge. Eight times the truth, on a money figure, in a
-  // dialog whose whole job is to tell the user what saving will cost. The composer cost line and the avatar fee were
-  // corrected for exactly this on 2026-08-03; the dialog was their twin and was missed.
-  if (privateLaneDirectPayEnabled()) return composerEstimatedNetCostNanotons(profile, parts);
-  if (Array.isArray(profile)) {
-    if (profile.length === 0) return 0n;
-    const hold = batchHoldNanotons(profile.map((item) => ({
-      kindLabel: composerProfileKindLabel(item),
-      sizeClass: Number(item?.sizeClass ?? 1),
-    })));
-    return hold + currentNetworkFeeSurchargeNanotons() * BigInt(profile.length);
-  }
-  const count = BigInt(Math.max(1, Number(parts) || 1));
-  const kindLabel = composerProfileKindLabel(profile);
-  const sizeClass = Number(profile?.sizeClass ?? 1);
-  const singleCapsuleHold = BATCH_SHARED_BASE_HOLD_NANOTONS + capsulePerPartHoldNanotons(kindLabel, sizeClass);
-  return (singleCapsuleHold + currentNetworkFeeSurchargeNanotons()) * count;
-}
 
 // The OBSERVED SETTLED net price of one capsule (real user debit after the over-hold is refunded on ACK),
 // from the sandbox-measured net-price tables, plus the retained network-fee surcharge (not refunded).
@@ -19261,18 +23062,11 @@ function composerProfileNetPriceNanotons(profile) {
   // needing more PARTS. The surplus comes back by mode-128, which is why the attached figure slightly OVERSTATES the
   // settled one (19.1M quoted vs 18.87M settled) — erring high is honest, erring low would promise a send the wallet
   // cannot fund.
-  if (privateLaneDirectPayEnabled()) {
-    // The KIND decides the attached value, and they differ by ~2x: a channel post is 20,300,000 while an avatar
-    // part is 39,500,000. This read `publicPublishValueForKind(0)` for every public profile, so the avatar's own
-    // "up to" label quoted a channel post's price for an avatar write. [caught in review 2026-08-16]
-    const attached = isPublic ? publicPublishValueForKind(Number(profile?.publicKind ?? 0)) : CONV_PUBLISH_VALUE;
-    return nonNegativeBigInt(attached) + currentNetworkFeeSurchargeNanotons();
-  }
-  const sizeClass = Number(profile?.sizeClass ?? 1);
-  const settled = isPublic
-    ? publicCapsuleBaseNetPriceNanotons(sizeClass)
-    : privateCapsuleBaseNetPriceNanotons(sizeClass);
-  return nonNegativeBigInt(settled) + currentNetworkFeeSurchargeNanotons();
+  // The KIND decides the attached value, and they differ by ~2x: a channel post is 20,300,000 while an avatar
+  // part is 39,500,000. This read `publicPublishValueForKind(0)` for every public profile, so the avatar's own
+  // "up to" label quoted a channel post's price for an avatar write. [caught in review 2026-08-16]
+  const attached = isPublic ? publicPublishValueForKind(Number(profile?.publicKind ?? 0)) : CONV_PUBLISH_VALUE;
+  return nonNegativeBigInt(attached) + currentNetworkFeeSurchargeNanotons();
 }
 
 // [ADDED 2026-08-16] What the wallet pays the NETWORK to send the transfer, on top of what the message carries to the
@@ -19296,37 +23090,18 @@ function composerEstimatedNetCostNanotons(profile, parts = 1) {
     + composerWalletSendFeeNanotons(Array.from({ length: count }, () => profile));
 }
 
-// Hold -> net fallback for paths that only have the final hold (no per-part profiles): the settled net cost
-// is materially below the hold (the bulk of the hold is the refundable import over-hold + ACK float), so we
-// estimate net from the observed-settled fraction of a 1-part hold. Used only for the price-change confirm
-// dialog's "new cost" line; if profiles are available, composerEstimatedNetCostNanotons is exact.
-function composerKnownVaultTonShortfall(profile, parts = 1) {
-  // clean-17 direct-pay has NO Vault hold — a CONV/public send is funded from the wallet, and the affordability
-  // check runs at SEND time via assertWalletGramAtLeast (attemptConvMessagePublishDirect, submitPublicPostDirect,
-  // submitPublicCommentDirect, submitProfileAvatarDirect). This comment previously claimed those checks existed
-  // when they did not — they were only built on 2026-07-25; keep claim and code together. The
-  // synthesized KeyShard activation user carries no ton_balance, so reading it here would be a permanent false shortfall
-  // that disables every registered user's send button at cutover. Skip the Vault-balance gate; keep the part-cap gate
-  // (checked in the wrappers before this call). [keyshard activation review: ton_balance false-shortfall]
-  if (privateLaneDirectPayEnabled()) return false;
-  const user = currentVaultUserSource();
-  if (user?.exists !== true) return false;
-  return vaultTonBalanceNanotons(user) < composerEstimatedMaxChargeNanotons(profile, parts);
-}
 
 function privateComposerKnownVaultTonShortfall() {
   const plan = privateComposerSendPlan(messageInput?.value ?? '', privateImageAttachments, currentPrivateSenderOptions(), {
   });
-  if (privateComposerPartLimitMessage(plan.length)) return true;
-  return composerKnownVaultTonShortfall(privateComposerPublishProfilesForPlan(currentOutgoingPrivateSuite(), plan), 1);
+  return Boolean(privateComposerPartLimitMessage(plan.length));
 }
 
 function publicComposerKnownVaultTonShortfall() {
   const plan = publicComposerSendPlan(publicMessageInput?.value ?? '', publicImageAttachments);
   // Part-cap disables the send button too (v648, mirrors the private branch); the cost status carries the
   // split-it message so the disabled state is explained right below the composer.
-  if (publicComposerPartLimitMessage(plan.length)) return true;
-  return composerKnownVaultTonShortfall(publicComposerPublishProfilesForPlan(plan), 1);
+  return Boolean(publicComposerPartLimitMessage(plan.length));
 }
 
 const PUBLISH_PRICE_CHANGE_CANCELLED_CODE = 'PLATHO_PUBLISH_PRICE_CHANGE_CANCELLED';
@@ -19421,9 +23196,9 @@ function estimatedProfileAvatarTonFeeNanotons(attachment) {
   const plan = imagePartsForSend(attachment, 'profile avatar');
   const pricedProfiles = publicComposerPublishProfilesForPlan(plan, 3);   // AVATAR kind — see publicComposerPublishProfile
   // Same defect as the mint estimator above: this added the Vault-era 115,000,000 while the send attaches 200,000,000.
-  // The wallet-send fee for the capsule parts rides in via composerEstimatedMaxChargeNanotons; the ProfileRegistry
+  // The wallet-send fee for the capsule parts rides in via composerEstimatedNetCostNanotons; the ProfileRegistry
   // write is a FURTHER message in the same transfer, so its own forward+action cost is added here.
-  return composerEstimatedMaxChargeNanotons(pricedProfiles, 1)
+  return composerEstimatedNetCostNanotons(pricedProfiles, 1)
     + PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS
     + WALLET_SEND_FEE_PER_PART_NANOTONS;
 }
@@ -19440,7 +23215,7 @@ function estimatedProfileAvatarTonFeeNanotons(attachment) {
  * Read from the same constants the send attaches — `publicPublishValueForKind(3)` and
  * PROFILE_AVATAR_DIRECT_REQUEST_VALUE_NANOTONS — rather than typed into a translation. This exact figure has been
  * wrong on screen three times (see the notes on estimatedUsernameMintTonFeeNanotons and
- * composerEstimatedMaxChargeNanotons): each time a hand-maintained number outlived the value the wallet was asked
+ * composerEstimatedNetCostNanotons): each time a hand-maintained number outlived the value the wallet was asked
  * to sign, on the screen where the user decides whether to trust the app. A label derived from the constant cannot
  * drift from it.
  */
@@ -19458,9 +23233,9 @@ function profileAvatarFloorNanotons() {
  * protecting against a state this function cannot observe.
  */
 function refreshProfileFeeLabels() {
-  if (mintUsernameStatus) {
-    mintUsernameStatus.textContent = t('username.mintFee', {
-      amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()),
+  if (profileCardMintNameStatus) {
+    profileCardMintNameStatus.textContent = t('username.mintFee', {
+      amount: formatTonNanotonsUp(estimatedUsernameMintTonFeeNanotons()),
     });
   }
   if (setAvatarStatus) {
@@ -19472,7 +23247,7 @@ function profileAvatarTonFeeLabel(attachment) {
   if (!attachment) return t('avatar.estimatedAfterCompression');
   const parts = Math.max(1, imageAttachmentPartCount(attachment));
   const capsuleLabel = tPlural('avatar.publicCapsules', parts);
-  return t('avatar.feeUpTo', { amount: formatTonNanotons(estimatedProfileAvatarTonFeeNanotons(attachment)), capsules: capsuleLabel });
+  return t('avatar.feeUpTo', { amount: formatTonNanotonsUp(estimatedProfileAvatarTonFeeNanotons(attachment)), capsules: capsuleLabel });
 }
 
 // Estimate the GRAM hold to PUBLISH a channel profile (a single public post carrying the PROFILE document block) so the
@@ -19480,17 +23255,17 @@ function profileAvatarTonFeeLabel(attachment) {
 // but for a document instead of an image: encode the SAME bytes publishChannelProfile will (incl. the owner-username
 // trailer, which affects the byte size), split into capsule parts, and price the public batch. No extra Vault charge —
 // a profile is a plain public post (createPublicPayloadParts type:'post'), unlike the avatar's ProfileRegistry write.
-function estimatedChannelProfileChargeNanotons(description, tags) {
+function estimatedChannelProfileChargeNanotons(description, tags, appearance = null, wornGift = null) {
   const desc = String(description ?? '').trim();
   const normalizedTags = normalizeProfileTags(tags);
   const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
   const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
-  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername, appearance, wornGift: normalizeProfileWornGift(wornGift) }]);
   const parts = splitBytesToCapsuleParts(documentBytes, MAX_CAPSULE_USEFUL_BYTES);
   // TWO legs, not one: publishChannelProfileDirect signs the same payload into the author's CHANNEL shard AND into a
   // BEACON shard (that second write is what makes the channel discoverable). Pricing only the channel leg quoted
   // roughly half of what saving a description costs.
-  return composerEstimatedMaxChargeNanotons(channelProfilePublishProfiles(parts), 1);
+  return composerEstimatedNetCostNanotons(channelProfilePublishProfiles(parts), 1);
 }
 
 function composerCostStatusText(profile, text, maxTextBytes, attachment = null, options = {}) {
@@ -19524,29 +23299,13 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
   // the figure returns to normal by itself once the conversation exists. [owner, 2026-08-14]
   const extra = options.extraNanotons ?? 0n;
   const price = composerEstimatedNetCostNanotons(pricedProfile, parts) + extra;
-  const hold = composerEstimatedMaxChargeNanotons(pricedProfile, parts) + extra;
   const surchargeParts = Array.isArray(pricedProfile)
     ? pricedProfile.length
     : Math.max(1, Number(parts) || 1);
   const surcharge = currentNetworkFeeSurchargeNanotons() * BigInt(surchargeParts);
   const surchargeText = surcharge > 0n ? t('composer.networkSurchargeSuffix', { amount: formatTonNanotons(surcharge) }) : '';
-  const user = currentVaultUserSource();
-  // No Vault hold under direct-pay (see composerKnownVaultTonShortfall) — do not show the "need hold … vault 0" warning.
-  if (!privateLaneDirectPayEnabled() && user?.exists === true && vaultTonBalanceNanotons(user) < hold) {
-    return {
-      text: t('composer.needHoldStatus', { hold: formatTonNanotons(hold), available: formatTonNanotons(vaultTonBalanceNanotons(user)) }),
-      state: 'short',
-      parts,
-    };
-  }
   return {
-    // [CORRECTED 2026-08-03] No hold under direct-pay, so do not name one. The code three lines above already knew
-    // this — "No Vault hold under direct-pay (see composerKnownVaultTonShortfall)" — and the label went on showing
-    // 0.1626 GRAM reserved anyway, computed by the batch-hold model of a contract clean-17 deleted. A number the
-    // surrounding code documents as non-existent is worse than no number.
-    text: privateLaneDirectPayEnabled()
-      ? t('composer.costStatus', { cost: formatTonNanotons(price), surcharge: surchargeText })
-      : t('composer.costHoldStatus', { cost: formatTonNanotons(price), hold: formatTonNanotons(hold), surcharge: surchargeText }),
+    text: t('composer.costStatus', { cost: formatTonNanotonsUp(price), surcharge: surchargeText }),
     state: 'ready',
     parts,
   };
@@ -19566,15 +23325,58 @@ function composerCostStatusText(profile, text, maxTextBytes, attachment = null, 
 const INTRO_CAPSULE_SIZE_CLASS = 2;
 
 // Same shape for the KeyShard register that activates an account: a fixed body (the signed key bundle), so its send
-// cost is a constant the fee label can name before anything is built. MEASURED 1,399 payload bytes -> class 2.
-const KEYSHARD_REGISTER_SIZE_CLASS = 2;
+// cost is a constant the fee label can name before anything is built. MEASURED 1,401 payload bytes.
+//
+// CLASS 4, NOT THE CLASS ITS BODY WOULD FALL IN [audit 2026-08-31, round 9]. The register is not a capsule
+// publish, and the size-class table describes capsule publishes: what a register costs is driven by the KEYSHARD
+// StateInit it carries, not by the length of its body, so a body that fits class 2 does not cost a class-2 send.
+// MEASURED by bisecting the funding floor against a real KeyShard deploy in the sandbox: a brand-new wallet needs
+// to hold 66,101,073 for the register to land, while KEYSHARD_REGISTER_VALUE + class 2 quotes 66,030,000 — short
+// by 71,073, and short is fatal here because sendMode carries IGNORE_ERRORS: the wallet drops the action, its own
+// transaction still succeeds, and activation reports success against an account that was never registered.
+// Class 4 is the smallest entry that clears the measured floor (68,430,000, a margin of 2,328,927). Over-quoting
+// a one-time activation by 0.0023 GRAM is the honest direction; the alternative is a new user funding exactly
+// what the app asked for and getting nothing. PWA-ACTIVATION-FEE-01 now brackets this against the chain from
+// both sides, so a register that outgrows class 4 turns a test red instead of quietly quoting low.
+const KEYSHARD_REGISTER_SIZE_CLASS = 4;
 
 function privateFirstContactExtraNanotons(thread) {
   if (!thread || isRealSavedThread(thread)) return 0n;
   // A first contact is TWO signed transfers, not one message with a bigger value: the INTRO is published on its own
   // (attemptIntroFirstContactDirect -> publishIntroLane), so it pays its own external import, gas and forward fee.
   // Counting only INTRO_PUBLISH_VALUE understated every first message by that whole second send.
-  return thread.convPeerKeyId ? 0n : INTRO_PUBLISH_VALUE + walletSendFeeNanotons([INTRO_CAPSULE_SIZE_CLASS]);
+  if (thread.convPeerKeyId) return 0n;
+  return INTRO_PUBLISH_VALUE + walletSendFeeNanotons([INTRO_CAPSULE_SIZE_CLASS])
+    + privateFirstContactRecoveryExtraNanotons();
+}
+
+// THE THIRD EXTERNAL A FIRST CONTACT PAYS FOR, AND THE ONLY ONE THE USER NEVER ASKED FOR.
+// attemptIntroFirstContactDirect arms scheduleRecoveryBackup the moment it adopts the K_root; RECOVERY_BACKUP_DEBOUNCE_MS
+// later a RCV1 write leaves the wallet carrying RECOVERY_PUBLISH_VALUE, with no user action at all. MEASURED on chain
+// 2026-09-09: 38,400,000 out, 7,145,132 back, 35 s after the CONV send. Leaving it out understated every first
+// contact by ~0.043 GRAM — nearly as much as the message itself (the label said "up to 0.0444", the chain took 0.0788).
+//
+// THE SLOT IS RE-PUBLISHED WHOLE, so the send fee is sized from the body, exactly as the backup's own pre-flight does
+// (runRecoveryBackupUnguarded). The new conversation's slot is not known here (the peer key is not resolved until the
+// intro bundle is fetched), so this takes the WIDEST partition the local map already has plus the one record this send
+// adds — an upper bound whichever slot the new conversation hashes into. Bytes per record derived from the bisection
+// recorded in wallet-send-fee.mjs (28 conversations = 10,485 payload bytes), rounded up.
+const RECOVERY_BLOB_ENVELOPE_BYTES = 256;
+const RECOVERY_BLOB_BYTES_PER_CONVERSATION = 375;
+
+function recoveryBackupSizeClassAfterOneMore() {
+  let widest = 0;
+  const map = convKeyStore?.snapshot?.() ?? new Map();
+  for (const partition of partitionRecoveryMap(map).values()) {
+    if (partition.size > widest) widest = partition.size;
+  }
+  return walletSendSizeClassForPayloadBytes(
+    RECOVERY_BLOB_ENVELOPE_BYTES + RECOVERY_BLOB_BYTES_PER_CONVERSATION * (widest + 1),
+  );
+}
+
+function privateFirstContactRecoveryExtraNanotons() {
+  return RECOVERY_PUBLISH_VALUE + walletSendFeeNanotons([recoveryBackupSizeClassAfterOneMore()]);
 }
 
 function refreshComposerCostStatus() {
@@ -19652,6 +23454,68 @@ function writePublicCommentsDefault(value) {
 function publicCommentsDefaultLabel(value = readPublicCommentsDefault()) {
   return normalizePublicCommentsDefault(value) === 'disabled' ? t('public.commentsClosedStatus') : t('public.commentsAllowedStatus');
 }
+
+// ── Channel looks [owner, 2026-09-07]: two switches. Mine is a PUBLISH (a profile post, paid, through the
+// description dialog); others' is a local preference — a reader who does not want anybody's clothes on their
+// screen turns them off here, and nothing is fetched or drawn for them.
+const CHANNEL_APPEARANCES_STORAGE_KEY = 'platho.channelAppearances.v1';
+
+function normalizeChannelAppearancesPreference(value) {
+  const text = String(value ?? 'show').toLowerCase();
+  return text === 'hide' ? 'hide' : 'show';
+}
+
+function readChannelAppearancesPreference() {
+  try {
+    return normalizeChannelAppearancesPreference(localStorageOrNull()?.getItem(CHANNEL_APPEARANCES_STORAGE_KEY));
+  } catch {
+    return 'show';
+  }
+}
+
+function writeChannelAppearancesPreference(value) {
+  const normalized = normalizeChannelAppearancesPreference(value);
+  try {
+    localStorageOrNull()?.setItem(CHANNEL_APPEARANCES_STORAGE_KEY, normalized);
+  } catch {
+    // Non-persistent mode still applies the visible selection for this tab.
+  }
+  return normalized;
+}
+
+function channelAppearancesVisible() {
+  return readChannelAppearancesPreference() === 'show';
+}
+
+/** The Settings rows say what is PUBLISHED and what is PREFERRED — never what is merely selected. */
+function refreshChannelAppearanceUi() {
+  if (channelAppearancesSelect) channelAppearancesSelect.value = readChannelAppearancesPreference();
+  if (!channelAppearanceSelect) return;
+  const own = rawWalletAddress(plathoWallet?.address);
+  const published = own ? cachedChannelProfile(own)?.appearance ?? null : null;
+  channelAppearanceSelect.value = published ? 'custom' : 'none';
+  channelAppearanceSelect.disabled = !own || !hasActivePlathoAccount();
+}
+
+channelAppearancesSelect?.addEventListener('change', () => {
+  writeChannelAppearancesPreference(channelAppearancesSelect.value);
+  refreshChannelAppearanceUi();
+  if (publicChannelViewOpen) renderPublicChannelView();   // the open channel dresses or undresses at once
+  applyGiftAppearance();
+});
+
+// Publishing is the description dialog's job: the row only presets the choice, and afterwards shows what really
+// went out — a cancelled dialog leaves the row where the chain is.
+channelAppearanceSelect?.addEventListener('change', () => {
+  const wanted = channelAppearanceSelect.value === 'custom' ? 'custom' : 'none';
+  // THE DIALOG REPLACES THE SETTINGS rather than stacking on them [the card's rule, 2026-09-07; owner, 2026-09-10: a
+  // preview]: the app behind the dialog wears the look being edited, and a second dimmed card in front of it would
+  // hide the very thing the knobs change. The settings are one tap away again from the corner.
+  closeProfileSettings();
+  openEditChannelProfileDialog({ appearance: wanted })
+    .catch((error) => console.error(error))
+    .finally(() => refreshChannelAppearanceUi());
+});
 
 function updatePublicCommentsDefaultUi() {
   const value = readPublicCommentsDefault();
@@ -21462,14 +25326,41 @@ function buildFileBlockChip(block) {
   return chip;
 }
 
+/**
+ * Save a JSON file and report what ACTUALLY happened.
+ *
+ *   'saved'     — showSaveFilePicker's stream closed: bytes are on disk, proof in hand.
+ *   'copied'    — the manual-copy dialog was SUBMITTED (the acknowledgement is the proof).
+ *   'cancelled' — the picker or the dialog was dismissed. Nothing was written.
+ *   'triggered' — an <a download> click and nothing else. No browser reports how that ended: in an embedded
+ *                 browser it opens the HOST's save dialog, and a cancelled host dialog is indistinguishable from a
+ *                 saved file [owner-run test, 2026-09-09]. Only the user can close that question.
+ */
 async function downloadJsonFile(filename, value) {
   const json = `${JSON.stringify(value, null, 2)}\n`;
-  if (isTelegramEnv()) {
-    // <a download>.click() silently fails in Telegram's in-app WebView, so the
-    // file would never save — surface the content for manual copy instead. Await
-    // the copy dialog so a mandatory export step only completes once acknowledged.
-    await showTelegramManualExportDialog(filename, json);
-    return;
+  if (!fileDownloadsCanBeSaved()) {
+    // <a download>.click() fails SILENTLY where it is not honoured, so the file would never save and nothing
+    // would say so — surface the content for manual copy instead. A DISMISSED dialog is not an acknowledgement:
+    // openActionDialog resolves null on ✕, and discarding that is how a cancelled copy used to read "done".
+    return (await showManualExportDialog(filename, json)) ? 'copied' : 'cancelled';
+  }
+  // THE ONE PATH THAT CAN PROVE ITSELF. showSaveFilePicker resolves only after a destination was chosen and the
+  // stream closed, so 'saved' means bytes on disk. AbortError is the user cancelling the save dialog — exactly the
+  // case that used to mark a MANDATORY step done over a file that was never written. Any other failure (no user
+  // activation, a cross-origin frame, unsupported) falls through to the old path rather than blocking the export.
+  if (typeof globalThis.showSaveFilePicker === 'function') {
+    try {
+      const handle = await globalThis.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      const writable = await handle.createWritable();
+      try { await writable.write(json); } finally { await writable.close(); }
+      return 'saved';
+    } catch (error) {
+      if (error?.name === 'AbortError') return 'cancelled';
+      console.error(error);
+    }
   }
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -21480,6 +25371,7 @@ async function downloadJsonFile(filename, value) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+  return 'triggered';
 }
 
 function safeWalletKeyFilename(record) {
@@ -21489,10 +25381,7 @@ function safeWalletKeyFilename(record) {
 }
 
 function readStoredToncenterApiKey() {
-  let key = globalThis.plathoToncenterApiKey ?? null;
-  if (key == null) {
-    try { key = globalThis.localStorage?.getItem(TONCENTER_API_KEY_STORAGE_KEY) || null; } catch { key = null; }
-  }
+  const key = globalThis.plathoToncenterApiKey ?? null;
   return key || null;
 }
 
@@ -21560,11 +25449,36 @@ async function walletKeyBackupFromRecord(record, unlockedWallet = plathoWallet) 
   };
 }
 
+function walletKeyBackupProven(outcome) {
+  return outcome === 'saved' || outcome === 'copied';
+}
+
+/** The user's own answer to "did the file arrive?" — the only proof a bare <a download> can ever produce. */
+function confirmWalletKeyBackupArrived(record = readEncryptedPlathoWalletRecord()) {
+  markWalletKeyBackupDone(storedWalletAddressForCopy(record) || record?.address || null);
+}
+
+/** The <a download> gate for surfaces with no inline room for the question (Wallet tab, the Profile warning row). */
+async function confirmWalletKeyFileArrived() {
+  const answered = await openActionDialog({
+    title: t('quickstart.keyFileConfirmTitle'),
+    hint: t('quickstart.keyFileConfirmQuestion'),
+    submitLabel: t('quickstart.keyFileConfirmYes'),
+    summary: [t('quickstart.keyFileConfirmSummary')],
+  }).catch(() => null);
+  if (!answered) return false;
+  confirmWalletKeyBackupArrived();
+  return true;
+}
+
 async function downloadEncryptedWalletKeyBackup(record = readEncryptedPlathoWalletRecord(), unlockedWallet = plathoWallet) {
   if (!record) throw new Error('No encrypted wallet key is stored on this device');
-  await downloadJsonFile(safeWalletKeyFilename(record), await walletKeyBackupFromRecord(record, unlockedWallet));
-  // The key file (or the Telegram manual-copy dialog) is now saved/acknowledged — clear the backup nudge.
-  markWalletKeyBackupDone(storedWalletAddressForCopy(record) || record?.address || null);
+  const outcome = await downloadJsonFile(safeWalletKeyFilename(record), await walletKeyBackupFromRecord(record, unlockedWallet));
+  // ONLY A PROVEN SAVE CLEARS THE NUDGE. 'triggered' means a click left the app and nothing came back; the host's
+  // save dialog may still be open, and it may be cancelled. That case is confirmed by the USER, on the surface that
+  // asked for it (confirmWalletKeyBackupArrived) — never here, on a click.
+  if (walletKeyBackupProven(outcome)) confirmWalletKeyBackupArrived(record);
+  return outcome;
 }
 
 function encryptedWalletRecordFromBackup(value) {
@@ -21598,10 +25512,13 @@ const PLATHO_LOCAL_INDEXED_DB_BASE_NAMES = Object.freeze([
   LEGACY_MESSAGE_HISTORY_DB_NAME,     // encrypted-message-store ('platho-local-message-history-v1')
   LEGACY_REPLAY_DB_NAME,              // replay-store + intro-cursor-store share this DB ('platho-local-security-v1')
   'platho-intro-replay-v1',           // the INTRO lane's own replay guard (currentIntroReplayDbName)
+  'platho-intro-cursors-v1',          // the INTRO scan's cursors + delivered ledger (currentIntroCursorDbName)
+  'platho-device-secrets-v1',         // device-scoped sealed settings — today the node API key
   'platho-conv-keys-v1',              // sealed K_root store + scan cursors (currentConvKeyDbName)
   'platho-profile-avatar-media-v1',   // avatar media cache (deployment-scoped)
   'platho-public-comments-v1',        // public comment window snapshots (deployment-scoped)
   'platho-public-post-media-v1',      // public post image media (deployment-scoped)
+  'platho-groups-v1',                 // private group records — INCLUDING their epoch keys (group-record-store)
 ]);
 const PLATHO_LOCAL_INDEXED_DB_PREFIX = 'platho-';
 
@@ -21716,8 +25633,6 @@ function refreshMessagingControls() {
   refreshToncenterKeyUi();
   refreshPrefsSyncUi();
   if (exportWalletSeedButton) exportWalletSeedButton.disabled = !plathoWallet;
-  if (copyWalletAddressButton) copyWalletAddressButton.disabled = !(plathoWallet || storedWalletAddressForCopy());
-  if (walletDisplayModeSelect) walletDisplayModeSelect.disabled = !plathoWallet;
   // An activation external is in flight from the moment submitVaultRegisterMessagingKeys
   // broadcasts it; the Vault only creates the user a few seconds to ~a minute later.
   // Until current_key_id flips (accountActive), keep the row showing progress and
@@ -21739,6 +25654,10 @@ function refreshMessagingControls() {
     // preserving the deliberate in-flight feedback at lines ~10946-10952.
     registerVaultKeysButton.hidden = !(Boolean(plathoWallet) && !accountActive && !appShellReloadPending);
   }
+  // The look row follows the same two facts as the rows above it — a wallet, an active account — and this is the
+  // one place those facts are re-read. It used to be refreshed at boot only, so a wallet unlocked a second later
+  // left the row disabled for the whole session [owner, 2026-09-08: "it does not switch"].
+  refreshChannelAppearanceUi();
   setText(vaultDraftStatus, !plathoWallet
     ? t('vault.statusWalletRequired')
     : appShellReloadPending
@@ -21756,11 +25675,10 @@ function refreshMessagingControls() {
     // clean-17: "Replace message keys" is VESTIGIAL under direct-pay — the messaging keys are wallet-frozen (no real
     // rotation is possible), and register/activate is now repair-aware (re-writes stale keys), so a separate replace
     // button would only let the user pay to bump a generation nothing depends on. Hide it. [rotation: keys are frozen]
-    replaceVaultKeysButton.hidden = privateLaneDirectPayEnabled();
-    replaceVaultKeysButton.disabled = privateLaneDirectPayEnabled() || !plathoWallet || !signedActionsReady;
+    replaceVaultKeysButton.hidden = true;
+    replaceVaultKeysButton.disabled = true;
   }
-  if (mintUsernameButton) mintUsernameButton.disabled = false;
-  if (linkUsernameButton) linkUsernameButton.disabled = false;
+  if (profileCardMintNameButton) profileCardMintNameButton.disabled = false;
   if (setAvatarButton) setAvatarButton.disabled = plathoProfileAvatarPending;
   // Secondary composer buttons follow the SEND state, not the draft state (owner: an inactive composer must
   // not show live-looking buttons); the eye + emoji live in the refreshPrivateSendButtonState funnel below.
@@ -21803,8 +25721,17 @@ function setView(view) {
     // selection), NOT activeThread() which falls back to threads[0] — matches the boot-time logic.
     appShell.dataset.chatOpen = activeThreadId ? 'true' : 'false';
   }
+  // Leaving the Public tab takes the unread mark over what the reader actually saw (flushPublicFeedRead).
+  // Placed AFTER dataset.view moves so the flush cannot repaint the surface being left.
+  if (view !== 'public') flushPublicFeedRead();
   railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
+  // The channel's dress follows the tab: off when the Public tab is left, back on when it is returned to
+  // (channelOnScreen answers by the tab now) [owner, 2026-09-10]. GUARDED: setView also runs at BOOT, before the
+  // gift runtime's block-scoped state exists — an unguarded call there threw on `wornGiftTheme` and abandoned the
+  // whole module (the stage did not boot). The flag is the one giftThemeChosen reads; the boot's own dress comes
+  // from the gift runtime itself once it is up.
+  if (globalThis.__plathoGiftRuntimeReady) applyGiftAppearance();
   if (view === 'chats') {
     // The conversation isn't rendered while this tab is hidden (boot opens on Public — see the guard in
     // renderConversation), so render it now that the strip is visible. Unconditional: renderConversation resolves the
@@ -21835,9 +25762,6 @@ function setView(view) {
   } else {
     scheduleVaultAutoRefresh(2_000);
   }
-  if (view === 'profile' && plathoWallet?.address) {
-    refreshProfilePaneReads();
-  }
 }
 
 // Serialize the Profile chain reads (GRAM balance -> ATH stats -> own avatar). Firing them concurrently is
@@ -21849,7 +25773,9 @@ function refreshProfilePaneReads() {
   (async () => {
     try { await refreshWalletTonBalanceForProfile(); } catch (error) { if (!noteTonRpcRateLimit(error)) console.error(error); }
     try { await refreshAthProtocolStats(); } catch { /* best effort */ }
-    try { await refreshOwnProfileAvatar(); } catch (error) { console.error(error); }
+    try { await refreshOwnProfileAvatar(); } catch (error) {
+      if (!isUninitializedAccountError(error) && !noteTonRpcRateLimit(error)) console.error(error);
+    }
   })();
 }
 
@@ -21891,7 +25817,13 @@ function ensureContactCtaCard() {
   add.setAttribute('data-i18n', 'chat.contactCtaAction');
   add.textContent = t('chat.contactCtaAction');
   add.addEventListener('click', openNewChatDialog);
-  actions.append(add);
+  const group = document.createElement('button');
+  group.type = 'button';
+  group.className = 'discovery-cta-action';
+  group.setAttribute('data-i18n', 'group.createAction');
+  group.textContent = t('group.createAction');
+  group.addEventListener('click', () => { void openCreateGroupDialog(); });
+  actions.append(add, group);
   card.append(head, actions);
   privateContactCtaCard = card;
   return card;
@@ -21960,6 +25892,22 @@ function buildThreadRow(threadId) {
   const avatar = document.createElement('div');
   avatar.className = 'avatar';
   avatar.setAttribute('aria-hidden', 'true');
+  // THE AVATAR IS A DOOR TO THE CONTACT'S PROFILE CARD, and it stays a plain div doing it. The row itself is a
+  // <button>, so a nested button (or a focusable role="button") would be invalid markup this codebase has already
+  // been bitten by — the pointer gesture lives here and the keyboard/AT route is the "Open profile" row in the
+  // chevron menu beside the name. The thread is resolved at CLICK time because rows are reused across renders.
+  // Without a peer wallet — "My notes", a group — nothing is stopped and the tap opens the conversation as before.
+  avatar.dataset.profileDoor = 'true';
+  avatar.setAttribute('data-i18n-title', 'profileCard.open');
+  avatar.title = t('profileCard.open');
+  avatar.addEventListener('click', (event) => {
+    const row = threads.find((entry) => entry.id === item.dataset.thread);
+    const wallet = row ? ownerWalletFromThread(row) : null;
+    if (!wallet) return;
+    event.stopPropagation();
+    event.preventDefault();
+    openProfileCardDialog({ wallet, thread: row }).catch((error) => console.error(error));
+  });
   const main = document.createElement('div');
   main.className = 'thread-main';
   const top = document.createElement('div');
@@ -21975,8 +25923,7 @@ function buildThreadRow(threadId) {
   side.className = 'thread-side';
   side.append(time);
   top.append(name);
-  // THE STATE SHARES THE PREVIEW'S LINE, it does not add one [OWNER 2026-08-23: "the layout shifts when the status
-  // appears"]. As a third row it was 11px + its margin, so a row grew ~18px the moment a send started and shrank
+  // THE STATE SHARES THE PREVIEW'S LINE, it does not add one [decided 2026-08-23]. As a third row it was 11px + its margin, so a row grew ~18px the moment a send started and shrank
   // back when it settled — every row below it jumped, twice, per send. Side by side the row's height is the same
   // whether the status is there or not, and both facts stay on screen: the status leads (short, accent, uppercase),
   // the preview takes what is left and ellipsises.
@@ -22368,6 +26315,18 @@ function renderConversation() {
   }
   renderConversationIdentity(thread);
   activeSubtitle.textContent = conversationSubtitleText(thread);
+  // A GROUP'S HEADER OPENS THE ROOM: its name is the way to the members, the invite and the removals — the
+  // gesture every messenger already taught people, and no new control in a header that is already full.
+  if (conversationHeaderNode) {
+    const groupId = groupIdOfThread(thread);
+    conversationHeaderNode.classList.toggle('is-group', Boolean(groupId));
+    if (activeTitle) {
+      activeTitle.onclick = groupId ? () => { void openGroupMembersDialog(groupId); } : null;
+      activeTitle.style.cursor = groupId ? 'pointer' : '';
+      if (groupId) activeTitle.title = t('group.membersOpen');
+      else activeTitle.removeAttribute('title');
+    }
+  }
   // Capture the pre-render scroll state so a background re-render can restore it instead of jumping to the bottom.
   // LIVE scroll state read at render entry. The scroll listener's debounced snapshot lagged an active gesture
   // (the debounce timer reset on every scroll event), so a mid-scroll re-render restored wherever the user was
@@ -22493,6 +26452,13 @@ function renderConversation() {
           bubble.append(buildSharedPostEmbed(block));
         }
       }
+    } else if (message.text && parseGroupJoinToken(message.text)) {
+      // THE ANSWER TO AN INVITE is a token too, and it is never shown as one either.
+      bubble.append(buildGroupJoinCard(parseGroupJoinToken(message.text), message.type === 'out'));
+    } else if (message.text && parseGroupInviteToken(message.text)) {
+      // AN INVITE IS NEVER SHOWN AS ITS TOKEN. The bytes are machine-readable by design; a person gets the offer,
+      // or — on the sending side — the plain fact that it went.
+      bubble.append(buildGroupInviteCard(parseGroupInviteToken(message.text), message.type === 'out'));
     } else if (message.text) {
       const text = document.createElement('div');
       text.className = 'message-text-block';
@@ -22525,8 +26491,7 @@ function renderConversation() {
     if (bubble.querySelector('.message-image')) bubble.classList.add('has-media');
     const metaText = messageMetaLine(message);
     if (metaText) row.dataset.status = messageStatusKey(message);
-    // ONE STATUS LINE PER BURST [OWNER 2026-08-24: "for messages that have the same received/published and time,
-    // sent in one batch by a user, write it only on the LAST message"]. Six lines reading "received · 00:03" under
+    // ONE STATUS LINE PER BURST [decided 2026-08-24]. Six lines reading "received · 00:03" under
     // six bubbles say one thing six times; the burst is one arrival, so it is stamped once, at its end. `showMeta`
     // is decided by the caller, which can see the message that follows this one.
     if (metaText && showMeta) {
@@ -22647,8 +26612,7 @@ function renderConversation() {
       // It used to re-assert a remembered position first. That line was a genuine restore once: the strip was
       // rebuilt from empty and scrollTop fell to 0 (the "flies to the beginning and back" jerk). Reconciled rows
       // never move, so the restore had nothing left to restore — and a teleport to a remembered number is exactly
-      // the jump it was there to prevent [OWNER 2026-08-25: "if I write one more message, the page jumps back to
-      // where I came in and scrolls down to my new message from there"]. The report is a narration of those two
+      // the jump it was there to prevent [decided 2026-08-25]. The report is a narration of those two
       // lines in order: the teleport, then the scroll. On the FIRST send it is invisible because the remembered
       // position IS where the reader is standing; on the second it is not, and the difference is on screen.
       //
@@ -23077,6 +27041,10 @@ function messageForRow(row) {
 }
 
 function copyTextFromContent(item) {
+  // AN INVITE OR JOIN TOKEN IS NOT COPY [audit 2026-09-06, round 3]: the card shows the room's name, and a long-press
+  // used to hand the clipboard the token itself — the day key and the roster key of a private room.
+  const tokenPreview = groupTokenPreviewText(item);
+  if (tokenPreview) return tokenPreview;
   const blocks = Array.isArray(item?.blocks) ? item.blocks : [];
   const fromBlocks = blocks
     .filter((block) => block?.type === 'text' && String(block.text ?? '').trim())
@@ -23216,6 +27184,9 @@ actionForm?.addEventListener('submit', async (event) => {
     }
     if (activeActionDialog !== dialogAtStart) return; // dialog was cancelled/replaced while validating
     if (outcome && outcome.ok) {
+      // A dialog whose write has left the wallet simply goes away [decided 2026-09-09, twice over: first "the save
+      // closed silently", then "a notice with a greyed button is not intuitive — just hide the window once it is
+      // sent"]. The surface behind it says what happened: the gift tile, the card's description.
       closeActionDialog(outcome.result ?? values);
       return;
     }
@@ -23270,53 +27241,27 @@ privateSenderModeSelect?.addEventListener('change', () => {
   flashWalletIdentityStatus(t('wallet.privateSenderFlash', { mode: privateSenderModeLabel(value) }));
 });
 
-mintUsernameButton?.addEventListener('click', async () => {
+profileCardMintNameButton?.addEventListener('click', async () => {
+  const preparing = t('username.preparingMint');
   try {
     if (!plathoWallet) {
       setUsernameMintStatus(t('profile.createWalletFirst'), 'error');
       return;
     }
-    mintUsernameButton.disabled = true;
+    // SAY THAT SOMETHING IS HAPPENING. The dialog opens only after a chain read of the price and the ATH balance
+    // (3–8 s on the keyless door), and a row that merely dims for that long reads as broken [owner-run test,
+    // 2026-09-09: "the dialog then pops up unexpectedly"].
+    profileCardMintNameButton.disabled = true;
+    setUsernameMintStatus(preparing, 'busy');
     await submitUsernameMint();
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
     setUsernameMintStatus(rateLimited ? TON_RPC_CONNECTING_STATUS : usernameMintStatusText(error), rateLimited ? 'busy' : 'error');
     console.error(error);
   } finally {
-    mintUsernameButton.disabled = false;
-  }
-});
-
-linkUsernameButton?.addEventListener('click', async () => {
-  if (!plathoWallet) {
-    setProfileAvatarStatus(t('profile.createWalletFirst'), 'error');
-    return;
-  }
-  const previous = readWalletDisplayIdentity(plathoWallet?.address);
-  const previousLinked = readLinkedPlathoUsername(plathoWallet?.address);
-  try {
-    linkUsernameButton.disabled = true;
-    const identity = await requestWalletDisplayIdentity(WALLET_DISPLAY_MODES.PLATHO_NFT);
-    if (!identity) return;
-    // "No name" picked: take the name off this device's presentation. NOT a failure and NOT an empty name — the
-    // wallet still owns whatever it owns on chain, it just stops stamping a name on what it sends. clearLinked...
-    // switches the display to the address itself, so there is no second write to keep in step.
-    if (identity.mode === WALLET_DISPLAY_MODES.ADDRESS) {
-      clearLinkedPlathoUsername(plathoWallet.address);
-      if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.ADDRESS;
-      flashWalletIdentityStatus(t('username.nameUnlinked'));
-      return;
-    }
-    writeLinkedPlathoUsername(identity, plathoWallet.address);
-    writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(t('username.linkedName', { name: canonicalUsernameDisplay(identity.label) }));
-  } catch (error) {
-    flashWalletIdentityStatus(t('username.nameLinkBlocked'));
-    if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(linkedUsernameStatus, canonicalUsernameDisplay(previousLinked?.label) || t('username.optional'));
-    console.error(error);
-  } finally {
-    linkUsernameButton.disabled = false;
+    profileCardMintNameButton.disabled = false;
+    // A dialog closed without a mint leaves the row's line as it was: the price, not a stale "preparing".
+    if (profileCardMintNameStatus?.textContent === preparing) refreshProfileFeeLabels();
   }
 });
 
@@ -23490,8 +27435,12 @@ async function openAddPublicChannelDialog() {
 }
 
 publicJumpDownButton?.addEventListener('click', () => {
-  const items = publicFeedItemsChronological();
-  markVisiblePublicFeedRead(items);
+  // Jumping to the newest post is the explicit "I am caught up" gesture, so it takes the mark on the spot — over
+  // the WHOLE surface, which is the set the "N unread" badge counts. Round 8 narrowed this to what was painted,
+  // to keep the transient preview channel out; publicSurfaceItems() excludes that channel already, and the
+  // narrowing left every channel with no post in the newest window permanently unread with no way to clear it.
+  publicUnreadPaintedItems = publicSurfaceItems();
+  flushPublicFeedRead();
   renderPublicSurface({ anchorUnread: false });
   requestAnimationFrame(() => {
     publicFeed?.scrollTo?.({ top: 0, behavior: 'smooth' }); // newest is at the top now (v752)
@@ -23737,8 +27686,7 @@ function composerRunMaximizeGeo(form, growing) {
     const curTop = form.__spacer.getBoundingClientRect().top;
     inlineRect = { ...inlineRect, top: inlineRect.top + (curTop - form.__spacerTop0) };
   }
-  // Re-read the viewport BEFORE measuring the target. [OWNER 2026-08-14] "The composer should expand INTO the
-  // right place, not somewhere wrong and then get dragged there." That is exactly what a stale
+  // Re-read the viewport BEFORE measuring the target. [decided 2026-08-14] That is exactly what a stale
   // --app-viewport-bottom-gap does: maximizing raises the keyboard, so the visible area is changing in the very
   // frame this measurement happens, and the browser reports the viewport change only afterwards. The animation
   // then flies to yesterday's rectangle and snaps to the real one when the variable catches up.
@@ -24055,11 +28003,7 @@ publicImageModeSelect?.addEventListener('change', () => {
   });
 });
 
-setAvatarButton?.addEventListener('click', async (event) => {
-  if (isProfileAvatarPickerSuppressed()) {
-    event?.preventDefault();
-    return;
-  }
+setAvatarButton?.addEventListener('click', async () => {
   if (!plathoWallet) {
     flashWalletIdentityStatus(t('wallet.createWalletFirst'));
     return;
@@ -24116,6 +28060,29 @@ publicClearImageButton?.addEventListener('click', () => {
   refreshComposerCostStatus();
 });
 
+/**
+ * The public post's confirmation: what it costs, that it cannot be taken back, and a box to tick. The cost is the
+ * composer's own live line (the "up to" figure the user has been looking at), so the dialog and the composer can
+ * never quote two numbers for one send.
+ */
+async function confirmPublicPostPublish() {
+  const cost = publicComposer?.querySelector('.composer-cost-status')?.textContent?.trim() || '';
+  const result = await openActionDialog({
+    title: t('public.confirmPublishTitle'),
+    hint: t('public.confirmPublishHint'),
+    submitLabel: t('public.confirmPublishSubmit'),
+    fields: [{
+      id: 'publishConfirmed',
+      type: 'checkbox',
+      label: t('public.confirmPublishCheckbox'),
+    }],
+    // The composer's line already reads "Cost up to … GRAM" — a labelled row would say "Cost" twice.
+    summary: cost ? [cost] : [],
+    validateSubmit: async (values) => (values.publishConfirmed ? { ok: true, result: { confirmed: true } } : { ok: false, error: t('public.confirmPublishTick') }),
+  }).catch(() => null);
+  return result?.confirmed === true;
+}
+
 publicComposer?.addEventListener('submit', async (event) => {
   event.preventDefault();
   enforcePublicComposerByteLimit();
@@ -24143,6 +28110,13 @@ publicComposer?.addEventListener('submit', async (event) => {
   }
   const commentsAllowed = publicComposerCommentsCheckbox?.checked !== false;
   if (!publicCommentTarget && commentsAllowed && !(await confirmPublicCommentsRisk())) {
+    setPublicStatus('publish cancelled');
+    return;
+  }
+  // ONE MORE LOOK BEFORE FOREVER. A post is public, paid and permanent, and it used to leave on a single press
+  // while the activation and the avatar both asked first [owner, 2026-09-09]. Comments keep the direct path: they
+  // are replies inside a thread the reader already chose to enter.
+  if (!publicCommentTarget && !(await confirmPublicPostPublish())) {
     setPublicStatus('publish cancelled');
     return;
   }
@@ -24268,6 +28242,13 @@ composer?.addEventListener('submit', async (event) => {
       privateComposerCostStatus.dataset.state = 'short';
     }
     refreshPrivateSendButtonState();
+    return;
+  }
+  // A GROUP ROW GOES THROUGH THE GROUP RUNTIME and nothing below applies: a group capsule is sealed under the
+  // group's own key, not to a peer's bundle, and its lane is this member's own. Everything the two share — the
+  // wallet, the activation, the affordability check inside the runtime's send — has already been asked above.
+  if (isGroupThread(thread)) {
+    await sendGroupMessageFromComposer(thread, text);
     return;
   }
   if (tonRpcLimited()) {
@@ -24455,6 +28436,12 @@ unlockWalletButton?.addEventListener('click', async () => {
     await bootCrypto();
     await enforceTelegramSeedBackupGate(wallet);
     flashWalletIdentityStatus(t('wallet.walletUnlocked'));
+    // ONE VAULT READ PER UNLOCK, so a staked user gets their discount on the first post of the session and
+    // not only after visiting the wallet tab. It costs NOTHING before the seal — vaultSupported() is false
+    // and the reader is never called — and it is deliberately not cached across sessions: a stale staked
+    // figure that reads HIGH under-attaches the publish, and the vault would book its take while the shard
+    // refused with nothing stored. Reading it fresh, or not routing at all, are the only two safe answers.
+    refreshFeeVaultState().catch(() => {});
     // Return-from-background flow: a user who hopped to another wallet app to top up came back to a locked
     // Platho; on unlock, resume the quick-start at the step they were on (e.g. Top up / Activate).
     maybeResumeQuickStartAfterUnlock();
@@ -24511,9 +28498,11 @@ sendWalletTonButton?.addEventListener('click', async () => {
 exportWalletKeyButton?.addEventListener('click', async () => {
   try {
     exportWalletKeyButton.disabled = true;
-    if (await exportEncryptedWalletKeyFile()) {
-      flashWalletIdentityStatus(t('wallet.walletKeyExported'));
-    }
+    const outcome = await exportEncryptedWalletKeyFile();
+    // 'cancelled' is a truthy string: the old `if (await …)` would have called a cancelled save an export.
+    if (walletKeyBackupProven(outcome)) flashWalletIdentityStatus(t('wallet.walletKeyExported'));
+    else if (outcome === 'cancelled') flashWalletIdentityStatus(t('wallet.walletKeyExportCancelled'));
+    else if (outcome === 'triggered' && await confirmWalletKeyFileArrived()) flashWalletIdentityStatus(t('wallet.walletKeyExported'));
   } catch (error) {
     setText(exportWalletKeyStatus, t('common.blocked'));
     console.error(error);
@@ -24532,7 +28521,10 @@ function refreshWalletBackupWarning() {
 walletBackupWarning?.addEventListener('click', async () => {
   try {
     walletBackupWarning.disabled = true;
-    if (await exportEncryptedWalletKeyFile()) flashWalletIdentityStatus(t('wallet.walletKeyExported'));
+    const outcome = await exportEncryptedWalletKeyFile();
+    if (walletKeyBackupProven(outcome)) flashWalletIdentityStatus(t('wallet.walletKeyExported'));
+    else if (outcome === 'cancelled') flashWalletIdentityStatus(t('wallet.walletKeyExportCancelled'));
+    else if (outcome === 'triggered' && await confirmWalletKeyFileArrived()) flashWalletIdentityStatus(t('wallet.walletKeyExported'));
   } catch (error) {
     console.error(error);
   } finally {
@@ -24592,67 +28584,6 @@ clearLocalDataButton?.addEventListener('click', async () => {
   } catch (error) {
     clearLocalDataButton.disabled = false;
     setText(clearLocalDataStatus, t('common.blocked'));
-    console.error(error);
-  }
-});
-
-copyWalletAddressButton?.addEventListener('click', async () => {
-  try {
-    const address = walletAddressForCopy(plathoWallet) || storedWalletAddressForCopy();
-    if (!address) throw new Error('No wallet address to copy');
-    await copyTextToClipboard(address);
-    flashWalletIdentityStatus(t('wallet.addressCopied'));
-  } catch (error) {
-    flashWalletIdentityStatus(t('wallet.copyBlocked'));
-    console.error(error);
-  }
-});
-
-walletDisplayModeSelect?.addEventListener('pointerdown', () => {
-  suppressProfileAvatarPicker();
-});
-
-walletDisplayModeSelect?.addEventListener('change', async () => {
-  suppressProfileAvatarPicker();
-  const previous = readWalletDisplayIdentity(plathoWallet?.address);
-  try {
-    requirePlathoWallet();
-    const mode = normalizeWalletDisplayMode(walletDisplayModeSelect.value);
-    let identity = null;
-    if (mode === WALLET_DISPLAY_MODES.ADDRESS) {
-      identity = { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-    } else if (mode === WALLET_DISPLAY_MODES.PLATHO_NFT) {
-      const linked = readLinkedPlathoUsername(plathoWallet.address);
-      if (!linked) {
-        if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-        await openActionDialog({
-          title: t('username.noAthNameLinked'),
-          hint: t('username.noAthNameLinkedHint'),
-          tone: 'muted',
-          submitLabel: t('common.gotIt'),
-          fields: [],
-          summary: [
-            { label: t('username.currentDisplay'), value: t('wallet.walletAddress') },
-            { label: t('username.optionalSetup'), value: t('username.linkAthNameValue') },
-          ],
-        });
-        flashWalletIdentityStatus(t('username.noAthNameLinked'));
-        return;
-      }
-      identity = linked;
-    } else {
-      identity = await requestWalletDisplayIdentity(mode);
-    }
-    if (!identity) {
-      if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-      return;
-    }
-    writeWalletDisplayIdentity(identity, plathoWallet.address);
-    flashWalletIdentityStatus(identity.mode === WALLET_DISPLAY_MODES.ADDRESS ? t('wallet.showingWalletAddress') : t('wallet.showingName', { name: canonicalUsernameDisplay(identity.label) }));
-  } catch (error) {
-    if (walletDisplayModeSelect) walletDisplayModeSelect.value = previous.mode;
-    setText(walletDisplayModeStatus, previous.mode === WALLET_DISPLAY_MODES.ADDRESS ? t('wallet.addressMode') : canonicalUsernameDisplay(previous.label));
-    flashWalletIdentityStatus(t('wallet.displayBlocked'));
     console.error(error);
   }
 });
@@ -24726,6 +28657,25 @@ function formatTonNanotons(value) {
   return formatDecimalAmount(value, 9, 4);
 }
 
+/**
+ * The same figure, rounded UP at the last shown digit — for every label that claims an UPPER BOUND ("up to
+ * {cost}", "activation needs {fee}", "wallet needs {amount}"). formatDecimalAmount TRUNCATES, so an honest sum of
+ * 44,595,000 printed as "0.0444" is a promise the wallet cannot keep: the user funds exactly what the screen said and
+ * the send is refused for the difference — the failure the fee work in web/wallet-send-fee.mjs exists to end
+ * (MEASURED on chain 2026-09-09: a first contact quoted "up to 0.0444" took 0.044595). A FLOOR label ("from
+ * {amount}") keeps formatDecimalAmount: rounding a floor up is the same lie pointing the other way.
+ */
+function formatDecimalAmountUp(units, decimals, fractionDigits = 4) {
+  const amount = BigInt(units ?? 0n);
+  if (fractionDigits <= 0 || fractionDigits >= decimals) return formatDecimalAmount(amount, decimals, fractionDigits);
+  const divisor = 10n ** BigInt(decimals - fractionDigits);
+  return formatDecimalAmount(((amount + divisor - 1n) / divisor) * divisor, decimals, fractionDigits);
+}
+
+function formatTonNanotonsUp(value) {
+  return formatDecimalAmountUp(value, 9, 4);
+}
+
 function formatAthAtomic(value) {
   return formatDecimalAmount(value, 9, 4);
 }
@@ -24755,6 +28705,771 @@ function formatAthAtomicGrouped(value) {
 function renderAthProfileStats() {
   setText(athSupplyStatus, formatAthProfileAmount(athProtocolState.total_supply));
 }
+
+// ── THE ATH FEE DISCOUNT ────────────────────────────────────────────────────────────────────────────────────
+// A stake of 100..10,000 ATH takes 1%..100% off the protocol fee every message pays. The whole mechanism lived
+// on chain and in web/fee-vault.mjs with NO CALLER anywhere in this app [swept 2026-09-02] — the contracts
+// promised a discount nobody could buy. web/vault-account.mjs is the layer that reaches it; this is the screen.
+//
+// THE BAND IS ENFORCED HERE BECAUSE THE CONTRACT CANNOT HOLD IT. The frozen ATHWallet credits its own balance
+// BEFORE it notifies, and notifies with bounce:false, so a throw in the vault's credit receiver would strand the
+// ATH outside the mirror rather than return it — and returning it is not affordable either (the notification
+// carries 10,000,000 and a transfer back to an existing wallet needs 36,000,012). The contract holds the CEILING,
+// which is a different guarantee and is gated separately [CUTOVER.md item 11, BAND-02].
+// THE WALLET THIS BELONGS TO IS PART OF THE STATE [audit 2026-09-02]. It used to be `{ address, snapshot }`
+// alone, and both readers took the cached address with `??` — so after an in-session wallet replacement
+// (setPlathoWallet, or a wallet-key import) the NEW wallet inherited the OLD wallet's vault. Measured against
+// the contract, that is not a cosmetic mix-up: planStake would send wallet B's ATH to vault V(A), V(A)'s own ATH
+// wallet would credit and notify it, V(A) would raise `staked` — and Unstake's gate 28030 (`sender() == owner`)
+// makes it unreachable for B forever. `clearWalletScopedRuntimeState` exists to stop exactly this family and did
+// not know about this state; it does now, and the readers below check the stamp rather than trusting the cache.
+let feeVaultState = { wallet: null, address: null, snapshot: null };
+let feeVaultStakeInFlight = false;
+
+/** The vault's yearly rent, MEASURED on the built contract — what the floor of the band exists to cover. */
+const FEE_VAULT_RENT_NANOTONS_PER_YEAR = 2_143_751n;
+
+const stakedAthOf = (snapshot) => (snapshot?.staked ?? 0n) / FV_ATOMIC_PER_ATH;
+
+/**
+ * THE ROUTING HALF OF A PUBLIC PUBLISH — the payer's own vault and their own discounted fee, or nothing at all.
+ *
+ * PUBLIC is the one lane with a real choice of door: the vault waives the flat protocol fee but crosses the
+ * capsule one more time, and carriage is per byte, so above a crossover inside the 32 KB range the discount
+ * becomes a surcharge. `publicPublishRoute` decides per part; this only hands it the two facts it cannot derive.
+ *
+ * NO CHAIN READ HAPPENS HERE. `feeDue` comes from the last vault read (the wallet tab's own refresh) because it
+ * is a pure function of the staked position — and returning nothing is always SAFE-DIRECTION: the direct door
+ * pays the full protocol fee, which every shard accepts. A user who staked on another device and has not opened
+ * the wallet tab since pays full price for a post; they do not lose one.
+ */
+// How long a vault read is trusted for a ROUTING decision. `fee_due` moves when the position moves — an unstake
+// on another device, an exit debt absorbing a stake — and a publish routed on the old figure under-attaches: the
+// vault books its take, the shard refuses, the post is lost. The wallet tab refreshes the snapshot when it is
+// looked at; a session that only reads and posts never did [audit 2026-09-05, round 2].
+const VAULT_SNAPSHOT_MAX_AGE_S = 600;
+// How long a deploy this device just carried is TRUSTED before the vault is read for real: the hop lands in p50 27 s,
+// max 39 s (measured 2026-09-04); an "absent" answer younger than this after a deploy proves nothing.
+const VAULT_DEPLOY_SETTLE_MS = 120_000;
+function vaultSnapshotOutdated() {
+  const snapshot = feeVaultState.wallet === plathoWallet?.address ? feeVaultState.snapshot : null;
+  if (!snapshot) return false;
+  // an ASSUMED snapshot (a deploy this device just sent) is trusted for the hop, then read for real [round 3]
+  if (snapshot.assumed === true) return Date.now() - Number(snapshot.assumedAt ?? 0) > VAULT_DEPLOY_SETTLE_MS;
+  if (snapshot.state !== VAULT_LIVE && snapshot.state !== VAULT_ABSENT) return false;   // unknown has its own path
+  // LIVE ages (an unstake elsewhere moves fee_due); ABSENT ages too [round 3] — a stake on another device created the
+  // vault, and a device that never re-read its absent answer deployed it again with its next message
+  return Math.floor(Date.now() / 1000) - Number(snapshot.nowSec ?? 0) > VAULT_SNAPSHOT_MAX_AGE_S;
+}
+
+async function publicPublishRouting() {
+  if (!vaultSupported() || !plathoWallet?.address) return {};
+  // A SNAPSHOT AGES [audit 2026-09-05, round 2]: past VAULT_SNAPSHOT_MAX_AGE_S the vault is read again before the
+  // door is chosen. A read that fails marks the snapshot stale (refreshFeeVaultState), and the checks below then
+  // send the post through the direct door at the full fee, which every shard accepts.
+  if (vaultSnapshotOutdated()) { try { await refreshFeeVaultState(); } catch { /* the refresh reports its own failures */ } }
+  const snapshot = feeVaultState.snapshot;
+  // THE STAMP, NOT JUST THE ADDRESS. Routing a publish through another wallet's vault is refused on chain by
+  // gate 28020 (`sender() == owner`), so it costs a bounced, failed post rather than money — but it is the same
+  // stale-cache mistake that costs money one function over, and it is closed the same way.
+  if (feeVaultState.wallet !== plathoWallet?.address) return {};
+  if (!vaultSupported() || !feeVaultState.address || snapshot?.state !== VAULT_LIVE) return {};
+  // A SNAPSHOT THAT SURVIVED A FAILED READ IS NOT AN ANSWER ABOUT NOW — nor is one ASSUMED after a deploy. Not
+  // routing is always safe — the direct door pays the full protocol fee and every shard accepts it — while routing
+  // on a stale `feeDue` under-attaches.
+  if (snapshot.stale || snapshot.assumed) return {};
+  return { vaultAddress: feeVaultState.address, feeDue: snapshot.feeDue };
+}
+
+/**
+ * THE ROUTING HALF OF A CONV SEND — the ONE door past the flip [CUTOVER item 11, 2026-09-03].
+ *
+ * Unlike PUBLIC, CONV has nothing to choose: clean-18's RecordShard opens only to the payer's own FeeVault, so past
+ * the flip every private message goes through it, and before the flip (generation 17, the direct door) the funnel
+ * ignores what this returns. Three facts travel:
+ *   * the vault ADDRESS, derived from the SIGNING wallet — never a cache another wallet filled;
+ *   * the FEE: the payer's own `fee_due` only from a FRESH read of THIS wallet's vault, otherwise the FULL protocol
+ *     fee — the safe direction: the chain takes what the stake says and returns the rest as change, whereas a
+ *     stale discount under-attaches, the vault books its take and the shard refuses with nothing stored;
+ *   * whether to DEPLOY: a vault never seen live is deployed by the same transfer, as its first message, funded at
+ *     FV_DEPLOY_FUNDING. A deploy aimed at a vault that turns out to exist is a top-up of the user's own float.
+ * Returns {} before the seal, when no vault can be addressed at all — and the flip cannot have happened yet.
+ */
+async function convVaultRouting() {
+  if (!vaultSupported() || !plathoWallet?.address) return {};
+  let mine = feeVaultState.wallet === plathoWallet.address ? feeVaultState : null;
+  // "NOT READ YET" IS NOT "ABSENT" [audit 2026-09-05, round 1]. The deploy used to ride on `state !== LIVE`, which
+  // is true before the unlock's read has finished (three serialized reads behind the one-request queue) and after a
+  // failed one (a 429 right after a transaction is the ordinary case): an existing vault then received a 50,000,000
+  // top-up with every first message of the session, into a float the app has no control to bring home. So an
+  // unknown state is read again, right here, before the decision; only an account the chain says does not exist is
+  // deployed, and a state that still cannot be read deploys nothing (the publish then bounces visibly if the vault
+  // really is missing, which is the loud failure, not the quiet fee).
+  if (!mine || (mine.snapshot?.state !== VAULT_LIVE && mine.snapshot?.state !== VAULT_ABSENT) || vaultSnapshotOutdated()) {
+    try { await refreshFeeVaultState(); } catch { /* the refresh reports its own failures */ }
+    mine = feeVaultState.wallet === plathoWallet.address ? feeVaultState : null;
+  }
+  const snapshot = mine?.snapshot ?? null;
+  const fresh = snapshot?.state === VAULT_LIVE && !snapshot.stale && !snapshot.assumed;
+  return {
+    vaultAddress: mine?.address ?? await vaultAddressFor(plathoWallet.address),
+    feeDue: fresh ? snapshot.feeDue : FV_PROTOCOL_FEE,
+    // absent: created by this transfer. Live but below its rent float (a stranger's under-funded deploy, or years of
+    // rent): the same message tops the float up — a StateInit on an existing account is ignored [round 3]. An
+    // assumed snapshot (a deploy in flight) carries no balance and triggers neither.
+    deployVault: snapshot?.state === VAULT_ABSENT
+      || (snapshot?.state === VAULT_LIVE && snapshot.assumed !== true && BigInt(snapshot.balance ?? 0n) < FV_RENT_FLOAT),
+  };
+}
+
+/**
+ * A CONV send just carried the vault's deploy: from here the vault EXISTS whatever the last read said, so the next
+ * send does not deploy it again. The snapshot is marked ASSUMED — no stake is claimed (fee at 100%, so the PUBLIC
+ * routing keeps ignoring it) — and the wallet tab's own refresh replaces it with a real read.
+ */
+function noteFeeVaultDeployed(wallet, address) {
+  if (!wallet || plathoWallet?.address !== wallet) return;
+  feeVaultState = {
+    wallet, address, realAtoms: null,
+    // stamped: an absent read inside VAULT_DEPLOY_SETTLE_MS of this moment is the deploy still in flight, not a fact
+    snapshot: { ...vaultSnapshot(null, { nowSec: Math.floor(Date.now() / 1000) }), state: VAULT_LIVE, assumed: true, assumedAt: Date.now() },
+  };
+}
+
+/**
+ * Read this wallet's vault, if this build can address one at all. Silent by design: a user who has never staked
+ * has no vault, and "the account does not exist" is that answer, not a fault to report.
+ */
+async function refreshFeeVaultState() {
+  const wallet = plathoWallet?.address ?? null;
+  if (!vaultSupported() || !wallet) {
+    feeVaultState = { wallet: null, address: null, snapshot: vaultSnapshot(null) };
+    renderFeeDiscountRows();
+    return feeVaultState;
+  }
+  try {
+    // The cache is only the cache OF THIS WALLET. Deriving is a local sha256 over a StateInit cell, so the miss
+    // costs nothing worth trading a wrong address for.
+    const address = feeVaultState.wallet === wallet && feeVaultState.address
+      ? feeVaultState.address
+      : await vaultAddressFor(wallet);
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    // NO TRANSPORT IS NOT AN ANSWER EITHER [audit 2026-09-02, round 2]. `null` means "the account is not
+    // deployed" everywhere else in this stack, so folding "I had nothing to ask with" into it made the row say
+    // "not staked" to a staked user — the identical claim the catch below was rewritten to stop making.
+    if (!transport?.runGetMethod) {
+      feeVaultState = { wallet, address, snapshot: vaultSnapshot(null, { state: VAULT_UNKNOWN }) };
+      renderFeeDiscountRows();
+      return feeVaultState;
+    }
+    const view = await withVaultReadLock(() => createFeeVaultReader((call) => transport.runGetMethod(call))(address));
+    // A DEPLOY IN FLIGHT IS NOT ABSENT [audit 2026-09-06, round 3]. The transfer that carried the vault's deploy is
+    // followed by the refresh ladder (0/2/5/10/20 s) and by the next send's own re-read, all inside the hop (p50 27 s,
+    // max 39 s): each read said "the account does not exist", overwrote the ASSUMED snapshot the deploy had left, and
+    // the next private message carried a second 50,000,000 deploy into the float — every message until a tick saw the
+    // account live. An absent answer younger than VAULT_DEPLOY_SETTLE_MS after the deploy is dropped; past it, absence
+    // is real (the deploy died) and deploying again is right.
+    if (view === null && feeVaultState.wallet === wallet && feeVaultState.snapshot?.assumed === true
+      && Date.now() - Number(feeVaultState.snapshot.assumedAt ?? 0) < VAULT_DEPLOY_SETTLE_MS) {
+      renderFeeDiscountRows();
+      return feeVaultState;
+    }
+    // THE WALLET CAN CHANGE DURING THIS READ [audit 2026-09-02, round 2]. `withVaultReadLock` serialises every
+    // vault read in the app, so the await above can be as long as the whole read queue — and a wallet
+    // replacement inside it runs `clearWalletScopedRuntimeState`, which resets this state and repaints. Assigning
+    // unconditionally afterwards re-stamps the DEPARTED wallet's vault and repaints it back onto the new wallet's
+    // profile. The read is simply dropped instead: the new wallet's own refresh is already queued behind it.
+    const snapshot = vaultSnapshot(view, { nowSec: Math.floor(Date.now() / 1000) });
+    // THE VAULT'S OWN ATH WALLET, READ LIKE THE USER'S OWN [2026-09-02]. `staked` is a mirror; the ATH itself sits
+    // in the vault's ATHWallet, and the two can differ — a transfer with a zero forward amount, a stranger's
+    // donation, a credit the vault never heard. The difference is money Unstake cannot reach (gate 28033) and the
+    // discount does not see. Only a live vault has a wallet worth asking about, and the address comes from the
+    // master's getter exactly as loadConnectedAthWalletAddress asks for the user's.
+    let realAtoms = null;
+    if (snapshot.state === VAULT_LIVE) {
+      try {
+        const master = await resolveAthMasterProvider();
+        const vaultAthWallet = await withVaultReadLock(() => master.getWalletAddress(address, {
+          address: requireAthMasterAddress(), ...criticalChainReadOptions(),
+        }));
+        const data = await withVaultReadLock(() => createAthWalletTonRpcProvider({ athWalletAddress: vaultAthWallet })
+          .getWalletData({ address: vaultAthWallet }));
+        realAtoms = nonNegativeBigInt(data.balance);
+      } catch (error) {
+        if (isAthWalletNotDeployedError(error)) realAtoms = 0n;   // never funded: a real, known zero
+        else if (!noteTonRpcRateLimit(error)) console.warn('[vault] vault ATH wallet read failed', error);
+      }
+    }
+    if (plathoWallet?.address !== wallet) return feeVaultState;
+    feeVaultState = { wallet, address, snapshot, realAtoms };
+  } catch (error) {
+    // A THROW IS NOT THE ANSWER "NO VAULT" [audit 2026-09-02]. createFeeVaultReader returns null ONLY for an
+    // undeployed account (-13/-256); everything else — a 429, a timeout, a dead door — comes out as an
+    // exception, because ton-rpc-transport THROWS on a non-zero exit code rather than returning one. This used
+    // to fold that into vaultSnapshot(null), i.e. into the POSITIVE claim "you have no vault and nothing
+    // staked": the row said "not staked" to a user holding 9,000 ATH, and the stake dialog priced from zero, so
+    // a top-up to "100%" landed at 19,000 with nine thousand of it above the cap, buying nothing. UNKNOWN keeps
+    // the same wallet's last good snapshot where there is one, and otherwise says plainly that it does not know.
+    if (feeVaultState.wallet !== wallet || feeVaultState.snapshot?.state !== VAULT_LIVE) {
+      feeVaultState = { wallet, address: feeVaultState.wallet === wallet ? feeVaultState.address : null,
+        snapshot: vaultSnapshot(null, { state: VAULT_UNKNOWN }) };
+    } else {
+      // KEPT FOR THE SCREEN, REFUSED FOR THE PUBLISH [audit 2026-09-02, round 2 — the repair above opened this].
+      // Keeping the last good snapshot is right for a row: "100.00%" is better than a blank while a read retries.
+      // It is WRONG for the publish path, which takes `feeDue` from this same object and funds a real message
+      // with it. If the user unstaked and the confirming read then threw — a 429 storm right after a transaction
+      // is the ordinary case — the retained figure is too generous, `vaultInternalPublishValue` under-attaches by
+      // the difference, the vault books its take and forwards, and the SHARD refuses with nothing stored. That is
+      // the direction this project measured as silent loss. So the snapshot is MARKED, and `publicPublishRouting`
+      // treats a marked one as no vault at all: the post takes the direct door and pays full price, which every
+      // shard accepts.
+      feeVaultState = { ...feeVaultState, snapshot: { ...feeVaultState.snapshot, stale: true } };
+    }
+    if (!noteTonRpcRateLimit(error)) console.warn('[vault] fee vault read failed', error);
+  }
+  renderFeeDiscountRows();
+  return feeVaultState;
+}
+
+/**
+ * The two rows' trailing status. The discount row carries the PERCENT once there is one, for the same reason the
+ * buy row carries its price: a control that changes what money does should say what it did before it is pressed.
+ */
+function renderFeeDiscountRows() {
+  if (!feeDiscountStatus) return;
+  if (!vaultSupported()) {
+    setText(feeDiscountStatus, t('profile.feeDiscountAfterUpgrade'));
+    if (unstakeAthButton) unstakeAthButton.hidden = true;
+    return;
+  }
+  // THE ROWS BELONG TO THE WALLET THE STATE WAS READ FOR. `publicPublishRouting` was given this check and this
+  // function was not, so a late read landing after a wallet replacement could paint wallet A's percentage and
+  // A's withdraw row onto wallet B's profile [audit 2026-09-02, round 2].
+  if (feeVaultState.wallet !== (plathoWallet?.address ?? null)) {
+    setText(feeDiscountStatus, t('profile.statusChecking'));
+    if (unstakeAthButton) unstakeAthButton.hidden = true;
+    return;
+  }
+  const snapshot = feeVaultState.snapshot;
+  // AN UNREAD VAULT SAYS SO. "not staked" is a claim about the chain; "checking" is a claim about this app.
+  if (snapshot?.state === VAULT_UNKNOWN) {
+    setText(feeDiscountStatus, t('profile.statusChecking'));
+    if (unstakeAthButton) unstakeAthButton.hidden = true;
+    return;
+  }
+  const staked = snapshot?.staked ?? 0n;
+  const wholeAth = stakedAthOf(snapshot);
+  setText(feeDiscountStatus, staked > 0n
+    ? `${(Number(snapshot.bps) / 100).toFixed(2)}%`
+    : t('profile.feeDiscountNone'));
+  // THE WITHDRAW ROW EXISTS WHENEVER THERE IS ANYTHING TO REACH, and that is not the same as "whole ATH staked"
+  // [audit 2026-09-02, twice over]. It used to hide on `stakedAthOf() <= 0`, which is truncated to whole ATH, so
+  // a 0.5-ATH position — reachable, because anyone may stake into anyone's vault — rendered as "not staked"
+  // while gate 28033 would happily have returned it. And it hid on staked alone, so the state that most needs a
+  // control was the one with none: an unstake whose ack never came leaves `staked` at 0 and `pending` holding
+  // the whole position, and the "in progress" text lives INSIDE this button, so it vanished with it. That is a
+  // user with ATH in neither their wallet nor the app and nothing on screen about it.
+  if (unstakeAthButton) {
+    const parked = snapshot?.pending ?? 0n;
+    // A SUB-1-ATH POSITION HAS NO REACHABLE WITHDRAWAL [audit 2026-09-02, round 2]. Showing the row for any
+    // staked > 0 was the previous repair going one step too far: the field takes whole ATH and `planUnstake`
+    // multiplies by FV_ATOMIC_PER_ATH, so 0.5 ATH renders a live control reading "0 ATH" that refuses every
+    // possible input. Such a position is only reachable because anyone may stake into anyone's vault; it is
+    // dust, and offering a button that cannot work is worse than not offering one.
+    unstakeAthButton.hidden = wholeAth <= 0n && parked <= 0n;
+    setText(unstakeAthStatus, parked > 0n
+      ? t('profile.unstakePending')
+      : `${groupDecimalText(String(wholeAth))} ATH`);
+  }
+  // THE RECOVERY ROW EXISTS ONLY WHEN THE PLAN WOULD SEND: at least 1 ATH outside the mirror, no unstake in
+  // flight, the wallet balance actually read. The status names the stranded amount, not the drain — what the
+  // user is missing is the question they open the row with.
+  if (recoverAthButton) {
+    const plan = planRecovery({ vaultAddress: feeVaultState.address, snapshot, realAtoms: feeVaultState.realAtoms ?? null });
+    recoverAthButton.hidden = !plan.ok;
+    if (plan.ok) setText(recoverAthStatus, `${groupDecimalText(String(plan.stranded / FV_ATOMIC_PER_ATH))} ATH`);
+  }
+  if (vaultFloatButton) {
+    // the owner's GRAM the vault parks above its float and the booked fees — see the row's note in index.html
+    const plan = planWithdrawFloat({ vaultAddress: feeVaultState.address, snapshot });
+    vaultFloatButton.hidden = !plan.ok;
+    if (plan.ok) setText(vaultFloatStatus, `${formatGramNanotons(plan.amount)} GRAM`);
+  }
+}
+
+/** The float row pressed: name the amount, then send the contract's own WithdrawFloat. */
+async function openVaultFloatDialog() {
+  if (!vaultSupported() || !plathoWallet?.address) return;
+  await refreshFeeVaultState();   // the amount named is the amount the chain holds now, not at the last look
+  const snapshot = feeVaultState.wallet === plathoWallet.address ? feeVaultState.snapshot : null;
+  const plan = planWithdrawFloat({ vaultAddress: feeVaultState.address, snapshot });
+  if (!plan.ok) { renderFeeDiscountRows(); return; }
+  const amount = formatGramNanotons(plan.amount);
+  const proceed = await openActionDialog({
+    title: t('profile.vaultFloatTitle'),
+    hint: t('profile.vaultFloatHint', { amount }),
+    submitLabel: t('profile.vaultFloatSubmit', { amount }),
+    fields: [],
+    summary: () => [{ label: t('profile.vaultFloat'), value: `${amount} GRAM` }],
+  });
+  if (!proceed) return;
+  if (feeVaultStakeInFlight) { setText(vaultFloatStatus, t('profile.stakeSending')); return; }
+  feeVaultStakeInFlight = true;
+  if (vaultFloatButton) vaultFloatButton.disabled = true;
+  setText(vaultFloatStatus, t('profile.stakeSending'));
+  try {
+    const owner = requirePlathoWalletAddress();
+    const vaultAddress = await vaultAddressFor(owner);
+    if (vaultAddress !== feeVaultState.address) throw new Error('vault does not belong to the signing wallet');
+    // the trigger value comes back with the float; the wallet fee is the send's own
+    const need = plan.messages.reduce((sum, message) => sum + BigInt(message.amount), 0n);
+    await assertWalletGramAtLeast(need + walletSendFeeReserveNanotons(), 'withdraw vault float');
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: plan.messages }, { transport });
+    setText(vaultFloatStatus, t('profile.stakeSent'));
+    queueAthPostTransactionRefresh();
+  } catch (error) {
+    if (broadcastMayHaveLanded(error)) { setText(vaultFloatStatus, t('profile.stakeSent')); queueAthPostTransactionRefresh(); return; }
+    setText(vaultFloatStatus, error?.code === 'PLATHO_WALLET_GRAM_REQUIRED' ? error.message : t('profile.stakeFailed'));
+    if (error?.code !== 'PLATHO_WALLET_GRAM_REQUIRED' && !noteTonRpcRateLimit(error)) console.warn('[vault] float withdrawal failed', error);
+  } finally {
+    feeVaultStakeInFlight = false;
+    if (vaultFloatButton) vaultFloatButton.disabled = false;
+  }
+}
+
+/** The prose under the stake field: the band, and why the floor is where it is. */
+function feeDiscountFootnotes() {
+  if (!vaultSupported()) return [t('profile.stakeFootUnavailable')];
+  return [
+    t('profile.stakeFootBand', { min: String(FV_STAKE_MIN_ATH), max: groupDecimalText(String(FV_STAKE_MAX_ATH)) }),
+    t('profile.stakeFootRent', {
+      min: String(FV_STAKE_MIN_ATH),
+      rent: formatGramNanotons(FEE_VAULT_RENT_NANOTONS_PER_YEAR),
+    }),
+  ];
+}
+
+async function openStakeAthDialog() {
+  if (!vaultSupported()) {
+    setText(feeDiscountStatus, t('profile.feeDiscountAfterUpgrade'));
+    return;
+  }
+  if (!plathoWallet?.address) {
+    setText(feeDiscountStatus, t('profile.stakeWalletRequired'));
+    return;
+  }
+  await refreshFeeVaultState();
+  const snapshot = feeVaultState.snapshot;
+  // AND IT MUST NOT OPEN ON A POSITION IT DID NOT READ [audit 2026-09-02, round 2]. `renderFeeDiscountRows`
+  // guards this and `planStake` guards it, and the dialog between them did not: on an unread vault the summary
+  // asserted "Staked now 0 ATH / After 10,000 / Discount 100.00%" about a user who might hold 9,000, enabled
+  // Send, and only the submit refused — with a word that names no reason. Refuse at the door instead.
+  // ...NOR ON ONE THAT IS A GUESS [audit 2026-09-05, round 2]: `stale` is the last good read kept for the screen
+  // after a failed one, `assumed` the placeholder a deploy leaves (staked 0) until a real read replaces it. Both
+  // price the top-up from a position the chain may not hold, and the excess above the cap buys nothing.
+  if (snapshot?.state === VAULT_UNKNOWN || !snapshot || snapshot.stale || snapshot.assumed) {
+    setText(feeDiscountStatus, t('profile.statusChecking'));
+    return;
+  }
+
+  let typed = 0n;
+  const input = document.createElement('input');
+  // WHOLE ATH ONLY, AND THE FIELD SAYS SO RATHER THAN ROUNDING. The contract divides atoms by FV_ATOMIC_PER_ATH
+  // and truncates, so 100.9 buys exactly what 100 buys — charging for the 0.9 would be the app lying about a price.
+  const readTyped = () => {
+    const clean = String(input.value ?? '').replace(/[\s ]/g, '');
+    if (!/^\d+$/.test(clean)) return null;
+    return BigInt(clean);
+  };
+  const fields = [{
+    type: 'custom',
+    className: 'action-custom-field buy-ath-inputs',
+    render: () => {
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.autocomplete = 'off';
+      input.id = 'stakeAthAmountInput';
+      input.className = 'buy-ath-input';
+      input.placeholder = '0';
+      input.setAttribute('aria-label', t('profile.stakeAmountLabel'));
+      input.addEventListener('input', () => { typed = readTyped() ?? 0n; updateActiveActionSummary(); });
+      const wrap = document.createElement('label');
+      wrap.className = 'buy-ath-card';
+      const span = document.createElement('span');
+      span.textContent = 'ATH';
+      wrap.append(span, input);
+      const box = document.createElement('div');
+      box.className = 'buy-ath-pair';
+      box.append(wrap);
+      return box;
+    },
+  }];
+
+  const proceed = await openActionDialog({
+    title: t('profile.stakeTitle'),
+    hint: '',
+    submitLabel: t('profile.stakeSubmit'),
+    fields,
+    footnotes: () => feeDiscountFootnotes(),
+    summary: () => {
+      // ONE CALL PRICES BOTH THE POSITION AND WHAT IT BUYS, with the SAME formula the chain uses — so the number
+      // on screen and the number the chain computes cannot come from two expressions that drift apart.
+      const verdict = stakeBandVerdict(typed, { stakedAtoms: snapshot?.staked ?? 0n });
+      return [
+        { label: t('profile.stakeSummaryStaked'), value: `${groupDecimalText(String(stakedAthOf(snapshot)))} ATH` },
+        { label: t('profile.stakeSummaryAfter'), value: `${groupDecimalText(String(verdict.whole ?? 0n))} ATH` },
+        { label: t('profile.stakeSummaryDiscount'), value: `${(verdict.percent ?? 0).toFixed(2)}%` },
+        // what the vault BOOKS per publish — the discounted fee plus the flush amortisation the chain adds to it
+        // (vaultTakeFor), not the bare fee_due: at the deepest bands the two differ threefold [audit 2026-09-05]
+        { label: t('profile.stakeSummaryFee'), value: `${formatGramNanotons(vaultTakeFor(verdict.feeDue ?? 0n))} GRAM` },
+        // A FIRST STAKE CREATES THE VAULT, and its funding is the one figure here that does not come back with the
+        // change: it stays as the account's rent float for as long as the vault lives [audit 2026-09-05, round 2].
+        ...((snapshot?.state !== VAULT_LIVE || BigInt(snapshot.balance ?? 0n) < FV_RENT_FLOAT)
+          ? [{ label: t('profile.stakeSummarySetup'), value: `${formatGramNanotons(FV_DEPLOY_FUNDING)} GRAM` }] : []),
+        { label: t('profile.stakeSummaryBalance'), value: formatAthProfileAmount(connectedWalletAthBalanceAtomic()) },
+      ];
+    },
+    validateSubmit: async () => {
+      if (readTyped() === null) return { ok: false, error: t('profile.stakeWholeOnly') };
+      const verdict = stakeBandVerdict(typed, { stakedAtoms: snapshot?.staked ?? 0n });
+      if (!verdict.ok) {
+        if (verdict.reason === 'below-band') {
+          return { ok: false, error: t('profile.stakeBelowBand', { min: String(FV_STAKE_MIN_ATH) }) };
+        }
+        if (verdict.reason === 'above-band') {
+          return { ok: false, error: t('profile.stakeAboveBand', { max: groupDecimalText(String(FV_STAKE_MAX_ATH)) }) };
+        }
+        return { ok: false, error: t('profile.stakeEnterAmount') };
+      }
+      const have = connectedWalletAthBalanceAtomic();
+      if (have !== null && have < verdict.atoms) {
+        return { ok: false, error: t('profile.stakeLowAth', { have: formatAthAtomic(have) }) };
+      }
+      // AN OPEN EXIT DEBT WOULD SWALLOW THIS STAKE, so the dialog says so and stays open rather than sending an
+      // amount the chain will absorb into the debt without moving the discount.
+      const window = snapshot?.exitWindow;
+      if (window?.open) {
+        return { ok: false, error: t('profile.stakeExitDebtOpen', { seconds: String(window.secondsLeft) }) };
+      }
+      return { ok: true };
+    },
+  });
+  if (!proceed || typed <= 0n) return;
+  await submitStakeAth(typed);
+}
+
+/**
+ * WHY A PLAN WAS REFUSED, in the user's language. The dialog validates against the snapshot it captured when it
+ * opened; the submit re-plans against the CURRENT one, so this branch is exactly where a refusal that the dialog
+ * could not have known about arrives — an exit debt that opened, an unstake that started, a position read since.
+ * Collapsing all of them into "failed" [audit 2026-09-02] threw away the one sentence that says what to do, and
+ * for `exit-debt-open` there is even a translated string carrying the seconds left.
+ */
+function vaultPlanRefusalText(plan) {
+  switch (plan?.reason) {
+    case 'exit-debt-open':
+      return t('profile.stakeExitDebtOpen', { seconds: String(plan.debtWindow?.secondsLeft ?? 0) });
+    case 'unstake-in-flight':
+      return t('profile.unstakePending');
+    case 'more-than-staked':
+      return t('profile.unstakeMoreThanStaked', {
+        staked: groupDecimalText(String(stakedAthOf(feeVaultState.snapshot))),
+      });
+    case 'above-band':
+      return t('profile.stakeAboveBand', { max: groupDecimalText(String(FV_STAKE_MAX_ATH)) });
+    case 'below-band':
+      return t('profile.stakeBelowBand', { min: String(FV_STAKE_MIN_ATH) });
+    case 'unjam-too-early':
+      // The chain refuses a release inside gate 28052's grace; say how long is left rather than "failed".
+      return t('profile.stakeExitDebtOpen', { seconds: String(plan.secondsLeft ?? 0) });
+    case 'nothing-parked':
+    case 'nothing-to-send':
+    case 'nothing-stranded':
+    case 'dust':
+      return t('profile.stakeEnterAmount');
+    case 'not-a-whole-number':
+      return t('profile.stakeWholeOnly');
+    case 'position-unknown':
+    case 'unavailable':
+    case 'no-vault':
+    case 'no-wallet':
+      return t('profile.statusChecking');
+    default:
+      return t('profile.stakeFailed');
+  }
+}
+
+async function submitStakeAth(ath) {
+  if (feeVaultStakeInFlight) return;
+  feeVaultStakeInFlight = true;
+  if (feeDiscountButton) feeDiscountButton.disabled = true;
+  setText(feeDiscountStatus, t('profile.stakeSending'));
+  let owner = null;
+  let vaultAddress = null;
+  let plan = null;
+  try {
+    owner = requirePlathoWalletAddress();
+    const athWalletAddress = await loadConnectedAthWalletAddress();
+    // DERIVED FROM THE WALLET THAT IS ABOUT TO SIGN, never taken from the cache. This is the last line before
+    // real ATH moves, and a `??` here would hand the send whatever vault the cache happened to hold.
+    vaultAddress = await vaultAddressFor(owner);
+    plan = planStake({
+      ownerWallet: owner,
+      vaultAddress,
+      athWalletAddress,
+      ath,
+      snapshot: feeVaultState.snapshot,
+      queryId: nextQueryId(),
+    });
+    if (!plan.ok) {
+      setText(feeDiscountStatus, vaultPlanRefusalText(plan));
+      return;
+    }
+    // ASK BEFORE SIGNING. The plan's own messages carry the whole cost — the ATH transfer's attach, plus the
+    // vault deploy when there is no vault yet — so the figure is summed from them rather than restated, and it
+    // cannot drift from what the transfer actually asks for. Without this a wallet short on GRAM signs, the
+    // transaction dies on the way, and the fee is burned for nothing [DIRECTPAY-05].
+    const stakeNeed = plan.messages.reduce((sum, message) => sum + BigInt(message.amount), 0n);
+    await assertWalletGramAtLeast(stakeNeed + walletSendFeeReserveNanotons(), 'stake ATH');
+    // THE DEPLOY RIDES THE SAME SIGNATURE when there is no vault yet — one password prompt, not two. Ordering is
+    // not left to chance: the deploy is ONE hop from this wallet while the credit notification is THREE (wallet ->
+    // owner's ATH wallet -> vault's ATH wallet -> vault), so the account is alive long before the notification
+    // looks for it. A notification landing on a dead account is the F1 state the emergency hatch exists for.
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: plan.messages }, { transport });
+    setText(feeDiscountStatus, t('profile.stakeSent'));
+    // THE DEPLOY THIS STAKE CARRIED IS A FACT FROM HERE ON [audit 2026-09-05, round 2]: until the ladder's read
+    // replaces the ABSENT snapshot, the private funnel would otherwise deploy the vault again with the next message
+    // — a 50,000,000 top-up into the float on every first send of the session.
+    if (plan.deploys) noteFeeVaultDeployed(owner, vaultAddress);
+    // The mirror moves when the notification arrives, a hop later — re-read rather than claim a discount.
+    // ONE LADDER, NOT TWO [audit 2026-09-02]. This also scheduled its own refreshFeeVaultState on the same
+    // ATH_POST_TRANSACTION_REFRESH_DELAYS_MS — but that ladder's tick already runs refreshAthProtocolStats,
+    // which reads the vault. Eight duplicate get_vault calls per stake, against the one-queue rule.
+    queueAthPostTransactionRefresh();
+  } catch (error) {
+    if (broadcastMayHaveLanded(error)) {
+      // signed and handed over: the chain decides; "failed" here invited a second stake on top of the first
+      setText(feeDiscountStatus, t('profile.stakeSent'));
+      if (plan?.deploys && owner && vaultAddress) noteFeeVaultDeployed(owner, vaultAddress);
+      queueAthPostTransactionRefresh();
+      return;
+    }
+    // THE ONE ERROR THAT TELLS THE USER WHAT TO DO KEEPS ITS WORDS [audit 2026-09-02]. assertWalletGramAtLeast
+    // raises PLATHO_WALLET_GRAM_REQUIRED carrying `errors.walletNeedsGram` WITH THE AMOUNT, and every other lane
+    // in this app surfaces it (DIRECTPAY-04 pins that); this one folded it into a bare "failed", so the user was
+    // told their stake did not work and not that they need ~N GRAM for it to.
+    setText(feeDiscountStatus, error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+      ? error.message
+      : t('profile.stakeFailed'));
+    if (error?.code !== 'PLATHO_WALLET_GRAM_REQUIRED' && !noteTonRpcRateLimit(error)) {
+      console.warn('[vault] stake failed', error);
+    }
+  } finally {
+    feeVaultStakeInFlight = false;
+    if (feeDiscountButton) feeDiscountButton.disabled = false;
+  }
+}
+
+async function openUnstakeAthDialog() {
+  await refreshFeeVaultState();
+  const snapshot = feeVaultState.snapshot;
+  if (snapshot?.state !== VAULT_LIVE) return;
+  if (snapshot.stale || snapshot.assumed) { setText(unstakeAthStatus, t('profile.statusChecking')); return; }   // a guess is not a position
+  if ((snapshot.staked ?? 0n) <= 0n && (snapshot.pending ?? 0n) <= 0n) return;
+  if ((snapshot.pending ?? 0n) > 0n) {
+    // A PARKED UNSTAKE HAS A WAY OUT, and until now nothing in the app called it [audit 2026-09-02]. The vault
+    // parks `pending` while the ATH leg is in flight; a deep failure past our own leg leaves it parked forever,
+    // and gate 28031 then refuses every further unstake. `UnstakeUnjam` is the contract's own release, opened
+    // after its grace period — the same class of unreachable capability this whole layer was built to end.
+    const unjam = planUnstakeUnjam({ vaultAddress: feeVaultState.address, snapshot });
+    if (!unjam.ok) {
+      // INSIDE THE GRACE THIS IS A HEALTHY WITHDRAWAL, NOT A STUCK ONE — its three-hop ack is simply still in
+      // flight. Saying "in progress" is the truth; offering a Release the chain aborts at 28052 is not.
+      setText(unstakeAthStatus, unjam.reason === 'unjam-too-early'
+        ? t('profile.unstakePending')
+        : vaultPlanRefusalText(unjam));
+      return;
+    }
+    const proceedUnjam = await openActionDialog({
+      title: t('profile.unstakeTitle'),
+      hint: t('profile.unstakeStuckHint'),
+      submitLabel: t('profile.unstakeRelease'),
+      fields: [],
+      summary: () => [
+        { label: t('profile.unstakePending'), value: `${groupDecimalText(String((snapshot.pending ?? 0n) / FV_ATOMIC_PER_ATH))} ATH` },
+      ],
+    });
+    if (!proceedUnjam) return;
+    setText(unstakeAthStatus, t('profile.stakeSending'));
+    try {
+      const need = unjam.messages.reduce((sum, message) => sum + BigInt(message.amount), 0n);
+      await assertWalletGramAtLeast(need + walletSendFeeReserveNanotons(), 'release stake');
+      const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+      await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: unjam.messages }, { transport });
+      setText(unstakeAthStatus, t('profile.stakeSent'));
+      queueAthPostTransactionRefresh();
+    } catch (error) {
+      if (broadcastMayHaveLanded(error)) { setText(unstakeAthStatus, t('profile.stakeSent')); queueAthPostTransactionRefresh(); return; }
+      setText(unstakeAthStatus, error?.code === 'PLATHO_WALLET_GRAM_REQUIRED' ? error.message : t('profile.stakeFailed'));
+      if (error?.code !== 'PLATHO_WALLET_GRAM_REQUIRED' && !noteTonRpcRateLimit(error)) {
+        console.warn('[vault] unstake release failed', error);
+      }
+    }
+    return;
+  }
+  let typed = 0n;
+  const input = document.createElement('input');
+  const readTyped = () => {
+    const clean = String(input.value ?? '').replace(/[\s ]/g, '');
+    return /^\d+$/.test(clean) ? BigInt(clean) : null;
+  };
+  const proceed = await openActionDialog({
+    title: t('profile.unstakeTitle'),
+    hint: '',
+    submitLabel: t('profile.unstakeSubmit'),
+    fields: [{
+      type: 'custom',
+      className: 'action-custom-field buy-ath-inputs',
+      render: () => {
+        input.type = 'text';
+        input.inputMode = 'numeric';
+        input.autocomplete = 'off';
+        input.id = 'unstakeAthAmountInput';
+        input.className = 'buy-ath-input';
+        input.placeholder = '0';
+        input.setAttribute('aria-label', t('profile.unstakeAmountLabel'));
+        input.addEventListener('input', () => { typed = readTyped() ?? 0n; updateActiveActionSummary(); });
+        const wrap = document.createElement('label');
+        wrap.className = 'buy-ath-card';
+        const span = document.createElement('span');
+        span.textContent = 'ATH';
+        wrap.append(span, input);
+        const box = document.createElement('div');
+        box.className = 'buy-ath-pair';
+        box.append(wrap);
+        return box;
+      },
+    }],
+    summary: () => {
+      const plan = planUnstake({ vaultAddress: feeVaultState.address, ath: typed, snapshot });
+      const remaining = plan.ok ? plan.remaining : snapshot.staked;
+      return [
+        { label: t('profile.stakeSummaryStaked'), value: `${groupDecimalText(String(stakedAthOf(snapshot)))} ATH` },
+        { label: t('profile.unstakeSummaryRemaining'), value: `${groupDecimalText(String(remaining / FV_ATOMIC_PER_ATH))} ATH` },
+        { label: t('profile.stakeSummaryFee'), value: `${formatGramNanotons(plan.ok ? plan.remainingFeeDue : snapshot.feeDue)} GRAM` },
+      ];
+    },
+    validateSubmit: async () => {
+      const plan = planUnstake({ vaultAddress: feeVaultState.address, ath: typed, snapshot });
+      if (plan.ok) return { ok: true };
+      if (plan.reason === 'more-than-staked') {
+        return { ok: false, error: t('profile.unstakeMoreThanStaked', { staked: groupDecimalText(String(stakedAthOf(snapshot))) }) };
+      }
+      if (plan.reason === 'not-a-whole-number') return { ok: false, error: t('profile.stakeWholeOnly') };
+      return { ok: false, error: t('profile.stakeEnterAmount') };
+    },
+  });
+  if (!proceed || typed <= 0n) return;
+  await submitUnstakeAth(typed);
+}
+
+async function submitUnstakeAth(ath) {
+  if (feeVaultStakeInFlight) return;
+  feeVaultStakeInFlight = true;
+  if (unstakeAthButton) unstakeAthButton.disabled = true;
+  setText(unstakeAthStatus, t('profile.stakeSending'));
+  try {
+    const plan = planUnstake({ vaultAddress: feeVaultState.address, ath, snapshot: feeVaultState.snapshot });
+    if (!plan.ok) {
+      setText(unstakeAthStatus, vaultPlanRefusalText(plan));
+      return;
+    }
+    // The unstake carries the inbound value gate 28034 checks; the same rule as the stake above.
+    const unstakeNeed = plan.messages.reduce((sum, message) => sum + BigInt(message.amount), 0n);
+    await assertWalletGramAtLeast(unstakeNeed + walletSendFeeReserveNanotons(), 'withdraw stake');
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: plan.messages }, { transport });
+    setText(unstakeAthStatus, t('profile.stakeSent'));
+    queueAthPostTransactionRefresh();   // its tick reads the vault through refreshAthProtocolStats
+  } catch (error) {
+    if (broadcastMayHaveLanded(error)) { setText(unstakeAthStatus, t('profile.stakeSent')); queueAthPostTransactionRefresh(); return; }
+    setText(unstakeAthStatus, error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+      ? error.message
+      : t('profile.stakeFailed'));
+    if (error?.code !== 'PLATHO_WALLET_GRAM_REQUIRED' && !noteTonRpcRateLimit(error)) {
+      console.warn('[vault] unstake failed', error);
+    }
+  } finally {
+    feeVaultStakeInFlight = false;
+    if (unstakeAthButton) unstakeAthButton.disabled = false;
+  }
+}
+
+async function openRecoverAthDialog() {
+  await refreshFeeVaultState();
+  const snapshot = feeVaultState.snapshot;
+  const plan = planRecovery({ vaultAddress: feeVaultState.address, snapshot, realAtoms: feeVaultState.realAtoms ?? null });
+  if (!plan.ok) {
+    setText(recoverAthStatus, vaultPlanRefusalText(plan));
+    renderFeeDiscountRows();
+    return;
+  }
+  const strandedAth = groupDecimalText(String(plan.stranded / FV_ATOMIC_PER_ATH));
+  const drainAth = groupDecimalText(String(plan.drain / FV_ATOMIC_PER_ATH));
+  const proceed = await openActionDialog({
+    title: t('profile.recoverTitle'),
+    // THE WHOLE AMOUNT IS NAMED BEFORE THE BUTTON. A partial exit cannot close the gap — measured: 5,000
+    // mirrored + 1,000 stranded, exit 1,000 → 4,000 mirrored + 1,000 still stranded — so what leaves is
+    // everything, and the user must read that before they press anything.
+    hint: t('profile.recoverHint', { stranded: strandedAth, drain: drainAth }),
+    submitLabel: t('profile.recoverSubmit'),
+    fields: [],
+    summary: () => [
+      { label: t('profile.recoverSummaryStranded'), value: `${strandedAth} ATH` },
+      { label: t('profile.recoverSummaryDrain'), value: `${drainAth} ATH` },
+    ],
+  });
+  if (!proceed) return;
+  await submitRecoverAth(plan);
+}
+
+async function submitRecoverAth(plan) {
+  if (feeVaultStakeInFlight) return;
+  feeVaultStakeInFlight = true;
+  if (recoverAthButton) recoverAthButton.disabled = true;
+  setText(recoverAthStatus, t('profile.stakeSending'));
+  try {
+    // The plan was built from THIS wallet's vault by the refresh a moment ago; the send still derives from the
+    // signer, as every other vault send here does, so a replaced wallet cannot drain a vault it does not own.
+    const owner = requirePlathoWalletAddress();
+    const vaultAddress = await vaultAddressFor(owner);
+    if (vaultAddress !== feeVaultState.address) throw new Error('vault does not belong to the signing wallet');
+    const need = plan.messages.reduce((sum, message) => sum + BigInt(message.amount), 0n);
+    await assertWalletGramAtLeast(need + walletSendFeeReserveNanotons(), 'recover ATH');
+    const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
+    await sendPlathoWalletTransaction(requirePlathoWallet(), { messages: plan.messages }, { transport });
+    setText(recoverAthStatus, t('profile.stakeSent'));
+    // Everything comes home a hop later, and the exit debt this books keeps planStake shut for 300 seconds on
+    // its own; the ladder re-reads both the wallet's ATH and the vault.
+    queueAthPostTransactionRefresh();
+  } catch (error) {
+    if (broadcastMayHaveLanded(error)) { setText(recoverAthStatus, t('profile.stakeSent')); queueAthPostTransactionRefresh(); return; }
+    setText(recoverAthStatus, error?.code === 'PLATHO_WALLET_GRAM_REQUIRED' ? error.message : t('profile.stakeFailed'));
+    if (error?.code !== 'PLATHO_WALLET_GRAM_REQUIRED' && !noteTonRpcRateLimit(error)) {
+      console.warn('[vault] recovery failed', error);
+    }
+  } finally {
+    feeVaultStakeInFlight = false;
+    if (recoverAthButton) recoverAthButton.disabled = false;
+  }
+}
+
+feeDiscountButton?.addEventListener('click', () => { openStakeAthDialog().catch((error) => console.error(error)); });
+recoverAthButton?.addEventListener('click', () => { openRecoverAthDialog().catch((error) => console.error(error)); });
+vaultFloatButton?.addEventListener('click', () => { openVaultFloatDialog().catch((error) => console.error(error)); });
+unstakeAthButton?.addEventListener('click', () => { openUnstakeAthDialog().catch((error) => console.error(error)); });
 
 function normalizeUsernameInput(input) {
   const raw = String(input ?? '').trim().toLowerCase();
@@ -24838,7 +29553,7 @@ function usernameMintStatusText(error) {
   // A funds shortfall is ACTIONABLE and already carries the exact numbers in the reader's language — show it as it
   // is, never wrapped in a "blocked" that reads as the app refusing.
   //
-  // [OWNER 2026-08-13] This used to be a SUBSTRING test for "not enough vault ath" / "not enough vault ton" —
+  // [decided 2026-08-13] / "not enough vault ton" —
   // Vault-era English, from before the sentence became t('errors.notEnoughAth'). It could not match the current
   // wording in ANY language, so the one message worth reading arrived wrapped in "blocked". The avatar lane
   // had already been moved onto the code; this one was left behind. Keyed on what the thrower actually sets.
@@ -24885,9 +29600,10 @@ async function requestWalletTonTransferDetails() {
     fields: [
       {
         id: 'recipient',
-        label: t('wallet.recipientAddress'),
+        // The same field the new-chat dialog offers: a wallet, a .ath name or a .ton name [owner, 2026-09-07].
+        label: t('dialog.recipient'),
         type: 'text',
-        placeholder: 'UQ...',
+        placeholder: t('dialog.recipientPlaceholder'),
         autocomplete: 'off',
         spellcheck: false,
       },
@@ -24907,16 +29623,25 @@ async function requestWalletTonTransferDetails() {
       ];
       const recipientText = values.recipient?.trim();
       if (recipientText) {
-        try {
-          const recipient = requireBasechainAddress(recipientText, 'Recipient');
-          lines.push({
-            label: t('wallet.recipient'),
-            value: shortAddress(formatTonUserFriendlyAddress(recipient, {
-              testOnly: Number(wallet.networkGlobalId) === PLATHO_WALLET_NETWORK_GLOBAL_IDS.TESTNET,
-            })),
-          });
-        } catch (error) {
-          lines.push({ label: t('wallet.recipient'), value: error.message });
+        // LIVE, on every keystroke — so nothing here may go to the chain. An address is echoed as an address; a
+        // name is echoed as the name and resolved once, at submit, where the answer is stated before signing.
+        const parsed = parseRecipientIdentity(recipientText);
+        if (!parsed.ok) {
+          lines.push({ label: t('wallet.recipient'), value: t('username.recipientInvalid') });
+        } else if (parsed.identity.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) {
+          try {
+            const recipient = requireBasechainAddress(parsed.identity.value, 'Recipient');
+            lines.push({
+              label: t('wallet.recipient'),
+              value: shortAddress(formatTonUserFriendlyAddress(recipient, {
+                testOnly: Number(wallet.networkGlobalId) === PLATHO_WALLET_NETWORK_GLOBAL_IDS.TESTNET,
+              })),
+            });
+          } catch (error) {
+            lines.push({ label: t('wallet.recipient'), value: error.message });
+          }
+        } else {
+          lines.push({ label: t('wallet.recipient'), value: parsed.identity.label });
         }
       }
       if (values.amount?.trim()) {
@@ -24928,11 +29653,51 @@ async function requestWalletTonTransferDetails() {
       }
       return lines;
     },
+    // THE NAME IS RESOLVED HERE, in the still-open dialog: a name that is not registered, or a chain that did not
+    // answer, is said in place — and the wallet a name resolved to is carried out with the amount, so the send
+    // signs what was confirmed and not a second lookup.
+    validateSubmit: async (submitted) => {
+      const entered = String(submitted?.recipient ?? '').trim();
+      let resolved = null;
+      try {
+        resolved = await resolveTransferRecipient(entered);
+      } catch (error) {
+        return { ok: false, error: transferRecipientError(error, entered) };
+      }
+      let amount = null;
+      try {
+        amount = parseTonAmountNanotons(submitted?.amount);
+      } catch (error) {
+        return { ok: false, error: error?.message ?? String(error) };
+      }
+      return { ok: true, result: { recipient: resolved.wallet, amount: amount.toString() } };
+    },
   });
   if (!result) return null;
   const recipient = requireBasechainAddress(result.recipient, 'Recipient');
-  const amount = parseTonAmountNanotons(result.amount);
+  const amount = BigInt(result.amount);
   return { recipient, amount };
+}
+
+/**
+ * DID THE BYTES LEAVE THE DEVICE? platho-wallet attaches `builtBoc` once an external has been signed and handed
+ * to sendBoc (or waited on after a broadcast), and withholds it when the chain PROVED the send dead — a seqno
+ * mismatch, or a wait that ran past validUntil. A throw that carries it is not a failure to report as one: the
+ * chain may still execute those bytes, and a user who re-sends on "failed" pays twice. Every lane that moves
+ * money and has no confirm of its own consults this before it says "failed" [audit 2026-09-05, round 2].
+ */
+function broadcastMayHaveLanded(error) {
+  if (!(error && typeof error === 'object' && typeof error.builtBoc === 'string' && error.builtBoc)) return false;
+  // THE DOOR'S CHAIN VERDICT IS READ [audit 2026-09-06, round 3]: 'rejected' (406, a TVM exit code in the body,
+  // "cannot apply external message") means the chain refused these exact bytes — they did not land, and calling
+  // them "submitted" would hide a refused transfer, note a vault deploy that never happened, or hide Activate for
+  // five minutes behind refused bytes. Unless an earlier door's answer was lost mid-flight (the transport marks
+  // that): then the refusal may be the chain saying "already done", and the outcome is unknown.
+  if (error.broadcastVerdict === 'rejected' && error.tonRpcPriorDeliveryAmbiguous !== true) return false;
+  // an external that ran past validUntil while the wait WATCHED the chain not consume it is dead; one whose every
+  // seqno read failed was never observed, and its bytes may have executed before the clock ran out
+  if (error.walletExternalExpired === true && error.seqnoReadFailed !== true) return false;
+  return true;
 }
 
 async function submitWalletTonTransfer() {
@@ -24945,7 +29710,28 @@ async function submitWalletTonTransfer() {
     bounce: false,
   };
   const transaction = createWalletTransaction(message);
-  const result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
+  // CAN THE WALLET PAY FOR THE AMOUNT **AND** THE SEND? [audit 2026-09-01, round 9.] This lane had no
+  // affordability check of any kind — the only two that move money outright did not, while every messaging lane
+  // did. storeOutList forces IGNORE_ERRORS, so an amount the balance cannot cover once fees are added is DROPPED,
+  // sendPlathoWalletTransaction resolves, and the two lines below flash "GRAM transfer submitted" over a transfer
+  // that never happened. Nothing here retains the external, re-broadcasts it or confirms it either, so there is no
+  // second chance to notice. A bare transfer carries no payload, which is what the empty class list prices.
+  await assertWalletGramAtLeast(details.amount + walletSendFeeReserveNanotons(), 'wallet transfer');
+  let result = null;
+  try {
+    result = await sendPlathoWalletTransaction(requirePlathoWallet(), transaction);
+  } catch (error) {
+    // AN AMBIGUOUS BROADCAST IS NOT A FAILURE [audit 2026-09-05, round 2]. This lane moves GRAM outright and has
+    // no confirm of its own; a throw after the external left the device surfaced as "blocked", and the natural
+    // next press signed a SECOND transfer while the first could still land. The signed bytes are kept for the
+    // console and the outcome is left to the chain, exactly as the mint lane does with its pending marker.
+    if (!broadcastMayHaveLanded(error)) throw error;
+    globalThis.plathoLastWalletTonTransfer = { details, message, transaction, result: null, ambiguous: true, boc: error.builtBoc, seqno: error.builtSeqno ?? null };
+    flashWalletIdentityStatus(t('wallet.gramTransferSubmitted'));
+    setVaultStatus('wallet GRAM transfer submitted (unconfirmed)');
+    queueVaultPostTransactionRefresh();
+    return null;
+  }
   globalThis.plathoLastWalletTonTransfer = { details, message, transaction, result };
   flashWalletIdentityStatus(t('wallet.gramTransferSubmitted'));
   setVaultStatus('wallet GRAM transfer submitted');
@@ -25056,9 +29842,8 @@ async function exportEncryptedWalletKeyFile(alreadyUnlocked = null) {
     hint: t('wallet.exportWalletKeyHint'),
     submitLabel: t('wallet.exportWalletKey'),
   });
-  if (!unlocked) return false;
-  await downloadEncryptedWalletKeyBackup(record, unlocked);
-  return true;
+  if (!unlocked) return false;                                   // the password was refused
+  return downloadEncryptedWalletKeyBackup(record, unlocked);     // 'saved' | 'copied' | 'cancelled' | 'triggered'
 }
 
 async function activateImportedEncryptedWalletRecord(wallet, record, { toncenterApiKey = null } = {}) {
@@ -25123,148 +29908,46 @@ async function importEncryptedWalletKeyFile(file) {
   return activateImportedEncryptedWalletRecord(wallet, record, { toncenterApiKey: restoredApiKey?.trim() || null });
 }
 
-/**
- * What the LINK dialog says when a name cannot be verified.
- *
- * [OWNER 2026-08-13] A user pressed "Link username" when they meant "Create", owning no names at all, and got a
- * string of messages he could make nothing of. They were the raw internals of resolvePlathoUsernameOwner —
- * "<name>.ath is not registered", "belongs to another wallet", "ownership is not authoritative" — printed straight
- * into the dialog hint. English sentences on a Russian screen, naming a contract concept rather than a next step.
- *
- * Every OTHER caller of that resolver already classified UsernameNotRegisteredError into a localized line (the new
- * chat, the public link, the feed lookups). This dialog was the one that did not — the same one-lane-fixed shape
- * twice more today. Three outcomes, three sentences, and the third one is honest about not knowing.
- */
-function usernameLinkErrorText(error, chosen) {
-  const name = canonicalUsernameDisplay(String(chosen ?? '').trim());
-  if (error instanceof UsernameNotRegisteredError) return t('username.linkNoSuchName', { name });
-  if (error?.code === 'PLATHO_USERNAME_OTHER_WALLET') return t('username.linkOtherWallet', { name });
-  // Anything else is a read we could not finish — a provider that is not configured, a rate limit, an
-  // inconclusive ownership proof. None of those mean the name is bad, so none of them may say so.
-  return t('username.linkCouldNotVerify', { name });
-}
-
 // The "no name" row in the linked-names picker. OWNING a name and PRESENTING one are different things [OWNER
 // 2026-08-24: "a person may not want to link a name and still own the username. Let's put a no-username option in
 // this menu, for when someone just wants to unlink theirs"] — the wallet keeps whatever .ath it owns on chain; it
 // simply stops putting one on messages and posts. A sentinel no name can be: labels are lower-case letters and
 // digits, so nothing typeable collides with it.
-const WALLET_DISPLAY_UNLINK_OPTION = '__no_name__';
-
-async function requestWalletDisplayIdentity(mode) {
-  const normalizedMode = normalizeWalletDisplayMode(mode);
-  if (normalizedMode === WALLET_DISPLAY_MODES.ADDRESS) return { mode: WALLET_DISPLAY_MODES.ADDRESS, label: '' };
-  const suffix = '.ath';
-  let feedback = t('username.linkNameHint', { suffix });
-  let tone = 'muted';
-  const current = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? readLinkedPlathoUsername(plathoWallet?.address)
-    : readWalletDisplayIdentity(plathoWallet?.address);
-  let value = current?.mode === normalizedMode ? current.label : '';
-  // [OWNER 2026-08-09] The quick-pick list comes from the CHAIN now, not from what this device happens to
-  // remember. That is the whole difference: the remembered list keeps offering a name that was TRANSFERRED AWAY
-  // until the verification on submit refuses it, which makes the app look broken for doing the right thing. A
-  // chain-verified list drops it by itself, and picking from it means never typing a name at all.
-  let ownedNames = null;
-  if (normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT && plathoWallet?.address) {
-    ownedNames = await loadOwnedUsernameNfts()
-      .then((result) => result.owned.map((nft) => nft.label).filter(Boolean))
-      .catch(() => null);
-  }
-  // Falls back to the remembered list when the chain could not be reached. A dialog that refuses to open offline
-  // would be worse than one offering a name it re-verifies on submit anyway — and the free-text field below stays
-  // in both cases, because the list can be short (indexer down) or hold an item whose name nobody could prove.
-  const knownNames = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? (ownedNames ?? readKnownPlathoUsernames(plathoWallet?.address))
-    : [];
-  const fields = [];
-  // The picker also opens for a wallet whose only pickable thing is "no name" — someone who linked a name and now
-  // wants it off must not be blocked by a chain read that came back empty.
-  const linkedNow = normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT
-    ? (readLinkedPlathoUsername(plathoWallet?.address)?.label ?? null)
-    : null;
-  if (knownNames.length > 0 || linkedNow) {
-    fields.push({
-      id: 'pick',
-      type: 'select',
-      label: t('username.yourLinkedNames'),
-      required: false,
-      options: [
-        { value: '', label: t('username.enterNameBelow') },
-        ...knownNames.map((label) => ({ value: label, label })),
-        // Offered only when there IS something to take off — on a wallet presenting no name it would be a row that
-        // does nothing.
-        ...(linkedNow ? [{ value: WALLET_DISPLAY_UNLINK_OPTION, label: t('username.noNameOption') }] : []),
-      ],
-      value: knownNames.includes(value) ? value : '',
-    });
-    fields.push({
-      id: 'displayName',
-      label: t('username.orDifferentName', { suffix }),
-      placeholder: t('username.namePlaceholder'),
-      autocomplete: 'off',
-      required: false,
-      value: '',
-    });
-  } else {
-    fields.push({
-      id: 'displayName',
-      label: WALLET_DISPLAY_MODE_LABELS[normalizedMode],
-      placeholder: t('username.namePlaceholder'),
-      autocomplete: 'off',
-      value,
-    });
-  }
-  // [OWNER 2026-08-13] A wallet that owns NO names opened onto a bare text field with nothing saying there was
-  // nothing to type — which is exactly how someone ends up here when they meant "Create username". Say it, and say
-  // what to do instead. `ownedNames !== null` is load-bearing: null means the CHAIN READ FAILED, and "you own no
-  // names" is then a claim we have not earned. In that case the original hint stands and submit re-verifies.
-  if (normalizedMode === WALLET_DISPLAY_MODES.PLATHO_NFT && ownedNames !== null && knownNames.length === 0) {
-    feedback = t('username.linkNoNamesYet');
-  }
-  // The name is verified IN-PLACE on submit (validateSubmit): the dialog stays open and shows the error inline if
-  // the name is not registered / not owned, instead of closing and immediately re-opening (the flicker the owner
-  // reported). It only closes once the name passes verification.
-  const verified = await openActionDialog({
-    title: t('username.linkPlathoName'),
-    hint: feedback,
-    tone,
-    submitLabel: t('username.linkName'),
-    fields,
-    checkingHint: t('username.verifyingName'),
-    // [OWNER 2026-08-09] The summary row is gone. It restated the button ("verify X is owned by this wallet" above
-    // "Link name") and its label was a hardcoded English 'Check' that no locale ever translated — which is why a
-    // Russian dialog read "Check:". A line that repeats the button in a language the reader did not choose is
-    // worse than no line.
-    validateSubmit: async (values) => {
-      const typed = values.displayName?.trim() ?? '';
-      // The deliberate "no name". Read ONLY from the picked row and only with the free-text box empty: an empty box
-      // on its own means "nothing chosen yet", not "take my name off", and a typed string must never stand in for a
-      // choice the user did not make. Nothing to verify — this asks the chain for nothing.
-      if (!typed && values.pick === WALLET_DISPLAY_UNLINK_OPTION) {
-        return { ok: true, result: { mode: WALLET_DISPLAY_MODES.ADDRESS } };
-      }
-      const chosen = (typed || values.pick || '').trim();
-      try {
-        const result = await verifyWalletDisplayIdentity(normalizedMode, chosen, plathoWallet);
-        if (result?.mode === WALLET_DISPLAY_MODES.PLATHO_NFT && result.label) {
-          addKnownPlathoUsername(result.label, plathoWallet?.address);
-        }
-        return { ok: true, result };
-      } catch (error) {
-        // NOT error.message: that is the contract's own English, and this line is the whole answer the user gets.
-        console.error(error);
-        return { ok: false, error: usernameLinkErrorText(error, chosen) };
-      }
-    },
-  });
-  return verified ?? null;
-}
 
 async function requestUsernameMintName() {
   let feedback = t('username.mintHint');
   let tone = 'muted';
   let usernameValue = '';
+  // LIVE AVAILABILITY, WHILE TYPING. The name's item is a pure function of the name (resolvePlathoUsernameOwner), so
+  // whether it is taken can be known before anyone pays: the old flow learned it only after "Create", from the
+  // chain, with gas at stake if the read had been skipped. Debounced so a keystroke is not a chain read; keyed by
+  // the normalised name so a stale answer never lands on a newer input [owner-run test, 2026-09-09: no feedback
+  // while typing, and "claude" (taken) looked exactly like "inkling" (free)].
+  let availability = { name: '', state: 'idle' };   // idle | checking | free | taken | unknown
+  let availabilityTimer = 0;
+  const probeAvailability = (name) => {
+    window.clearTimeout(availabilityTimer);
+    availabilityTimer = window.setTimeout(async () => {
+      availability = { name, state: 'checking' };
+      updateActiveActionSummary();
+      let state = 'unknown';
+      let parked = false;
+      try {
+        if (tonRpcLimited()) throw Object.assign(new Error('rpc busy'), { code: 'RATE_LIMITED' });
+        await resolvePlathoUsernameOwner(name);
+        state = 'taken';
+      } catch (error) {
+        if (error instanceof UsernameNotRegisteredError) state = 'free';
+        else parked = error?.code === 'RATE_LIMITED' || noteTonRpcRateLimit(error);
+      }
+      if (availability.name !== name) return;   // the input moved on; that answer is about another name
+      availability = { name, state };
+      updateActiveActionSummary();
+      // A parked door (the keyless toncenter budget) is not an answer about the name: ask again once it clears,
+      // while the dialog is still open and the input has not moved.
+      if (parked && activeActionDialog) availabilityTimer = window.setTimeout(() => { availability = { name: '', state: 'idle' }; updateActiveActionSummary(); }, 5000);
+    }, 600);
+  };
   // The number this whole dialog turns on, read BEFORE the first paint. The summary is synchronous (it re-runs on
   // every keystroke), so it can only show what is already cached — and a dialog that opened on a stale or absent
   // balance is what let a user with no ATH get all the way to the mint. One read, fail-open: an unreadable balance
@@ -25289,6 +29972,16 @@ async function requestUsernameMintName() {
           { label: t('username.display'), value: canonicalUsernameDisplay(raw) },
           { label: t('username.athPrice'), value: usernameMintPricePreview(raw) },
         ];
+        let normalized = null;
+        try { normalized = normalizeUsernameInput(raw); } catch { normalized = null; }
+        if (normalized && availability.name !== normalized) probeAvailability(normalized);
+        const known = normalized && availability.name === normalized ? availability.state : (normalized ? 'checking' : 'idle');
+        const availabilityText = known === 'free' ? t('username.availabilityFree')
+          : known === 'taken' ? t('username.availabilityTaken')
+            : known === 'checking' ? t('username.availabilityChecking')
+              : known === 'unknown' ? t('username.availabilityUnknown') : '';
+        if (availabilityText) lines.push({ label: t('username.availability'), value: availabilityText });
+        let blocked = known === 'taken' || known === 'checking';
         // The live ATH balance + an affordability flag, read from the WALLET jetton — the thing that pays.
         //
         // [OWNER 2026-08-13] This block was skipped outright whenever direct pay was on, because it read the
@@ -25303,8 +29996,16 @@ async function requestUsernameMintName() {
           try { priceAtomic = localUsernameMintPriceAtomic(normalizeUsernameInput(raw)); } catch { priceAtomic = null; }
           const short = priceAtomic !== null && athBalance < priceAtomic;
           lines.push({ label: t('username.yourAth'), value: short ? t('username.athBalanceNotEnough', { amount: formatAthAtomic(athBalance) }) : t('username.athBalance', { amount: formatAthAtomic(athBalance) }) });
+          // NOT ENOUGH ATH IS A CLOSED DOOR, NOT A DARE. The button used to stay live over "not enough", and the
+          // shortfall sentence appeared only after pressing it; now the line says where ATH comes from and the
+          // button waits [owner-run test, 2026-09-09].
+          if (short) {
+            lines.push({ label: t('username.athTopUp'), value: t('errors.buyAthHint') });
+            blocked = true;
+          }
         }
-        lines.push({ label: t('common.cost'), value: t('common.gramCostValue', { amount: formatTonNanotons(estimatedUsernameMintTonFeeNanotons()) }) });
+        lines.push({ label: t('common.cost'), value: t('common.gramCostValue', { amount: formatTonNanotonsUp(estimatedUsernameMintTonFeeNanotons()) }) });
+        setActiveActionSubmitEnabled(!blocked);
         // The "Route: Vault" line is GONE with the Vault. Under direct pay the mint request goes from the wallet
         // straight to UsernameRegistry (USERNAME_MINT_DIRECT_REQUEST_VALUE_NANOTONS — the constant says so), so the
         // line named a hop that no longer exists. Naming the wallet as a "route" instead would say nothing: there
@@ -25540,7 +30241,7 @@ const PLATHO_DOCUMENT_BLOCK_TYPES = Object.freeze({
   // The author's .ath CLAIM riding an ordinary PUBLIC post/comment (2026-08-26). The private surface has carried
   // senderUsername on every message from the start; the public surface carried it ONLY in the channel-profile
   // block, so an author who never saved a profile (or saved it before linking) stayed a bare address on every
-  // card [OWNER: "the user posts to the feed. The user has a username, but the app does not see it"]. A claim,
+  // card [decided]. A claim,
   // never a proof — the receive path verifies it against the registry exactly like the profile claim. PUBLIC
   // documents only (their decode is tolerant, so old clients skip it); the private path neither needs nor takes
   // it — its envelope already carries the same fact.
@@ -26005,7 +30706,7 @@ async function assertWalletGramAtLeast(requiredNanotons, action) {
   const balance = await loadConnectedTonWalletBalance().catch(() => null);
   if (balance === null) return;   // fail-open: unreadable balance must not block a funded wallet
   if (nonNegativeBigInt(balance) < required) {
-    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotons(required) }));
+    const error = new Error(t('errors.walletNeedsGram', { amount: formatTonNanotonsUp(required) }));
     error.code = 'PLATHO_WALLET_GRAM_REQUIRED';
     error.action = action;   // diagnostic only — see assertConnectedAthAtLeast
     throw error;
@@ -26022,6 +30723,22 @@ async function loadConnectedAthWalletBalance() {
     if (isAthWalletNotDeployedError(error)) return 0n;
     throw error;
   }
+}
+
+/**
+ * Did this read fail because the account HAS NO CODE — i.e. was never deployed?
+ *
+ * THE EXIT CODE, NOT THE MESSAGE, and not the HTTP status. TON aborts a get-method against a code-less account
+ * and the transport rethrows it as `error.exitCode`: -13 in production, -256 under the sandbox emulator, and the
+ * project's rule (four shard readers already follow it) counts both. A bare 404 is deliberately NOT absence — the
+ * transport 404s on any proxy or misroute failure, and reading that as "nothing there" is how a transient becomes
+ * a false fact. `isAthWalletNotDeployedError` below cannot serve here: it matches on message text and also on
+ * "Missing ATH wallet owner", which is a different question with a different answer.
+ */
+const UNINITIALIZED_ACCOUNT_EXIT_CODES = new Set([-13, -256]);
+function isUninitializedAccountError(error) {
+  const code = error?.exitCode ?? error?.exit_code ?? error?.body?.exit_code;
+  return code !== undefined && code !== null && UNINITIALIZED_ACCOUNT_EXIT_CODES.has(Number(code));
 }
 
 function isAthWalletNotDeployedError(error) {
@@ -26078,8 +30795,11 @@ let walletTonProfileBalanceRetryTimer = null;
 let walletTonProfileBalanceRetryAttempt = 0;
 const WALLET_TON_PROFILE_BALANCE_RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
 
+// The balance retry chases a number that is only ON SCREEN inside the settings dialog; when the dialog is closed
+// there is nothing to correct and the ladder stops. It used to ask the shell which tab was open — there is no
+// profile tab any more, and asking the old question would have kept the retry running forever.
 function isProfileViewActive() {
-  return appShell?.dataset?.view === 'profile';
+  return profileSettingsDialog?.hidden === false;
 }
 
 function clearWalletTonProfileBalanceRetry() {
@@ -26187,13 +30907,10 @@ function refreshNavVaultBalance() {
       container.classList.remove('rail-vault-balance-reveal');
       container.setAttribute('aria-hidden', 'true');
     }
-    // Mobile tab bar: with no known balance the plate cell is dropped entirely, so the four tabs center
-    // across the full width; the class puts the cell back the moment a balance exists (owner request —
-    // no :has() per the iOS floor rule, so the state rides a JS-toggled ancestor class).
-    document.querySelector('.sidebar')?.classList.remove('has-vault-balance');
+    // The mobile tab bar reserves the plate cell at ALL times now, wallet or no wallet [owner, 2026-09-10, from a
+    // phone with no wallet yet]: the cell is the stylesheet's, and only its contents follow the balance.
     return;
   }
-  document.querySelector('.sidebar')?.classList.add('has-vault-balance');
   for (const container of navVaultBalanceContainers) {
     if (container.classList.contains('is-pending')) {
       container.classList.remove('is-pending');
@@ -26235,12 +30952,15 @@ async function refreshAthProtocolStats() {
  * distinction matters at the point of sale: "sold out" and "I could not ask" look identical in a zeroed struct, and
  * only one of them should stop a buyer.
  */
-async function refreshMarketStabilityState() {
+async function refreshMarketStabilityState({ fresh = false } = {}) {
   const address = PLATHO_APP_CONFIG.marketStabilitySeller?.address ?? null;
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!address || !transport?.runGetMethod) return;
   try {
-    const state = await createMarketStabilityReader((call) => transport.runGetMethod(call))(address);
+    // FRESH WHERE MONEY DECIDES [audit 2026-09-06, round 3]: get-method answers are cached 15 s, so the buy's "did the
+    // price move" check and the six idle probes read the figure the dialog opened with — a tranche crossed by another
+    // buyer inside the window was invisible, and the buy was signed at a multiplier gate 23218 then refused.
+    const state = await createMarketStabilityReader((call) => transport.runGetMethod(fresh ? { ...call, cacheTtlMs: 0 } : call))(address);
     if (state.exists) marketStabilityState = state;
     renderBuyAthStatus();
   } catch (error) {
@@ -26277,7 +30997,7 @@ function renderBuyAthStatus() {
   setText(buyAthStatus, price ? t('profile.buyAthFromPrice', { price }) : t('profile.statusChecking'));
 }
 
-// [OWNER 2026-08-27] The buy dialog used to carry two more lines — "ATH is earned by writing" and the coming
+// [decided 2026-08-27] and the coming
 // pool's launch terms — gated on the airdrop pool's remaining budget, so both would end themselves the moment
 // the budget did ("prose about a phase goes stale in silence"). The budget IS spent now (measured 2026-08-26:
 // remaining 0, all 15,000,000 ATH delivered), the airdrop UI is removed wholesale along with the pool/ticket
@@ -26301,7 +31021,7 @@ function buyAthFootnotes(state) {
  */
 async function awaitMarketStabilityIdle(attempts = 6, delayMs = 2500) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await refreshMarketStabilityState();
+    await refreshMarketStabilityState({ fresh: true });
     if (marketStabilityCanSell(marketStabilityState)) return marketStabilityState;
     if (marketStabilityState && maxBuyableAtomic(marketStabilityState) <= 0n) return null;  // sold out, not busy
     await delay(delayMs);
@@ -26314,7 +31034,7 @@ async function openBuyAthDialog() {
     setText(buyAthStatus, t('profile.buyAthWalletRequired'));
     return;
   }
-  await refreshMarketStabilityState();
+  await refreshMarketStabilityState({ fresh: true });   // the quote on screen is the chain's now, not the cache's
   const state = marketStabilityState;
   if (!state) {
     setText(buyAthStatus, t('profile.buyAthUnavailable'));
@@ -26422,10 +31142,10 @@ async function openBuyAthDialog() {
     },
   });
   if (!proceed || amountAtomic <= 0n) return;
-  await submitBuyAth(amountAtomic);
+  await submitBuyAth(amountAtomic, state.currentMultiplier);
 }
 
-async function submitBuyAth(amountAtomic) {
+async function submitBuyAth(amountAtomic, quotedMultiplier = null) {
   if (marketStabilityBuyInFlight) return;
   marketStabilityBuyInFlight = true;
   if (buyAthButton) buyAthButton.disabled = true;
@@ -26434,6 +31154,22 @@ async function submitBuyAth(amountAtomic) {
     const ready = await awaitMarketStabilityIdle();
     if (!ready) {
       setText(buyAthStatus, t('profile.buyAthBusy'));
+      return;
+    }
+    // THE PRICE THE USER CONFIRMED IS THE PRICE THAT IS PAID [audit 2026-09-05, round 2]. The dialog quoted and
+    // checked affordability at the multiplier it opened with; the send used the multiplier read a moment ago. A
+    // sale in between moves the tranche price up, and this lane would then have attached a figure nobody saw —
+    // or, short of it, signed a transfer the wallet drops under IGNORE_ERRORS while the status said "sent".
+    if (quotedMultiplier !== null && Number(ready.currentMultiplier) !== Number(quotedMultiplier)) {
+      setText(buyAthStatus, t('profile.buyAthPriceChanged'));
+      return;
+    }
+    const total = buyValueNanotons(amountAtomic, ready.currentMultiplier);
+    try {
+      await assertWalletGramAtLeast(total + walletSendFeeReserveNanotons(), 'buy');
+    } catch (error) {
+      if (error?.code !== 'PLATHO_WALLET_GRAM_REQUIRED') throw error;
+      setText(buyAthStatus, t('profile.buyAthLowBalance', { amount: formatGramNanotons(total) }));
       return;
     }
     const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
@@ -26449,13 +31185,19 @@ async function submitBuyAth(amountAtomic) {
     setText(buyAthStatus, t('profile.buyAthSent'));
     // The ATH lands when the seller forwards it, a hop later — re-read rather than claim a balance.
     //
-    // [OWNER 2026-08-13] "bought it, and nothing updated in the balance." The claim lane was cured of exactly this on
+    // [decided 2026-08-13] The claim lane was cured of exactly this on
     // 2026-08-03 and the BUY lane kept its own one-shot: a single 8s call to refreshAthProtocolStats, which reads
     // PROTOCOL figures (supply, multiplier) and never touches the wallet's ATH balance — the number the user is
     // actually watching is fed by refreshVaultNavBalanceInBackground. So the balance waited for a background tick
     // that could be three minutes away. Both lanes now queue the same ladder.
     queueAthPostTransactionRefresh();
   } catch (error) {
+    if (broadcastMayHaveLanded(error)) {
+      // signed and handed over: the chain decides, the ladder reads the balance back — not "failed"
+      setText(buyAthStatus, t('profile.buyAthSent'));
+      queueAthPostTransactionRefresh();
+      return;
+    }
     if (!noteTonRpcRateLimit(error)) console.warn('[market] buy failed', error);
     setText(buyAthStatus, t('profile.buyAthFailed'));
   } finally {
@@ -26477,6 +31219,10 @@ async function refreshAthProtocolStatsRun() {
         : nonNegativeBigInt(data.total_supply),
     };
     await refreshMarketStabilityState();
+    // THE VAULT RIDES THE WALLET TAB'S EXISTING REFRESH. It is one more read on a screen that already reads,
+    // not a timer of its own — and it is silent before the seal, where vaultSupported() is false and the
+    // reader is never called [one-request-queue-invariant].
+    await refreshFeeVaultState();
     renderAthProfileStats();
     return athProtocolState;
   } catch (error) {
@@ -26625,7 +31371,10 @@ function queueVaultPostTransactionRefresh(options = {}) {
     // Safety release: if activation never settles within the poll horizon (dropped
     // external, failed compute, abandoned tab), drop the in-flight lock so the row
     // returns to a clickable "Activate" state for a retry instead of spinning forever.
-    const releaseDelayMs = Math.max(...delays) + 5_000;
+    // ...AND NOT BEFORE THE EXTERNAL CAN NO LONGER EXECUTE [audit 2026-09-06, round 3]. This released at the poll
+    // ladder's end (95 s) while the marker's own horizon is PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS (330 s, the external's
+    // validity): between the two the row offered Activate again and the knocks stopped, for bytes still able to land.
+    const releaseDelayMs = PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS + 5_000;
     setTimeout(() => {
       if (plathoAccountActivationPending && !hasActivePlathoAccount()) {
         plathoAccountActivationPending = false;
@@ -26762,42 +31511,15 @@ async function readUsernameMintAvailabilityForOwnVaultAction(provider, registry,
 // local storage alone and the reads happen when the dialog opens. Two getters on every refresh to render a row
 // nobody had opened is exactly what the ATH-flush row cost, and it was deleted this morning for it.
 let ownedUsernameNftsInFlight = false;
-// ONE real read per wallet per session, behind the row's first paint (scheduleOwnedUsernameNftsSessionCheck below):
-// the remembered list is only a FLOOR and the row quoted it as fact until the dialog was opened — a name transferred
-// away from another wallet app kept showing as owned. Keyed by raw wallet; a rate-limited attempt is not counted.
+// ONE real read per wallet per session, behind the wallet identity's first paint (scheduleOwnedUsernameNftsSessionCheck
+// below): the remembered list is only a FLOOR — a name transferred away from another wallet app kept showing as
+// owned until something read the chain. Keyed by raw wallet; a rate-limited attempt is not counted.
 const OWNED_USERNAME_NFTS_SESSION_CHECK_DELAY_MS = 6_000;
 const ownedUsernameNftsSessionChecked = new Set();
-// [OWNER 2026-08-09] The last CHAIN-VERIFIED count. Without it the row kept claiming four names straight after the
-// dialog had just shown three: the row read local storage while the dialog read the chain, so the app displayed a
-// number it had itself disproved seconds earlier. The dialog does the expensive work; throwing its answer away was
-// the whole bug. `{ count, complete }` — an incomplete read says "3+" rather than claiming three is all there is.
+// The last CHAIN-VERIFIED count, `{ count, complete }`: what the session's one real read found, so it is not run a
+// second time — and null again after a transfer or a rate-limited read, so the next chance re-reads. [The Wallet-tab
+// row and its dialog that quoted this number went on 2026-09-08; the profile card lists the names now.]
 let ownedUsernameNftsVerified = null;
-
-function renderMyUsernamesStatus() {
-  if (!myUsernamesButton || !myUsernamesStatus) return;
-  myUsernamesButton.disabled = !plathoWallet?.address || ownedUsernameNftsInFlight;
-  if (!plathoWallet?.address) {
-    setProfileActionStatus(myUsernamesStatus, t('common.walletRequiredStatus'), '');
-    return;
-  }
-  if (ownedUsernameNftsInFlight) {
-    setProfileActionStatus(myUsernamesStatus, t('common.checking'), 'busy');
-    return;
-  }
-  if (ownedUsernameNftsVerified) {
-    const { count, complete } = ownedUsernameNftsVerified;
-    setProfileActionStatus(myUsernamesStatus, complete
-      ? (count > 0 ? tPlural('username.knownNames', count) : t('username.openList'))
-      : t('username.knownNamesPartial', { count: String(count) }), '');
-    return;
-  }
-  // Nothing verified yet this session — what the device remembers, painted NOW, and ONE real check scheduled behind
-  // this first paint (once per wallet per session). The refresh itself still adds no chain read — two getters per
-  // wallet refresh to render a row nobody had opened is what the ATH-flush row cost, and it was deleted for it.
-  const known = readKnownPlathoUsernames().length;
-  setProfileActionStatus(myUsernamesStatus, known > 0 ? tPlural('username.knownNames', known) : t('username.openList'), '');
-  scheduleOwnedUsernameNftsSessionCheck();
-}
 
 // The session's one real read of the owned names (loadOwnedUsernameNfts: floor + indexer, every item chain-verified,
 // memory reconciled), deferred past the post-unlock burst and serialized on the username-hygiene lane so it never runs
@@ -26813,7 +31535,6 @@ function scheduleOwnedUsernameNftsSessionCheck() {
       if (ownedUsernameNftsInFlight || ownedUsernameNftsVerified) return;
       if (tonRpcLimited()) { ownedUsernameNftsSessionChecked.delete(owner); return; }
       ownedUsernameNftsInFlight = true;
-      renderMyUsernamesStatus();
       try {
         await loadOwnedUsernameNfts();
         // A rate-limited read comes back complete:false through the caught paths inside the loader, never via the
@@ -26827,7 +31548,6 @@ function scheduleOwnedUsernameNftsSessionCheck() {
         else console.warn('[username] owned-names session check failed', error);
       } finally {
         ownedUsernameNftsInFlight = false;
-        renderMyUsernamesStatus();
       }
     });
   }, OWNED_USERNAME_NFTS_SESSION_CHECK_DELAY_MS);
@@ -26953,89 +31673,6 @@ function reconcileKnownPlathoUsernames(result, owner = plathoWallet?.address) {
   }
 }
 
-function usernameNftCardNode(nft, onTransfer) {
-  const card = document.createElement('div');
-  card.className = 'nft-card';
-  // THE ART LEADS. It is the reason this screen exists — the names are drawn on chain by the registry itself, and a
-  // list that renders them as lines of text throws away the entire point of having them.
-  // A SQUARE FRAME, not a bare <img> sized by aspect-ratio. [OWNER 2026-08-22: the names list rendered as thin
-  // strips on his Android/Telegram WebView.] REPRODUCED: an engine that does not honour `aspect-ratio` on an <img>
-  // (Chrome < 88, the WebView many Telegram clients ship) gives the on-chain SVG — which carries a viewBox but no
-  // width/height, so it has no intrinsic pixel height — a height of ZERO under `width:100%`, and the art collapses
-  // to a sliver. The frame's height comes from padding-bottom:100% instead, which every engine has always honoured,
-  // and the <img> fills it absolutely; nothing depends on aspect-ratio any more. [PWA-NFTART-01]
-  const frame = document.createElement('div');
-  frame.className = 'nft-card-art-frame';
-  frame.hidden = !nft.image;
-  const art = document.createElement('img');
-  // A data: URI only — see safeInlineImage. Never a remote URL: img-src forbids it, and naming a host would hand
-  // that host the wallet's identity.
-  if (nft.image) art.src = nft.image;
-  art.alt = '';
-  art.className = 'nft-card-art';
-  art.loading = 'lazy';
-  frame.append(art);
-  card.append(frame);
-
-  const foot = document.createElement('div');
-  foot.className = 'nft-card-foot';
-  const name = document.createElement('strong');
-  // A name is shown only when hashing it reproduced the item's own name_hash. When it did not, the item is still
-  // the user's — the chain said so — but it is honestly presented by the one thing left that identifies it.
-  // THAT is the only case where an address belongs on screen: for a named item it is noise nobody can act on.
-  name.className = 'nft-card-name';
-  name.textContent = nft.label ? `${nft.label}.ath` : shortAddress(nft.itemAddress);
-  const send = document.createElement('button');
-  send.type = 'button';
-  send.className = 'nft-card-send';
-  send.textContent = t('username.transferName');
-  send.addEventListener('click', () => onTransfer(nft));
-  foot.append(name, send);
-  card.append(foot);
-  return card;
-}
-
-async function openMyUsernamesDialog() {
-  if (ownedUsernameNftsInFlight) return;
-  ownedUsernameNftsInFlight = true;
-  renderMyUsernamesStatus();
-  let result = null;
-  try {
-    result = await loadOwnedUsernameNfts();
-  } catch (error) {
-    console.error(error);
-    flashWalletIdentityStatus(t('common.syncDelayed'));
-    return;
-  } finally {
-    ownedUsernameNftsInFlight = false;
-    renderMyUsernamesStatus();
-  }
-
-  let picked = null;
-  const footnotes = [];
-  // An indexer that could not be asked leaves the list SHORT, and saying so is not a nicety: an incomplete list of
-  // somebody's property that presents itself as complete is the one failure this whole lane is shaped to avoid.
-  if (!result.complete) footnotes.push(t('username.listMayBeIncomplete'));
-  await openActionDialog({
-    title: t('username.myNames'),
-    hint: result.owned.length === 0 ? t('username.noNamesFound') : '',
-    submitLabel: t('common.close'),
-    footnotes,
-    fields: [{
-      type: 'custom',
-      className: 'nft-card-list',
-      render: () => {
-        const box = document.createDocumentFragment();
-        for (const nft of result.owned) {
-          box.append(usernameNftCardNode(nft, (chosen) => { picked = chosen; closeActionDialog(null); }));
-        }
-        return box;
-      },
-    }],
-  });
-  if (picked) await openUsernameNftTransferDialog(picked);
-}
-
 async function openUsernameNftTransferDialog(nft) {
   const displayName = nft.label ? `${nft.label}.ath` : shortAddress(nft.itemAddress);
   const values = await openActionDialog({
@@ -27047,8 +31684,8 @@ async function openUsernameNftTransferDialog(nft) {
       type: 'text',
       id: 'usernameTransferRecipient',
       name: 'recipient',
-      label: t('username.recipientWallet'),
-      placeholder: 'UQ…',
+      label: t('dialog.recipient'),
+      placeholder: t('dialog.recipientPlaceholder'),
       required: true,
     }],
     footnotes: [
@@ -27056,7 +31693,14 @@ async function openUsernameNftTransferDialog(nft) {
       t('username.transferLosesName'),
     ],
     validateSubmit: async (submitted) => {
-      const recipient = String(submitted?.recipient ?? '').trim();
+      const entered = String(submitted?.recipient ?? '').trim();
+      let recipient = null;
+      let identity = null;
+      try {
+        ({ wallet: recipient, identity } = await resolveTransferRecipient(entered));
+      } catch (error) {
+        return { ok: false, error: transferRecipientError(error, entered) };
+      }
       try {
         // Refused HERE rather than by a bounce: the item rejects a non-basechain owner at 18032, and a typo that
         // costs a round trip and returns an opcode number is not an answer anybody can act on.
@@ -27083,7 +31727,7 @@ async function openUsernameNftTransferDialog(nft) {
             : t('username.transferFailed'),
         };
       }
-      return { ok: true, result: { recipient } };
+      return { ok: true, result: { recipient: transferRecipientDisplay(identity, recipient) } };
     },
   });
   if (!values?.recipient) return;
@@ -27091,15 +31735,21 @@ async function openUsernameNftTransferDialog(nft) {
   // has to include it — hence "sent", not "transferred".
   await openActionDialog({
     title: t('username.transferSubmittedTitle'),
-    hint: t('username.transferSubmittedHint', { name: displayName, recipient: shortAddress(values.recipient) }),
+    hint: t('username.transferSubmittedHint', { name: displayName, recipient: values.recipient }),
     submitLabel: t('common.close'),
     fields: [],
   });
+  return true;   // the transfer is away — a caller showing the item may stop showing it
 }
 
 async function submitUsernameNftTransfer(nft, recipient) {
   requireNoPendingServiceWorkerAppShellReload();
   const wallet = requirePlathoWallet();
+  // The twin of the GRAM transfer, with the same hole [audit 2026-09-01, round 9]: an underfunded transfer is
+  // dropped by IGNORE_ERRORS while the transaction succeeds, and the dialog then says the name was sent. The name
+  // stays put and the user believes it moved — worse here than for GRAM, because they may tell the recipient.
+  // It throws into the dialog's validateSubmit, so the refusal lands in the still-open window (see below).
+  await assertWalletGramAtLeast(USERNAME_NFT_TRANSFER_VALUE_NANOTONS + walletSendFeeReserveNanotons(), 'name transfer');
   // THROWS on failure, deliberately. The caller runs this inside the dialog's validateSubmit, which turns a throw
   // into a sentence shown in the still-open window; swallowing it here would put the failure behind a window that
   // had already closed, which is exactly what made a transfer indistinguishable from a success.
@@ -27120,16 +31770,15 @@ async function submitUsernameNftTransfer(nft, recipient) {
   // stamping a name it no longer owns onto everything it sends — recipients re-verify and reject, so it is not a
   // security hole, but it is the app lying to its own user about who they are. (This is the FM-4 note from the
   // v564 transfer audit, closed here because there is finally a place in the app where a name is handed over.)
-  if (nft.label && readLinkedPlathoUsername()?.label === nft.label) clearLinkedPlathoUsername();
+  if (nft.label && canonicalUsernameDisplay(readLinkedPlathoUsername()?.label).toLowerCase() === canonicalUsernameDisplay(nft.label).toLowerCase()) clearLinkedPlathoUsername();
   removeKnownPlathoUsername(nft.label);
+  void deleteStoredUsernameNftList(parseTonAddress(wallet.address).raw);
   // The cached chain count is now WRONG by one and must not be quoted as fact. Dropping it rather than decrementing
-  // it: the truth is one chain read away and the local floor covers the gap until the list is opened again.
+  // it: the truth is one chain read away, and the next session check reads it.
   ownedUsernameNftsVerified = null;
-  renderMyUsernamesStatus();
   renderWalletIdentity();
 }
 
-myUsernamesButton?.addEventListener('click', () => { openMyUsernamesDialog().catch((error) => console.error(error)); });
 
 async function resolveUsernameNftItemProvider() {
   const provider = globalThis.plathoUsernameNftItemProvider
@@ -27220,7 +31869,6 @@ async function autoLinkMintedUsername(username, ownerWallet, options = {}) {
   writeLinkedPlathoUsername(linked, owner);
   addKnownPlathoUsername(identity.label, owner);
   writeWalletDisplayIdentity(linked, owner);
-  if (walletDisplayModeSelect) walletDisplayModeSelect.value = WALLET_DISPLAY_MODES.PLATHO_NFT;
   clearPendingUsernameMint(username, owner);
   setUsernameMintStatus(t('username.linked', { name: canonicalUsernameDisplay(identity.label) }), '');
   renderWalletIdentity();
@@ -27262,22 +31910,21 @@ async function loadConnectedAthWalletAddress() {
   return requireBasechainAddress(walletAddress, 'Connected ATH wallet');
 }
 
-async function resolveRecipientWalletForThread(thread) {
-  const variants = threadIdentityVariants(thread);
-  // The dialog's WALLET is canonical for routing. A .ath username is a movable display alias whose ownership is
-  // reconciled at ADDRESSING time (new-chat resolves it to the current owner and keys the dialog by that wallet)
-  // and lazily on dialog OPEN — NOT re-resolved on the hot send path. So use the stored wallet variant first
-  // (zero chain read); resolve a username/DNS only as a FALLBACK for a username-only dialog that has no wallet
-  // variant yet (e.g. first contact before any send). [Reverts the v562 FM-1 band-aid, which made the username
-  // win over the wallet — wrong layer: it could route a wallet-A dialog to B just because it still carried the
-  // alias. Old-owner dialogs are now stripped+relabelled instead; see reconcileUsernameOwnership.]
+/**
+ * The three ways a person can be addressed in this app, turned into the one wallet they mean.
+ *
+ * Split out of resolveRecipientWalletForThread [2026-09-07] so the NFT transfer dialogs can take a .ath name the
+ * way every other recipient field does. Nothing about the routes changed: the order below is the routing order,
+ * and the wallet still wins over an alias wherever both are known.
+ */
+async function resolveWalletFromIdentityVariants(variants, purpose) {
   const walletIdentity = variants.find((identity) => identity.type === 'wallet_address');
-  if (walletIdentity) return requireBasechainAddress(walletIdentity.value, 'Payment recipient');
+  if (walletIdentity) return requireBasechainAddress(walletIdentity.value, purpose);
 
   const plathoIdentity = variants.find((identity) => identity.type === 'platho_nft');
   if (plathoIdentity) {
     const resolved = await resolvePlathoUsernameOwner(plathoIdentity.value);
-    return requireBasechainAddress(resolved.ownerWallet, 'Payment recipient');
+    return requireBasechainAddress(resolved.ownerWallet, purpose);
   }
 
   const tonDnsIdentity = variants.find((identity) => identity.type === 'ton_dns');
@@ -27288,10 +31935,59 @@ async function resolveRecipientWalletForThread(thread) {
       rootAddress: appConfig.tonDns?.rootAddress ?? null,
       ...criticalChainReadOptions(),
     });
-    return requireBasechainAddress(walletAddress, 'Payment recipient');
+    return requireBasechainAddress(walletAddress, purpose);
   }
 
   throw new Error('Recipient wallet route is not available');
+}
+
+async function resolveRecipientWalletForThread(thread) {
+  // The dialog's WALLET is canonical for routing. A .ath username is a movable display alias whose ownership is
+  // reconciled at ADDRESSING time (new-chat resolves it to the current owner and keys the dialog by that wallet)
+  // and lazily on dialog OPEN — NOT re-resolved on the hot send path. So the stored wallet variant is used first
+  // (zero chain read); a username/DNS is resolved only as a FALLBACK for a username-only dialog that has no wallet
+  // variant yet (e.g. first contact before any send). [Reverts the v562 FM-1 band-aid, which made the username
+  // win over the wallet — wrong layer: it could route a wallet-A dialog to B just because it still carried the
+  // alias. Old-owner dialogs are now stripped+relabelled instead; see reconcileUsernameOwnership.]
+  return resolveWalletFromIdentityVariants(threadIdentityVariants(thread), 'Payment recipient');
+}
+
+/**
+ * What a person TYPED into a transfer field, turned into the wallet the item is sent to.
+ *
+ * A wallet address is itself; a .ath or .ton name is looked up on chain through the very resolver the private lane
+ * uses, so a name means the same person here as it does in a chat — including the part where a .ath name is
+ * MOVABLE and resolves to whoever owns it now, not whoever minted it.
+ */
+async function resolveTransferRecipient(input) {
+  const parsed = parseRecipientIdentity(input);
+  if (!parsed.ok) {
+    const error = new Error(parsed.error);
+    error.code = 'PLATHO_RECIPIENT_INVALID';
+    throw error;
+  }
+  return {
+    identity: parsed.identity,
+    wallet: await resolveWalletFromIdentityVariants([parsed.identity], 'Transfer recipient'),
+  };
+}
+
+/** The recipient as the sender will recognise it: the name they typed, or a short address if they typed one. */
+function transferRecipientDisplay(identity, wallet) {
+  return identity?.type === RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS ? shortAddress(wallet) : identity.label;
+}
+
+/**
+ * One reading of a failed lookup, for both transfer dialogs.
+ *
+ * A name that is DEFINITIVELY unregistered and a chain we could not reach are different answers, and calling both
+ * "invalid recipient" would blame the user for the second one.
+ */
+function transferRecipientError(error, entered) {
+  if (error instanceof UsernameNotRegisteredError) return t('chat.usernameNotRegistered', { name: entered });
+  if (error?.code === 'PLATHO_RECIPIENT_INVALID') return t('username.recipientInvalid');
+  console.error(error);
+  return t('username.recipientUnresolved', { name: entered });
 }
 
 // clean-17 direct-pay username mint values (proven by tests/username-registry-ath-wallet-integration.test.ts). The mint
@@ -27433,7 +32129,8 @@ async function submitProfileAvatarDirect(avatar) {
   const avatarEpochTag = publicEpochTag(3, publicEraOf(3, createdAtSec));
   const avatarValue = publicPublishValueForKind(3);
   const shardParts = payloads.map((payload) => ({
-    kind: 3, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell, value: avatarValue, partitionKey: avatarPartitionKey, epochTag: avatarEpochTag,
+    // `nowUnix` is the SAME instant avatarEpochTag came from [round 5] — see buildPublicPublishBrowser.
+    kind: 3, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell, value: avatarValue, partitionKey: avatarPartitionKey, epochTag: avatarEpochTag, nowUnix: createdAtSec,
   }));
 
   const athWalletAddress = await loadConnectedAthWalletAddress();
@@ -27456,18 +32153,19 @@ async function submitProfileAvatarDirect(avatar) {
   // SendIgnoreErrors drops that leg silently, the image bytes still land and are still paid for, and the
   // pointer is never written. See assertConnectedAthAtLeast for why the two rules differ.
   await assertConnectedAthAtLeast(PROFILE_AVATAR_PRICE_ATH, 'set an avatar');
-  await assertWalletGramAtLeast(
-    avatarValue * BigInt(shardParts.length) + PROFILE_AVATAR_DIRECT_REQUEST_VALUE
+  // The squat cushion rides every shard part (refunded by the shard; web/shard-debt.mjs) and so sits in this sum;
+  // a squat DEBT above it is rare, resolved inside the funnel, and asserted through `assertAffordable` below.
+  const avatarNeed = (avatarValue + squatCushionNanotons(LANE_PUBLIC)) * BigInt(shardParts.length) + PROFILE_AVATAR_DIRECT_REQUEST_VALUE
       // …plus the registry write, a further message in the same transfer (class 1 — a small request body).
-      + walletSendFeeReserveNanotons([...payloads.map((payload) => payload.sizeClass), 1]),
-    'set an avatar',
-  );
+      + walletSendFeeReserveNanotons([...payloads.map((payload) => payload.sizeClass), 1]);
+  await assertWalletGramAtLeast(avatarNeed, 'set an avatar');
 
   setProfileAvatarStatus(t('avatar.publishing'));
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   let result = null;
   try {
-    result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, shardParts, { extraMessages: [athRequest] });
+    result = await publishPublicLaneParts({ wallet: plathoWallet, transport, ...(await publicPublishRouting()) }, shardParts,
+      { extraMessages: [athRequest], assertAffordable: (extra) => assertWalletGramAtLeast(avatarNeed + extra, 'set an avatar') });
   } catch (error) {
     // A CLEAR pre-broadcast failure spent nothing — surface it. An AMBIGUOUS one (platho-wallet attaches
     // error.builtBoc when the external may already have landed) must NOT be reported as a failure: re-picking
@@ -27539,7 +32237,6 @@ async function confirmProfileAvatarPointer(owner, avatarHash) {
     // tab change, and the Set-avatar button lives ON that pane — there is no tab change to ride).
     const imageUrl = await readProfileAvatarMediaCache(read.pointer.avatarHash).catch(() => null);
     if (imageUrl) {
-      setAvatarNode(profileAvatar, 'P', imageUrl);
       setOwnPublicFeedAvatar(owner, imageUrl);
     }
     return read.pointer;
@@ -27582,7 +32279,7 @@ async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
   const provider = createKeyShardTonRpcProvider({ profileRegistryAddress: registry, decodeAddressSliceBoc: decodeTonAddressSliceBoc });
   let view = null;
   try {
-    view = await withVaultReadLock(() => provider.getView(ownerWallet, criticalChainReadOptions()));
+    view = await withVaultReadLock(() => provider.getView(ownerWallet, { ...criticalChainReadOptions(), stopOnUninitializedAccount: true }));
   } catch (error) {
     if (!isKeyShardUninitError(error)) throw error;   // transient — abort rather than write on a bad read
     view = { exists: false };
@@ -27600,14 +32297,51 @@ async function submitKeyShardRegisterDirect({ preConfirmed = false } = {}) {
     if (needsKeyBackup) { await downloadEncryptedWalletKeyBackup(); }
   }
   vaultDraftStatus.textContent = t('vault.signing');
-  // Affordability before signing, on the same figure the fee label quoted. Activation is the one send a brand-new
-  // wallet makes, so this is exactly where a balance funded to the quoted number gets tested.
+  // WHAT THE SHARD WILL ACTUALLY CHARGE, read from the shard [audit 2026-09-02]. Gate 22110 asks for the REGISTER
+  // floor on a first write and the REPLACE floor on a re-write, and the two differ by the whole base endowment:
+  // 57,000,000 against 12,000,000. This path sent the register figure for both, which the contract refunds — no
+  // loss — but the affordability check below asks for the same number, so a wallet holding plenty for a REPAIR
+  // was told it could not afford one. That matters more after the migration than before it: an adopted identity
+  // is already registered, so restoring its rotation key is a replace, and the wallet that needs to do it is
+  // exactly the thin one. `view` is already in hand here — this costs no extra chain read.
+  //
+  // The headroom over the floor comes from the VIEW too, not from a second constant: whatever margin this client
+  // carries over the register floor, it carries over the replace floor as well. A view without floors (a
+  // definitive uninit read, which reports nothing else) falls back to the shipped figure unchanged.
+  const shardFloors = view?.exists === true
+    ? { charged: view.min_replace_value, register: view.min_register_value }
+    : { charged: view?.min_register_value, register: view?.min_register_value };
+  let registerValue = KEYSHARD_REGISTER_VALUE;
+  try {
+    const charged = BigInt(shardFloors.charged ?? 0n);
+    const registerFloor = BigInt(shardFloors.register ?? 0n);
+    if (charged > 0n && registerFloor > 0n && KEYSHARD_REGISTER_VALUE > registerFloor) {
+      registerValue = charged + (KEYSHARD_REGISTER_VALUE - registerFloor);
+    }
+  } catch { /* a view that will not parse is a view we do not price from */ }
+  // Affordability before signing, on the same figure the send is about to use. Activation is the one send a
+  // brand-new wallet makes, so this is exactly where a balance funded to the quoted number gets tested.
   await assertWalletGramAtLeast(
-    KEYSHARD_REGISTER_VALUE + walletSendFeeReserveNanotons([KEYSHARD_REGISTER_SIZE_CLASS]), 'activate');
-  const result = await publishKeyShardRegister({
-    wallet: requirePlathoWallet(), transport, ownerWallet, profileRegistry: registry,
-    keyRecord: localVaultDraft.message, value: KEYSHARD_REGISTER_VALUE,
-  });
+    registerValue + walletSendFeeReserveNanotons([KEYSHARD_REGISTER_SIZE_CLASS]), 'activate');
+  let result = null;
+  try {
+    result = await publishKeyShardRegister({
+      wallet: requirePlathoWallet(), transport, ownerWallet, profileRegistry: registry,
+      keyRecord: localVaultDraft.message, value: registerValue,
+    });
+  } catch (error) {
+    // THE FEE MAY ALREADY BE ON ITS WAY [audit 2026-09-05, round 2]. A throw after the external left the device
+    // skipped the marker below, so the Profile tab offered Activate again — the second fee for one registration
+    // that the marker exists to prevent. The signed bytes are written down and knocked on like a clean send's;
+    // the activation poll decides.
+    if (!broadcastMayHaveLanded(error)) throw error;
+    plathoAccountActivationPending = true;
+    rememberPlathoActivationInFlight(ownerWallet, error.builtBoc, error.builtSeqno ?? null);
+    forcePlathoActivationDelivery();
+    vaultDraftStatus.textContent = t('vault.activationSent');
+    queueVaultPostTransactionRefresh({ pollActivation: true });
+    return null;
+  }
   plathoAccountActivationPending = true;
   // ...and written down WITH the signed external, so a reload inside the settling window neither offers to pay the
   // fee a second time nor abandons the copy already paid for. `pendingBoc` is the LAST chunk's — the one that may
@@ -27628,14 +32362,14 @@ async function submitVaultRegisterMessagingKeys(options = {}) {
 }
 
 async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = {}) {
-  const fee = plathoAccountActivationFeeNanotons(user);
+  const fee = plathoAccountActivationFeeNanotons();
   const walletBalance = await refreshWalletTonBalanceForProfile().catch(() => null);
   let feedback = needsKeyBackup
     ? t('vault.activationExportKeyFeedback')
     : t('vault.activationKeyBackedUpFeedback');
   let tone = 'muted';
   if (walletBalance !== null && walletBalance < fee) {
-    feedback = t('vault.activationLowBalanceFeedback', { fee: formatTonNanotons(fee) });
+    feedback = t('vault.activationLowBalanceFeedback', { fee: formatTonNanotonsUp(fee) });
     tone = 'error';
   }
   // The forced key-export step (and its acknowledgement checkbox) only appears when the key has not been
@@ -27651,7 +32385,7 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
   fields.push({
     id: 'activationConfirmed',
     type: 'checkbox',
-    label: t('vault.activationConfirmCheckbox', { amount: t('common.gramAmount', { amount: formatTonNanotons(fee) }) }),
+    label: t('vault.activationConfirmCheckbox', { amount: plathoAccountActivationFeeLabel() }),
   });
   const result = await openActionDialog({
     title: t('vault.activateAccountTitle'),
@@ -27662,7 +32396,7 @@ async function confirmPlathoAccountActivation(user, { needsKeyBackup = true } = 
     fields,
     summary: [
       { label: t('common.walletGram'), value: walletBalance === null ? t('common.unknown') : t('common.gramAmount', { amount: formatTonNanotons(walletBalance) }) },
-      { label: t('vault.activationTxValue'), value: t('common.gramAmount', { amount: formatTonNanotons(fee) }) },
+      { label: t('vault.activationTxValue'), value: plathoAccountActivationFeeLabel() },
       { label: t('vault.backupLabel'), value: needsKeyBackup ? t('vault.backupEncryptedJson') : t('vault.backupAlreadySaved') },
       { label: t('vault.afterActivationLabel'), value: t('vault.afterActivationValue') },
     ],
@@ -27720,6 +32454,30 @@ function publishStateVisibleSubmittedCount(publishState) {
     publishStatePriorAttemptCount(publishState),
   );
   return Math.min(total, Math.max(previous, current));
+}
+
+/**
+ * The machine words of publishStateMeta / publishStatus, said in the user's language — at DISPLAY time only. The
+ * English phrases stay as they are underneath: they are persisted state and every substring gate classifies on
+ * them ('not sent', 'failed', 'confirming'), so the dictionary lookup lives here, on the way to the screen, and an
+ * unknown phrase passes through unchanged [owner, 2026-09-09: a Russian feed showed a raw "SENDING" badge].
+ */
+function publishStatusDisplayText(text) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return raw;
+  let m;
+  if (raw === 'sending') return t('publish.sending');
+  if (raw === 'confirming') return t('publish.confirming');
+  if (raw === 'published') return t('publish.published');
+  if (raw === 'not sent') return t('publish.notSent');
+  if (raw === 'queued, retrying') return t('publish.queuedRetrying');
+  if (raw === 'public published, confirming') return t('publish.publishedConfirming');
+  if ((m = /^sending (\d+) parts$/.exec(raw))) return t('publish.sendingParts', { count: m[1] });
+  if ((m = /^submitted (\d+)\/(\d+), retrying$/.exec(raw))) return t('publish.submittedRetrying', { landed: m[1], total: m[2] });
+  if ((m = /^submitted (\d+)\/(\d+)$/.exec(raw))) return t('publish.submittedProgress', { landed: m[1], total: m[2] });
+  if ((m = /^confirming (\d+)\/(\d+)$/.exec(raw))) return t('publish.confirmingProgress', { confirmed: m[1], total: m[2] });
+  if (raw.endsWith('failed')) return t('publish.failed');
+  return raw;
 }
 
 function publishStateMeta(publishState) {
@@ -28152,8 +32910,7 @@ globalThis.plathoDebugPendingPublishes = () => {
  * publishState, so a direct send goes stale 10 minutes after it was composed, exactly like its Vault-era sibling.
  */
 function directPaySendRetryResumable(message) {
-  return privateLaneDirectPayEnabled()
-    && !directSendReachedWallet(message)
+  return !directSendReachedWallet(message)
     && message?.privateManualRetryAvailable !== true
     && Number(message?.privateSendRetryAttempt ?? 0) > 0
     && sendContentSurvivesReload(message);
@@ -28314,9 +33071,21 @@ async function deleteSelfNoteFromUi(thread, message, button) {
   renderThreads();
   renderConversation();
   try {
-    await publishSelfNotesSnapshotForThread(thread);
+    const outcome = await publishSelfNotesSnapshotForThread(thread);
     // Durable history too: a record left behind here is merged back on the next restore, silently undoing the delete.
     if (message.localHistoryId) await encryptedMessageStore?.deleteMessage?.(message.localHistoryId);
+    // THE RECEIPT, IN THE BACKGROUND [audit 2026-09-06, round 3]: the note is gone from the screen already; if the
+    // slots never show the write, the snapshot is published once more (idempotent — only chunks the chain lacks are
+    // written), and only a second miss is reported.
+    if (outcome.writes.length > 0) {
+      confirmRecoverySlotWrites({ readView: outcome.readView, writes: outcome.writes }).then(async (receipt) => {
+        if (receipt.landed) return;
+        const again = await publishSelfNotesSnapshotForThread(thread);
+        if (again.writes.length === 0) return;
+        const second = await confirmRecoverySlotWrites({ readView: again.readView, writes: again.writes });
+        if (!second.landed) flashWalletIdentityStatus(t('notes.deleteFailed'));
+      }).catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[notes] delete receipt', error); });
+    }
   } catch (error) {
     // Put it back: the chain still holds it, and a local view that quietly disagrees with the durable copy is worse
     // than a failed delete.
@@ -28479,10 +33248,12 @@ async function attemptIntroFirstContactDirect(context) {
     // Affordability before signing — this transfer had NO pre-flight at all, the only direct-pay send without one.
     // It matters here as much as on the message itself: an underfunded INTRO leaves a conversation half-opened (the
     // peer never learns the keys) while the wallet has already paid for whatever did land.
-    await assertWalletGramAtLeast(
-      INTRO_PUBLISH_VALUE + walletSendFeeReserveNanotons([capsule?.header0?.sizeClass ?? INTRO_CAPSULE_SIZE_CLASS]), 'send');
+    const introNeed = INTRO_PUBLISH_VALUE + squatCushionNanotons(LANE_INTRO)
+      + walletSendFeeReserveNanotons([capsule?.header0?.sizeClass ?? INTRO_CAPSULE_SIZE_CLASS]);
+    await assertWalletGramAtLeast(introNeed, 'send');
     try {
-      const result = await publishIntroLane({ wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE });
+      const result = await publishIntroLane({ wallet: plathoWallet, transport, epoch: slot.epoch, bucket: slot.bucket, capsule, value: INTRO_PUBLISH_VALUE },
+        { assertAffordable: (extra) => assertWalletGramAtLeast(introNeed + extra, 'send') });
       pending.boc = result?.result?.boc ?? null;
       pending.seqno = result?.result?.seqno ?? null;   // an INTRO is one message = one external: top-level seqno is its seqno
     } catch (error) {
@@ -29008,6 +33779,11 @@ async function attemptConvMessagePublishDirect(context) {
     coldFloor = await createRecordShardLastSeqReader((call) => transport.runGetMethod(call))(route.address);
   }
 
+  // THE SHARD IS KNOWN LIVE when anything has been seen on it — the cold read above or this device's own high-water.
+  // Past the flip that spares the vault door the shard's StateInit halves, charged per byte on two hops; before it,
+  // and whenever nothing proves the shard exists, the first part carries them (harmless on a live account).
+  const shardLive = Math.max(coldFloor, convBucketSeqHighWater(route.address)) > 0;
+
   // Seal each part as a CONV capsule and assign a strictly-increasing outgoing seq (local monotonic counter,
   // floored by everything this device has seen on the shard — see the allocation below).
   const streamId = randomBytes(16);
@@ -29045,12 +33821,12 @@ async function attemptConvMessagePublishDirect(context) {
     // committed by this wallet's OTHER devices; a device that fell behind would re-claim committed seqs and bounce
     // off the shard's anti-rollback gate on every send until its own counter caught up.
     const seq = await convKeyStore.nextOutgoingSeq(selfKeyId, peerKeyId, route.epoch, Math.max(coldFloor, convBucketSeqHighWater(route.address)));
-    parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE });
+    parts.push({ writePublicKey: route.writePublicKey, writeSecret: route.writeSecret, seq, epoch: route.epoch, capsule, value: CONV_PUBLISH_VALUE, shardLive });
   }
 
   // MY OWN MESSAGE'S CHAIN ANCHOR — what makes a reply to it possible at all.
   //
-  // OWNER, 2026-08-08: "I can only reply to the other person's messages." Correct, and the reason was that nothing
+  // decided 2026-08-08 Correct, and the reason was that nothing
   // ever gave an outgoing message a chainEntryId: privateChainMessageOrderFields runs only on RECEIVED entries, and
   // every reply affordance (swipe, double-click, the hover button) is gated on the row carrying one. The mechanism
   // for the other half was fully built and documented — the conversation render has always given a row its entry
@@ -29081,6 +33857,11 @@ async function attemptConvMessagePublishDirect(context) {
   // "it threw and is retrying" — the dump could not distinguish those, and both render as the word "sending".
   globalThis.plathoConvSendInFlight = (globalThis.plathoConvSendInFlight ?? 0) + 1;
   const sendStartedAt = Date.now();
+  // The amount the pre-flight demands: the deploy figure plus the squat cushion (refunded by the shard;
+  // web/shard-debt.mjs) per part, plus the send fee. Named, so the funnel's `assertAffordable` can add a squat
+  // DEBT above the cushion to the SAME sum instead of a copy of it. Pure arithmetic — nothing here can throw.
+  const convNeed = (CONV_PUBLISH_VALUE + squatCushionNanotons(LANE_CONV)) * BigInt(parts.length)
+      + walletSendFeeReserveNanotons(parts.map((part) => part.capsule?.header0?.sizeClass));
   try {
     // Affordability before signing. This matters MORE here than on the public lane: the wallet stamps
     // SendIgnoreErrors on every action, so an underfunded multi-part message loses its tail SILENTLY — and a
@@ -29088,10 +33869,13 @@ async function attemptConvMessagePublishDirect(context) {
     // re-sent under the same seq. Fail-open on an unreadable balance; the send stays the authority. INSIDE the
     // try, deliberately: an underfunded send must exit through the same catch as every other pre-broadcast
     // failure and shed its chain claim there.
-    await assertWalletGramAtLeast(
-      CONV_PUBLISH_VALUE * BigInt(parts.length)
-        + walletSendFeeReserveNanotons(parts.map((part) => part.capsule?.header0?.sizeClass)), 'send');
-    result = await publishConvLaneParts({ wallet: plathoWallet, transport }, parts);
+    await assertWalletGramAtLeast(convNeed, 'send');
+    // THE ONE DOOR PAST THE FLIP rides in `routing` (convVaultRouting): the payer's vault, their fee, and whether
+    // this transfer must deploy the vault first. Before the flip the funnel takes the direct door and ignores it.
+    const routing = await convVaultRouting();
+    result = await publishConvLaneParts({ wallet: plathoWallet, transport, ...routing }, parts,
+      { assertAffordable: (extra) => assertWalletGramAtLeast(convNeed + extra, 'send') });
+    if (result?.deploy) noteFeeVaultDeployed(plathoWallet?.address, routing.vaultAddress);
     // seqno lives at result.result.seqno: publishConvLaneParts returns { parts, result } and `result` is what
     // sendPlathoWalletTransaction returned, which spreads the FIRST built external ({ boc, seqno, wallet }).
     // Reading result.seqno one level up silently produced null on every send — a diagnostic that reports nothing is
@@ -29201,10 +33985,43 @@ async function publishSelfNoteSnapshot(context) {
     error.code = 'PLATHO_NOTES_RESTORE_INCOMPLETE';
     throw error;
   }
-  const wrote = await publishSelfNotesSnapshotForThread(thread);
-  // Self-notes write RecoveryShard slots and are never read back — no verifier exists to lift this out of 'sending'.
-  markDirectSendBroadcast(thread, message, { awaitsConfirm: false });
-  return { selfNote: true, wrote };
+  const outcome = await publishSelfNotesSnapshotForThread(thread);
+  if (outcome.writes.length === 0) {
+    // the chain already holds exactly these notes (every chunk's h1 matched the slot's): proven, nothing to wait for
+    markDirectSendBroadcast(thread, message);
+    markSelfNotePublished(thread, message);
+    return { selfNote: true, wrote: 0 };
+  }
+  markDirectSendBroadcast(thread, message);   // 'sending' until the slots show the seqs and the h1s
+  armSelfNoteReceipt(context, outcome);        // in the background — never inside the outgoing lane [round 3]
+  return { selfNote: true, wrote: outcome.wrote };
+}
+
+/** The slot showed the seq and the h1 this device sealed: proven on chain, painted as a CONV record read back is. */
+function markSelfNotePublished(thread, message) {
+  if (!thread?.messages?.includes(message)) return;
+  message.meta = 'published';
+  refreshThreadAfterMessageChange(thread);
+  updateMessageInEncryptedHistory(thread, message).catch((error) => console.error(error));
+  refreshMessagingControls();
+}
+
+/**
+ * THE NOTES RECEIPT, OUTSIDE THE LANE [audit 2026-09-06, round 3]. The slots are read on the receipt ladder while
+ * the outgoing lane is free for the next send. A write the slots show is painted published; one they do not show
+ * within the ladder is handed to the private retry ladder as a recoverable error — the retry re-packs the notes,
+ * skips every chunk the chain already holds (h1), and writes only what is missing.
+ */
+function armSelfNoteReceipt(context, outcome) {
+  const { thread, message } = context;
+  confirmRecoverySlotWrites({ readView: outcome.readView, writes: outcome.writes }).then((receipt) => {
+    if (!thread?.messages?.includes(message)) return;
+    if (message.meta !== 'sending') return;   // a retry or a delete moved it on meanwhile
+    if (receipt.landed) { markSelfNotePublished(thread, message); return; }
+    const error = new Error(`notes write not confirmed on ${receipt.pending.length} slot(s)`);
+    error.code = 'PLATHO_NOTES_NOT_CONFIRMED';
+    return settlePrivateComposerSendError(context, error);
+  }).catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[notes] receipt failed', error); });
 }
 
 /**
@@ -29221,7 +34038,7 @@ async function publishSelfNotesSnapshotForThread(thread) {
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) throw new Error(t('notes.rpcUnavailable'));
   const notes = selfNotesFromThread(thread);
-  const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+  const readView = createRecoveryViewReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));   // fresh: the seqs it reads are the ones these writes claim [audit 2026-09-05, round 2]
   let built;
   try {
     built = await prepareNotesBackup({
@@ -29233,7 +34050,7 @@ async function publishSelfNotesSnapshotForThread(thread) {
     full.code = 'PLATHO_NOTES_FULL';
     throw full;
   }
-  if (built.publishes.length === 0) return 0;
+  if (built.publishes.length === 0) return { wrote: 0, readView, writes: [] };
   await assertWalletGramAtLeast(
     // A notes publish carries no size class of its own — the SEALED blob is the payload, so its byte count decides
     // what the send costs. That count is `blobBytes`, carried out of sealNotesBlob deliberately: `blob` is a snake
@@ -29243,13 +34060,24 @@ async function publishSelfNotesSnapshotForThread(thread) {
       + walletSendFeeReserveNanotons(built.publishes.map(
         (publish) => capsuleSizeClassForUsefulBytes(minimalCapsuleUsefulBytesForLength(publish.blobBytes)),
       )), 'save a note');
-  await sendPlathoWalletTransaction(plathoWallet, {
-    messages: built.publishes.map((publish) => ({
-      address: publish.to, amount: publish.value, bounce: true,
-      payload: tonCell.bytesToBase64(tonCell.serializeBoc(publish.body)), stateInit: publish.init,
-    })),
-  }, { transport });
-  return built.publishes.length;
+  try {
+    await sendPlathoWalletTransaction(plathoWallet, {
+      messages: built.publishes.map((publish) => ({
+        address: publish.to, amount: publish.value, bounce: true,
+        payload: tonCell.bytesToBase64(tonCell.serializeBoc(publish.body)), stateInit: publish.init,
+      })),
+    }, { transport });
+  } catch (error) {
+    if (!broadcastMayHaveLanded(error)) throw error;   // ambiguous: the slots' seqs below are the receipt
+  }
+  // THE RECEIPT IS THE CALLER'S TO AWAIT [audit 2026-09-06, round 3]. Round 2 waited for it HERE — inside the app's
+  // one outgoing lane, where a ladder of up to 110 s held every later private and public send behind a note. The
+  // writes go back with the reader that can confirm them (each with the h1 it sealed, so a sibling's write cannot
+  // pass for this one); the composer arms the receipt in the background, the delete path waits on its own.
+  return {
+    wrote: built.publishes.length, readView,
+    writes: built.publishes.map((publish) => ({ address: publish.to, seq: publish.seq, h1: publish.h1 ?? null })),
+  };
 }
 
 /** The note list a thread carries, oldest first: its own text messages, without the ones that carry no text. */
@@ -29390,7 +34218,7 @@ function patchPublicPublishBadgesInPlace(job, item) {
   if (!localId) return false;
   const badges = document.querySelectorAll(`.public-publish-status[data-publish-local-id="${localId}"]`);
   if (badges.length === 0) return false;
-  const text = (item.publishState ? publishStateMeta(item.publishState) : null) || status;
+  const text = publishStatusDisplayText((item.publishState ? publishStateMeta(item.publishState) : null) || status);
   for (const badge of badges) badge.textContent = text;
   return true;
 }
@@ -29839,6 +34667,14 @@ async function submitPrefsSnapshotDirect() {
   if (tonRpcLimited()) { setText(savePrefsStatus, t('sync.rpcBusy')); return; }
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) { setText(savePrefsStatus, t('sync.rpcBusy')); return; }
+  // NEVER WRITE FROM A LOCAL STATE THAT WAS NEVER PROVED COMPLETE — the twin of conv's guard at the backup and
+  // sweep sites, and of notes' at its two save sites. The button is the only thing that can destroy the blob, so
+  // it is also the right place to RETRY: a boot whose transport was not ready yet, or whose read hiccuped, heals
+  // on the very press it refuses, and the user sees a refusal only if the retry fails too.
+  if (!prefsBackupAllowed) {
+    await restorePrefsFromRecoveryIfFresh();
+    if (!prefsBackupAllowed) { setText(savePrefsStatus, t('sync.restoreIncomplete')); return; }
+  }
   prefsSyncInFlight = true;
   refreshPrefsSyncUi();
   refreshGlobalSyncIndicator();
@@ -29848,11 +34684,34 @@ async function submitPrefsSnapshotDirect() {
     const snapshot = buildPrefsSnapshot();
     const savedEditEpoch = prefsEditEpoch;   // edits after this point are not in `snapshot` — guards the dirty-clear
     const prefsBytes = serializePrefsSnapshotBytes(snapshot);
-    const readView = createRecoveryViewReader((call) => transport.runGetMethod(call));
+    // FRESH, NOT CACHED [audit 2026-09-05, round 2]: get_view answers are cached 15 s, and a second save inside
+    // that window would claim the same seq the first one took — refused by the slot, recorded as saved here.
+    const readView = createRecoveryViewReader((call) => transport.runGetMethod({ ...call, cacheTtlMs: 0, priority: 'critical' }));
     const built = await preparePrefsBackup({ seed, prefsBytes, readView, value: RECOVERY_PUBLISH_VALUE });
-    await sendPlathoWalletTransaction(plathoWallet, {
-      messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
-    }, { transport });
+    // The recovery lane's twin, and it had the same hole [audit 2026-09-01, round 9]: no affordability check, and
+    // IGNORE_ERRORS turns an underfunded publish into a dropped action under a successful transaction — after
+    // which the two lines below stamp lastSyncedAt and clear the dirty flag, and the screen says saved. The user
+    // loses their subscription list with nothing left to retry from. Fail-open on an unreadable balance, like
+    // every other pre-flight; a refusal exits through the catch below, which leaves the dirty flag alone.
+    await assertWalletGramAtLeast(
+      RECOVERY_PUBLISH_VALUE
+        + walletSendFeeReserveNanotons([walletSendSizeClassForPayloadBytes(tonCell.serializeBoc(built.body).length)]),
+      'prefs snapshot');
+    try {
+      await sendPlathoWalletTransaction(plathoWallet, {
+        messages: [{ address: built.to, amount: built.value, payload: tonCell.bytesToBase64(tonCell.serializeBoc(built.body)), stateInit: built.init, bounce: true }],
+      }, { transport });
+    } catch (error) {
+      if (!broadcastMayHaveLanded(error)) throw error;   // ambiguous: the receipt below decides, not the throw
+    }
+    // GREEN MEANS THE CHAIN [audit 2026-09-05, round 2]. The send resolves when the external is QUEUED at the door,
+    // not when the slot holds the blob; this row then said "saved" and dropped the dirty flag over a write the
+    // network could still lose. The slot's own anti-rollback seq is the receipt: it is read until it shows the seq
+    // this write claimed, and an unconfirmed write stays dirty for the next press.
+    if (!(await confirmRecoverySlotWrite({ readView, address: built.to, seq: built.seq, h1: built.h1 ?? null }))) {
+      setText(savePrefsStatus, t('sync.notConfirmed'));
+      return;
+    }
     setPrefsLastSyncedAt(snapshot.writtenAt);
     if (prefsEditEpoch === savedEditEpoch) writePrefsDirty(false);   // a follow/unfollow mid-send stays dirty (→ "unsaved")
     settled = true;
@@ -29897,14 +34756,6 @@ function refreshPrefsSyncUi() {
   setText(savePrefsStatus, label);
 }
 
-// When appConfig.privateLane.directPay is true, PRIVATE messaging runs on the clean-17 direct-pay shards: CONV
-// messages publish straight from the wallet into RecordShard, first contact is scanned off IntroShard and its pairwise
-// K_root adopted into the local conv key store, and durability writes go to RecoveryShard. DEFAULT OFF: clean-15 is the
-// live genesis and the shards are not deployed yet, so the flag flips at clean-17 genesis alongside publicLane.directPay.
-function privateLaneDirectPayEnabled() {
-  return appConfig.privateLane?.directPay === true;
-}
-
 // PPH2 payload parts for a composed public post — mirrors createPublicPayloadParts' multipart plan, but calls the
 // V2 builder (uniform 32-byte header, no profile pointer / parent id / is_profile — all removed in the shard model)
 // and returns the client header/body cells the wallet builder consumes directly.
@@ -29933,6 +34784,42 @@ async function createPublicLanePayloadPartsV2({ type, text, attachments = public
 
 // Publish a composed post DIRECT-PAY into the author's own CHANNEL shard. All N multipart parts ride ONE wallet
 // transfer to the same shard (N entries grouped on read by streamId); the first carries the deploy, the rest publish.
+/**
+ * THE SHARD SEQ A PUBLIC WRITE LANDS IN — 0 while there is room, the next one when there is not.
+ *
+ * [audit 2026-09-01, round 9.] Every write site passed a literal 0, so the overflow the contract documents
+ * ("Overflow is the client's job: it rolls shard_seq to a fresh account and readers probe 0..PS_SEQ_PROBE-1")
+ * never happened. The READER has probed four seqs all along; the writer had no way to use them. A channel that
+ * reached PS_SAFE_CAP entries inside its era was refused for the rest of it — 30 days for a channel, a year for
+ * a thread's comments — with no client signal beyond a six-minute "failed".
+ *
+ * ONE batched accountStates over the seq space, and a get_view only for the seqs that are live. The common answer
+ * is seq 0 on its first probe, so the steady-state cost is one batched read per publish on a path that already
+ * spends two reads and N broadcasts and charges the user ~0.06 GRAM. Falling back to 0 on an unreadable probe is
+ * deliberate: refusing to publish because a room read failed would turn a bad minute on the network into a lost
+ * post, and 0 is where the write would have gone anyway.
+ */
+async function resolvePublicWriteShardSeq(lane, { kind, partitionKeyOf, epochTag, need }) {
+  return (await resolvePublicWriteShard(lane, { kind, partitionKeyOf, epochTag, need })).seq;
+}
+
+/**
+ * The shard seq to write to AND whether that shard is already live — so the parts can leave the StateInit off when
+ * the account exists [audit 2026-09-05, round 1]. Every failure answers `{ seq: 0, live: false }`: seq 0 with the
+ * halves attached is the shape that always lands, on an existing account as on an empty one.
+ */
+async function resolvePublicWriteShard(lane, { kind, partitionKeyOf, epochTag, need, nowUnix = null }) {
+  try {
+    const target = await lane.readWriteShard({ kind, partitionKeyOf, epochTag, need, ...(nowUnix === null ? {} : { nowUnix }) });
+    if (target && Number.isInteger(target.seq) && target.seq >= 0) return { seq: target.seq, live: target.live === true };
+    console.warn('[public] every shard seq for this era is full or unreadable — writing to 0', { kind, need });
+  } catch (error) {
+    noteTonRpcRateLimit(error);
+    console.warn('[public] shard seq probe failed, writing to 0', error);
+  }
+  return { seq: 0, live: false };
+}
+
 async function submitPublicPostDirect(draft = null) {
   if (!plathoWallet?.address) throw new Error('Connect a wallet to publish to the public lane');
   const resolvedDraft = draft ?? {
@@ -29965,11 +34852,25 @@ async function submitPublicPostDirect(draft = null) {
   // Derive the author's CHANNEL shard for the current era. keyArg is unused (0) for CHANNEL — the contract stamps
   // the real sender, so the partition_key over senderHash is what binds the shard to this wallet.
   const walletHash = publicWalletHash(plathoWallet.address);
-  const partitionKey = await publicChannelPartitionKey(walletHash, 0);
-  const epochTag = publicEpochTag(0, publicEraOf(0, Math.floor(Date.now() / 1000)));
+  // ONE instant for the probe, the era AND the generation [round 5; audit 2026-09-05, round 2]: a second clock read
+  // after the probe could cross an era or the flip and address a shard the probe never looked at — with `live: true`
+  // from the old one and no StateInit for the new.
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const channelEpochTag = publicEpochTag(0, publicEraOf(0, nowUnix));
+  const channelShard = await resolvePublicWriteShard(directPublicLaneReader(), {
+    kind: 0,
+    partitionKeyOf: (seq) => publicChannelPartitionKey(walletHash, seq),
+    epochTag: channelEpochTag,
+    need: payloads.length,
+    nowUnix,
+  });
+  const channelShardSeq = channelShard.seq;
+  const partitionKey = await publicChannelPartitionKey(walletHash, channelShardSeq);
+  const epochTag = channelEpochTag;   // the same instant the probe used — see buildPublicPublishBrowser [round 5]
   const value = publicPublishValueForKind(0);
   const parts = payloads.map((payload) => ({
-    kind: 0, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell, value, partitionKey, epochTag,
+    kind: 0, keyArg: 0n, header: payload.headerCell, body: payload.bodyCell, value, partitionKey, epochTag, nowUnix,
+    shardLive: channelShard.live,   // a live shard needs no StateInit; an empty one gets it on the first part alone
   }));
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
 
@@ -29977,12 +34878,15 @@ async function submitPublicPostDirect(draft = null) {
   // `sendMode | 2`), so an underfunded MULTIPART post does not fail — the fundable prefix lands and the rest
   // is dropped silently, which the reader then discards as an incomplete stream (assemblePublicParts). The
   // user would see "public published" for a post that does not exist. Fail-open on an unreadable balance.
-  await assertWalletGramAtLeast(
-    value * BigInt(parts.length) + walletSendFeeReserveNanotons(payloads.map((payload) => payload.sizeClass)), 'publish');
+  await assertNotRestrictedForPublicPublishing();
+  const postNeed = (value + squatCushionNanotons(LANE_PUBLIC)) * BigInt(parts.length)
+    + walletSendFeeReserveNanotons(payloads.map((payload) => payload.sizeClass));
+  await assertWalletGramAtLeast(postNeed, 'publish');
 
   let result;
   try {
-    result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
+    result = await publishPublicLaneParts({ wallet: plathoWallet, transport, ...(await publicPublishRouting()) }, parts,
+      { assertAffordable: (extra) => assertWalletGramAtLeast(postNeed + extra, 'publish') });
   } catch (error) {
     // An external that was SIGNED and handed to sendBoc may already be on chain: keep it and resend, never call it
     // failed (see publicAmbiguousPublishPatch). A clear pre-broadcast failure still terminals immediately.
@@ -30015,6 +34919,71 @@ async function submitPublicPostDirect(draft = null) {
 // Publish/update the connected wallet's CHANNEL PROFILE (description + tags) as a normal public top-level POST whose
 // body is a single PROFILE document block. It rides the identical public part-build + broadcast path, lands on the
 // author's on-chain public_author_index, and is read back by resolveChannelProfile walking that author's chain.
+/**
+ * WHICH DIRECTORY BUCKET THIS SAVE ANNOUNCES INTO, and why it is not simply walletHash % 1024 any more.
+ *
+ * A BEACON bucket-era holds PS_SAFE_CAP entries and the BEACON era is a YEAR, so a full bucket refuses every
+ * further announcement in it for up to a year — the contract refuses in COMPUTE (gate 13705) and the beacon
+ * bounces. MEASURED by audit: 57.2 GRAM fills one. With the bucket pinned to the announcer's wallet hash that was
+ * a permanent, targeted denial: the victim could not move, and the channel simply never appeared in Discover.
+ *
+ * The live contract does not pin it. A BEACON address folds H(domain, bucket) with NO sender in it, gate 13702
+ * only checks that the claimed key matches the address, and `publisher` is stamped by the VM from sender() — so an
+ * announcement in ANY bucket is found by the sweep (which reads every bucket and keys the catalogue by publisher)
+ * and can still only advertise its own announcer. The contract's own overflow note says it: "overflow is the
+ * client's job". This is that job, for the one kind whose overflow the client had never done.
+ *
+ * The home bucket is still preferred — it spreads the directory and keeps a re-save idempotent within its era. The
+ * roll is RANDOM rather than home+1, which is the whole point: an attacker cannot pre-fill where the victim will
+ * go next, so denying one channel now means denying all 1024 buckets rather than one.
+ *
+ * Cost: one batched state read plus, at most, a getter per LIVE candidate — on an operation a user performs a
+ * handful of times a year. A probe that cannot be answered falls back to the home bucket: an unreadable network
+ * must not turn into a channel that never announces.
+ */
+async function chooseChannelBeaconBucket(walletHash, createdAtSec) {
+  const home = Number(walletHash % BigInt(PUBLIC_BEACON_READ_SPACE));
+  const lane = directPublicLaneReader();
+  if (!lane?.readBeaconBucketRoom) return home;
+  // Seven alternatives, drawn at random and only ever used if home is full. Seven is not a magic number: it is
+  // what one batched state read costs nothing to include, and the roll's strength comes from being UNPREDICTABLE,
+  // not from being wide — one unfilled bucket is enough to announce in.
+  const candidates = [];
+  const drawn = new Set([home]);
+  const cryptoImpl = globalThis.crypto;
+  const draws = new Uint32Array(7);
+  if (cryptoImpl && typeof cryptoImpl.getRandomValues === 'function') cryptoImpl.getRandomValues(draws);
+  else return home;   // no randomness, no roll worth making — the home bucket is the honest answer
+  for (const draw of draws) {
+    const bucket = draw % PUBLIC_BEACON_READ_SPACE;
+    if (drawn.has(bucket)) continue;
+    drawn.add(bucket);
+    candidates.push(bucket);
+  }
+  let room = new Map();
+  try {
+    room = await lane.readBeaconBucketRoom([home, ...candidates], { nowUnix: createdAtSec });
+  } catch (error) {
+    noteTonRpcRateLimit(error);
+    console.warn('[public] beacon bucket probe failed, announcing in the home bucket', error);
+    return home;
+  }
+  // The probe already measures entry_count per bucket; handing it over is what lets the roll fire on the
+  // READABLE window rather than on the shard's capacity [audit 2026-09-01, round 9].
+  const choice = chooseBeaconBucket({
+    home,
+    candidates,
+    entriesOf: (b) => room.get(b)?.entryCount ?? null,
+    roomOf: (b) => room.get(b)?.room ?? null,
+  });
+  if (choice.rolled) {
+    console.info('[public] beacon home bucket is full, announcing elsewhere', {
+      home, chosen: choice.bucket, homeEntries: room.get(home)?.entryCount ?? null, cap: room.get(home)?.safeCap ?? null,
+    });
+  }
+  return choice.bucket;
+}
+
 // Latest profile post per author wins — no on-chain mutation of a prior profile, each save is a fresh post. Unlike a
 // composer post, NO optimistic feed record is created: a profile is channel metadata, diverted from the visible feed.
 // clean-17 channel profile: publish the profile document into BOTH the author's CHANNEL shard (already-subscribed
@@ -30022,40 +34991,179 @@ async function submitPublicPostDirect(draft = null) {
 // ONE wallet transfer. The beacon bucket is deterministic (walletHash % PUBLIC_BEACON_READ_SPACE) so re-saving a
 // profile idempotently updates the same beacon shard; the contract stamps publisher=sender(), so a beacon entry can
 // only advertise the announcer's own wallet — which is exactly what makes it findable and self-attributing.
-async function publishChannelProfileDirect(description, tags) {
+async function publishChannelProfileDirect(description, tags, appearance = null, wornGift = null) {
   if (!plathoWallet?.address) throw new Error('Connect a wallet to publish a channel profile');
   const desc = String(description ?? '').trim();
   const normalizedTags = normalizeProfileTags(tags);
   const linkedLabel = readLinkedPlathoUsername(plathoWallet?.address)?.label ?? '';
   const ownerUsername = linkedLabel ? canonicalUsernameDisplay(linkedLabel) : '';
+  const look = normalizeProfileAppearance(appearance);
   const createdAtSec = Math.floor(Date.now() / 1000);
-  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername }]);
+  const worn = normalizeProfileWornGift(wornGift);
+  const documentBytes = encodeMessageDocumentBlocks([{ type: 'profile', description: desc, tags: normalizedTags, ownerUsername, appearance: look, wornGift: worn }]);
   const [profilePayload] = await createPublicLanePayloadPartsV2({ type: 'post', documentBytes, commentsAllowed: false });
   if (!profilePayload) throw new Error('Channel profile produced no payload');
 
   const walletHash = publicWalletHash(plathoWallet.address);
-  const bucket = Number(walletHash % BigInt(PUBLIC_BEACON_READ_SPACE));
+  const bucket = await chooseChannelBeaconBucket(walletHash, createdAtSec);
+  // The channel half of a profile save is an ordinary channel entry and rolls its shard seq like any other.
+  const profileEpochTag = publicEpochTag(0, publicEraOf(0, createdAtSec));
+  const profileShard = await resolvePublicWriteShard(directPublicLaneReader(), {
+    kind: 0,
+    partitionKeyOf: (seq) => publicChannelPartitionKey(walletHash, seq),
+    epochTag: profileEpochTag,
+    need: 1,
+    nowUnix: createdAtSec,   // the probe's generation follows the instant the parts are stamped with
+  });
+  const profileShardSeq = profileShard.seq;
   const channelPart = {
-    kind: 0, keyArg: 0n, header: profilePayload.headerCell, body: profilePayload.bodyCell,
-    value: publicPublishValueForKind(0), partitionKey: await publicChannelPartitionKey(walletHash, 0), epochTag: publicEpochTag(0, publicEraOf(0, createdAtSec)),
+    kind: 0, keyArg: 0n, header: profilePayload.headerCell, body: profilePayload.bodyCell, nowUnix: createdAtSec,
+    value: publicPublishValueForKind(0), partitionKey: await publicChannelPartitionKey(walletHash, profileShardSeq), epochTag: profileEpochTag,
+    shardLive: profileShard.live,
   };
   const beaconPart = {
-    kind: 2, keyArg: BigInt(bucket), header: profilePayload.headerCell, body: profilePayload.bodyCell,
+    kind: 2, keyArg: BigInt(bucket), header: profilePayload.headerCell, body: profilePayload.bodyCell, nowUnix: createdAtSec,
     value: publicPublishValueForKind(2), partitionKey: await publicBeaconPartitionKey(bucket), epochTag: publicEpochTag(2, publicEraOf(2, createdAtSec)),
   };
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   // Affordability before signing — the eighth direct-pay send, and the only one that never had this check. Both legs
   // ride ONE transfer under SendIgnoreErrors, so an underfunded save could land the channel write and drop the
   // beacon: a description saved but never discoverable, with nothing on screen saying so.
-  await assertWalletGramAtLeast(
-    channelPart.value + beaconPart.value
-      + walletSendFeeReserveNanotons([profilePayload.sizeClass, profilePayload.sizeClass]), 'save a channel description');
-  const result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, [channelPart, beaconPart]);
-  return { result, description: desc, tags: normalizedTags, ownerUsername, createdAtSec };
+  const profileNeed = channelPart.value + beaconPart.value + squatCushionNanotons(LANE_PUBLIC) * 2n
+      + walletSendFeeReserveNanotons([profilePayload.sizeClass, profilePayload.sizeClass]);
+  await assertWalletGramAtLeast(profileNeed, 'save a channel description');
+  const result = await publishPublicLaneParts({ wallet: plathoWallet, transport, ...(await publicPublishRouting()) }, [channelPart, beaconPart],
+    { assertAffordable: (extra) => assertWalletGramAtLeast(profileNeed + extra, 'save a channel description') });
+  return { result, description: desc, tags: normalizedTags, ownerUsername, appearance: look, wornGift: worn, createdAtSec };
 }
 
-async function publishChannelProfile(description, tags) {
-  return publishChannelProfileDirect(description, tags);
+async function publishChannelProfile(description, tags, appearance = null, wornGift = null) {
+  return publishChannelProfileDirect(description, tags, appearance, wornGift);
+}
+
+/** The worn gift's item address as the block carries it (raw), or null when nothing is worn. */
+function wornGiftClaimAddress() {
+  if (!wornGiftTheme?.itemAddress) return null;
+  try {
+    return normalizeProfileWornGift(parseTonAddress(wornGiftTheme.itemAddress).raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * WEARING IS FOR OTHERS TO SEE [owner, 2026-09-09: the point of wearing a gift is showing it to other people, not
+ * admiring it alone]. A worn gift is local until it is PUBLISHED: the profile block carries its claim, readers prove
+ * it against the wallet's own proven gift list (wornGiftAmong), and only a proven claim dresses the profile card's
+ * hero on their side. So "wear" offers the publication right away, priced, and never publishes on its own.
+ *
+ * TWO CLAIMS, NOT ONE [owner, later the same day: "wearing a gift does not have to show on the channel — maybe I
+ * only wanted it on the profile"]: the block carries the WORN gift (the card) apart from the channel's look, whose
+ * gift is the look editor's own choice. Wearing republishes the block with the look exactly as it stands.
+ */
+function claimedGiftAddress(appearance) {
+  return normalizeProfileAppearance(appearance)?.itemAddress ?? null;
+}
+
+/**
+ * The gift a profile says its wallet WEARS: the worn-gift claim, or — for a block from before the claim had its own
+ * field — the appearance's gift (the old "my worn gift" channel look), so nobody undresses on the day of the change.
+ */
+function profileWornGiftClaim(profile) {
+  return normalizeProfileWornGift(profile?.wornGift ?? null) ?? claimedGiftAddress(profile?.appearance ?? null);
+}
+
+function sameGiftItem(a, b) {
+  if (!a || !b) return false;
+  try {
+    return String(parseTonAddress(a).raw).toLowerCase() === String(parseTonAddress(b).raw).toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+/** TRUE when the profile on chain (or this device's optimistic copy of it) claims this gift for the wallet. */
+function wornGiftPublished(itemAddress) {
+  const own = rawWalletAddress(plathoWallet?.address);
+  if (!own || !itemAddress) return false;
+  return sameGiftItem(profileWornGiftClaim(cachedChannelProfile(own)), itemAddress);
+}
+
+/**
+ * ONE PUBLISH FOR EVERYTHING WORN. The profile block carries the description, the tags, the worn NAME
+ * (publishChannelProfileDirect reads the linked .ath itself) and the worn GIFT's claim — so whichever of them the
+ * user just changed, the same priced dialog republishes the block as it stands now. Wearing a gift and wearing a
+ * name both come here with their own words; the block is one.
+ */
+async function offerProfileBlockPublish({ title, hint, submitLabel, failure }) {
+  const wallet = rawWalletAddress(plathoWallet?.address);
+  if (!wallet || !hasActivePlathoAccount()) return false;
+  let current = cachedChannelProfile(wallet);
+  if (!current || !current.fetchedAt) {
+    try { current = await resolveChannelProfile(wallet); } catch { current = cachedChannelProfile(wallet); }
+  }
+  const description = String(current?.description ?? '');
+  const tags = Array.isArray(current?.tags) ? current.tags : [];
+  // The channel's look stays exactly as it stands on chain; only the WORN gift's claim follows wear / take-off.
+  const appearance = normalizeProfileAppearance(current?.appearance ?? null);
+  const wornGift = wornGiftClaimAddress();
+  let cost = '';
+  try {
+    cost = t('common.gramCostValue', { amount: formatTonNanotonsUp(estimatedChannelProfileChargeNanotons(description, tags, appearance, wornGift)) });
+  } catch { cost = ''; }
+  const result = await openActionDialog({
+    title,
+    hint,
+    submitLabel,
+    checkingHint: t('public.descriptionSaving'),
+    summary: cost ? [{ label: t('common.cost'), value: cost }] : [],
+    fields: [],
+    validateSubmit: async () => {
+      if (tonRpcLimited()) return { ok: false, error: t('sync.rpcBusy') };
+      try {
+        const published = await publishChannelProfile(description, tags, appearance, wornGift);
+        const meta = { description: published.description, tags: published.tags, ownerUsername: published.ownerUsername, appearance: published.appearance ?? null, wornGift: published.wornGift ?? null };
+        setChannelProfileOptimistic(wallet, meta, published.createdAtSec);
+        return { ok: true, result: { status: 'submitted' } };
+      } catch (error) {
+        if (noteTonRpcRateLimit(error)) return { ok: false, error: t('sync.rpcBusy') };
+        console.error(error);
+        return { ok: false, error: failure };
+      }
+    },
+  }).catch(() => null);
+  return result?.status === 'submitted';
+}
+
+async function offerWornGiftPublish(gift, { remove = false } = {}) {
+  if (!gift) return false;
+  return offerProfileBlockPublish({
+    title: remove ? t('gift.unpublishTitle') : t('gift.publishTitle', { name: gift.name }),
+    hint: remove ? t('gift.unpublishHint') : t('gift.publishHint'),
+    submitLabel: remove ? t('gift.unpublishSubmit') : t('gift.publishSubmit'),
+    failure: t('gift.publishFailed'),
+  });
+}
+
+/** TRUE when the profile on chain (or this device's optimistic copy of it) names this .ath for the wallet. */
+function wornNamePublished(label) {
+  const own = rawWalletAddress(plathoWallet?.address);
+  if (!own || !label) return false;
+  const claimed = canonicalUsernameDisplay(String(cachedChannelProfile(own)?.ownerUsername ?? '')).toLowerCase();
+  return Boolean(claimed) && claimed === canonicalUsernameDisplay(label).toLowerCase();
+}
+
+// The same offer for a NAME [owner, 2026-09-09]: private chats already prove the worn name on every message, but the
+// feed, the channel and the card read it from the profile block — so wearing a name offers the block's publication.
+async function offerWornNamePublish(label, { remove = false } = {}) {
+  if (!label) return false;
+  const name = canonicalUsernameDisplay(label);
+  return offerProfileBlockPublish({
+    title: remove ? t('username.unpublishTitle') : t('username.publishTitle', { name }),
+    hint: remove ? t('username.unpublishHint') : t('username.publishHint'),
+    submitLabel: remove ? t('gift.unpublishSubmit') : t('gift.publishSubmit'),
+    failure: t('username.publishFailed'),
+  });
 }
 
 // Publish a comment DIRECT-PAY into the parent post's THREAD shard. The thread partition is f(post_uid), post_uid
@@ -30089,23 +35197,39 @@ async function submitPublicCommentDirect(parent, bodyText = null, draftAttachmen
   // source as the rest — defaulting it to 0 would address the wrong channel shard for an overflow-shard post,
   // and its thread would never be found.
   const channelPk = await publicChannelPartitionKey(publicWalletHash(parentCoords.authorWallet), parentCoords.shardSeq);
-  const postUid = await publicPostUid(channelPk, parentCoords.epochTag, parentCoords.shardEntryId);
-  const threadPk = await publicThreadPartitionKey(postUid, 0);
-  const threadEpochTag = publicEpochTag(1, publicEraOf(1, Math.floor(Date.now() / 1000)));
+  // The parent's generation folds into its post_uid, so a comment lands in the thread of the post it answers —
+  // not in the one its straddle-era twin shares [round 5].
+  const postUid = await publicPostUid(channelPk, parentCoords.epochTag, parentCoords.shardEntryId, parentCoords.generation);
+  // ONE instant for the probe, the era AND the generation [round 5; audit 2026-09-05, round 2], as on the post path.
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const threadEpochTag = publicEpochTag(1, publicEraOf(1, nowUnix));
+  const threadShard = await resolvePublicWriteShard(directPublicLaneReader(), {
+    kind: 1,
+    partitionKeyOf: (seq) => publicThreadPartitionKey(postUid, seq),
+    epochTag: threadEpochTag,
+    need: payloads.length,
+    nowUnix,
+  });
+  const threadShardSeq = threadShard.seq;
+  const threadPk = await publicThreadPartitionKey(postUid, threadShardSeq);
   const value = publicPublishValueForKind(1);
   const parts = payloads.map((payload) => ({
-    kind: 1, keyArg: postUid, header: payload.headerCell, body: payload.bodyCell, value, partitionKey: threadPk, epochTag: threadEpochTag,
+    kind: 1, keyArg: postUid, header: payload.headerCell, body: payload.bodyCell, value, partitionKey: threadPk, epochTag: threadEpochTag, nowUnix,
+    shardLive: threadShard.live,
   }));
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
 
   // Same two rules as the post path: pre-check the wallet (SendIgnoreErrors drops unfundable actions silently)
   // and keep the record pending after broadcast until the chain twin appears.
-  await assertWalletGramAtLeast(
-    value * BigInt(parts.length) + walletSendFeeReserveNanotons(payloads.map((payload) => payload.sizeClass)), 'comment');
+  await assertNotRestrictedForPublicPublishing();
+  const commentNeed = (value + squatCushionNanotons(LANE_PUBLIC)) * BigInt(parts.length)
+    + walletSendFeeReserveNanotons(payloads.map((payload) => payload.sizeClass));
+  await assertWalletGramAtLeast(commentNeed, 'comment');
 
   let result;
   try {
-    result = await publishPublicLaneParts({ wallet: plathoWallet, transport }, parts);
+    result = await publishPublicLaneParts({ wallet: plathoWallet, transport, ...(await publicPublishRouting()) }, parts,
+      { assertAffordable: (extra) => assertWalletGramAtLeast(commentNeed + extra, 'comment') });
   } catch (error) {
     // Same rule as the post path — a signed external is retained and resent, not written off.
     const ambiguous = publicAmbiguousPublishPatch(error, 'comment unconfirmed, retrying');
@@ -30168,7 +35292,7 @@ async function refreshVaultActivationStatus(options = {}) {
     // outer catch, which PRESERVES the existing binding. [activation review: transient read flips activated→activate]
     let view;
     try {
-      view = await withVaultReadLock(() => provider.getView(forWallet, { verify: true, priority: 'critical', cacheTtlMs: 0 }));
+      view = await withVaultReadLock(() => provider.getView(forWallet, { verify: true, priority: 'critical', cacheTtlMs: 0, stopOnUninitializedAccount: true }));
     } catch (readError) {
       if (!isKeyShardUninitError(readError)) throw readError;
       view = { exists: false };
@@ -30245,8 +35369,7 @@ function setBootDebug(step) {
 // falling back to a main-thread loop otherwise. Returns a stop() that tears the animation down.
 function startBootSignalField(canvas) {
   if (!canvas) return () => {};
-  // THE LOADING SCREEN WEARS THE SAME BACKGROUND THE APP DOES [OWNER 2026-08-23: "if the user picks plasma, let it
-  // slosh on the loading screen too; if they turned the background off, there must be none there either"]. The
+  // THE LOADING SCREEN WEARS THE SAME BACKGROUND THE APP DOES [decided 2026-08-23]. The
   // choice is in localStorage and is read before anything starts, so this needs no app state to be up yet.
   if (backgroundMode === 'none') { canvas.hidden = true; return () => {}; }
   if (backgroundMode === 'plasma') return startBootPlasmaField(canvas);
@@ -30255,10 +35378,15 @@ function startBootSignalField(canvas) {
   // Preferred path: transfer the canvas to a worker and animate there, immune to main-thread jank.
   if (typeof Worker !== 'undefined' && typeof canvas.transferControlToOffscreen === 'function') {
     try {
-      const worker = new Worker('./boot-signal-worker.js?v=2', { type: 'module' });
+      const worker = new Worker('./boot-signal-worker.js?v=15', { type: 'module' });
       const offscreen = canvas.transferControlToOffscreen();
+      // THE MARK IS NOT PART OF THIS PAYLOAD. nodesFieldOptions() carries a canvas, and a canvas cannot be
+      // structured-cloned — posting it throws, the catch below abandons the worker, and the boot field lands on
+      // the main thread this worker exists to keep it off. The sliders are copied by name; the mark follows as an
+      // ImageBitmap once it is decoded.
+      const { mark: _boot_mark_not_cloneable, ...sliders } = nodesFieldOptions();
       worker.postMessage(
-        { type: 'init', canvas: offscreen, width: window.innerWidth, height: window.innerHeight, dpr, reduceMotion, ...nodesFieldOptions() },
+        { type: 'init', canvas: offscreen, width: window.innerWidth, height: window.innerHeight, dpr, reduceMotion, ...sliders, patternUrl: bootFieldPatternUrl(), ink: bootFieldInk() },
         [offscreen],
       );
       const onResize = () => { try { worker.postMessage({ type: 'resize', width: window.innerWidth, height: window.innerHeight }); } catch { /* worker gone */ } };
@@ -30279,6 +35407,14 @@ function startBootSignalField(canvas) {
   const field = createBootSignalField(ctx, { reduceMotion, ...nodesFieldOptions() });
   field.resize(window.innerWidth, window.innerHeight, dpr);
   field.start();
+  // The fallback path is the main thread, so this decode competes with the boot's crypto exactly as the first
+  // version did — best effort, and it is the rare path (no OffscreenCanvas). The worker path above does not wait.
+  const patternUrl = bootFieldPatternUrl();
+  if (patternUrl && typeof createImageBitmap === 'function') {
+    fetch(patternUrl).then((r) => r.blob()).then((b) => createImageBitmap(b))
+      .then((bitmap) => { field.setMark(bitmap); field.paintOnce(); })
+      .catch(() => { /* dots */ });
+  }
   let raf = null;
   let stopped = false;
   const loop = (now) => { raf = null; if (stopped) return; field.tick(now); raf = requestAnimationFrame(loop); };
@@ -30548,7 +35684,13 @@ async function bootCrypto() {
     // activation + private-sync reads above and BEFORE the background loop / vault auto-refresh timers are
     // armed below, so no avatar read overlaps another chain read on iOS (v509 class). Cached avatars resolve
     // instantly (IndexedDB) so this rarely blocks; an uncached avatar pays one serial read, never a freeze.
-    await refreshOwnProfileAvatar().catch((error) => console.error(error));
+    await refreshOwnProfileAvatar().catch((error) => {
+      // No KeyShard yet is an ANSWER (the wallet has not activated), not a failure worth a stack trace; a rate
+      // limit is the queue's business. Everything else is still surfaced. MEASURED 2026-09-09: an unactivated
+      // wallet's unlock printed five "-13" errors from this path and its siblings.
+      if (isUninitializedAccountError(error)) return;
+      if (!noteTonRpcRateLimit(error)) console.error(error);
+    });
     scheduleMessageAutoSync();
     armIntroReceiveLane().catch((error) => console.warn('[intro] arm on unlock failed', error));
     if (isVaultViewActive()) {
@@ -30575,6 +35717,46 @@ async function bootCrypto() {
 }
 
 initTelegramMiniApp();
+
+// THE CUTOVER UPDATE GATE [CUTOVER.md items 6/7, owner ruling 2026-08-31]. Past the baked boundary epoch this
+// build's writes are unreadable and its intro sweep reads addresses nobody writes — so the screen goes up, the
+// sweep stops, and the wallet lane refuses sends (platho-wallet.mjs, the one funnel). Checked at load and once
+// a minute: the epoch flips at UTC midnight and an app left open must block AT the flip, not at next launch.
+// Dormant while CUTOVER_EPOCH is null — cutoverUpdateRequired() is then constant false and nothing here runs.
+function refreshCutoverGate() {
+  const screen = document.getElementById('cutoverScreen');
+  if (!cutoverUpdateRequired()) {
+    // NOT A ONE-WAY LATCH [audit 2026-08-31, round 8]. This used to return here, so nothing ever removed
+    // `inert` or re-hid the screen. The gate is Date.now()-driven and this runs on a 60 s tick: a device whose
+    // clock runs ahead raises it, and when NTP corrects the clock the app stays blocked and untouchable until
+    // the user reloads by hand — a self-inflicted outage on a screen whose only control is "reload". Being
+    // symmetric costs nothing on the boundary release, where the condition never goes back.
+    const wasBlocked = screen ? screen.hidden !== true : false;
+    if (wasBlocked) screen.hidden = true;
+    document.querySelector('.app-shell')?.removeAttribute('inert');
+    // AND GIVE BACK WHAT RAISING THE GATE TOOK AWAY [audit 2026-09-01, round 9]. Raising it calls
+    // stopIntroReceiveLane(); the round-8 reversal put the screen down and the shell back but left the lane
+    // stopped, so a device whose clock ran ahead — the only way to get here — silently received no first contacts
+    // for the rest of the session. The two re-arm sites (unlock, visibilitychange) need not fire again.
+    if (wasBlocked) armIntroReceiveLane().catch((error) => console.warn('[intro] arm after cutover gate cleared failed', error));
+    return;
+  }
+  if (screen) screen.hidden = false;
+  // NOTHING BEHIND IT IS REACHABLE [audit 2026-08-31, round 7]. Measured with the screen up: 43 focusable
+  // controls still tabbable behind it, no aria of any kind, and Ctrl/Cmd+Enter in the composer still fired a
+  // send the screen says is impossible. `inert` takes the whole shell out of focus, hit-testing and the
+  // accessibility tree in one attribute; moving focus to the one live control is what a screen-reader user
+  // needs to hear that the app is blocked at all.
+  document.querySelector('.app-shell')?.setAttribute('inert', '');
+  const reload = document.getElementById('cutoverReloadButton');
+  // preventScroll for the same reason every other focus in this file carries it (PWA-IOS-FOCUS-01): letting the
+  // browser bring the control into view scrolls the PAGE, and this screen is position:fixed with its own scroll.
+  if (reload && document.activeElement !== reload) reload.focus({ preventScroll: true });
+  stopIntroReceiveLane();
+}
+document.getElementById('cutoverReloadButton')?.addEventListener('click', () => window.location.reload());
+refreshCutoverGate();
+setInterval(refreshCutoverGate, 60_000);
 
 if ('serviceWorker' in navigator && window.isSecureContext) {
   let serviceWorkerRefreshing = false;
@@ -30625,6 +35807,7 @@ for (const eventName of ['pointerdown', 'keydown', 'touchstart']) {
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
+    flushPublicFeedRead();   // the reader put the app away: what was on screen has been seen
     clearMessageAutoSyncTimer();
     clearVaultAutoRefreshTimer();
     stopIntroReceiveLane();
@@ -30707,11 +35890,8 @@ document.addEventListener('touchcancel', releasePageDragRefusal, { passive: true
 window.addEventListener('resize', () => {
 }, { passive: true });
 
-customPublicChannels = readCustomPublicChannels();
-rebuildPublicChannelRegistry();
-publicChannelSubscriptions = readPublicChannelSubscriptions(publicChannelStorage(), publicChannelRegistry);
+hydratePersonalPublicState();
 writePublicChannelSubscriptions(publicChannelStorage(), publicChannelSubscriptions);
-loadPrefsSyncMeta();
 refreshGlobalSyncIndicator();
 publicChannelFeedCache = readPublicChannelFeedCache(publicChannelStorage());
 publicChannelProfileCache = readPublicChannelProfileCache(publicChannelStorage());
@@ -30735,11 +35915,12 @@ let publicBootFeedRendered = false;
 // (the blanket no-concurrent-read guard; these are local IndexedDB reads, but the rule is a literal ban and
 // serial is plenty fast). Bounded by one boot deadline so a slow/unavailable IndexedDB can never hang boot.
 const publicBootMediaWarm = (async () => {
-  await warmPublicChannelAvatarsFromCache();
-  const changed = await warmPublicPostImagesFromCache().catch(() => false);
+  const facesChanged = await warmPublicChannelAvatarsFromCache().catch(() => false);
+  const changed = (await warmPublicPostImagesFromCache().catch(() => false)) || facesChanged;
   // If this warm already landed BEFORE the boot render (won the race), the boot render below reflects it and
   // publicBootFeedRendered is still false → no redundant repaint. If it lands AFTER (slow IndexedDB lost the
-  // race), re-render so the post image still appears in ms, not only after the serial chain sync.
+  // race), re-render so the post image — AND THE FACES, which used to be left out of this [2026-09-07] — still
+  // appear in ms, not only after the serial chain sync.
   if (changed && publicBootFeedRendered) {
     rebuildThreadsFromPublicSubscriptions({ preserveActive: true });
     renderThreads();
@@ -30755,8 +35936,6 @@ setTimeout(() => { void migrateLegacyAvatarMediaCacheToIndexedDb(); }, 0);
 // re-serialize of the old store does not block boot; it runs before the user can navigate to the Vault tab.
 // The in-memory cache keeps its media for rendering; only the persisted copy is lightened.
 setTimeout(() => { try { writePublicChannelFeedCache(publicChannelStorage(), publicChannelFeedCache); } catch {} }, 0);
-publicReadCursors = readScopedJsonMap(PUBLIC_READ_CURSORS_STORAGE_KEY);
-publicCommentReadCursors = readScopedJsonMap(PUBLIC_COMMENT_READ_CURSORS_STORAGE_KEY);
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
 renderConfiguredShell();
 renderDocsNav();
@@ -30972,7 +36151,7 @@ function quickStartActivationUnderfunded() {
 //                 you can skip this" — the wrong problem, and it walks them away from a five-second fix.
 //   underfunded — a button that is going to refuse reads as broken, which is the complaint that started this pass.
 
-// CONFIRMED BY THE CHAIN, never by the broadcast. [OWNER 2026-08-13] The step reported "Done" the instant the
+// CONFIRMED BY THE CHAIN, never by the broadcast. [decided 2026-08-13] the instant the
 // external was accepted, and the Profile tab — which reads the shard — went on offering activation. Two surfaces
 // disagreeing about one account, both seen within a minute. The transaction did land later, so this is not a lost
 // send; it is the app stating a settled fact it had not read. Same rule the public lane was cured of this week.
@@ -31039,8 +36218,8 @@ function buildQuickStartActivateBody() {
     const bal = quickStartWalletTonNanotons();
     const fee = plathoAccountActivationFeeNanotons();
     summary.textContent = bal === null
-      ? t('quickstart.activationNeedsChecking', { fee: formatTonNanotons(fee) })
-      : t('quickstart.balanceActivationNeeds', { balance: formatTonNanotons(bal), fee: formatTonNanotons(fee) });
+      ? t('quickstart.activationNeedsChecking', { fee: formatTonNanotonsUp(fee) })
+      : t('quickstart.balanceActivationNeeds', { balance: formatTonNanotons(bal), fee: formatTonNanotonsUp(fee) });
     // Locked outranks short of funds: it blocks regardless of the balance, and unlike an empty wallet it is
     // fixable on the spot. maybeResumeQuickStartAfterUnlock re-renders this step, so unlocking updates it.
     const locked = !plathoWallet;
@@ -31104,7 +36283,7 @@ function buildQuickStartActivateBody() {
 // action out of the footer leaves the footer doing one job: Back and Continue, which is all a stepper footer
 // should ever mean. Feedback goes to the step status line, mirroring what the footer action used to report.
 function buildQuickStartBackupBody() {
-  // [OWNER 2026-08-10] TWO buttons, each with a line saying what it saves. The inline phrase + "type SAVED" that
+  // [decided 2026-08-10] that
   // stood here read as a school exercise and, worse, the file button sat under the words with nothing explaining
   // it was a different thing. Both actions reuse the flows the Wallet tab already uses.
   const wrap = document.createElement('div');
@@ -31136,10 +36315,52 @@ function buildQuickStartBackupBody() {
     if (walletLeftForegroundSinceUnlock && !(await confirmWalletPasswordForExport(wallet))) return;
     await showWalletSeed(t('wallet.recoveryPhrase'), exportPlathoWalletRecoveryPhrase(wallet));
   });
-  plate(t('quickstart.keyFilePlateNote'), t('quickstart.saveWalletKeyAction'), async () => {
-    const ok = await exportEncryptedWalletKeyFile(plathoWallet ?? null);
-    setText(quickStartStepStatus, ok === false ? t('quickstart.notCompleted') : t('quickstart.done'));
+  // THE QUESTION THE BROWSER CANNOT ANSWER. An <a download> click reports nothing: in an embedded browser it opens
+  // the HOST's save dialog, and a cancelled dialog is indistinguishable from a saved file. This step is MANDATORY
+  // and used to write "done" on that click, so a cancelled save left the wizard satisfied and the wallet with no
+  // backup at all [owner-run test, 2026-09-09]. Where showSaveFilePicker exists the write proves itself and this
+  // row never appears; everywhere else the row IS the proof, and until it is tapped the pending-backup nudge stays.
+  const confirm = document.createElement('div');
+  confirm.className = 'quick-start-key-confirm';
+  confirm.hidden = true;
+  const question = document.createElement('div');
+  question.className = 'quick-start-step-hint';
+  question.textContent = t('quickstart.keyFileConfirmQuestion');
+  const yes = document.createElement('button');
+  yes.type = 'button';
+  yes.className = 'discovery-cta-action quick-start-key-cta';
+  yes.textContent = t('quickstart.keyFileConfirmYes');
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'discovery-cta-action';
+  again.textContent = t('quickstart.keyFileDownloadAgain');
+  confirm.append(question, yes, again);
+  const runKeyExport = async () => {
+    const outcome = await exportEncryptedWalletKeyFile(plathoWallet ?? null);
+    if (outcome === false) { setText(quickStartStepStatus, t('quickstart.notCompleted')); return; }
+    if (outcome === 'cancelled') {
+      confirm.hidden = true; quickStartKeyFileAwaitingConfirm = false;
+      setText(quickStartStepStatus, t('quickstart.keyFileSaveCancelled'));
+      return;
+    }
+    if (outcome === 'triggered') {
+      confirm.hidden = false; quickStartKeyFileAwaitingConfirm = true;
+      setText(quickStartStepStatus, t('quickstart.keyFileConfirmQuestion'));
+      return;
+    }
+    confirm.hidden = true; quickStartKeyFileAwaitingConfirm = false;
+    setText(quickStartStepStatus, t('quickstart.keyFileSaved'));
+  };
+  plate(t('quickstart.keyFilePlateNote'), t('quickstart.saveWalletKeyAction'), runKeyExport);
+  yes.addEventListener('click', () => {
+    confirmWalletKeyBackupArrived();
+    confirm.hidden = true; quickStartKeyFileAwaitingConfirm = false;
+    setText(quickStartStepStatus, t('quickstart.keyFileSaved'));
   });
+  again.addEventListener('click', () => { runKeyExport().catch((error) => console.error(error)); });
+  wrap.append(confirm);
+  // Survive a re-render: the answer is still owed if the click happened and the key is still not backed up.
+  if (quickStartKeyFileAwaitingConfirm && walletKeyBackupPendingForStoredWallet()) confirm.hidden = false;
   return wrap;
 }
 
@@ -31181,9 +36402,7 @@ function quickStartCreateWalletPassword() {
 
 // ── INSTALL, AS A STEP RATHER THAN AN AFTERTHOUGHT ────────────────────────────────────────────────────────────
 //
-// [OWNER 2026-08-13] "the last step offered to install the app. That part is fine, but the last step is a modal,
-// not in the wizard's style. Fold it into the wizard's steps and dress it properly. And the step before it should
-// say Next, not Finish." Exactly: the wizard finished, and a modal in a different visual language arrived on top of
+// [decided 2026-08-13] Exactly: the wizard finished, and a modal in a different visual language arrived on top of
 // it to ask for one more thing. So the ask moves INTO the wizard as its final step — same header, same counter,
 // same footer — and the modal is dropped for anyone who saw the step (dropDeferredInstallPrompt).
 //
@@ -31367,7 +36586,7 @@ const QUICK_START_STEPS = [
   {
     key: 'activate',
     title: () => t('quickstart.activateTitle'),
-    // [OWNER 2026-08-13] Plainly "Next". This used to be the last step and said "Done", which is why the install
+    // [decided 2026-08-13]. This used to be the last step and said "Done", which is why the install
     // invitation had to arrive afterwards as a modal in nobody's style; now installing IS the last step and this
     // one only moves on, whether the activation ran, is settling, or has to wait for funds.
     action: () => t('common.next'),
@@ -31465,6 +36684,10 @@ function quickStartAdvance() {
 // exists), closing it must NOT permanently dismiss onboarding — the backup is still pending and should
 // re-surface next launch. quickStartBackupMode tracks that so closeQuickStart skips the dismissed-forever flag.
 let quickStartBackupMode = false;
+// An <a download> click that has not been answered yet. It has to outlive the body, because renderQuickStartStep
+// rebuilds body() and blanks the status line on every render (language switch, Back-then-forward, resume-on-boot) —
+// the question would otherwise vanish and the step look untouched.
+let quickStartKeyFileAwaitingConfirm = false;
 
 function closeQuickStart() {
   hideDialogAnimated(quickStartDialog);
@@ -31787,6 +37010,7 @@ setupEmojiPicker();
 renderAthProfileStats();
 refreshProfileFeeLabels();
 updatePublicCommentsDefaultUi();
+refreshChannelAppearanceUi();
 updatePrivateSenderModeUi();
 setPublicCommentTarget(null);
 rebuildThreadsFromPublicSubscriptions({ preserveActive: false });
@@ -31807,6 +37031,10 @@ refreshMessagingControls();
 // document.hidden and re-arms on visibility/focus/pageshow.
 scheduleMessageAutoSync(2_000);
 document.documentElement.dataset.plathoAppJs = 'ready';
+// THE BOOT DECISION IS FAST, SO IT CAN BE WRONG — and then it has to be corrected. Set only when the decision
+// below found no wallet at all; a CloudStorage restore that lands afterwards reads it to know that the unlock it
+// should have produced was never shown.
+let bootDecidedWithNoWallet = false;
 bootCrypto()
   .then(() => { setBootDebug('crypto-locked'); })
   // ALL Telegram-CloudStorage restores are bounded by a single race: telegramCloudGet has no timeout, so a slow
@@ -31817,6 +37045,16 @@ bootCrypto()
   .then(() => {
     setBootDebug('restore');
     const walletRestore = restoreWalletRecordFromTelegramCloud().catch(() => false);
+    // LOSING THE RACE IS NOT THE SAME AS FINDING NOTHING. Whichever way the race goes this keeps running, and a
+    // restore that finishes after the decision used to write the wallet somewhere nobody would look again until
+    // the next launch — the app meanwhile offering to create one, which overwrites both this record and the cloud
+    // mirror it came from. The unlock prompt guards itself on the wallet being stored, locked and not already
+    // being asked for, so calling it late is safe in either order.
+    walletRestore.then((restored) => {
+      if (!restored || !bootDecidedWithNoWallet) return;
+      bootDecidedWithNoWallet = false;
+      return promptStoredWalletUnlockOnStartup();
+    }).catch((error) => console.error(error));
     const dismissalRestore = restoreQuickStartDismissalFromTelegramCloud().catch(() => {});
     const backupRestore = restoreWalletKeyBackupPendingFromTelegramCloud().catch(() => {});
     return Promise.race([
@@ -31846,6 +37084,7 @@ bootCrypto()
       void runBootScreenUnlock();
     } else {
       // Nothing to unlock (no wallet, or already unlocked) — reveal the app.
+      bootDecidedWithNoWallet = !hasWallet;
       markBootAppReady();
     }
   })
@@ -31863,6 +37102,3209 @@ bootCrypto()
     return undefined;
   })
   .catch((error) => { setBootDebug(`boot-chain-err ${error?.message ?? error}`); console.error(error); });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// TELEGRAM GIFTS — the corner, the theme they tint, and the profile card behind both.
+//
+// EVERYTHING HERE IS DECORATION AND IS LOCAL. Wearing a gift writes nothing to the chain and tells nobody: the
+// choice is a preference on this device, and what it changes is what THIS app looks like. Which is also why the
+// feature needs no contract, no pointer and no migration — the only chain traffic is reading, and a wallet's gifts
+// are public by construction. A contact's card reads THEIR wallet the same way; nothing private is involved on
+// either side.
+//
+// PLACEMENT: after every declaration it reads and immediately BEFORE the module's install-prompt tail, which is
+// pinned as the last top-level statement (PWA-QSTDZ-01) precisely so nothing can be added past it into a dead zone.
+// The one function an earlier surface calls is guarded on a plain global, so a boot-time call cannot reach one.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** The worn gift and the appearance derived from it. Per device, per wallet; cosmetic, so a loss costs nothing. */
+const GIFT_THEME_STORAGE_KEY = 'platho.giftTheme.v1';
+/**
+ * WHICH PALETTE THE GIFT THEME IS. Dark [owner, 2026-09-07], and not measured from anything.
+ *
+ * It used to be derived: the palette whose background the gift's colour showed up against best. That is a real
+ * measurement of the wrong quantity, and putting on a black gift proved it — the app went WHITE, because a dark
+ * colour stands out against a light ground. Nobody buys a black gift for a white app. What a gift theme is for is
+ * the gift's mood, and every one of these backdrops is a mood that belongs on a dark app.
+ *
+ * A light variant, if it comes, is this constant and nothing else: giftAccentFromStop already takes the palette as
+ * an argument and carries both palettes' colours.
+ */
+const TELEGRAM_GIFT_THEME_PALETTE = 'dark';
+
+/**
+ * The two themes' backgrounds. Mirrors `--bg` in styles.css for `:root` and `:root[data-theme="light"]`.
+ */
+const TELEGRAM_GIFT_DARK_THEME_BG = [0x0a, 0x0f, 0x12];
+const TELEGRAM_GIFT_LIGHT_THEME_BG = [0xe9, 0xf0, 0xee];
+/**
+ * The two themes' accent pairs and the ink that rides them.
+ *
+ * The accents are NOT used as colours — a worn gift replaces them. They are here for the STEP between the pair:
+ * `--accent-hi` is one notch further from the page than `--accent`, and the gift's pair keeps the same notch.
+ * The ink is used as a colour, because the label on a button has to be legible on whatever the gift turns out to
+ * be, and that is measured rather than assumed.
+ *
+ * Mirrors `--accent`, `--accent-hi` and `--on-accent` in styles.css for `:root` and `:root[data-theme="light"]`.
+ */
+const TELEGRAM_GIFT_DARK_THEME_ACCENT = [0x30, 0xd5, 0xb0];
+const TELEGRAM_GIFT_DARK_THEME_ACCENT_HI = [0x4c, 0xe4, 0xc3];
+const TELEGRAM_GIFT_DARK_THEME_ON_ACCENT = [0x04, 0x21, 0x1a];
+const TELEGRAM_GIFT_LIGHT_THEME_ACCENT = [0x0f, 0x9d, 0x81];
+const TELEGRAM_GIFT_LIGHT_THEME_ACCENT_HI = [0x0c, 0x8a, 0x71];
+const TELEGRAM_GIFT_LIGHT_THEME_ON_ACCENT = [0xff, 0xff, 0xff];
+/** WCAG's floor for text, which is what both of these are: the accent on the page, and the label on the accent. */
+const TELEGRAM_GIFT_ACCENT_MIN_CONTRAST = 4.5;
+/**
+ * One's own message bubble, the largest coloured surface in the app.
+ *
+ * Not an alpha of the accent — two specific dark greens, and the near-white text on them depends on how dark they
+ * are. So a gift takes the HUE and leaves the rest: same saturation, same lightness, same contrast under the text.
+ *
+ * Mirrors `--bubble-out` and `--bubble-out-flat` in styles.css, which both palettes share.
+ */
+const TELEGRAM_GIFT_BUBBLE_OUT_STOPS = [[0x1a, 0x64, 0x50], [0x10, 0x3f, 0x34]];
+const TELEGRAM_GIFT_BUBBLE_OUT_FLAT = [0x15, 0x52, 0x43];
+/** Below this a gift has no hue to lend, and anything recoloured from it would be an invented one. */
+const TELEGRAM_GIFT_MIN_SATURATION = 0.05;
+/** A wallet's gift list, re-read at most this often. Gifts move rarely and this list is never load-bearing. */
+const TELEGRAM_GIFT_CACHE_TTL_MS = 5 * 60_000;
+
+let wornGiftTheme = readWornGiftTheme();
+const telegramGiftListCache = new Map();      // wallet raw -> { at, result }
+const telegramGiftArtCache = new Map();       // `${slug}-${number}` -> data: URL
+// ── MOTION: the worn gift animated, as the Gift layer of its own Lottie ──────────────────────────────────────────
+// Declared HERE, above every function that renders the corner: renderBrandGift runs during module evaluation, and
+// a `let` below it would be in its dead zone (the class of bug that has taken this app's boot down before).
+const TELEGRAM_GIFT_LOTTIE_PLAYER_SRC = '/vendor/lottie-web/lottie_light_canvas.min.js?v=1';
+// Ceilings on what a gift host may hand the app: a Lottie file measured at 402 KB, a webp at tens of KB — both ten
+// times that and no more, because both end up parsed and stored on the device.
+const TELEGRAM_GIFT_LOTTIE_MAX_BYTES = 4 * 1024 * 1024;
+const TELEGRAM_GIFT_ART_MAX_BYTES = 2 * 1024 * 1024;
+const telegramGiftLottieCache = new Map();    // `${slug}-${number}` -> the parsed Lottie file, whole
+let telegramGiftLottiePlayerPromise = null;   // one script load, however many players ask for it
+let brandGiftMotion = null;                   // { key, anim } the corner is playing
+let brandGiftMotionToken = 0;                 // a newer wear supersedes a mount still in flight
+let heroGiftMotion = null;                    // { key, anim } the open card is playing
+let heroGiftMotionToken = 0;
+const telegramGiftCropCache = new Map();      // `${slug}-${number}` -> { x, y, side }: the subject's box, as fractions
+const GIFT_SUBJECT_CROP_SAMPLE_PX = 128;      // the probe canvas: coarse is fine, the box gets padding anyway
+const GIFT_SUBJECT_CROP_FRAMES = [0, 45, 90, 135];   // a quarter-loop apart, so the union catches the swing
+const GIFT_SUBJECT_CROP_PAD = 0.04;
+const GIFT_MOTION_RENDER_PX = 512;            // a gift file's own units; the offscreen frame is never smaller
+// One at a time, like every other chain read in this app: a profile card with a dozen gifts is a dozen reads, and
+// two of them running at once is the iOS run-loop stall this codebase keeps paying for.
+const enqueueGiftChainRead = createSerialLane();
+
+function readWornGiftTheme() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GIFT_THEME_STORAGE_KEY) ?? 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    // ONLY WHAT THE WRITER STILL WRITES. This also demanded `resolved` — the palette — until that stopped being
+    // stored and started being derived from the two stops. The writer changed, the validator did not, and every
+    // gift worn after that was saved correctly and then REFUSED on the next load: the app came back undressed with
+    // the theme fallen to plain dark, as if it had forgotten. A record's writer and its validator are one contract.
+    if (!Array.isArray(parsed.tint) || parsed.tint.length !== 3) return null;
+    if (!parsed.tint.every((channel) => Number.isFinite(channel))) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeWornGiftTheme(next) {
+  wornGiftTheme = next;
+  try {
+    if (next) localStorage.setItem(GIFT_THEME_STORAGE_KEY, JSON.stringify(next));
+    else localStorage.removeItem(GIFT_THEME_STORAGE_KEY);
+  } catch { /* best-effort persist — the gift is decoration, not state */ }
+}
+
+/**
+ * THE CHOICE HAS ITS OWN KEY, because it is not a property of any particular gift.
+ *
+ * It used to live inside the worn-gift record, so taking a gift off — which nulls that record — threw the
+ * preference away with it, and the next gift arrived "not chosen": the app went plain and stayed plain until the
+ * user went back into Appearance [owner, 2026-09-06].
+ *
+ * Read from STORAGE rather than module state so the boot-screen helpers can ask the same question while this
+ * module is still evaluating, and answered from the old place when the new key has never been written — which is
+ * the whole migration.
+ */
+const GIFT_THEME_CHOICE_STORAGE_KEY = 'platho.giftTheme.choice.v1';
+
+function giftThemeChosenInStorage() {
+  try {
+    const stored = localStorage.getItem('platho.giftTheme.choice.v1');
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+    const record = JSON.parse(localStorage.getItem('platho.giftTheme.v1') ?? 'null');
+    return record?.theme === true;   // written by a build where the choice lived in the gift's record
+  } catch {
+    return false;
+  }
+}
+
+let giftThemeChoice = null;   // read once, then kept; null means "not read yet", not "not chosen"
+
+function writeGiftThemeChoice(next) {
+  giftThemeChoice = next === true;
+  try {
+    localStorage.setItem(GIFT_THEME_CHOICE_STORAGE_KEY, String(giftThemeChoice));
+  } catch { /* best-effort persist — the gift is decoration, not state */ }
+}
+
+/**
+ * Has the user chosen the gift theme? Distinct from "is a gift worn" AND from "is it in effect": a gift can be
+ * worn with a plain theme, and the choice stands while nothing is worn at all.
+ *
+ * Guarded on the same plain global as renderBrandGift, and for a reason that is not theoretical: refreshAppearanceUi
+ * runs at MODULE-EVALUATION time (app.js binds the appearance sliders and calls it straight away), which is long
+ * before this block's `let` exists. Reading it there threw ReferenceError, and a throw at top level abandons the
+ * REST of the module — the app booted to a DOM with no runtime behind it. Before the flag, the answer is simply
+ * "no gift theme", which is what an app that has not finished loading one should say.
+ */
+function giftThemeChosen() {
+  if (!globalThis.__plathoGiftRuntimeReady) return false;
+  if (giftThemeChoice === null) giftThemeChoice = giftThemeChosenInStorage();
+  return giftThemeChoice;
+}
+
+/** Chosen AND something to derive it from. This is what the app actually looks like. */
+function giftThemeInEffect() {
+  return giftThemeChosen() && Boolean(wornGiftTheme);
+}
+
+/** Turn the gift theme ON. False when there is nothing to derive it from, which the caller reports. */
+function selectGiftTheme() {
+  if (!wornGiftTheme) return false;   // nothing to derive a theme FROM; the caller says so
+  writeGiftThemeChoice(true);
+  applyGiftAppearance();
+  refreshGiftNodeMark();
+  refreshAppearanceUi();
+  return true;
+}
+
+function clearGiftThemeChoice() {
+  if (!giftThemeChosen()) return;
+  writeGiftThemeChoice(false);
+  applyGiftAppearance();
+  refreshGiftNodeMark();
+}
+
+/**
+ * Dress (or undress) the app in the worn gift.
+ *
+ * THE GIFT DOES NOT PAINT THE PAGE [decided 2026-09-06]: "the background must come from the theme,
+ * dark or light; the plasma is the colour of the gift's backdrop; the patterns must not be visible on the
+ * background, they should become visible when the plasma runs over them."
+ *
+ * So exactly one colour crosses over — `--aurora-rgb`, which the plasma paints with. On the theme's own near-black
+ * or near-white ground that colour is finally a colour rather than a shade of the wallpaper it sat on (measured:
+ * as a wallpaper it was 1.13 contrast against itself). The gift's pattern rides the same light and is invisible
+ * without it.
+ *
+ * An earlier take made `--bg` the gift's backdrop. It was wrong twice over: it dressed the app in the gift instead
+ * of dressing the gift in the app, and it dragged in a rail surface, harder card glass and an ambient wash that
+ * existed only to survive it. All three are gone with it.
+ *
+ * Set through CSSOM, never a style attribute — `style-src 'self'` drops the attribute form silently. The forced
+ * theme goes through the app's own applyForcedTheme so the cross-fade, the persisted key and the browser chrome
+ * colour all follow as usual, and the pre-paint boot guard needs no knowledge of gifts to honour it.
+ */
+/**
+ * A PREVIEW IS THE CHANNEL ON SCREEN [owner, 2026-09-10: "the result of all these knobs and settings can only be
+ * seen after publishing — it would be nice to see a preview"]. No second renderer: while the description dialog
+ * is open, channelOnScreen answers with the look the editor holds — and the worn gift, when its row asks for one —
+ * so the very code that dresses a visitor dresses the author, live, on every knob. The dialog's close takes it off
+ * again, and nothing about it is persisted (a channel's dress never is). A look of "none" previews as none: the
+ * author's own look, which is exactly what a visitor keeps.
+ *
+ * The gift is the WORN one, in the visitor's record shape: channelGiftTheme reads its slug and number and builds
+ * the dress from the gift's own file if this device has none yet. Its proof is the wallet's own — it wears it.
+ */
+let channelLookPreview = null;
+
+function previewChannelLook(editor) {
+  const gift = editor.wantsGift() && wornGiftTheme?.itemAddress
+    ? { itemAddress: wornGiftTheme.itemAddress, slug: wornGiftTheme.slug, number: wornGiftTheme.number, verifiedAt: 0 }
+    : null;
+  channelLookPreview = { appearance: editor.read(), verifiedGift: gift };
+  document.documentElement.setAttribute('data-look-preview', 'true');
+  applyGiftAppearance();
+}
+
+function endChannelLookPreview() {
+  if (!channelLookPreview) return;
+  channelLookPreview = null;
+  document.documentElement.removeAttribute('data-look-preview');
+  applyGiftAppearance();
+}
+
+/**
+ * THE CHANNEL WHOSE GIFT THE APP SHOULD WEAR RIGHT NOW [owner, 2026-09-08: "the whole background must change to
+ * the channel's custom one — and the colours: the hashtags, the comments under a post too"]: the open channel
+ * view, or the open post's channel. One's own channel counts whatever the "others' appearances" preference says;
+ * another's only when the reader wants to see them. Only a PROVEN gift dresses anything.
+ */
+function channelOnScreen() {
+  if (channelLookPreview) return channelLookPreview;   // the description dialog's look, for as long as it is open
+  // THE UNLOCK PROMPT IS THE APP'S OWN DOOR [owner, 2026-09-10: locked on somebody's channel, the unlock button
+  // came up in that channel's colour]. walletUnlockPromise is live exactly while the password dialog is awaited.
+  if (walletUnlockPromise) return null;
+  // THE PROFILE CARD IS NOT THE CHANNEL [owner, 2026-09-09: opened his own card from inside my channel and found its
+  // buttons in MY gift's colours]. While a card is open the app wears the viewer's own palette; the channel's dress
+  // comes back when the card closes. The hero on the card wears the card subject's own gift regardless.
+  if (profileCardDialog && !profileCardDialog.hidden) return null;
+  // ON SCREEN MEANS ON THE PUBLIC TAB [owner, 2026-09-10: opened a dressed channel, switched to Private or Wallet,
+  // and the channel's background stayed]. The channel view and the post detail keep their state while another tab
+  // is shown, so that the reader lands back where they were — but a channel nobody is looking at dresses nothing.
+  if (!isPublicViewActive()) return null;
+  const wallet = publicChannelViewOpen
+    ? publicChannelViewWallet
+    : (publicPostDetailOpen ? rawWalletAddress(publicPostDetailItem?.authorWallet) : null);
+  if (!wallet) return null;
+  const own = sameWalletAddress(wallet, plathoWallet?.address ?? '');
+  if (!own && !channelAppearancesVisible()) return null;
+  return cachedChannelProfile(wallet) ?? null;
+}
+
+function channelGiftOnScreen() {
+  return channelOnScreen()?.verifiedGift ?? null;
+}
+
+/** The channel's LOOK on screen [2026-09-09]: theme, background, settings — needs no proof, it is the owner's choice. */
+function channelLookOnScreen() {
+  const appearance = channelOnScreen()?.appearance ?? null;
+  return appearance?.kind === 'look' ? appearance : null;
+}
+
+let channelLookKey = null;       // the look the app wears for the channel on screen, so a re-apply is a no-op
+let channelLookRestore = null;   // this device's own background and settings, put back when the look comes off
+
+/**
+ * THE WHOLE LOOK, NOT ONLY THE GIFT [owner, 2026-09-09: "plasma or the dots or future themes — and the theme the
+ * owner chose for guests"]. The channel's background animation, its four settings and the guests' theme replace
+ * this device's for the visit, clamped by the codec to the sliders' own bounds; on the way out everything the
+ * device had is put back. A gift on the same look is worn through applyGiftAppearance as before, and its palette
+ * outranks the look's theme byte.
+ */
+function applyChannelLook(look, giftWorn) {
+  const key = look ? JSON.stringify(look) : null;
+  if (key === channelLookKey) return;
+  channelLookKey = key;
+  if (!look) {
+    restoreOwnLook();
+    return;
+  }
+  const root = document.documentElement;
+  if (!channelLookRestore) {
+    channelLookRestore = { backgroundMode, auroraLevel, auroraCount, auroraSpeed, auroraEnergy, nodesLevel, nodesRunners, nodesSpeed, nodesLights };
+  }
+  if (look.background) {
+    backgroundMode = look.background;
+    if (look.background === 'plasma') [auroraLevel, auroraCount, auroraSpeed, auroraEnergy] = look.settings;
+    if (look.background === 'nodes') [nodesLevel, nodesRunners, nodesSpeed, nodesLights] = look.settings;
+    applyBackgroundMode({ rebuildNodes: true });
+    rebuildAuroraSuns();
+    if (typeof auroraRedrawStill === 'function') auroraRedrawStill();
+  }
+  if (!giftWorn) {
+    // The guests' theme, worn like the gift's palette: remembered once on the way in, never persisted.
+    if (!channelDressActive) channelDressRestore = root.getAttribute('data-theme');
+    channelDressActive = true;
+    if (root.getAttribute('data-theme') !== look.theme) applyForcedTheme(look.theme, { animate: false });
+  }
+}
+
+function restoreOwnLook() {
+  if (!channelLookRestore) return;
+  ({ backgroundMode, auroraLevel, auroraCount, auroraSpeed, auroraEnergy, nodesLevel, nodesRunners, nodesSpeed, nodesLights } = channelLookRestore);
+  channelLookRestore = null;
+  applyBackgroundMode({ rebuildNodes: true });
+  rebuildAuroraSuns();
+  if (typeof auroraRedrawStill === 'function') auroraRedrawStill();
+}
+
+/**
+ * The worn-gift record's shape, cut from the dress the channel header already builds from the gift's own file:
+ * both backdrop stops, the pattern tile. Until that file is read there is nothing to wear — the read is started
+ * and the app is dressed the moment it lands.
+ */
+function channelGiftTheme(gift) {
+  const key = `${gift.slug}-${gift.number}`;
+  if (!channelGiftDressCache.has(key)) {
+    void buildChannelGiftDress(gift).then(() => applyGiftAppearance()).catch(() => { /* undressed, as before */ });
+    return null;
+  }
+  const dress = channelGiftDressCache.get(key);
+  if (!dress) return null;
+  return {
+    itemAddress: gift.itemAddress,
+    slug: gift.slug,
+    number: gift.number,
+    tint: dress.edge,
+    inner: dress.inner,
+    patternTile: dress.pattern,
+    patternTileVersion: GIFT_PATTERN_TILE_VERSION,
+    stopsFrom: 'lottie',
+  };
+}
+
+/** The gift the APP wears: the channel's while one is on screen, else one's own when the gift theme is chosen. */
+function presentedGiftTheme() {
+  const onScreen = channelGiftOnScreen();
+  const channel = onScreen ? channelGiftTheme(onScreen) : null;
+  if (channel) return { theme: channel, channel: true };
+  return giftThemeChosen() && wornGiftTheme ? { theme: wornGiftTheme, channel: false } : null;
+}
+
+/** The channel's dress comes off: the theme the reader had is put back, and nothing about it was persisted. */
+function endChannelDress() {
+  if (!channelDressActive) return;
+  channelDressActive = false;
+  const back = channelDressRestore;
+  channelDressRestore = null;
+  const root = document.documentElement;
+  if (back) {
+    applyForcedTheme(back, { animate: false });
+  } else {
+    clearTimeout(themeAnimTimer);
+    root.classList.remove('theme-anim');   // a fade still running would carry the dress into the next frame
+    root.removeAttribute('data-theme');
+    reflectThemeColorMeta();
+  }
+}
+
+/** The lighter middle stop. A gift worn before the second stop existed keeps working, flat. */
+function giftInnerStop(theme) {
+  return Array.isArray(theme.inner) && theme.inner.length === 3 ? theme.inner : theme.tint;
+}
+
+/**
+ * The profile card's hero is dressed in the worn gift WHETHER OR NOT THE APP IS [owner, 2026-09-08: "the backdrop
+ * in the profile only shows when the Telegram-gift theme is chosen — wrong, it must show whenever a gift is
+ * worn"]. The hero and the corner are the gift's own surfaces, the way the gifts around a Telegram profile are;
+ * the theme choice in applyGiftAppearance is only about tinting the whole APP with the gift.
+ *
+ * BOTH BACKDROP STOPS, for the surfaces that are DELIBERATELY the gift's rather than the app's. The page is not
+ * one of them — that is the whole rule — but the hero is a frame around the gift's own subject, and it uses the
+ * two the way the artwork does: the lighter middle in the centre, the darker rim at the edge. Space-separated so
+ * a rule can put an alpha after them.
+ *
+ * THE PATTERN IS A TONE SHIFT OF THE GROUND, not one of the two stops. Painting it in the rim colour left it
+ * invisible, and measurably so: on Chill Flame the two stops are 1.13 apart, which is the same colour. The
+ * artwork draws its own pattern darker or lighter than its backdrop, so the ink is black or white — whichever the
+ * backdrop is not. MEASURED, NOT THRESHOLDED: the first cut compared a luminance against a hand-picked 0.35,
+ * which was a SECOND way of answering a question this file already answers one way — everything else here
+ * measures contrast. Two gifts whose backdrops sat either side of that line got opposite inks while resolving to
+ * the same palette, which is what the owner caught. readableInkOn asks the same primitive as the palette rule.
+ *
+ * The pattern tile rides its OWN tokens and its own attribute: the plasma field's tile is keyed on
+ * data-gift-pattern, which is a theme matter, and the hero must be able to wear the tile while the field stays
+ * plain.
+ */
+// THE TOKENS ARE WRITTEN ON THE HERO, NEVER ON :root. A card is about ONE wallet, and custom properties inherit:
+// written on the document they dressed every card in the READER's gift — a wallet that owned no Telegram gifts
+// opened wearing the reader's wallpaper while the card said "no gifts" two rows below [owner, 2026-09-09]. A card
+// that has nothing to wear gets NO declaration rather than a neutral value: the stylesheet's fallbacks differ per
+// rule on purpose, and only an absent token reproduces the undressed hero.
+function applyGiftHeroTokens(node, theme) {
+  if (!node) return;
+  if (!theme) {
+    node.removeAttribute('data-gift-hero-pattern');
+    node.style.removeProperty('--gift-hero-inner');
+    node.style.removeProperty('--gift-hero-edge');
+    node.style.removeProperty('--gift-hero-ink');
+    node.style.removeProperty('--gift-hero-pattern');
+    node.style.removeProperty('--gift-hero-pattern-size');
+    return;
+  }
+  const [ir, ig, ib] = giftInnerStop(theme);
+  const [er, eg, eb] = theme.tint;
+  node.style.setProperty('--gift-hero-inner', `${ir} ${ig} ${ib}`);
+  node.style.setProperty('--gift-hero-edge', `${er} ${eg} ${eb}`);
+  const heroInk = readableInkOn([ir, ig, ib]);
+  node.style.setProperty('--gift-hero-ink', heroInk.join(' '));
+  const tile = typeof theme.patternTile === 'string' ? theme.patternTile : null;
+  if (tile) {
+    node.style.setProperty('--gift-hero-pattern', `url("${tile}")`);
+    node.style.setProperty('--gift-hero-pattern-size', `${GIFT_PATTERN_TILE_CSS_PX}px`);
+    node.setAttribute('data-gift-hero-pattern', 'true');
+  } else {
+    node.removeAttribute('data-gift-hero-pattern');
+    node.style.removeProperty('--gift-hero-pattern');
+    node.style.removeProperty('--gift-hero-pattern-size');
+  }
+}
+
+function applyGiftAppearance() {
+  const root = document.documentElement;
+  // UNCONDITIONALLY, both branches: a session that started on the build where the gift WAS the wallpaper would
+  // otherwise keep a background nothing sets any more.
+  dropRootToken('--bg');
+  dropRootToken('--gift-bg-inner');
+  // THE HERO IS THE CARD'S, NOT THE PAGE'S — see applyGiftHeroTokens. What is unconditional here is the worn gift's
+  // own artefacts (the cut-out, the true stops, the tile); the hero itself is dressed by whichever card is open,
+  // for the wallet that card is about.
+  ensureGiftSubjectArt();
+  redressProfileCardHeroIfOpen();
+  const presented = presentedGiftTheme();
+  // The channel's look (background, settings, guests' theme) rides beside the gift: applied for the visit, put
+  // back afterwards. A look with a gift leaves the theme to the gift's palette below.
+  applyChannelLook(channelLookOnScreen(), Boolean(presented?.channel));
+  if (!presented) {
+    dropRootFlag('data-gift-theme');
+    dropRootFlag('data-gift-pattern');
+    dropRootToken('--aurora-rgb');
+    dropRootToken('--gift-pattern');
+    dropRootToken('--gift-pattern-size');
+    dropRootToken('--accent');
+    dropRootToken('--accent-hi');
+    dropRootToken('--accent-rgb');
+    dropRootToken('--bubble-out');
+    dropRootToken('--bubble-out-flat');
+    dropRootToken('--cta-fill');
+    dropRootToken('--cta-glow');
+    dropRootToken('--cta-ink');
+    if (!channelLookKey) endChannelDress();   // a look-only visit keeps its theme until the look itself comes off
+    return;
+  }
+  const theme = presented.theme;
+  if (presented.channel) {
+    // Remembered ONCE, on the way in: what to put back on the way out. The palette forced below is then not
+    // persisted (applyForcedTheme checks the flag), so the reader's own choice survives the visit untouched.
+    if (!channelDressActive) channelDressRestore = root.getAttribute('data-theme');
+    channelDressActive = true;
+  } else {
+    endChannelDress();
+  }
+  const [ir, ig, ib] = giftInnerStop(theme);
+  setRootFlag('data-gift-theme', 'true');
+  setRootToken('--aurora-rgb', `${ir}, ${ig}, ${ib}`);
+  const [er, eg, eb] = theme.tint;
+  const heroInk = readableInkOn([ir, ig, ib]);
+  // THE PILLS ARE THE HERO [owner, 2026-09-07: \"these buttons that are supposedly the gift's colour differ — make
+  // them like the profile, with the radial gradient\"]. They differed BY CONSTRUCTION: the hero paints the two
+  // backdrop stops as the artwork does, while --accent is the rim LIFTED to a contrast floor against the app's
+  // own ink — one gift, two derivations, two colours. One now: the rim as the flat underlay the theme cross-fade
+  // rides, the hero's radial (its geometry verbatim) as the glow layer, and the hero's measured ink. Inline
+  // beside --accent, not a selector keyed on the gift: the gift crosses over as tokens, never as a rule.
+  setRootToken('--cta-fill', `rgb(${er}, ${eg}, ${eb})`);
+  setRootToken('--cta-glow', `radial-gradient(ellipse 58% 96% at 50% 38%, rgb(${ir}, ${ig}, ${ib}) 0%, rgb(${er}, ${eg}, ${eb}) 88%)`);
+  setRootToken('--cta-ink', `rgb(${heroInk.join(', ')})`);
+  if (!presented.channel) ensureGiftSubjectArt();   // one's own gift's artefacts; a channel's dress is built whole
+  // FORCED, not merely matched. Applying this only when the current theme differs left the app following the
+  // SYSTEM whenever the two happened to agree — and the next time the OS flipped, the gift's own side of the
+  // contrast line went with it. applyForcedTheme is idempotent, so paying it once per apply is the cheap half.
+  const palette = TELEGRAM_GIFT_THEME_PALETTE;
+  applyForcedTheme(palette, { animate: !presented.channel });
+  // THE BUTTONS WEAR IT TOO [owner, 2026-09-06: the green looks foreign now, use the gift's colour].
+  // Its own colour, moved only as far as it has to be to stay readable — see giftAccentFromStop.
+  const { accent, accentHi } = giftAccentFromStop([ir, ig, ib], palette);
+  setRootToken('--accent', `rgb(${accent[0]}, ${accent[1]}, ${accent[2]})`);
+  setRootToken('--accent-hi', `rgb(${accentHi[0]}, ${accentHi[1]}, ${accentHi[2]})`);
+  // The alpha tokens read this one triple, so every tinted surface — the dialog hairline included — follows
+  // without a rule of its own.
+  setRootToken('--accent-rgb', `${accent[0]}, ${accent[1]}, ${accent[2]}`);
+  // AND ONE'S OWN BUBBLE, which is not an alpha of anything: it keeps its own darkness, and only turns.
+  const { hue, saturation } = rgbToHueSaturation([ir, ig, ib]);
+  if (saturation >= TELEGRAM_GIFT_MIN_SATURATION) {
+    const [from, to] = TELEGRAM_GIFT_BUBBLE_OUT_STOPS.map((stop) => colourAtHue(stop, hue));
+    const flat = colourAtHue(TELEGRAM_GIFT_BUBBLE_OUT_FLAT, hue);
+    setRootToken('--bubble-out', `linear-gradient(155deg, rgb(${from.join(', ')}), rgb(${to.join(', ')}))`);
+    setRootToken('--bubble-out-flat', `rgb(${flat.join(', ')})`);
+  }
+  applyGiftPatternWallpaper();
+}
+
+/**
+ * Publish (or withdraw) the gift's pattern as the wallpaper the plasma lights.
+ *
+ * The tile is a mask, not a picture: styles.css paints it in `--text` and the plasma's canvas is cut to the same
+ * shape, so both sides of the effect follow the theme with no second copy of the colour anywhere.
+ *
+ * `data-gift-pattern` is what the stylesheet keys on rather than the URL being set, because a custom property that
+ * resolves to nothing does not disable `mask-image` — it invalidates it, and an unmasked ink plate is a full-screen
+ * wash. The attribute is only ever set when there is a tile to show.
+ */
+function applyGiftPatternWallpaper() {
+  const presented = presentedGiftTheme();
+  const theme = presented?.theme ?? null;
+  const tile = typeof theme?.patternTile === 'string' ? theme.patternTile : null;
+  if (!tile) {
+    dropRootFlag('data-gift-pattern');
+    dropRootToken('--gift-pattern');
+    dropRootToken('--gift-pattern-size');
+    if (presented && !presented.channel) ensureGiftPatternTile();   // built for one's own gift only
+    return;
+  }
+  setRootToken('--gift-pattern', `url("${tile}")`);
+  setRootToken('--gift-pattern-size', `${GIFT_PATTERN_TILE_CSS_PX}px`);
+  setRootFlag('data-gift-pattern', 'true');
+}
+
+/**
+ * Grow a wallpaper tile for a gift that was worn before wearing built one.
+ *
+ * Nothing else would ever put it there: the tile is written at wear time, and a user who is already wearing a gift
+ * does not wear it again. Once per gift per session, and a failure is silent — a gift whose pattern cannot be read
+ * simply keeps the plain backdrop.
+ */
+let giftPatternTilePending = '';
+function ensureGiftPatternTile() {
+  if (!giftThemeChosen() || !wornGiftTheme || wornGiftTheme.patternTile) return;
+  const key = `${wornGiftTheme.slug}-${wornGiftTheme.number}`;
+  if (giftPatternTilePending === key) return;
+  giftPatternTilePending = key;
+  buildGiftPatternTile(wornGiftTheme)
+    .then((canvas) => {
+      if (!canvas || !wornGiftTheme) return;
+      if (`${wornGiftTheme.slug}-${wornGiftTheme.number}` !== key) return;   // the gift changed while we decoded
+      writeWornGiftTheme({ ...wornGiftTheme, patternTile: canvas.toDataURL('image/png') });
+      applyGiftPatternWallpaper();
+    })
+    .catch(() => { /* no tile: the plasma keeps the plain backdrop */ });
+}
+
+/** Hue and saturation of a colour, so its brightness can be replaced without touching either. */
+function rgbToHueSaturation([r, g, b]) {
+  const red = r / 255;
+  const green = g / 255;
+  const blue = b / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const span = max - min;
+  const lightness = (max + min) / 2;
+  if (span === 0) return { hue: 0, saturation: 0 };
+  const saturation = span / (1 - Math.abs((2 * lightness) - 1));
+  let hue = 0;
+  if (max === red) hue = ((green - blue) / span) % 6;
+  else if (max === green) hue = ((blue - red) / span) + 2;
+  else hue = ((red - green) / span) + 4;
+  return { hue: ((hue * 60) + 360) % 360, saturation: Math.min(1, saturation) };
+}
+
+/** The inverse, for one chosen lightness. */
+function hueSaturationToRgb(hue, saturation, lightness) {
+  const c = (1 - Math.abs((2 * lightness) - 1)) * saturation;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = lightness - (c / 2);
+  const [r, g, b] = hue < 60 ? [c, x, 0]
+    : hue < 120 ? [x, c, 0]
+    : hue < 180 ? [0, c, x]
+    : hue < 240 ? [0, x, c]
+    : hue < 300 ? [x, 0, c]
+    : [c, 0, x];
+  return [r, g, b].map((channel) => Math.round(Math.max(0, Math.min(255, (channel + m) * 255))));
+}
+
+/** HSL lightness, the axis the accent is moved along. */
+function lightnessOf([r, g, b]) {
+  return (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+}
+
+/**
+ * The gift's colour as an accent: kept as it is if it already reads, and otherwise moved the least it can be.
+ *
+ * TWO FLOORS, because the accent is text twice over — it is written on the page, and the button's label is written
+ * on it. Both are cleared in the same direction within a palette: on the dark one the page and the ink are both
+ * near-black, so lifting helps both, and on the light one the page and the ink are both near-white, so sinking
+ * does. That is what makes the smallest sufficient step findable by halving.
+ *
+ * Matching the shipped accent's brightness outright was the first attempt and it was wrong: the shipped mint is
+ * bright because mint is intrinsically bright, and dragging a duller hue to that luminance washes it out — Chill
+ * Flame's green came back a pale sage, which is no longer the gift's colour. A floor asks only for what is needed.
+ */
+function giftAccentFromStop(stop, palette) {
+  const light = palette === 'light';
+  const page = light ? TELEGRAM_GIFT_LIGHT_THEME_BG : TELEGRAM_GIFT_DARK_THEME_BG;
+  const ink = light ? TELEGRAM_GIFT_LIGHT_THEME_ON_ACCENT : TELEGRAM_GIFT_DARK_THEME_ON_ACCENT;
+  const reads = (colour) => contrastRatio(colour, page) >= TELEGRAM_GIFT_ACCENT_MIN_CONTRAST
+    && contrastRatio(ink, colour) >= TELEGRAM_GIFT_ACCENT_MIN_CONTRAST;
+  const { hue, saturation } = rgbToHueSaturation(stop);
+  let lightness = lightnessOf(stop);
+  if (!reads(stop)) {
+    // The far end always reads — white on the dark palette, black on the light one — so a bound is guaranteed.
+    let low = light ? 0 : lightness;
+    let high = light ? lightness : 1;
+    for (let step = 0; step < 18; step += 1) {
+      const middle = (low + high) / 2;
+      if (reads(hueSaturationToRgb(hue, saturation, middle))) {
+        if (light) low = middle; else high = middle;
+      } else if (light) high = middle;
+      else low = middle;
+    }
+    lightness = light ? low : high;
+  }
+  // `--accent-hi` sits one notch further from the page, and the gift's pair keeps the notch the design uses.
+  const shipped = light ? TELEGRAM_GIFT_LIGHT_THEME_ACCENT : TELEGRAM_GIFT_DARK_THEME_ACCENT;
+  const shippedHi = light ? TELEGRAM_GIFT_LIGHT_THEME_ACCENT_HI : TELEGRAM_GIFT_DARK_THEME_ACCENT_HI;
+  const notch = lightnessOf(shippedHi) - lightnessOf(shipped);
+  return {
+    accent: hueSaturationToRgb(hue, saturation, lightness),
+    accentHi: hueSaturationToRgb(hue, saturation, Math.max(0, Math.min(1, lightness + notch))),
+  };
+}
+
+/** The same colour in another hue: its own saturation and lightness, so what was measured on it still holds. */
+function colourAtHue(colour, hue) {
+  const { saturation } = rgbToHueSaturation(colour);
+  return hueSaturationToRgb(hue, saturation, lightnessOf(colour));
+}
+
+/**
+ * Black or white — whichever can actually be READ on this colour.
+ *
+ * The one place that answers "light or dark" for a colour, and it answers by measuring, like everything else here.
+ * A threshold on luminance is the tempting alternative and it is what this replaced: any cut has to fall
+ * somewhere, and two colours a hair either side of it get opposite answers while every other rule in the file
+ * calls them the same.
+ */
+function readableInkOn(colour) {
+  return contrastRatio([255, 255, 255], colour) >= contrastRatio([0, 0, 0], colour)
+    ? [255, 255, 255]
+    : [0, 0, 0];
+}
+
+/** WCAG contrast between two colours. Used to choose a theme by measurement rather than by eye. */
+function contrastRatio(a, b) {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** WCAG relative luminance. */
+function relativeLuminance([r, g, b]) {
+  const channel = (value) => {
+    const c = value / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return (0.2126 * channel(r)) + (0.7152 * channel(g)) + (0.0722 * channel(b));
+}
+
+/**
+ * The backdrop colour of a gift, taken from the picture itself.
+ *
+ * There is no colour anywhere in the metadata — a gift names its backdrop ("Lemongrass", "Onyx Black") and nothing
+ * more, and a name-to-colour table would be a copy of somebody else's derived value with 31 entries per collection
+ * and no way to learn a new one. The corners and edge midpoints of the art ARE the backdrop, so they are measured.
+ */
+async function sampleGiftBackdrop(imageUrl) {
+  const image = await new Promise((resolve, reject) => {
+    const node = new Image();
+    node.onload = () => resolve(node);
+    node.onerror = () => reject(new Error('gift art did not decode'));
+    node.src = imageUrl;
+  });
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) throw new Error('gift art: no 2d context');
+  context.drawImage(image, 0, 0, size, size);
+  const { data } = context.getImageData(0, 0, size, size);
+  const at = (x, y) => {
+    const index = ((y * size) + x) * 4;
+    return [data[index], data[index + 1], data[index + 2]];
+  };
+  const average = (points) => {
+    const total = points.reduce((sum, point) => {
+      const pixel = at(point[0], point[1]);
+      return [sum[0] + pixel[0], sum[1] + pixel[1], sum[2] + pixel[2]];
+    }, [0, 0, 0]);
+    return total.map((value) => Math.round(value / points.length));
+  };
+  // A gift's backdrop is a two-stop radial: darker at the rim, lighter around the subject. Both are sampled, but
+  // it is the MIDDLE that leaves this function meaning anything — that is the colour the plasma paints with.
+  const edge = average([[2, 2], [size - 3, 2], [2, size - 3], [size - 3, size - 3], [size >> 1, 2], [2, size >> 1]]);
+  const radius = Math.round(size * 0.30);
+  const middle = size >> 1;
+  const inner = average([[middle - radius, middle], [middle + radius, middle], [middle, middle - radius], [middle, middle + radius]]);
+  // No palette is returned with them, and none is stored: the gift theme is dark, full stop — see
+  // TELEGRAM_GIFT_THEME_PALETTE for why that stopped being derived from these two at all.
+  return { tint: edge, inner };
+}
+
+/**
+ * A gift's picture as a blob: URL, or null.
+ *
+ * FETCHED, not linked. An <img> pointed straight at a remote host would tell that host which wallet is looking at
+ * which gift on every render and would need the host in `img-src`; bytes fetched once become a blob: URL that
+ * `img-src blob:` already allows, are cached for the session, and can be re-served with no second request. The
+ * sources are tried in order — the toncenter proxy first because the app already talks to toncenter, then Telegram's
+ * own host, whose URL is built from what the chain said rather than from what an indexer offered.
+ */
+async function loadTelegramGiftArt(gift) {
+  const key = `${gift?.slug}-${gift?.number}`;
+  if (telegramGiftArtCache.has(key)) return telegramGiftArtCache.get(key);
+  // FROM THE DEVICE FIRST. A picture fetched once is kept as a data URL — a blob: URL dies with the page, which is
+  // why every reopen, and the corner on every reload, went back to Telegram's host for the same bytes.
+  const stored = await readStoredTelegramGiftArt(key);
+  if (stored) {
+    telegramGiftArtCache.set(key, stored);
+    return stored;
+  }
+  const sources = Array.isArray(gift?.imageSources) && gift.imageSources.length > 0
+    ? gift.imageSources
+    : telegramGiftImageSources({ slug: gift?.slug, number: gift?.number });
+  for (const source of sources) {
+    try {
+      const response = await fetch(source, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+      if (!response?.ok) continue;
+      const blob = await response.blob();
+      if (!blob?.size || !String(blob.type).startsWith('image/')) continue;
+      if (blob.size > TELEGRAM_GIFT_ART_MAX_BYTES) continue;   // the same ceiling for the picture: it becomes a data URL in IndexedDB
+      const url = bytesToImageDataUrl(await blobToBytes(blob), blob.type);
+      telegramGiftArtCache.set(key, url);
+      void writeStoredTelegramGiftArt(key, url);
+      return url;
+    } catch { /* try the next source; a missing picture is a missing picture, never an error the user must read */ }
+  }
+  telegramGiftArtCache.set(key, null);
+  return null;
+}
+
+/**
+ * How a gift read asks the queue.
+ *
+ * NOT `critical`. That class is for sends, key reads and message delivery — the things a user loses something by
+ * waiting for. A gift is decoration, and dressed as critical it cut in front of all of them on an endpoint that
+ * grants about one request a second: the owner saw 429s the moment a profile opened. `profile` is the class the
+ * pump already keeps for exactly this, and the queue's ageing guard means a low class still cannot starve.
+ *
+ * And it MAY be cached. `criticalChainReadOptions()` forces `cacheTtlMs: 0` because a critical read must see the
+ * chain as it is right now; nothing here does. An item's owner changes when somebody transfers a gift, which is
+ * not a thing that needs to be noticed within the minute.
+ */
+function giftChainReadOptions() {
+  return { priority: 'profile', cacheTtlMs: GIFT_CHAIN_READ_CACHE_TTL_MS };
+}
+const GIFT_CHAIN_READ_CACHE_TTL_MS = 5 * 60_000;
+
+/**
+ * Collection verdicts, for the life of the tab.
+ *
+ * A gift collection is IMMUTABLE — ownerless, its code and its minter key fixed at deploy — so "is this one of
+ * Telegram's" is a question with a permanent answer. It was being re-derived on every profile open, at two
+ * requests a time (the raw state and the content getter), which is most of what opening a profile actually cost.
+ */
+const telegramGiftCollectionVerdicts = new Map();
+
+/** One gift item, read from its own account. Throws on anything short of a complete answer. */
+async function verifyTelegramGiftItemOnChain(itemAddress) {
+  const transport = globalThis.plathoTonRpcTransport ?? null;
+  if (typeof transport?.runGetMethod !== 'function') throw new Error('no chain transport');
+  const result = await transport.runGetMethod({
+    address: itemAddress,
+    method: 'get_nft_data',
+    stack: [],
+    ...giftChainReadOptions(),
+  });
+  return decodeNftItemDataStack(result?.stack ?? result?.result?.stack ?? result, {
+    decodeAddressSliceBoc: decodeTonAddressSliceBoc,
+  });
+}
+
+/**
+ * One collection's raw state — the half of the anchor that cannot be asked for with a get-method, because the
+ * minter key the collections share is plain state and no getter exposes it. `include_boc` brings the data cell down
+ * with the code hash in the same row.
+ */
+async function verifyTelegramGiftCollectionOnChain(collectionAddress) {
+  const remembered = telegramGiftCollectionVerdicts.get(collectionAddress);
+  if (remembered) return remembered;
+  const states = await readAccountStates([collectionAddress], {
+    request: createShardStatesRequest({ strict: true, requestOptions: { priority: 'profile' } }),
+    includeBoc: true,
+  });
+  const row = [...states.values()][0] ?? null;
+  if (!row || row.status !== 'active') throw new Error('gift collection: no live account state');
+  // ONE REQUEST, NOT TWO. The content URI used to be fetched with `get_collection_data` — a second call for a fact
+  // that is already in the bytes this row carries: it is the first reference of the data root. On an endpoint that
+  // grants about one request a second, the second call was half the cost of opening a profile, and the owner's
+  // console showed it being refused and dragging the whole transport into its rate-limit backoff.
+  const contentUri = readCollectionContentUri(row.dataBoc);
+  const verdict = { codeHash: row.codeHash, dataBoc: row.dataBoc, contentUri };
+  // Kept only once it is COMPLETE. A half-read verdict remembered for the tab would answer "not a gift" forever.
+  if (verdict.codeHash && verdict.dataBoc && verdict.contentUri) telegramGiftCollectionVerdicts.set(collectionAddress, verdict);
+  return verdict;
+}
+
+/** Every Telegram gift a wallet holds, proven. Cached briefly so reopening a card is free. */
+async function loadTelegramGiftsForWallet(wallet, options = {}) {
+  const key = parseTonAddress(wallet).raw;
+  const cached = telegramGiftListCache.get(key);
+  if (!options.force && cached && (Date.now() - cached.at) < TELEGRAM_GIFT_CACHE_TTL_MS) return cached.result;
+
+  let indexerItems = null;
+  let indexerError = null;
+  try {
+    // THROUGH THE TRANSPORT LAYER, and therefore through the ONE queue. The reader supplies the shared limiter
+    // key and the primary provider's spacing by construction, so this cannot become a second pump by omission —
+    // which is exactly how it produced 429s on opening a profile while nothing else in the app ever saw one.
+    indexerItems = await discoverTelegramGiftItems({
+      ownerWallet: key,
+      origin: toncenterRestOrigin(),
+      apiKey: readStoredToncenterApiKey(),
+      fetchImpl: createToncenterRestFetch({ requestOptions: { priority: 'profile' } }),
+    });
+  } catch (error) {
+    indexerError = error;
+    console.warn('telegram gift discovery unavailable', error);
+  }
+  const result = await collectOwnedTelegramGifts({
+    ownerWallet: key,
+    indexerItems,
+    indexerError,
+    verifyItem: (address) => enqueueGiftChainRead(() => verifyTelegramGiftItemOnChain(address)),
+    verifyCollection: (address) => enqueueGiftChainRead(() => verifyTelegramGiftCollectionOnChain(address)),
+  });
+  // ONLY A FINISHED READ IS REMEMBERED. Caching an incomplete one meant that a single busy minute kept answering
+  // "nothing here" for the next five, including to a user who closed the card and opened it again to check.
+  if (result.complete) telegramGiftListCache.set(key, { at: Date.now(), result });
+  return result;
+}
+
+/**
+ * The corner: a worn gift, or the app's own mark.
+ *
+ * Guarded on a plain global rather than on module state because an earlier surface may call this while the module is
+ * still evaluating, and a `let` declared down here would be in its dead zone — the class of bug that has taken this
+ * app's boot down before. Before the flag is set the corner is simply the logo, which is what it was anyway.
+ */
+function renderBrandGift() {
+  if (!globalThis.__plathoGiftRuntimeReady) return;
+  const brand = document.querySelector('.brand');
+  const mark = document.querySelector('#brandMarkImage');
+  if (!brand || !mark) return;
+  // AN AFFORDANCE THAT DOES NOTHING IS A BUG [owner, 2026-09-06: the corner went clickable on hover and then
+  // nothing happened]. The card is about an account, so with the wallet locked or absent there is no account to
+  // show — and the honest answer is a corner that is not offered, not a tap that is silently swallowed.
+  // NOT DISABLED ANY MORE: with no wallet the corner opens the settings instead of the card, so there is always a
+  // screen behind it — and one of the things on that screen is how you activate the account.
+  const door = document.querySelector('#brandProfileButton');
+  if (door) door.disabled = false;
+  // A gift belongs to the wallet that held it. Another wallet signing in does not inherit it — and this only fires
+  // on a wallet that is actually LOADED, never on "no wallet yet", which would forget it on every locked start.
+  let active = null;
+  try {
+    active = plathoWallet?.address ? parseTonAddress(plathoWallet.address).raw : null;
+  } catch { active = null; }
+  if (active && wornGiftTheme?.wallet && wornGiftTheme.wallet !== active) {
+    writeWornGiftTheme(null);
+    applyGiftAppearance();
+  }
+  const art = wornGiftTheme ? telegramGiftArtCache.get(`${wornGiftTheme.slug}-${wornGiftTheme.number}`) : null;
+  if (wornGiftTheme && art) {
+    brand.dataset.brandGift = 'true';
+    mark.src = art;
+    mark.alt = wornGiftTheme.name ?? '';
+    syncBrandGiftMotion();   // …and the same gift in motion, over the still picture, once its player is up
+    return;
+  }
+  brand.dataset.brandGift = 'false';
+  mark.src = '/assets/platho-icon-192.png?v=3';
+  syncBrandGiftMotion();     // nothing worn: any player comes down and the mark is the logo again
+  mark.alt = '';
+}
+
+/**
+ * The gift's BACKGROUND SYMBOL, cut out of its own artwork, as the mark the lattice and the runners wear.
+ *
+ * NOT a small copy of the gift [owner, 2026-09-06]. A Telegram gift's backdrop carries a tiled symbol — the thing
+ * Telegram itself calls the pattern — and that is what belongs behind the app.
+ *
+ * HOW IT IS FOUND, without rendering vector art. The gift's Lottie holds a "Pattern" precomp whose layers are
+ * instances of one icon, each with a position and a scale in the 512x512 composition; the root Pattern layer's
+ * transform is the identity, so those coordinates are the ARTWORK's coordinates. The Lottie is therefore read as a
+ * MAP and never rendered: one tile is cropped straight out of the .webp at a position it names.
+ *
+ * WHY A MASK AND NOT THE CROP. Measured on Chill Flame: the symbol sits about 70 levels off the backdrop out of
+ * 255 — a watermark. Pasted as-is it would be invisible on a page painted in that same backdrop, and no alpha
+ * would rescue it, because the crop CARRIES the backdrop with it. So the crop is turned into an alpha mask (how
+ * far each pixel departs from the tile's own corners) painted in the symbol's own colour, which reproduces the
+ * gift's pattern exactly and leaves its strength for the field to modulate.
+ *
+ * Anything unavailable — no artwork yet, no Lottie, no tile that looks like a symbol — returns null, which is the
+ * field's own default and today's dots. A wrong-looking mark is worse than none.
+ */
+let giftNodeMarkCanvas = null;
+let giftNodeMarkKey = '';
+const giftNodeMarkPending = new Set();
+/** Drawn at ~22-40 CSS px; this keeps it crisp on a 2x screen without carrying a texture nobody looks at closely. */
+const GIFT_PATTERN_MARK_PX = 64;
+/** The glyph is measured at this size before being fitted to the mark, so its own bounds decide the crop. */
+const GIFT_PATTERN_PROBE_PX = 512;
+/**
+ * How far a pixel must sit from the backdrop the Lottie defines before it can be part of the gift.
+ *
+ * LOW ON PURPOSE, because this is no longer the whole test — the connected-region step below is. Measured on Vice
+ * Cream: the true backdrop departs by 9-10, the cone by 54, the chocolate by 106. A cut of 90 removed most of the
+ * cone (a row through it came back 250 pixels of 298 at alpha zero), because a cone that is the colour of its own
+ * backdrop cannot be told from it by colour at all. At 30 the subject survives whole and what also survives — the
+ * backdrop's own pattern symbols, up to 53 — is discarded by shape instead.
+ */
+const GIFT_SUBJECT_CUT = 30;
+/**
+ * And the threshold the TILE's centrepiece keeps, which is the one this file started with.
+ *
+ * The tile draws the subject as a single-colour mask, so what makes it read as a cone rather than a wedge is the
+ * interior gaps — the waffle, the flame's cut-outs. A cut low enough to keep a hero's subject whole keeps far too
+ * much here, and filling the interior (which the hero must do) turns the mask into a blob.
+ */
+const GIFT_PATTERN_SUBJECT_CUT = 90;
+/** The width of the band the subject's edge fades over, so the silhouette is not a jagged cut-out. */
+const GIFT_SUBJECT_RAMP = 45;
+/** The subject's longest side inside the tile's 512 units. The ring's inner radius is 137, so this clears it. */
+const GIFT_SUBJECT_FIT = 230;
+/**
+ * WHICH CUT MADE A STORED CUT-OUT. Bumped whenever the algorithm changes, because a cached derivative that does not
+ * record what produced it cannot know it is stale — and the first version punched holes through any subject that
+ * shared a colour with its own backdrop, which is a picture nothing would ever have replaced.
+ */
+const GIFT_SUBJECT_ART_VERSION = 5;
+/** …and the TILE's own, for the same reason: its centrepiece changed cut with it. */
+const GIFT_PATTERN_TILE_VERSION = 3;   // 3: the artwork's ramp, thinned along the object's contours and confined to its own alpha
+/** The wallpaper tile is the gift's own square, so the Lottie map's coordinates need no rescaling to land in it. */
+const GIFT_PATTERN_TILE_UNITS = 512;
+// The pattern's subject, since 2026-09-09: the artwork's ramp, thinned along the object's own contours and confined
+// to what its vectors render opaque (see cutGiftSubjectMask and giftObjectAlphaFromLottie).
+const GIFT_SUBJECT_CONTOUR_GAMMA = 0.5;      // square root: a moderate edge still thins the ink, the strongest cuts it
+const GIFT_SUBJECT_OBJECT_EDGE_FROM = 191;   // 0.75 of full alpha in the vectors: below this a pixel is light, not object
+const GIFT_SUBJECT_OBJECT_EDGE_TO = 230;     // 0.9: from here the object is whole; between the two the edge is a ramp
+/** How wide that square is drawn. The gift's symbols are 7.4-11% of it, so they land at about 19-28 CSS px. */
+const GIFT_PATTERN_TILE_CSS_PX = 256;
+
+function giftNodeMark() {
+  if (!giftThemeChosen() || !wornGiftTheme) return null;
+  const key = `${wornGiftTheme.slug}-${wornGiftTheme.number}`;
+  if (giftNodeMarkKey === key) return giftNodeMarkCanvas;
+  if (!giftNodeMarkPending.has(key)) {
+    giftNodeMarkPending.add(key);
+    buildGiftPatternMark(wornGiftTheme)
+      .then((canvas) => {
+        giftNodeMarkCanvas = canvas;
+        giftNodeMarkKey = canvas ? key : '';
+        // HEAL A STORED MASK THAT IS MISSING **OR WAS PAINTED IN ANOTHER COLOUR**. A gift worn before the mask
+        // existed has none, and nothing else would ever put one there. A gift worn before the mark took the
+        // gift's colour has one painted in the theme's text — the app rebuilds its own every session and would
+        // look right, while the loading screen kept showing white symbols on a coloured app forever.
+        //
+        // WHICH IS WHY THE INK IS STORED BESIDE IT: a cached derivative that does not record what it was derived
+        // from cannot know it has gone stale. Same rule as the palette, learned the same way.
+        const ink = bootFieldInk() ?? null;
+        if (canvas && wornGiftTheme && (!wornGiftTheme.pattern || wornGiftTheme.patternInk !== ink)) {
+          try {
+            writeWornGiftTheme({ ...wornGiftTheme, pattern: canvas.toDataURL('image/png'), patternInk: ink });
+          } catch { /* best-effort */ }
+        }
+        if (canvas && backgroundMode === 'nodes') applyBackgroundMode({ rebuildNodes: true });
+      })
+      .catch(() => { /* no pattern: the field keeps its dots */ })
+      .finally(() => { giftNodeMarkPending.delete(key); });
+  }
+  return null;
+}
+
+/**
+ * A gift's pattern, read from its Lottie as DRAWING rather than as pixels.
+ *
+ * WHY NOT THE ARTWORK. The first version cut each symbol out of the .webp: take the crop's corners as a baseline,
+ * call every pixel's distance from it the symbol, then pick a floor and a coverage band to tell a symbol from
+ * noise. Rendered large that was plainly wrong — the mask carried the artwork's shading as opacity and dragged the
+ * gift's own drop shadow along as a smear under every symbol. The Lottie states what the symbol IS: one closed
+ * path with a flat opaque fill. Tracing it is exact at any size and deletes every threshold that existed only to
+ * guess at what the file says outright.
+ *
+ * The file is a few hundred kilobytes, fetched once per gift from the host that already served the picture, and
+ * the browser caches it for a month.
+ */
+/**
+ * The gift's Lottie file, fetched ONCE and kept — in memory for the session, in IndexedDB across launches.
+ *
+ * Two readers want it: the pattern reader (backdrop stops, pattern vector) and the players (the Gift layer). It
+ * used to be fetched on every wear by the first; 402 KB measured on Vice Cream, from a host whose CORS is not
+ * reliable [2026-09-06]. A refusal is not remembered — it says nothing about the file.
+ */
+async function readTelegramGiftLottie(gift) {
+  if (!gift?.slug) return null;
+  const key = `${gift.slug}-${gift.number}`;
+  if (telegramGiftLottieCache.has(key)) return telegramGiftLottieCache.get(key);
+  let lottie = await readStoredTelegramGiftLottie(key);
+  if (!lottie) {
+    const response = await fetch(`${TELEGRAM_GIFT_ASSET_ORIGIN}/gift/${gift.slug}-${gift.number}.lottie.json`, {
+      credentials: 'omit', referrerPolicy: 'no-referrer',
+    });
+    if (!response?.ok) return null;
+    // A CEILING ON WHAT A HOST MAY HAND US [pre-stage review 2026-09-08]. The file is parsed, cloned, rendered and
+    // written to IndexedDB; a gift's own file is 402 KB measured, and nothing about a third-party CDN promises the
+    // next answer is the same order of size. Refused above the cap rather than parsed: an oversized answer is not a
+    // gift file, whatever it claims to be.
+    const text = await response.text();
+    if (text.length > TELEGRAM_GIFT_LOTTIE_MAX_BYTES) return null;
+    lottie = JSON.parse(text);
+    if (!lottie || typeof lottie !== 'object' || !Array.isArray(lottie.layers)) return null;
+    void writeStoredTelegramGiftLottie(key, lottie);
+  }
+  telegramGiftLottieCache.set(key, lottie);
+  return lottie;
+}
+
+/**
+ * The Gift layer alone: the subject with its own alpha, without the backdrop, the pattern or the tint matte.
+ *
+ * MEASURED 2026-09-07 on Vice Cream #57012: the file's top-level layers are Gift (a precomp of 35 layers, 34 of them
+ * animated), Pattern (23 static icons), Color Icon (a track matte) and Background (the radial). Keeping only the
+ * first renders with all four corners at alpha 0 — there is nothing to cut out.
+ */
+function giftOnlyLottie(lottie) {
+  const layers = (lottie?.layers ?? []).filter((layer) => layer?.nm === 'Gift');
+  return layers.length > 0 ? { ...lottie, layers } : null;
+}
+
+/**
+ * THE RECTANGLE [owner, 2026-09-08: "an artefact — a rectangle — now on the phone and the desktop"]. lottie-web's
+ * canvas renderer clips every precomp layer to its declared width and height, and on a gift file that clip lands
+ * INSIDE the tile — a faint lighter square about 12% in from the edge, drawn over the backdrop. MEASURED on Vice
+ * Cream: it shows at 58, 87 and 232 device pixels and even at the composition's native 512, so it is not a
+ * rounding artefact of small canvases; doubling every precomp's declared bounds moves the clip edge outside the
+ * tile and the square is gone at every size tried, with the centre pixel byte-identical to the original — the
+ * bounds only clip, they do not position. Applied to a COPY: the file in the cache stays the file.
+ */
+const GIFT_LOTTIE_PRECOMP_UNCLIP_FACTOR = 2;
+
+function unclipLottiePrecomps(lottie) {
+  if (!lottie || typeof lottie !== 'object') return lottie;
+  const clone = JSON.parse(JSON.stringify(lottie));
+  const widen = (layers) => {
+    for (const layer of Array.isArray(layers) ? layers : []) {
+      if (layer?.ty === 0 && typeof layer.w === 'number' && typeof layer.h === 'number') {
+        layer.w *= GIFT_LOTTIE_PRECOMP_UNCLIP_FACTOR;
+        layer.h *= GIFT_LOTTIE_PRECOMP_UNCLIP_FACTOR;
+      }
+    }
+  };
+  widen(clone.layers);
+  for (const asset of Array.isArray(clone.assets) ? clone.assets : []) widen(asset.layers);
+  return clone;
+}
+
+/** The player script, loaded once and only when something is going to move. */
+function loadTelegramGiftLottiePlayer() {
+  if (globalThis.lottie?.loadAnimation) return Promise.resolve(globalThis.lottie);
+  if (telegramGiftLottiePlayerPromise) return telegramGiftLottiePlayerPromise;
+  telegramGiftLottiePlayerPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = TELEGRAM_GIFT_LOTTIE_PLAYER_SRC;   // same origin: script-src 'self' is untouched
+    script.async = true;
+    script.onload = () => (globalThis.lottie?.loadAnimation ? resolve(globalThis.lottie) : reject(new Error('lottie player did not define itself')));
+    script.onerror = () => reject(new Error('lottie player failed to load'));
+    document.head.append(script);
+  }).catch((error) => {
+    telegramGiftLottiePlayerPromise = null;   // a failed load may be retried on the next wear
+    throw error;
+  });
+  return telegramGiftLottiePlayerPromise;
+}
+
+function giftMotionAllowed() {
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Where the subject IS in the composition, as fractions of the square — measured once per gift.
+ *
+ * The Gift layer renders in the full 512-unit frame, where the subject spans about 41% × 57% of the square (union
+ * over the loop, Spiced Wine); drawn as-is into a 44 px box it was less than half the size the cut-out had been
+ * [owner, 2026-09-07]. lottie-web's canvas renderer ignores `viewBoxSize` (measured: the same bounding box with and
+ * without it), so the box is found by looking: four frames a quarter-loop apart on a small probe canvas, their
+ * opaque pixels' union, a little padding, squared. Nothing opaque at all means the whole square — which is what an
+ * unmeasured gift got, so a probe that fails changes nothing.
+ */
+function measureGiftSubjectCrop(player, data, key) {
+  if (telegramGiftCropCache.has(key)) return telegramGiftCropCache.get(key);
+  const px = GIFT_SUBJECT_CROP_SAMPLE_PX;
+  const probe = document.createElement('canvas');
+  probe.width = px;
+  probe.height = px;
+  const context = probe.getContext('2d', { willReadFrequently: true });   // four getImageData reads follow
+  const anim = player.loadAnimation({
+    renderer: 'canvas', loop: false, autoplay: false, animationData: data,
+    rendererSettings: { context, clearCanvas: true, preserveAspectRatio: 'xMidYMid meet' },
+  });
+  let x0 = px; let y0 = px; let x1 = -1; let y1 = -1;
+  try {
+    const last = Math.max(0, Number(anim.totalFrames || 1) - 1);
+    for (const frame of GIFT_SUBJECT_CROP_FRAMES) {
+      anim.goToAndStop(Math.min(frame, last), true);
+      const pixels = context.getImageData(0, 0, px, px).data;
+      for (let y = 0; y < px; y += 1) {
+        for (let x = 0; x < px; x += 1) {
+          if (pixels[(y * px + x) * 4 + 3] <= 8) continue;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+  } catch { /* a probe that cannot read its pixels measures nothing, and nothing is the whole square */
+  } finally {
+    try { anim.destroy(); } catch { /* already gone */ }
+  }
+  let crop = { x: 0, y: 0, side: 1 };
+  if (x1 >= x0 && y1 >= y0) {
+    const w = (x1 - x0 + 1) / px;
+    const h = (y1 - y0 + 1) / px;
+    const side = Math.min(1, Math.max(w, h) * (1 + 2 * GIFT_SUBJECT_CROP_PAD));
+    crop = {
+      x: Math.max(0, Math.min(1 - side, x0 / px + (w - side) / 2)),
+      y: Math.max(0, Math.min(1 - side, y0 / px + (h - side) / 2)),
+      side,
+    };
+  }
+  telegramGiftCropCache.set(key, crop);
+  return crop;
+}
+
+/**
+ * Mount the worn gift's animation on a canvas. Returns { key, anim }, or null when there is nothing to play.
+ *
+ * By default the WHOLE file plays — backdrop, pattern and gift, the composition the still artwork is — which is
+ * what the corner's tile has always shown [owner, 2026-09-07: "in the corner the gift lost its backdrop and
+ * pattern"]. `subjectOnly` plays the Gift layer alone, with its box measured and filling the canvas; that is the
+ * hero, where the cut-out used to stand. Reuses a player that is already showing this gift — the corner is
+ * re-rendered on every wallet-identity refresh and must not restart. Sequential awaits, deliberately (the
+ * no-concurrent-read guard is a literal ban).
+ */
+/**
+ * The CSS box a player must fill, in CSS pixels — from the canvas when it is on screen, else from its visible
+ * twin (the still picture wears the same class, so the same box), else the attribute size.
+ *
+ * [owner, 2026-09-08: "artefacts on the picture" on the phone] The canvas is `hidden` until its player has
+ * mounted, and a hidden element measures 0 × 0 — so the first cut fell through to the HTML attribute (58) and
+ * rasterised 58 units for whatever box CSS actually gave it: on a 42 px box at 3× that is 174 device pixels
+ * squeezed into 126, a resample of a composition full of one-pixel pattern strokes.
+ */
+function giftMotionBoxSide(canvas, twin) {
+  for (const node of [canvas, twin]) {
+    const width = node?.getBoundingClientRect?.().width ?? 0;
+    if (width > 0) return Math.round(width);
+  }
+  return Math.max(1, Number(canvas?.getAttribute?.('width')) || 58);
+}
+
+function giftMotionDevicePixelRatio() {
+  return Math.min(3, Number(window.devicePixelRatio) || 1);
+}
+
+async function mountGiftMotion(canvas, gift, current, { subjectOnly = false, twin = null, onBoxChange = null } = {}) {
+  const key = `${gift?.slug}-${gift?.number}`;
+  if (!canvas || !gift?.slug) return null;
+  if (current?.key === key && current.anim) return current;
+  stopGiftMotion(current);
+  const player = await loadTelegramGiftLottiePlayer();
+  const source = await readTelegramGiftLottie(gift);
+  const data = unclipLottiePrecomps(subjectOnly ? giftOnlyLottie(source) : source);
+  if (!data?.layers?.length) return null;
+  // Backing store at device pixels, so a 58 px mark is not a 58 px bitmap stretched over a 3x screen.
+  const fit = (side) => {
+    const px = Math.max(1, Math.round(side * giftMotionDevicePixelRatio()));
+    if (canvas.width === px && canvas.height === px) return false;
+    canvas.width = px;
+    canvas.height = px;
+    return true;
+  };
+  fit(giftMotionBoxSide(canvas, twin));
+  const settings = { clearCanvas: true, preserveAspectRatio: 'xMidYMid meet' };
+  // ONE RENDER PATH FOR BOTH: the file draws offscreen in its OWN units (512 for a gift — integer clip coordinates,
+  // no fractional edge), and every frame is copied into the box, downscaled with smoothing — the whole square for
+  // the corner, the measured crop for the hero. The price is in the paths, not the pixels: 0.9–2.3 ms per frame
+  // including the copy, measured at 512 against 2.5 ms drawn straight onto a 58 px canvas.
+  const crop = subjectOnly ? measureGiftSubjectCrop(player, data, key) : { x: 0, y: 0, side: 1 };
+  const units = Math.max(GIFT_MOTION_RENDER_PX, Number(data.w) || 0, Number(data.h) || 0);
+  const offscreen = document.createElement('canvas');
+  offscreen.width = units;
+  offscreen.height = units;
+  const visible = canvas.getContext('2d');
+  visible.imageSmoothingQuality = 'high';
+  const anim = player.loadAnimation({
+    renderer: 'canvas', loop: true, autoplay: false, animationData: data,
+    rendererSettings: { ...settings, context: offscreen.getContext('2d') },
+  });
+  const copy = () => {
+    visible.clearRect(0, 0, canvas.width, canvas.height);
+    visible.drawImage(offscreen, crop.x * units, crop.y * units, crop.side * units, crop.side * units, 0, 0, canvas.width, canvas.height);
+  };
+  anim.addEventListener('enterFrame', copy);   // fires on play AND on goToAndStop (measured)
+  // INTEGER FRAMES ONLY: half the work on a 120 Hz screen, and invisible on a 58 px mark.
+  anim.setSubframe(false);
+  if (giftMotionAllowed() && !document.hidden) anim.play();
+  else anim.goToAndStop(0, true);   // reduced motion / hidden tab: frame 0 is still the clean subject
+  // THE BOX MOVES — rotation, the 900 px breakpoint, a zoomed page — and a canvas that keeps its old backing store
+  // is stretched by the browser. Re-rasterise instead, by MOUNTING AGAIN: lottie-web's canvas resize() was tried
+  // and drew the composition at the new scale around the old origin (measured 2026-09-08 — a quarter of the tile),
+  // so the player is torn down and the owner's sync rebuilds it on the resized canvas. Rare, and cheap.
+  let observer = null;
+  if (typeof ResizeObserver === 'function' && typeof onBoxChange === 'function') {
+    observer = new ResizeObserver(() => {
+      if (fit(giftMotionBoxSide(canvas, twin))) onBoxChange();
+    });
+    observer.observe(canvas);
+  }
+  return { key, anim, observer };
+}
+
+function stopGiftMotion(motion) {
+  try { motion?.observer?.disconnect(); } catch { /* already gone */ }
+  try { motion?.anim?.destroy(); } catch { /* a player that is already gone */ }
+}
+
+/**
+ * The corner follows the worn gift: mounted when one is worn, torn down when it comes off. The WHOLE file, as the
+ * tile always was — backdrop, pattern, gift — at 1.49 ms/frame measured on 58 px against 0.50 for the subject alone.
+ */
+function syncBrandGiftMotion() {
+  if (!globalThis.__plathoGiftRuntimeReady) return;   // module still evaluating — see renderBrandGift
+  const canvas = document.querySelector('#brandMarkMotion');
+  const mark = document.querySelector('#brandMarkImage');
+  if (!canvas || !mark) return;
+  if (!wornGiftTheme) {
+    stopGiftMotion(brandGiftMotion);
+    brandGiftMotion = null;
+    canvas.hidden = true;
+    mark.hidden = false;
+    return;
+  }
+  const token = ++brandGiftMotionToken;
+  mountGiftMotion(canvas, wornGiftTheme, brandGiftMotion, {
+    twin: mark,
+    onBoxChange: () => { stopGiftMotion(brandGiftMotion); brandGiftMotion = null; syncBrandGiftMotion(); },
+  }).then((motion) => {
+    if (token !== brandGiftMotionToken) { if (motion !== brandGiftMotion) stopGiftMotion(motion); return; }
+    brandGiftMotion = motion;
+    canvas.hidden = !motion;
+    mark.hidden = Boolean(motion);
+  }).catch(() => { /* the still picture stays — a missing player is not an error the user must read */ });
+}
+
+/** The hero of one's own card: the same animation, mounted while the card is open. */
+function syncHeroGiftMotion(theme) {
+  const canvas = document.querySelector('#profileCardHeroGiftMotion');
+  if (!canvas || !profileCardHeroGift) return;
+  if (!theme?.slug) {
+    stopGiftMotion(heroGiftMotion);
+    heroGiftMotion = null;
+    canvas.hidden = true;
+    return;
+  }
+  const token = ++heroGiftMotionToken;
+  mountGiftMotion(canvas, theme, heroGiftMotion, {
+    subjectOnly: true,
+    twin: profileCardHeroGift,
+    onBoxChange: () => { stopGiftMotion(heroGiftMotion); heroGiftMotion = null; syncHeroGiftMotion(theme); },
+  }).then((motion) => {
+    if (token !== heroGiftMotionToken) { if (motion !== heroGiftMotion) stopGiftMotion(motion); return; }
+    heroGiftMotion = motion;
+    canvas.hidden = !motion;
+    if (motion) profileCardHeroGift.hidden = true;
+  }).catch(() => { /* the cut-out stays */ });
+}
+
+// A hidden tab does not deserve a frame; a tab that comes back gets its motion back.
+document.addEventListener('visibilitychange', () => {
+  for (const motion of [brandGiftMotion, heroGiftMotion]) {
+    if (!motion?.anim) continue;
+    if (document.hidden) motion.anim.pause();
+    else if (giftMotionAllowed()) motion.anim.play();
+  }
+});
+
+async function readGiftPatternDrawing(gift) {
+  const lottie = await readTelegramGiftLottie(gift);
+  if (!lottie) return null;
+  const units = Number(lottie?.w) || 0;
+  const assets = Array.isArray(lottie?.assets) ? lottie.assets : [];
+  const root = (lottie?.layers ?? []).find((layer) => layer?.nm === 'Pattern');
+  const pattern = assets.find((asset) => asset?.id === root?.refId);
+  if (!units || !root || !Array.isArray(pattern?.layers)) return null;
+  const instances = [];
+  for (const layer of pattern.layers) {
+    const glyph = assets.find((asset) => asset?.id === layer?.refId);
+    const shapes = (glyph?.layers ?? []).filter((node) => node?.ty === 4 && Array.isArray(node?.shapes));
+    if (shapes.length > 0) instances.push({ transform: layer?.ks, shapes });
+  }
+  if (instances.length === 0) return null;
+  return { units, transform: root?.ks, instances, backdrop: readGiftBackdropGradient(lottie) };
+}
+
+/** One decoded artwork per gift. The subject is cut out of pixels, so the picture has to be in hand first. */
+async function decodeGiftArtImage(gift) {
+  const url = await loadTelegramGiftArt(gift);
+  if (!url) return null;
+  return new Promise((resolve) => {
+    const node = new Image();
+    node.onload = () => resolve(node);
+    node.onerror = () => resolve(null);
+    node.src = url;
+  });
+}
+
+/**
+ * The backdrop the artwork was rendered over, read from the file that defines it.
+ *
+ * This is what makes cutting the subject out of the .webp honest rather than a guess: the picture has no alpha and
+ * no edge to find, but the backdrop behind it is a radial gradient whose two stops, centre and radius are all
+ * written down. Subtracting a known thing is not the same act as guessing an unknown one.
+ *
+ * The two points arrive in the shape's own coordinates, so they are pushed through the same layer and group
+ * transforms the paths use — the one matrix, read back off a context that has had them applied.
+ */
+function readGiftBackdropGradient(lottie) {
+  const layer = (lottie?.layers ?? []).find((node) => node?.nm === 'Background');
+  for (const group of layer?.shapes ?? []) {
+    if (group?.ty !== 'gr' || !Array.isArray(group.it)) continue;
+    const fill = group.it.find((item) => item?.ty === 'gf');
+    if (Number(fill?.t) !== 2) continue;   // radial only; a linear backdrop is a different model, not a variant
+    const stops = lottieStill(fill?.g?.k, null);
+    const start = lottieStill(fill?.s, null);
+    const end = lottieStill(fill?.e, null);
+    if (!Array.isArray(stops) || stops.length < 8) continue;
+    if (!Array.isArray(start) || !Array.isArray(end)) continue;
+    const probe = document.createElement('canvas').getContext('2d');
+    if (!probe) return null;
+    if (!applyLottieTransform(probe, layer?.ks)) continue;
+    if (!applyLottieTransform(probe, group.it.find((item) => item?.ty === 'tr'))) continue;
+    const matrix = probe.getTransform();
+    const at = (point) => [
+      (matrix.a * point[0]) + (matrix.c * point[1]) + matrix.e,
+      (matrix.b * point[0]) + (matrix.d * point[1]) + matrix.f,
+    ];
+    const centre = at(start);
+    const rim = at(end);
+    const channel = (offset) => Math.max(0, Math.min(255, Math.round(255 * stops[offset])));
+    return {
+      centre,
+      radius: Math.hypot(rim[0] - centre[0], rim[1] - centre[1]),
+      inner: [channel(1), channel(2), channel(3)],
+      outer: [channel(5), channel(6), channel(7)],
+    };
+  }
+  return null;
+}
+
+/**
+ * The gift itself, as an alpha mask, by subtracting its own backdrop from the artwork.
+ *
+ * Every pixel is compared with the colour the gradient says should be there, and what departs far enough is the
+ * subject. The threshold is not a taste: below it sit the backdrop's own dither, the gift's drop shadow, and the
+ * pattern symbols — measured, those symbols surface at 45 and are gone by 90.
+ */
+function cutGiftSubjectMask(image, backdrop, units, { keepColour = false, solid = false, contours = false, objectAlpha = null } = {}) {
+  const cut = solid ? GIFT_SUBJECT_CUT : GIFT_PATTERN_SUBJECT_CUT;
+  const canvas = document.createElement('canvas');
+  canvas.width = units;
+  canvas.height = units;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return null;
+  context.drawImage(image, 0, 0, units, units);
+  const frame = context.getImageData(0, 0, units, units);
+  const data = frame.data;
+  const [cx, cy] = backdrop.centre;
+  const count = units * units;
+  const ramp = new Float32Array(count);
+  const looksLikeBackdrop = new Uint8Array(count);
+  for (let y = 0, index = 0; y < units; y += 1) {
+    for (let x = 0; x < units; x += 1, index += 1) {
+      const t = Math.min(1, Math.hypot(x - cx, y - cy) / backdrop.radius);
+      const at = index * 4;
+      let departure = 0;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const expected = backdrop.inner[channel] + ((backdrop.outer[channel] - backdrop.inner[channel]) * t);
+        departure += Math.abs(data[at + channel] - expected);
+      }
+      ramp[index] = departure <= cut ? 0 : Math.min(1, (departure - cut) / GIFT_SUBJECT_RAMP);
+      looksLikeBackdrop[index] = ramp[index] <= 0 ? 1 : 0;
+    }
+  }
+
+  // REACHABILITY, NOT COLOUR. A pixel is the backdrop when it can be reached from the frame's edge without crossing
+  // the subject. The threshold alone cannot tell the ground BEHIND a subject from a part OF it that happens to be
+  // the same colour — and Vice Cream's cone is the colour of its own backdrop, so the cut was punching holes
+  // through it and the gift read as semi-transparent. Everything the flood cannot reach is inside the subject,
+  // whatever colour it is.
+  // THE OBJECT'S OWN CONTOURS THIN THE INK [owner, 2026-09-09: "go from the texture, not from the silhouette"]. The
+  // ramp above is "how far from the backdrop", and on a dark backdrop that is nearly brightness — which is why a
+  // cone's waffle grid, a mug's glass and a torch's flame come out as an engraving of their own accord. A book on
+  // indigo does not: cover, pages, emblem and pen are all equally far from blue, so the ramp is flat and the book is
+  // a blot. Where the object's brightness changes sharply — the emblem's edge, the page block, the pen's outline —
+  // the ink thins in proportion (Sobel of luminance, against the object's own strongest edge, square-rooted so a
+  // moderate edge still shows). Same rule for the cone, whose sharp edges are the grid lines already cut by the
+  // ramp: it changes nothing it does not need to. Read before the pixels are whitened — the colours are still here.
+  let contour = null;
+  if (contours && !keepColour) {
+    const lum = new Float32Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const at = index * 4;
+      lum[index] = ((0.2126 * data[at]) + (0.7152 * data[at + 1]) + (0.0722 * data[at + 2])) / 255;
+    }
+    const grad = new Float32Array(count);
+    let strongest = 0;
+    for (let y = 1; y < units - 1; y += 1) {
+      for (let x = 1; x < units - 1; x += 1) {
+        const index = (y * units) + x;
+        if (ramp[index] <= 0) continue;
+        const gx = (lum[index - units + 1] + (2 * lum[index + 1]) + lum[index + units + 1])
+          - (lum[index - units - 1] + (2 * lum[index - 1]) + lum[index + units - 1]);
+        const gy = (lum[index + units - 1] + (2 * lum[index + units]) + lum[index + units + 1])
+          - (lum[index - units - 1] + (2 * lum[index - units]) + lum[index - units + 1]);
+        grad[index] = Math.hypot(gx, gy);
+        if (grad[index] > strongest) strongest = grad[index];
+      }
+    }
+    contour = new Float32Array(count);
+    for (let index = 0; index < count; index += 1) {
+      contour[index] = strongest > 0 ? 1 - Math.pow(grad[index] / strongest, GIFT_SUBJECT_CONTOUR_GAMMA) : 1;
+    }
+  }
+  const outside = new Uint8Array(count);
+  const stack = solid ? [] : null;
+  if (!stack) {
+    // MASK MODE — what this file did before the hero existed, and what the tile still wants: the ramp alone, so
+    // every interior gap the artist drew stays a gap. No flood, no region, nothing filled.
+    let bx0 = units;
+    let by0 = units;
+    let bx1 = -1;
+    let by1 = -1;
+    for (let y = 0, index = 0; y < units; y += 1) {
+      for (let x = 0; x < units; x += 1, index += 1) {
+        const at = index * 4;
+        // The artwork's ramp, thinned along the object's contours, and confined to what the object's own vectors
+        // render opaque (a ray of light is translucent there and leaves) — each a factor, none a cut.
+        let alpha = ramp[index];
+        if (contour) alpha *= contour[index];
+        if (objectAlpha) alpha *= objectAlpha[index];
+        if (!keepColour) {
+          data[at] = 255;
+          data[at + 1] = 255;
+          data[at + 2] = 255;
+        }
+        data[at + 3] = Math.round(255 * alpha);
+        if (alpha > 0.35) {
+          if (x < bx0) bx0 = x;
+          if (x > bx1) bx1 = x;
+          if (y < by0) by0 = y;
+          if (y > by1) by1 = y;
+        }
+      }
+    }
+    if (bx1 < 0) return null;
+    context.putImageData(frame, 0, 0);
+    return { canvas, box: { x: bx0, y: by0, width: (bx1 - bx0) + 1, height: (by1 - by0) + 1 } };
+  }
+  for (let x = 0; x < units; x += 1) {
+    stack.push(x, ((units - 1) * units) + x);
+  }
+  for (let y = 0; y < units; y += 1) {
+    stack.push(y * units, (y * units) + units - 1);
+  }
+  while (stack.length > 0) {
+    const index = stack.pop();
+    if (outside[index] || !looksLikeBackdrop[index]) continue;
+    outside[index] = 1;
+    const x = index % units;
+    const y = (index - x) / units;
+    if (x > 0) stack.push(index - 1);
+    if (x + 1 < units) stack.push(index + 1);
+    if (y > 0) stack.push(index - units);
+    if (y + 1 < units) stack.push(index + units);
+  }
+
+  // THE SUBJECT IS THE BIGGEST CONNECTED THING. What survives the flood is "not reachable ground", and that still
+  // includes the backdrop's own pattern symbols — islands sitting out in it. The gift is the largest of those
+  // regions; the symbols are small ones.
+  //
+  // NOT "the region under the middle pixel", which is what this was first: Chill Flame's torch lies diagonally
+  // across the square and does not cover the centre, so the seed landed on backdrop, the region came back empty
+  // and no cut-out was produced at all. Largest carries no assumption about where a gift is drawn.
+  const region = new Int32Array(count).fill(-1);
+  const subject = new Uint8Array(count);
+  let bestLabel = -1;
+  let bestSize = 0;
+  let label = 0;
+  const walk = [];
+  for (let start = 0; start < count; start += 1) {
+    if (outside[start] || region[start] !== -1) continue;
+    let size = 0;
+    walk.length = 0;
+    walk.push(start);
+    region[start] = label;
+    while (walk.length > 0) {
+      const index = walk.pop();
+      size += 1;
+      const x = index % units;
+      const y = (index - x) / units;
+      const push = (next) => {
+        if (outside[next] || region[next] !== -1) return;
+        region[next] = label;
+        walk.push(next);
+      };
+      if (x > 0) push(index - 1);
+      if (x + 1 < units) push(index + 1);
+      if (y > 0) push(index - units);
+      if (y + 1 < units) push(index + units);
+    }
+    if (size > bestSize) { bestSize = size; bestLabel = label; }
+    label += 1;
+  }
+  if (bestLabel >= 0) {
+    for (let index = 0; index < count; index += 1) {
+      if (region[index] === bestLabel) subject[index] = 1;
+    }
+  }
+
+  let minX = units;
+  let minY = units;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0, index = 0; y < units; y += 1) {
+    for (let x = 0; x < units; x += 1, index += 1) {
+      const at = index * 4;
+      // Outside: gone. Inside: SOLID — and that is the whole correction. Applying the ramp throughout the interior
+      // is what made the gift look semi-transparent: every mid-tone of Vice Cream's cone sits just above the cut,
+      // so it came out at a fraction of its own opacity. Measured before the fix, only 58% of the subject was
+      // fully opaque. The ramp is kept for pixels that TOUCH the outside, which is the only place it does any
+      // work — a soft silhouette edge instead of a jagged one.
+      let alpha = subject[index] ? 1 : 0;
+      if (alpha && ((x > 0 && !subject[index - 1])
+        || (x + 1 < units && !subject[index + 1])
+        || (y > 0 && !subject[index - units])
+        || (y + 1 < units && !subject[index + units]))) {
+        // Only the silhouette's own edge is softened. Applied throughout the interior this is what made the gift
+        // look semi-transparent: every mid-tone sat just above the cut and came out at a fraction of its opacity.
+        alpha = Math.max(ramp[index], 0.35);
+      }
+      // A MASK for the tile, which is painted in whatever colour the surface wants; the SUBJECT ITSELF for the
+      // profile's hero, where it has to look like the gift and not like a silhouette of it.
+      if (!keepColour) {
+        data[at] = 255;
+        data[at + 1] = 255;
+        data[at + 2] = 255;
+      }
+      data[at + 3] = Math.round(255 * alpha);
+      if (alpha > 0.35) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  context.putImageData(frame, 0, 0);
+  return { canvas, box: { x: minX, y: minY, width: (maxX - minX) + 1, height: (maxY - minY) + 1 } };
+}
+
+/** A still Lottie property, or null when it is animated — a moving glyph is not a wallpaper and is refused. */
+function lottieStill(property, fallback) {
+  if (property === undefined || property === null) return fallback;
+  if (property.a === 1) return null;
+  return property.k === undefined ? fallback : property.k;
+}
+
+/** Apply one Lottie transform — anchor, position, scale, rotation — to a canvas. */
+function applyLottieTransform(context, ks) {
+  const position = lottieStill(ks?.p, [0, 0]);
+  const anchor = lottieStill(ks?.a, [0, 0]);
+  const scale = lottieStill(ks?.s, [100, 100]);
+  const rotation = lottieStill(ks?.r, 0);
+  if (!Array.isArray(position) || !Array.isArray(anchor) || !Array.isArray(scale)) return false;
+  if (rotation === null || !Number.isFinite(Number(rotation))) return false;
+  context.translate(position[0], position[1]);
+  if (rotation) context.rotate((Number(rotation) * Math.PI) / 180);
+  context.scale(scale[0] / 100, scale[1] / 100);
+  context.translate(-anchor[0], -anchor[1]);
+  return true;
+}
+
+/** Trace one Lottie bezier. Its in/out handles are offsets FROM the vertex they belong to, not absolute points. */
+function traceLottiePath(context, shape) {
+  const path = lottieStill(shape?.ks, null);
+  const vertices = path?.v;
+  const incoming = path?.i;
+  const outgoing = path?.o;
+  if (!Array.isArray(vertices) || vertices.length < 2) return false;
+  if (!Array.isArray(incoming) || !Array.isArray(outgoing)) return false;
+  context.moveTo(vertices[0][0], vertices[0][1]);
+  for (let n = 1; n < vertices.length; n += 1) {
+    context.bezierCurveTo(
+      vertices[n - 1][0] + outgoing[n - 1][0], vertices[n - 1][1] + outgoing[n - 1][1],
+      vertices[n][0] + incoming[n][0], vertices[n][1] + incoming[n][1],
+      vertices[n][0], vertices[n][1],
+    );
+  }
+  if (path.c) {
+    const last = vertices.length - 1;
+    context.bezierCurveTo(
+      vertices[last][0] + outgoing[last][0], vertices[last][1] + outgoing[last][1],
+      vertices[0][0] + incoming[0][0], vertices[0][1] + incoming[0][1],
+      vertices[0][0], vertices[0][1],
+    );
+    context.closePath();
+  }
+  return true;
+}
+
+/**
+ * Fill one shape layer as a flat silhouette.
+ *
+ * The gift's own fill is a single opaque colour, so nothing is lost by ignoring it — and the caller needs the shape
+ * in ITS colour, not the file's. Every path of a group goes into one path object so holes cut as the artist drew
+ * them rather than painting over each other.
+ */
+function fillLottieShapeLayer(context, layer) {
+  context.save();
+  let drew = false;
+  if (applyLottieTransform(context, layer?.ks)) {
+    for (const group of layer.shapes ?? []) {
+      if (group?.ty !== 'gr' || !Array.isArray(group.it)) continue;
+      context.save();
+      if (applyLottieTransform(context, group.it.find((item) => item?.ty === 'tr'))) {
+        context.beginPath();
+        let traced = false;
+        for (const item of group.it) {
+          if (item?.ty === 'sh' && traceLottiePath(context, item)) traced = true;
+        }
+        if (traced) {
+          context.fill('evenodd');
+          drew = true;
+        }
+      }
+      context.restore();
+    }
+  }
+  context.restore();
+  return drew;
+}
+
+/** The whole arrangement, painted once into whatever transform the caller has set up. */
+function paintGiftPatternDrawing(context, drawing) {
+  let drew = false;
+  context.save();
+  if (applyLottieTransform(context, drawing.transform)) {
+    for (const instance of drawing.instances) {
+      context.save();
+      if (applyLottieTransform(context, instance.transform)) {
+        for (const layer of instance.shapes) {
+          if (fillLottieShapeLayer(context, layer)) drew = true;
+        }
+      }
+      context.restore();
+    }
+  }
+  context.restore();
+  return drew;
+}
+
+/** The tightest box holding anything at all. Used to fit a glyph to the mark without leaving it swimming. */
+function opaqueBounds(frame) {
+  const { data, width, height } = frame;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(((y * width) + x) * 4) + 3] === 0) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return maxX < 0 ? null : { x: minX, y: minY, width: (maxX - minX) + 1, height: (maxY - minY) + 1 };
+}
+
+/**
+ * The worn gift's pattern mask, as the data URL it was stored as — or null.
+ *
+ * SYNCHRONOUS AND FROM STORAGE, both deliberately. initBootScreen() runs while this module is still evaluating, so
+ * the worn-gift state declared far below is in its temporal dead zone and reading it throws; and anything async
+ * here would starve behind the boot's synchronous crypto, which is what happened to the first version — the mask
+ * was built and delivered correctly, just after the loading screen had gone. A string crosses into the worker with
+ * the rest of the init payload and is decoded there, on a thread with nothing else to do.
+ *
+ * The key is written out rather than referenced for the same dead-zone reason; PWA-GIFT-05 pins the two together.
+ */
+function bootFieldInk() {
+  try {
+    if (!giftThemeChosenInStorage()) return undefined;
+    const record = JSON.parse(localStorage.getItem('platho.giftTheme.v1') ?? 'null');
+    const glow = record ? (record.inner ?? record.tint) : null;
+    if (!Array.isArray(glow) || glow.length !== 3) return undefined;
+    return glow.map((channel) => Math.round(Number(channel))).join(', ');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * FROM STORAGE, not from the token, and `undefined` rather than null when no gift is worn.
+ *
+ * Same dead-zone reason as the pattern below — initBootScreen runs while this module is still evaluating — and the
+ * same source of truth either way, since `--aurora-rgb` is set from this very record. `undefined` because that is
+ * what makes a destructuring default apply; `null` would paint the whole field in nothing.
+ */
+function bootFieldPatternUrl() {
+  try {
+    const record = giftThemeChosenInStorage()
+      ? JSON.parse(localStorage.getItem('platho.giftTheme.v1') ?? 'null')
+      : null;
+    const url = record ? record.pattern : null;
+    setBootDebug(url ? 'mark:queued' : `mark:none:${record ? 'no-pattern' : 'no-record'}`);
+    return typeof url === 'string' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What colour the lattice's mark is drawn in: the GIFT's own, the same one the plasma paints with.
+ *
+ * It used to be the theme's text token, from back when a worn gift WAS the background and everything drawn on top
+ * had to come from whichever palette read on it. The background is the theme's now, so the gift's colour is the
+ * thing that belongs here — a white grid on an orange app was the seam that showed. `--aurora-rgb` carries it, and
+ * carries the app's own accent when no gift is worn, so this needs no branch; `--text` stays as the last resort
+ * for a token that could not be parsed.
+ */
+function giftPatternMarkColour() {
+  const glow = getComputedStyle(document.documentElement).getPropertyValue('--aurora-rgb').trim();
+  const channels = glow.match(/\d+/g);
+  if (channels && channels.length >= 3) return channels.slice(0, 3).map((value) => Number(value));
+  const token = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+  const hex = /^#([0-9a-f]{6})$/i.exec(token);
+  if (hex) {
+    const value = Number.parseInt(hex[1], 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  }
+  const parts = token.match(/[\d.]+/g);
+  if (parts && parts.length >= 3) return parts.slice(0, 3).map((v) => Math.round(Number(v)));
+  return currentEffectiveTheme() === 'light' ? [22, 33, 31] : [238, 244, 242];
+}
+
+/** Paint a white mask in one colour, keeping its alpha. Cheaper and shorter than a second pixel loop. */
+function tintGiftPatternMask(mask, colour) {
+  const canvas = document.createElement('canvas');
+  canvas.width = mask.width;
+  canvas.height = mask.height;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.drawImage(mask, 0, 0);
+  context.globalCompositeOperation = 'source-in';
+  context.fillStyle = `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/**
+ * ONE symbol, fitted to the lattice's mark.
+ *
+ * Drawn once at a size where its own bounds can be measured, then drawn again scaled to fill the mark: the glyph
+ * sits wherever the artist put it inside the icon's square, so fitting it by its BOX is what keeps every gift's
+ * symbol the same visual weight on the lattice.
+ */
+function composeGiftPatternMark(drawing) {
+  const probe = document.createElement('canvas');
+  probe.width = GIFT_PATTERN_PROBE_PX;
+  probe.height = GIFT_PATTERN_PROBE_PX;
+  const probeContext = probe.getContext('2d', { willReadFrequently: true });
+  if (!probeContext) return null;
+  probeContext.fillStyle = '#fff';
+  const shapes = drawing.instances[0]?.shapes ?? [];
+  let drew = false;
+  for (const layer of shapes) {
+    if (fillLottieShapeLayer(probeContext, layer)) drew = true;
+  }
+  if (!drew) return null;
+  const box = opaqueBounds(probeContext.getImageData(0, 0, probe.width, probe.height));
+  if (!box) return null;
+
+  const px = GIFT_PATTERN_MARK_PX;
+  const canvas = document.createElement('canvas');
+  canvas.width = px;
+  canvas.height = px;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.fillStyle = '#fff';
+  const k = px / Math.max(box.width, box.height);
+  context.translate((px - (box.width * k)) / 2, (px - (box.height * k)) / 2);
+  context.scale(k, k);
+  context.translate(-box.x, -box.y);
+  for (const layer of shapes) fillLottieShapeLayer(context, layer);
+  return canvas;
+}
+
+/**
+ * The gift's pattern as a REPEATING TILE, laid out the way the gift lays it out.
+ *
+ * WHY NOT A GRID. Read from the Lottie, a gift's pattern is not an even field: its 23 symbols sit on rings around
+ * the centre (measured on one gift: radii 137, then 170-177, then 201-265), their size falls outward from 11.0% of
+ * the square to 7.4%, the arrangement mirrors about the vertical axis, and the middle is left empty because that is
+ * where the gift itself is drawn. An even lattice of one size reproduces none of that.
+ *
+ * WRAPPED, because that map is a medallion and not a tile: symbols sit on and across its edges, and painted once
+ * they would be sliced in half at the seam. The whole arrangement is painted nine times, of which eight land
+ * entirely outside the tile and contribute only their overhang — which is exactly the neighbour's missing half.
+ *
+ * White on transparent: the colour belongs to the theme and is applied where the tile is used, so one tile survives
+ * a light/dark flip and can be stored once beside the worn gift.
+ */
+function composeGiftPatternTile(drawing, subject = null) {
+  const units = GIFT_PATTERN_TILE_UNITS;
+  const canvas = document.createElement('canvas');
+  canvas.width = units;
+  canvas.height = units;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.fillStyle = '#fff';
+  const k = units / drawing.units;
+  let drew = false;
+  for (const dx of [-units, 0, units]) {
+    for (const dy of [-units, 0, units]) {
+      context.save();
+      context.translate(dx, dy);
+      context.scale(k, k);
+      if (paintGiftPatternDrawing(context, drawing)) drew = true;
+      context.restore();
+    }
+  }
+  // THE GIFT GOES WHERE ITS OWN PATTERN LEFT ROOM. The map's middle is empty because that is where the artwork
+  // draws the gift, so a tile without it is half a composition. Fitted by its BOX rather than by the artwork's
+  // frame: the subject sits wherever the artist put it in the square, and only its own bounds centre it.
+  if (subject) {
+    const k = GIFT_SUBJECT_FIT / Math.max(subject.box.width, subject.box.height);
+    context.save();
+    context.translate((units - (subject.box.width * k)) / 2, (units - (subject.box.height * k)) / 2);
+    context.scale(k, k);
+    context.drawImage(subject.canvas, -subject.box.x, -subject.box.y);
+    context.restore();
+    drew = true;
+  }
+  return drew ? canvas : null;
+}
+
+/** The lattice's single mark: one symbol, in the active theme's ink. */
+async function buildGiftPatternMark(gift) {
+  const drawing = await readGiftPatternDrawing(gift).catch(() => null);
+  if (!drawing) return null;
+  const mask = composeGiftPatternMark(drawing);
+  return mask ? tintGiftPatternMask(mask, giftPatternMarkColour()) : null;
+}
+
+/** The worn gift's tile — its pattern, and the gift in the middle of it. Null if the pattern could not be read. */
+async function buildGiftPatternTile(gift) {
+  const drawing = await readGiftPatternDrawing(gift).catch(() => null);
+  if (!drawing) return null;
+  return composeGiftPatternTile(drawing, await cutGiftSubjectForDrawing(gift, drawing));
+}
+
+/** The subject, or null — a gift whose backdrop cannot be read still gets its pattern, just without the middle. */
+async function cutGiftSubjectForDrawing(gift, drawing, { keepColour = false } = {}) {
+  if (!drawing.backdrop) return null;
+  const image = await decodeGiftArtImage(gift).catch(() => null);
+  if (!image) return null;
+  // `solid` rides with `keepColour` because the two callers are the two modes: the hero wants the subject filled
+  // and in colour, the tile wants a mask with every gap the artist drew — and, since 2026-09-09, the object's own
+  // contours cut into it and the object's own alpha (its vectors) around it; the hero's colour cut stays as it was.
+  const objectAlpha = keepColour ? null : await giftObjectAlphaFromLottie(gift, drawing.units).catch(() => null);
+  return cutGiftSubjectMask(image, drawing.backdrop, drawing.units, { keepColour, solid: keepColour, contours: !keepColour, objectAlpha });
+}
+
+const giftObjectAlphaCache = new Map();   // `${slug}-${number}:${units}` -> Float32Array | null
+
+/**
+ * THE OBJECT'S OWN ALPHA, from the Gift layer of its Lottie at the mask's resolution — the one thing the artwork
+ * cannot say. In the artwork a ray of light is a colour like any other, and "how far from the backdrop" counts it as
+ * object; in the vectors the object is opaque and the light is translucent (MEASURED on Star Notepad #14609: the
+ * rays sit below 0.75 alpha, the book and the pen at 1). A short ramp (0.75 → 0.9) rather than a cut, so an edge
+ * stays a curve. Null when the file or the player is out of reach — then the mask is the artwork's alone, as before.
+ */
+async function giftObjectAlphaFromLottie(gift, units) {
+  if (!gift?.slug) return null;
+  const key = `${gift.slug}-${gift.number}:${units}`;
+  if (giftObjectAlphaCache.has(key)) return giftObjectAlphaCache.get(key);
+  let field = null;
+  try {
+    const player = await loadTelegramGiftLottiePlayer();
+    const data = unclipLottiePrecomps(giftOnlyLottie(await readTelegramGiftLottie(gift)));
+    if (!data?.layers?.length) throw new Error('the gift file has no Gift layer');
+    const canvas = document.createElement('canvas');
+    canvas.width = units;
+    canvas.height = units;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('no 2d context');
+    const anim = player.loadAnimation({
+      renderer: 'canvas', loop: false, autoplay: false, animationData: data,
+      rendererSettings: { context, clearCanvas: true, preserveAspectRatio: 'xMidYMid meet' },
+    });
+    try {
+      anim.goToAndStop(0, true);
+      const px = context.getImageData(0, 0, units, units).data;
+      field = new Float32Array(units * units);
+      for (let index = 0; index < field.length; index += 1) {
+        const t = Math.max(0, Math.min(1, (px[(index * 4) + 3] - GIFT_SUBJECT_OBJECT_EDGE_FROM) / (GIFT_SUBJECT_OBJECT_EDGE_TO - GIFT_SUBJECT_OBJECT_EDGE_FROM)));
+        field[index] = t * t * (3 - (2 * t));
+      }
+    } finally {
+      try { anim.destroy(); } catch { /* already gone */ }
+    }
+  } catch {
+    field = null;
+  }
+  giftObjectAlphaCache.set(key, field);
+  return field;
+}
+
+/**
+ * The gift itself, out of its own backdrop, in colour — what the profile's hero stands on its face.
+ *
+ * The artwork is a square that INCLUDES the backdrop, so pasted onto a hero painted in that same backdrop it reads
+ * as a sticker with a visible edge, which is what the owner saw. Subtracting the gradient the Lottie defines takes
+ * the square away and leaves the subject.
+ */
+async function buildGiftSubjectArt(gift) {
+  const drawing = await readGiftPatternDrawing(gift).catch(() => null);
+  if (!drawing) return null;
+  const subject = await cutGiftSubjectForDrawing(gift, drawing, { keepColour: true });
+  if (!subject) return null;
+  const side = Math.max(subject.box.width, subject.box.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = side;
+  canvas.height = side;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  // Centred in its own square, so the hero can size it without knowing which way the subject leans.
+  context.drawImage(
+    subject.canvas,
+    subject.box.x, subject.box.y, subject.box.width, subject.box.height,
+    (side - subject.box.width) / 2, (side - subject.box.height) / 2, subject.box.width, subject.box.height,
+  );
+  return canvas;
+}
+
+let giftArtefactsPending = '';
+/**
+ * Fill in whatever a worn gift is missing, from the one read that can supply all of it.
+ *
+ * Two things arrive this way. The CUT-OUT, for a gift worn before the hero existed. And the exact backdrop STOPS,
+ * for one worn while they were still being sampled off the artwork's pixels — a sample whose middle lands on the
+ * gift itself, so the two came back almost the same colour and every surface derived from them was flat.
+ *
+ * Stamped rather than guessed: the record says where its colours came from, so a corrected one is not re-corrected
+ * on every launch and an uncorrected one cannot be mistaken for current.
+ */
+function ensureGiftSubjectArt() {
+  if (!wornGiftTheme) return;
+  const needsArt = !wornGiftTheme.subjectArt || wornGiftTheme.subjectArtVersion !== GIFT_SUBJECT_ART_VERSION;
+  const needsStops = wornGiftTheme.stopsFrom !== 'lottie';
+  const needsTile = wornGiftTheme.patternTileVersion !== GIFT_PATTERN_TILE_VERSION;
+  if (!needsArt && !needsStops && !needsTile) return;
+  const key = `${wornGiftTheme.slug}-${wornGiftTheme.number}`;
+  if (giftArtefactsPending === key) return;
+  giftArtefactsPending = key;
+  (async () => {
+    const drawing = await readGiftPatternDrawing(wornGiftTheme).catch(() => null);
+    if (!drawing) return;
+    const subject = needsArt ? await buildGiftSubjectArt(wornGiftTheme).catch(() => null) : null;
+    if (!wornGiftTheme || `${wornGiftTheme.slug}-${wornGiftTheme.number}` !== key) return;
+    const next = { ...wornGiftTheme };
+    if (subject) {
+      next.subjectArt = subject.toDataURL('image/png');
+      next.subjectArtVersion = GIFT_SUBJECT_ART_VERSION;
+    }
+    if (needsTile) {
+      const tile = composeGiftPatternTile(drawing, await cutGiftSubjectForDrawing(wornGiftTheme, drawing));
+      if (tile) {
+        next.patternTile = tile.toDataURL('image/png');
+        next.patternTileVersion = GIFT_PATTERN_TILE_VERSION;
+      }
+    }
+    if (needsStops && drawing.backdrop) {
+      next.tint = drawing.backdrop.outer;
+      next.inner = drawing.backdrop.inner;
+      next.stopsFrom = 'lottie';
+    }
+    writeWornGiftTheme(next);
+    applyGiftAppearance();   // the colours it was dressed in a moment ago were the guessed ones
+    redressProfileCardHeroIfOpen();   // and the subject it was cut for stands on the open card at once
+  })().catch(() => { /* the hero falls back to what it already had */ });
+}
+
+
+/**
+ * Send a gift to another wallet.
+ *
+ * THE NAME TRANSFER'S SHAPE, and for its reasons: the send runs inside validateSubmit so a refusal is stated in the
+ * still-open window instead of behind one that has already closed, and the recipient is refused HERE rather than by
+ * a bounce, because an item that rejects a non-basechain owner answers with an opcode number nobody can act on.
+ */
+async function openTelegramGiftTransferDialog(gift) {
+  const displayName = gift.name || shortAddress(gift.itemAddress);
+  const values = await openActionDialog({
+    title: t('gift.transferTitle', { name: displayName }),
+    hint: t('gift.transferIrreversible'),
+    tone: 'warning',
+    submitLabel: t('username.transferName'),
+    fields: [{
+      type: 'text',
+      id: 'giftTransferRecipient',
+      name: 'recipient',
+      label: t('dialog.recipient'),
+      placeholder: t('dialog.recipientPlaceholder'),
+      required: true,
+    }],
+    footnotes: [
+      t('username.transferCostNote', { amount: formatTonNanotons(TELEGRAM_GIFT_TRANSFER_VALUE_NANOTONS) }),
+      t('gift.transferLosesGift'),
+    ],
+    validateSubmit: async (submitted) => {
+      const entered = String(submitted?.recipient ?? '').trim();
+      let recipient = null;
+      let identity = null;
+      try {
+        ({ wallet: recipient, identity } = await resolveTransferRecipient(entered));
+      } catch (error) {
+        return { ok: false, error: transferRecipientError(error, entered) };
+      }
+      try {
+        buildUsernameNftTransferBody({ queryId: 1n, newOwner: recipient, responseDestination: plathoWallet.address });
+      } catch {
+        return { ok: false, error: t('username.recipientInvalid') };
+      }
+      if (parseTonAddress(recipient).raw === parseTonAddress(plathoWallet.address).raw) {
+        return { ok: false, error: t('username.recipientIsSelf') };
+      }
+      try {
+        await submitTelegramGiftTransfer(gift, recipient);
+      } catch (error) {
+        console.error(error);
+        return {
+          ok: false,
+          error: error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
+            ? t('common.needsWalletGram')
+            : t('gift.transferFailed'),
+        };
+      }
+      return { ok: true, result: { recipient: transferRecipientDisplay(identity, recipient) } };
+    },
+  });
+  if (!values?.recipient) return;
+  await openActionDialog({
+    title: t('gift.transferSubmittedTitle'),
+    hint: t('username.transferSubmittedHint', { name: displayName, recipient: values.recipient }),
+    submitLabel: t('common.close'),
+    fields: [],
+  });
+  return true;   // the transfer is away — a caller showing the item may stop showing it
+}
+
+async function submitTelegramGiftTransfer(gift, recipient) {
+  requireNoPendingServiceWorkerAppShellReload();
+  const wallet = requirePlathoWallet();
+  // BEFORE THE SIGNATURE, and it is not a formality: an underfunded transfer is dropped by IGNORE_ERRORS while the
+  // transaction itself succeeds, so the app would report a gift as sent that never moved (DIRECTPAY-05).
+  await assertWalletGramAtLeast(
+    TELEGRAM_GIFT_TRANSFER_VALUE_NANOTONS + walletSendFeeReserveNanotons(), 'gift transfer');
+  // THE SAME BUILDER THE NAME USES. It has never been about names — it builds a TEP-62 `transfer`, and a Telegram
+  // gift is a plain TEP-62 item. Only the VALUE differs, and that one was measured on these very contracts.
+  const body = buildUsernameNftTransferBody({
+    queryId: nextUsernameNftTransferQueryId(),
+    newOwner: recipient,
+    responseDestination: wallet.address,   // the change comes back rather than settling into the item
+  });
+  await sendPlathoWalletTransaction(wallet, createWalletTransaction([{
+    address: gift.itemAddress,
+    amount: TELEGRAM_GIFT_TRANSFER_VALUE_NANOTONS.toString(),
+    payload: tonCell.bytesToBase64(serializeBoc(body)),
+    bounce: true,   // a refused transfer must return the money, not burn it
+  }]));
+  // GIVING A GIFT AWAY MEANS TAKING IT OFF. The same reasoning that unlinks a name when the name is sent: the app
+  // would otherwise keep wearing, and dressing itself in, something that is no longer this wallet's.
+  if (wornGiftTheme?.itemAddress && wornGiftTheme.itemAddress === gift.itemAddress) unwearTelegramGift();
+  // The cached list is now wrong by one and must not be quoted as fact; the truth is one read away. Both copies:
+  // the five-minute one in memory and the one the next open would paint first.
+  telegramGiftListCache.delete(parseTonAddress(wallet.address).raw);
+  void deleteStoredTelegramGiftList(parseTonAddress(wallet.address).raw);
+}
+
+/** Wear a gift: remember it, learn its colours, repaint the corner, and tint the app if the gift theme is on. */
+async function wearTelegramGift(gift) {
+  let wallet = null;
+  try {
+    wallet = plathoWallet?.address ? parseTonAddress(plathoWallet.address).raw : null;
+  } catch { wallet = null; }
+  if (!wallet || !gift) return;
+  const art = await loadTelegramGiftArt(gift);
+  let appearance = { tint: [48, 213, 176], inner: [48, 213, 176], stopsFrom: 'fallback' };
+  if (art) {
+    try {
+      appearance = { ...await sampleGiftBackdrop(art), stopsFrom: 'sample' };
+    } catch (error) {
+      // A picture we could not read is a gift that can still be WORN — it just cannot dress the app. Keeping the
+      // current theme is the honest fallback; guessing a colour would be a lie with a visible consequence.
+      console.warn('gift backdrop could not be sampled', error);
+    }
+  }
+  // BUILT AT WEAR TIME AND KEPT. The loading screen has no time to fetch artwork and decode a mask before it
+  // paints, so the mask travels with the choice — a 64px PNG, a couple of kilobytes.
+  let pattern = null;
+  let patternInk = null;   // what the mask above was painted in, so a colour change can be noticed later
+  let patternTile = null;
+  let patternTileVersion = null;
+  let subjectArt = null;   // the gift out of its own backdrop, for the profile card's hero
+  let subjectArtVersion = null;
+  try {
+    const drawing = await readGiftPatternDrawing({ ...gift, ...appearance });
+    // THE FILE OUTRANKS THE PICTURE. Sampling the middle of the artwork lands on the gift and its shadow, not on
+    // the backdrop behind it, so the two stops came back almost equal — which is why the hero's radial read as a
+    // flat fill. The Lottie states them outright.
+    if (drawing?.backdrop) {
+      appearance = { tint: drawing.backdrop.outer, inner: drawing.backdrop.inner, stopsFrom: 'lottie' };
+    }
+    if (drawing) {
+      const mark = composeGiftPatternMark(drawing);
+      const tinted = mark ? tintGiftPatternMask(mark, giftPatternMarkColour()) : null;
+      pattern = tinted ? tinted.toDataURL('image/png') : null;
+      patternInk = pattern ? (bootFieldInk() ?? null) : null;
+      const tile = composeGiftPatternTile(drawing, await cutGiftSubjectForDrawing(gift, drawing));
+      patternTile = tile ? tile.toDataURL('image/png') : null;
+      patternTileVersion = patternTile ? GIFT_PATTERN_TILE_VERSION : null;
+      const subject = await buildGiftSubjectArt(gift);
+      subjectArt = subject ? subject.toDataURL('image/png') : null;
+      subjectArtVersion = subjectArt ? GIFT_SUBJECT_ART_VERSION : null;
+    }
+  } catch { pattern = null; patternInk = null; patternTile = null; subjectArt = null; subjectArtVersion = null; }
+  writeWornGiftTheme({
+    wallet,
+    itemAddress: gift.itemAddress,
+    slug: gift.slug,
+    number: gift.number,
+    name: gift.name,
+    // KEPT, because the corner has to find this picture again on the next launch and the fallback host cannot be
+    // relied on to answer: nft.fragment.com sits behind a shared cache that varies on `accept-encoding` and NOT on
+    // Origin, so a CORS request is served whatever variant that edge happens to hold — measured 2026-09-06, the
+    // browser was refused for a URL curl fetched with `access-control-allow-origin: *` seconds earlier. The
+    // toncenter proxy answers CORS properly and is a host the app already talks to.
+    imageSources: Array.isArray(gift.imageSources) ? gift.imageSources : [],
+    tint: appearance.tint,
+    inner: appearance.inner,
+    stopsFrom: appearance.stopsFrom,
+    pattern,
+    patternInk,
+    patternTile,
+    patternTileVersion,
+    subjectArt,
+    subjectArtVersion,
+  });
+  applyGiftAppearance();
+  renderBrandGift();
+  refreshGiftNodeMark();
+  // The theme select reads what is IN EFFECT, and wearing a gift is what puts a standing choice into effect.
+  refreshAppearanceUi();
+}
+
+function unwearTelegramGift() {
+  writeWornGiftTheme(null);
+  applyGiftAppearance();
+  renderBrandGift();
+  refreshGiftNodeMark();
+  refreshAppearanceUi();
+}
+
+/** The lattice bakes its mark in when it is built, so a changed gift REBUILDS it — same rule as the sliders. */
+function refreshGiftNodeMark() {
+  giftNodeMarkCanvas = null;
+  giftNodeMarkKey = '';
+  if (backgroundMode === 'nodes') applyBackgroundMode({ rebuildNodes: true });
+}
+
+// ── The profile card itself ──────────────────────────────────────────────────────────────────────────────────
+const profileCardDialog = document.querySelector('#profileCardDialog');
+const profileCardAvatar = document.querySelector('#profileCardAvatar');
+const profileCardHero = document.querySelector('#profileCardHero');
+const profileCardActions = document.querySelector('#profileCardActions');
+const profileCardAbout = document.querySelector('#profileCardAbout');
+// The wallet whose gift list the chain has CONFIRMED on the open card — so a stored list that arrives after the
+// live one (the live one can be instant, from the five-minute memory cache) never paints over it.
+let profileCardGiftsConfirmedFor = null;
+let profileCardNamesConfirmedFor = null;
+const profileCardSettingsRow = document.querySelector('#profileCardSettingsRow');
+const profileCardMintNameRow = document.querySelector('#profileCardMintNameRow');
+const profileCardLatest = document.querySelector('#profileCardLatest');
+const profileCardHeroGift = document.querySelector('#profileCardHeroGift');
+const profileCardName = document.querySelector('#profileCardName');
+const profileCardSubtitle = document.querySelector('#profileCardSubtitle');
+const profileCardWallet = document.querySelector('#profileCardWallet');
+const profileCardWalletLabel = document.querySelector('#profileCardWalletLabel');
+const profileCardCopyButton = document.querySelector('#profileCardCopyButton');
+const profileCardNames = document.querySelector('#profileCardNames');
+const profileCardNamesNote = document.querySelector('#profileCardNamesNote');
+const profileCardGifts = document.querySelector('#profileCardGifts');
+const profileCardGiftsNote = document.querySelector('#profileCardGiftsNote');
+const profileCardMeta = document.querySelector('#profileCardMeta');
+/** Which wallet the open card is about. A late read must not paint into a card that has moved on. */
+let profileCardSubject = null;
+// WHAT THE CARD IS STILL READING [owner, 2026-09-08: "there is too much 'reading the chain' — say it once, in the
+// line with the network and the version, and 'Synced' once the description, the latest post, the names and the
+// gifts have all been read"]. The description rides the latest-post walk — the feed's decoder diverts profile
+// documents into the cache on the way — so three lanes cover the four things.
+let profileCardLanesDone = new Set();
+const PROFILE_CARD_LANES = ['latest', 'names', 'gifts'];
+
+function renderProfileCardMeta() {
+  if (!profileCardMeta || !profileCardSubject) return;
+  const own = sameWalletAddress(profileCardSubject, plathoWallet?.address ?? '');
+  const synced = PROFILE_CARD_LANES.every((lane) => profileCardLanesDone.has(lane));
+  const status = synced ? t('sync.synced') : t('profileCard.giftsLoading');
+  // Network and version belong to THIS app, not to a contact; the reading status is everyone's.
+  setText(profileCardMeta, own ? `${appConfig.network?.label ?? appConfig.mode} · ${PLATHO_APP_RUNTIME_VERSION} · ${status}` : status);
+}
+
+/** A lane has its final answer for the wallet the card shows. Guarded: the latest-post lane lives far above. */
+function markProfileCardLaneDone(wallet, lane) {
+  let subject = null;
+  try {
+    subject = profileCardSubject;
+  } catch {
+    return;
+  }
+  if (!subject || subject !== wallet) return;
+  profileCardLanesDone.add(lane);
+  renderProfileCardMeta();
+}
+
+/**
+ * LAST TIME'S POST FIRST [owner, 2026-09-08: "the latest post still loads every time"]. An answer this tab already
+ * holds is final and its lane is done at once. Otherwise the stored one is painted, marked stale, and the lane is
+ * asked to read the chain behind it; with nothing stored the shimmer stays until the read lands, as before.
+ */
+async function restoreOrQueueLatestPost(raw) {
+  if (!discoveryLatestState(raw)) {
+    const stored = await readStoredLatestPost(raw);
+    if (profileCardSubject !== raw) return;
+    if (stored && !discoveryLatestState(raw)) {
+      publicDiscoveryLatestPosts.set(raw, { ...stored, stale: true });
+      renderProfileCardLatestPost(raw);
+    }
+  }
+  const state = discoveryLatestState(raw);
+  if (state && !state.stale && state.status !== 'loading') {
+    markProfileCardLaneDone(raw, 'latest');
+    return;
+  }
+  queueDiscoveryLatestPost(raw, { retry: true });
+}
+
+/** One's own open card, its hero dressed again — the worn gift's subject or stops landed after the card opened. */
+function redressProfileCardHeroIfOpen() {
+  let subject = null;
+  try {
+    subject = profileCardSubject;
+  } catch {
+    return;
+  }
+  if (!subject || !sameWalletAddress(subject, plathoWallet?.address ?? '')) return;
+  dressProfileCardHero(true);
+}
+
+/** The description, from the cache the feed's walks keep — re-painted whenever a walk updates it for this wallet. */
+function renderProfileCardAbout(raw) {
+  if (!profileCardAbout) return;
+  const about = String(cachedChannelProfile(raw)?.description ?? '').trim();
+  setText(profileCardAbout, about);
+  profileCardAbout.hidden = about === '';
+}
+
+/**
+ * REMEMBERED LIKE THE NAMES AND THE GIFTS [owner, 2026-09-08]: the profile cache is durable already, so the card
+ * opens onto the description it held; the latest-post walk that the card starts passes the profile document and
+ * refreshes the cache — this is what puts the fresh text on the open card. Guarded like the others.
+ */
+function redressProfileCardAboutIfOpen(wallet) {
+  let subject = null;
+  try {
+    subject = profileCardSubject;
+  } catch {
+    return;
+  }
+  const raw = rawWalletAddress(wallet);
+  if (!raw || subject !== raw) return;
+  renderProfileCardAbout(raw);
+}
+
+function closeProfileCardDialog() {
+  profileCardSubject = null;
+  profileCardPeerGiftTheme = null;   // the closed card's gift is not the next one's
+  profileCardPeerGiftKey = '';
+  clearProfileCardRetries();
+  syncHeroGiftMotion(false);   // a closed card does not deserve a frame
+  hideDialogAnimated(profileCardDialog, () => applyGiftAppearance());   // and the channel's dress, if any, comes back
+}
+
+/**
+ * A card's read that could not finish is RE-ASKED while the card is open.
+ *
+ * THE FIRST RETRY WAITS FOR NOTHING [owner, 2026-09-06]. It used to sit out three seconds first, which was a delay
+ * on top of a queue that already does the pacing: every one of these reads goes through the app's single request
+ * pump, which spaces them and backs off by itself after a 429. Handing the next attempt straight back to it costs
+ * nothing and the pump decides when it actually goes — while a timer in front of it just made the user wait with
+ * an idle queue.
+ *
+ * After that the gap grows and holds, because a card left open must not become a poller.
+ *
+ * The subject IS the lifetime. `profileCardSubject` is cleared the moment the card closes or moves to another
+ * wallet, so a pending attempt that wakes into either finds nothing to paint and stops there; nobody is looking at
+ * a closed card, and nothing should be asked on its behalf.
+ */
+const PROFILE_CARD_RETRY_LADDER_MS = [0, 4_000, 12_000, 30_000];
+let profileCardRetryTimers = [];
+
+function clearProfileCardRetries() {
+  for (const timer of profileCardRetryTimers) window.clearTimeout(timer);
+  profileCardRetryTimers = [];
+}
+
+function driveProfileCardRead(subject, lane, attempt = 0) {
+  lane.load()
+    .then((result) => {
+      if (profileCardSubject !== subject) return;
+      // `complete: false` is the read saying so itself: it reached the end with a hole in it. Whatever it DID
+      // find is still painted — only the verdict is withheld, because another attempt is already on its way.
+      const retrying = result?.complete === false;
+      lane.render(result, { retrying });
+      if (retrying) scheduleProfileCardRetry(subject, lane, attempt);
+    })
+    .catch((error) => {
+      console.warn('profile card read unavailable', error);
+      if (profileCardSubject !== subject) return;
+      lane.render(null, { retrying: true });   // a throw is an unfinished read, not an empty wallet
+      scheduleProfileCardRetry(subject, lane, attempt);
+    });
+}
+
+function scheduleProfileCardRetry(subject, lane, attempt) {
+  const wait = PROFILE_CARD_RETRY_LADDER_MS[Math.min(attempt, PROFILE_CARD_RETRY_LADDER_MS.length - 1)];
+  profileCardRetryTimers.push(window.setTimeout(() => {
+    if (profileCardSubject !== subject) return;
+    driveProfileCardRead(subject, lane, attempt + 1);
+  }, wait));
+}
+
+/**
+ * The channel's latest post — discovery's block, discovery's reader, in the card's own slot.
+ *
+ * buildDiscoveryLatestNode returns null for a channel with no visible post or a read that gave up, which is the
+ * same "show nothing" the cards use; the slot is emptied in that case rather than left holding a stale line.
+ */
+function renderProfileCardLatestPost(wallet) {
+  if (!profileCardLatest) return;
+  const node = buildDiscoveryLatestNode(wallet);
+  profileCardLatest.replaceChildren();
+  if (node) profileCardLatest.append(node);
+  profileCardLatest.hidden = !node;
+}
+
+/**
+ * Chat, mute and pin — on somebody ELSE's card only.
+ *
+ * The three the chat list's chevron already offers, reached from where you are actually looking at the person.
+ * Their state comes from the per-counterparty STORE, not from a thread: a wallet you have never written to has no
+ * thread, and pinning it is still a sensible thing to ask for — the flag is picked up when one materialises.
+ *
+ * Rebuilt rather than mutated on every toggle, because two of the three labels are the state ("Pin" / "Unpin"), and
+ * a control whose label disagrees with what it did is worse than no control.
+ */
+function renderProfileCardActions(raw, own) {
+  if (!profileCardActions) return;
+  profileCardActions.replaceChildren();
+  // THREE THINGS YOU CAN DO TO A CONTACT. Your own card's one action — the settings — is a ROW under the wallet
+  // plate instead [owner, 2026-09-07]: a single button stretched across a row built for three read as nothing else
+  // in this card, and the plate above it is the shape the card actually speaks in.
+  profileCardActions.hidden = own;
+  if (own) return;
+  const stored = readContactDisplayPreference(raw);
+  const add = (labelKey, pressed, onClick, { primary = false } = {}) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = primary ? 'profile-card-action profile-card-action--primary' : 'profile-card-action';
+    if (pressed !== null) button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    button.textContent = t(labelKey);
+    button.dataset.i18n = labelKey;
+    button.addEventListener('click', onClick);
+    profileCardActions.append(button);
+  };
+  // ONE WORD EACH, ONE ROW OF FOUR [owner, 2026-09-09: the long menu sentences did not belong on buttons]. The
+  // chevron menu keeps its full labels with hints; the card says Chat / Channel / Mute / Pin, and a pressed toggle
+  // names its state (Muted, Pinned) rather than the opposite action.
+  add('profileCard.actionChat', null, () => {
+    closeProfileCardDialog();
+    openPrivateThreadForWallet(raw);
+  }, { primary: true });
+  // THE WAY TO THE BLOG. A reader who met this wallet in a thread or on its card had no path to what it publishes:
+  // the card offered chat, mute and pin, the chevron menu the same plus the profile, and "open channel" lived only
+  // on discovery cards [owner, 2026-09-09]. The channel view handles a wallet with no posts itself.
+  add('profileCard.actionChannel', null, () => {
+    closeProfileCardDialog();
+    // The channel view is drawn INSIDE the Public pane; opened from a Private thread that pane is hidden, so the
+    // tab switches first [owner, 2026-09-09: "the Channel button does not open the channel"].
+    setView('public');
+    openPublicChannelView({ authorWallet: raw });
+  });
+  const muted = stored?.muted === true;
+  add(muted ? 'profileCard.actionMuted' : 'profileCard.actionMute', muted, () => {
+    setContactMuted(raw, !muted);
+    renderProfileCardActions(raw, own);
+  });
+  const pinned = stored?.pinned === true;
+  add(pinned ? 'profileCard.actionPinned' : 'profileCard.actionPin', pinned, () => {
+    setContactPinned(raw, !pinned);
+    renderProfileCardActions(raw, own);
+  });
+}
+
+/**
+ * The card's face, by the same three rules the dialog list uses.
+ *
+ * A PICTURE if there is one; the ANONYMITY MASK for a bare wallet, because a monogram of an address is the same
+ * two letters for everyone and identifies nobody (which is what it was showing); otherwise the initials of the
+ * name. What it deliberately does NOT take from setThreadAvatarNode is the pin, mute and group badges — those
+ * describe a conversation row, and this is a profile.
+ *
+ * The tier comes from the same tone the name is painted in, so a face and its name can never disagree about it.
+ */
+/**
+ * A face that landed after the card opened is painted onto the card if it is still showing that wallet. Guarded
+ * like discoveryLatestHasAnAudience: `profileCardSubject` is a `let`, and a caller that reaches here before the
+ * module's body has run would throw in its temporal dead zone.
+ */
+function redressProfileCardFaceIfOpen(raw) {
+  let subject = null;
+  try {
+    subject = profileCardSubject;
+  } catch {
+    return;
+  }
+  if (!raw || subject !== raw || !profileCardAvatar) return;
+  const own = sameWalletAddress(raw, plathoWallet?.address ?? '');
+  dressProfileCardFace({ node: profileCardAvatar, thread: null, raw, own, label: profileCardName?.textContent ?? '' });
+}
+
+function dressProfileCardFace({ node, thread, raw, own, label }) {
+  if (!node) return;
+  const imageUrl = thread?.avatarImageUrl ?? publicAvatarUrlForWallet(raw);
+  const linked = own ? readLinkedPlathoUsername(plathoWallet?.address)?.label ?? null : null;
+  const tier = linked ? plathoUsernameTier(linked) : null;
+  applyAvatarTier(node, own
+    ? (tier && tier !== PLATHO_USERNAME_TIERS.COMMON ? `platho-${tier}` : 'wallet')
+    : threadDisplayTone(thread));
+  node.classList.remove('avatar-saved');
+  if (imageUrl) {
+    node.classList.remove('avatar-anonymous');
+    setAvatarNode(node, label, imageUrl);
+    return;
+  }
+  // A NAME, or nothing to show yet. For one's own card the linked name is the name; for a contact the thread's own
+  // test decides, which is the one the list already trusts.
+  const named = own ? Boolean(linked) : !threadIsBareWalletAddress(thread);
+  if (!named) {
+    node.classList.remove('has-image');
+    node.classList.add('avatar-anonymous');
+    node.style.backgroundImage = '';
+    delete node.dataset.avatarUrl;
+    node.innerHTML = ANONYMOUS_AVATAR_SVG;
+    return;
+  }
+  node.classList.remove('avatar-anonymous');
+  setAvatarNode(node, own ? canonicalUsernameDisplay(linked) : label, null);
+}
+
+/**
+ * The hero's frame and the gift standing on it.
+ *
+ * THE FRAME IS THE NAME'S RARITY, read from the LINKED name through plathoUsernameTier — the one place that decides
+ * where a tier begins. Only on one's own card: a contact's linked name is not something this device knows, and a
+ * frame drawn from a guess would be a claim about somebody else's property.
+ *
+ * The gift is the worn one's artwork, which the corner has already fetched, so this costs nothing. Static for now
+ * [owner, 2026-09-07]: fragment serves the motion only as Lottie/TGS, and rendering that is its own decision.
+ */
+/**
+ * The two lines under the face, and the label the face itself falls back to. Called at open and again whenever a
+ * name is worn or taken off [owner, 2026-09-08: with no name worn the card kept saying "platho" — the title was
+ * written once, at open, while the frame under it was re-dressed every time].
+ */
+function dressProfileCardTitle({ thread, raw, own }) {
+  // STRINGS, NOT THE RECORDS THEY COME FROM [owner, 2026-09-08: the card read "[object Object]" twice]. The wallet
+  // display is a {name, tone, identity} record and the linked name a {label, …} identity; setText prints whatever
+  // it is handed, and both lines were handed the record the moment a name was worn.
+  const display = thread
+    ? { name: threadDisplayLabel(thread), tone: threadDisplayTone(thread) }
+    : resolveWalletChannelDisplay(raw);
+  const label = display?.name;
+  const name = label || shortAddress(raw);
+  setText(profileCardName, name);
+  // THE NAME IS PAINTED IN ITS RARITY [owner, 2026-09-08] — the tone class the list and the identity menu already
+  // use, so the card cannot invent a second scale; the halo under it is the stylesheet's, sized for exactly this.
+  if (profileCardName) {
+    profileCardName.classList.remove('identity-label-platho', 'identity-label-platho-epic', 'identity-label-platho-rare');
+    if (display?.tone) profileCardName.classList.add(`identity-label-${display.tone}`);
+  }
+  // THE SECOND LINE ONLY EARNS ITS PLACE IF IT SAYS SOMETHING NEW. It used to repeat the shortened address while
+  // the full one sat two rows below, so the card said the same thing three times. A linked .ath belongs here; a
+  // second copy of the name above it does not, and neither does an abbreviation of what follows.
+  const secondary = own ? canonicalUsernameDisplay(readLinkedPlathoUsername()?.label) : '';
+  setText(profileCardSubtitle, secondary && secondary !== name ? secondary : '');
+  if (profileCardSubtitle) profileCardSubtitle.hidden = profileCardSubtitle.textContent === '';
+  return label;
+}
+
+let profileCardPeerGiftTheme = null;   // the dress the OPEN contact's card wears; null on one's own card and when closed
+let profileCardPeerGiftKey = '';       // the gift it was built for, so a re-render of the list is not a re-dress
+let profileCardGiftsLastRender = null; // { result, own, flags } — a profile landing later re-dresses the same list
+
+/**
+ * THE GIFT A WALLET SAYS IT WEARS, IF THE CHAIN AGREES [owner, 2026-09-09]. The claim is the wallet's PUBLISHED
+ * appearance (the profile block); the list is what the chain proved the wallet holds. Their intersection is the worn
+ * gift. Anything else — a list with no claim, a claim the list does not hold (sold, transferred, invented) — leaves
+ * the hero plain. Never the first gift of the list: that was a guess about somebody else's choice, and the choice
+ * is theirs to publish. Off while this reader hides others' appearances, like the channel's dress.
+ */
+function wornGiftAmong(wallet, gifts) {
+  if (!channelAppearancesVisible()) return null;
+  const claimed = profileWornGiftClaim(cachedChannelProfile(wallet));
+  if (!claimed) return null;
+  return (gifts ?? []).find((gift) => sameGiftItem(gift.itemAddress, claimed)) ?? null;
+}
+
+/**
+ * A CONTACT'S HERO, FROM THE GIFT THE CONTACT PUBLISHED AS WORN (wornGiftAmong) — a wallet that published none, or
+ * whose claim the chain does not hold, leaves the hero plain rather than borrowing the reader's or guessing from the
+ * list. The dress is the channel header's, verbatim: buildChannelGiftDress reads the gift's own file once and keeps
+ * both stops and the tile in memory AND in the durable store, so the second card for the same gift costs nothing.
+ * Until it lands the hero stays undressed — a hero is never painted on a guess.
+ */
+/**
+ * THE HERO'S DRESS FOR A GIFT — the same record the worn gift keeps (applyGiftHeroTokens, the cut-out and the
+ * motion all read it), built from the gift's own file by the builders that already exist: the channel dress for the
+ * two stops and the tile (kept in memory and in the durable store), the subject cut for the picture. One record
+ * shape, so one's own card and a contact's are painted by ONE path, dressProfileCardHero.
+ */
+async function buildHeroGiftTheme(gift) {
+  const dress = await buildChannelGiftDress(gift);
+  if (!dress) return null;
+  const subject = await buildGiftSubjectArt(gift).catch(() => null);
+  return {
+    itemAddress: gift.itemAddress,
+    slug: gift.slug,
+    number: gift.number,
+    name: gift.name,
+    imageSources: Array.isArray(gift.imageSources) ? gift.imageSources : [],
+    tint: dress.edge,
+    inner: dress.inner,
+    stopsFrom: 'lottie',
+    patternTile: dress.pattern,
+    patternTileVersion: GIFT_PATTERN_TILE_VERSION,
+    subjectArt: subject ? subject.toDataURL('image/png') : null,
+    subjectArtVersion: subject ? GIFT_SUBJECT_ART_VERSION : null,
+  };
+}
+
+function dressProfileCardPeerHero(subject, gift) {
+  const key = gift ? `${gift.slug}-${gift.number}` : '';
+  if (key === profileCardPeerGiftKey) return;   // the list re-rendered; the gift did not change
+  profileCardPeerGiftKey = key;
+  profileCardPeerGiftTheme = null;
+  dressProfileCardHero(false);   // plain until the contact's own record is built — never painted on a guess
+  if (!gift) return;
+  void buildHeroGiftTheme(gift).then((theme) => {
+    if (!theme || profileCardSubject !== subject || profileCardPeerGiftKey !== key) return;
+    profileCardPeerGiftTheme = theme;
+    dressProfileCardHero(false);   // the one path: tokens, the cut-out, the motion — exactly as one's own card
+  }).catch(() => { /* an undressed hero is the honest answer to a file that could not be read */ });
+}
+
+function dressProfileCardHero(own) {
+  if (!profileCardHero) return;
+  // The title and the face follow the frame: wearing a name or taking it off changes all three — the ring around
+  // the face is painted from the AVATAR's own tier attribute, which dressProfileCardFace sets, so a name of another
+  // rarity left the old ring in place [owner, 2026-09-08]. A contact's card has nothing to wear.
+  if (own && profileCardSubject) {
+    dressProfileCardTitle({ thread: null, raw: profileCardSubject, own });
+    redressProfileCardFaceIfOpen(profileCardSubject);
+  }
+  const linked = own ? readLinkedPlathoUsername(plathoWallet?.address)?.label ?? null : null;
+  const tier = linked ? plathoUsernameTier(linked) : null;
+  profileCardHero.dataset.tier = tier ?? 'none';
+  // THE SUBJECT'S GIFT, NEVER THE READER'S — see applyGiftHeroTokens. On one's own card the WORN gift is the
+  // answer; on somebody else's it is the gift they PUBLISHED as worn and the chain proved (wornGiftAmong), built
+  // into the same record by dressProfileCardPeerHero once the list is read, and nothing until then.
+  // ONE PATH FOR BOTH CARDS [owner, 2026-09-09: what is shown locally looks right — show a contact's gift the same
+  // way, with the same code]: the record differs, the painting does not — tokens, the cut-out standing on the
+  // hero, the motion.
+  const theme = own ? wornGiftTheme : profileCardPeerGiftTheme;
+  applyGiftHeroTokens(profileCardHero, theme);
+  if (!profileCardHeroGift) return;
+  // THE SUBJECT, not the artwork: the artwork is a square that includes the gift's own backdrop, and on a hero
+  // painted in that same backdrop it reads as a sticker. The whole picture is the fallback for a gift worn before
+  // the cut-out existed — ensureGiftSubjectArt is already growing one for the next open.
+  const art = theme ? theme.subjectArt ?? telegramGiftArtCache.get(`${theme.slug}-${theme.number}`) ?? null : null;
+  if (art) {
+    profileCardHeroGift.src = art;
+    profileCardHeroGift.alt = theme?.name ?? '';
+  }
+  profileCardHeroGift.hidden = !art;
+  // THE SUBJECT IN MOTION [owner, 2026-09-07], mounted while the card is open. The cut-out above is the first
+  // paint and the fallback; the canvas takes over the moment the player has the Gift layer.
+  syncHeroGiftMotion(theme);
+}
+
+/**
+ * One TILE per proven name, in the same grid as the gifts, and wearable the same way.
+ *
+ * WEARING A NAME IS NOT A NEW IDEA HERE: it is the LINKED name — the one the wallet is presented under and the one
+ * that rides every message it sends — so this does exactly what the Profile pane's link control does, and tapping
+ * the worn one takes it off. No verification dialog: the card only lists names the chain has already confirmed
+ * belong to this wallet, which is the whole premise of the screen.
+ */
+function renderProfileCardNames(result, own, { retrying = false, unconfirmed = false } = {}) {
+  if (!profileCardNames) return;
+  profileCardNames.replaceChildren();
+  // UNCONFIRMED, as for the gifts: last time's list, painted while the chain is asked again — real enough to wear
+  // (wearing is local), not real enough to send from. Transfer is in every tile from the first paint, and this
+  // attribute keeps it invisible until the read lands.
+  profileCardNames.dataset.confirmed = unconfirmed ? 'false' : 'true';
+  const owned = result?.owned ?? [];
+  // Same rule as the gifts: an attempt still to come is not a failure to report, so "may be incomplete" is held
+  // back while one is pending. Whatever WAS found is listed either way.
+  const incomplete = (retrying || unconfirmed) ? false : (result ? result.complete === false : true);
+  // THE LINK CARRIES ".ath", THE LIST DOES NOT [owner, 2026-09-08: "tapping a name does nothing"]. It did — the
+  // link was written and the hero's frame changed — but the WORN mark compared "platho.ath" with "platho", never
+  // matched, and nothing on the tile said so. Both sides are read in the bare form the tile prints.
+  const linked = own ? canonicalUsernameDisplay(readLinkedPlathoUsername(plathoWallet?.address)?.label).toLowerCase() : '';
+
+  if (profileCardNamesNote) {
+    // ORDER, as in the gifts: "I could not look" outranks "you own nothing", and neither is said over a live
+    // attempt. The chain-reading line is the gifts' own — it says nothing about gifts, and two strings for one
+    // sentence is two strings to keep in step.
+    if (retrying || unconfirmed) profileCardNamesNote.textContent = '';
+    else if (incomplete) profileCardNamesNote.textContent = t('username.listMayBeIncomplete');
+    else if (owned.length === 0) profileCardNamesNote.textContent = t('username.noNamesFound');
+    else profileCardNamesNote.textContent = own ? t('profileCard.nameWearHint') : '';
+    profileCardNamesNote.hidden = profileCardNamesNote.textContent === '';
+  }
+
+  // Whatever re-renders a tile from inside it — wear, unwear, a transfer — must say the same thing about the list.
+  const flags = { retrying, unconfirmed };
+  const subjectAtRender = profileCardSubject;
+  for (const nft of owned) {
+    const worn = Boolean(own && linked && nft.label && linked === canonicalUsernameDisplay(nft.label).toLowerCase());
+    // Only a name the chain proved by hash can be worn: an item presented by its address has nothing to sign with.
+    const wearable = Boolean(own && nft.label);
+    // THE GIFT TILE'S TWIN [owner, 2026-09-08: "no Transfer and no Wear on the names, unlike the gifts"]. A div
+    // with buttons inside, not a button: the face wears the name, the labelled button under it sends the name
+    // away, and a button inside a button is not markup a browser will honour. Same classes as the gift tile —
+    // one tile, two grids — so the two rows cannot drift apart in a stylesheet.
+    const tile = document.createElement('div');
+    tile.className = 'profile-card-name';
+    tile.dataset.worn = worn ? 'true' : 'false';
+    const face = document.createElement(wearable ? 'button' : 'div');
+    face.className = 'profile-card-gift-face';
+    if (wearable) {
+      face.type = 'button';
+      face.addEventListener('click', () => {
+        const wasPublished = worn && wornNamePublished(nft.label);
+        wearPlathoUsername(worn ? null : nft.label);
+        renderProfileCardNames(result, own, flags);
+        dressProfileCardHero(own);   // the frame IS this choice; it must not describe the previous one
+        // Then the half that others see: offer the block's publication (priced, never silent) — or, when the name
+        // just taken off is still on chain, offer to take it off there too — and repaint once the answer is in.
+        (worn ? (wasPublished ? offerWornNamePublish(nft.label, { remove: true }) : Promise.resolve(false)) : offerWornNamePublish(nft.label))
+          .then(() => { if (profileCardSubject === subjectAtRender) renderProfileCardNames(result, own, flags); })
+          .catch((error) => console.error(error));
+      });
+    }
+    // THE SQUARE COMES FROM padding-bottom — see the stylesheet. A name's art is the registry's own SVG, and an
+    // engine that ignores `aspect-ratio` on an <img> collapses it to a strip; this frame has no such dependency.
+    const frame = document.createElement('div');
+    frame.className = 'nft-card-art-frame';
+    frame.hidden = !nft.image;
+    const art = document.createElement('img');
+    // A data: URI only — see safeInlineImage in username-nft-owned.mjs. Never a remote URL: img-src forbids it,
+    // and naming a host would hand that host the wallet's identity.
+    if (nft.image) art.src = nft.image;
+    art.alt = '';
+    art.className = 'nft-card-art';
+    art.loading = 'lazy';
+    frame.append(art);
+
+    const label = document.createElement('span');
+    label.className = 'profile-card-name-label';
+    // A name is shown only when hashing it reproduced the item's own name_hash. When it did not, the item is still
+    // the user's — the chain said so — but it is honestly presented by the one thing left that identifies it.
+    label.textContent = nft.label ? canonicalUsernameDisplay(nft.label) : shortAddress(nft.itemAddress);
+    face.append(frame, label);
+    tile.append(face);
+    // SENDING IT ON, and only from one's own card — a name on somebody else's is not yours to move. The dialog is
+    // the one the "My .ath names" list opens; it answers true once the transfer is away, and then the tile goes
+    // with it: the chain still has to include the transfer, but the wallet has already stopped counting the name
+    // as its own (submitUsernameNftTransfer forgets it), and a tile that stays would offer a second send that can
+    // only bounce.
+    if (own) {
+      const send = document.createElement('button');
+      send.type = 'button';
+      send.className = 'profile-card-gift-send';
+      send.textContent = t('username.transferName');
+      send.dataset.i18n = 'username.transferName';
+      send.addEventListener('click', () => {
+        openUsernameNftTransferDialog(nft)
+          .then((sent) => {
+            if (sent) result = { ...result, owned: owned.filter((item) => item.itemAddress !== nft.itemAddress) };
+            renderProfileCardNames(result, own, flags);
+            dressProfileCardHero(own);
+          })
+          .catch((error) => console.error(error));
+      });
+      tile.append(send);
+    }
+    // WORN GOES LAST, as on the gift tile: between the label and the button it would lift Transfer on the worn
+    // tile alone and break the row's line of buttons.
+    if (worn) {
+      const state = document.createElement('span');
+      state.className = 'profile-card-name-state';
+      state.textContent = t('profileCard.worn');
+      tile.append(state);
+      // A worn name the chain does not show yet: the same way out to others as a gift's (the block's publication).
+      if (!wornNamePublished(nft.label) && hasActivePlathoAccount()) {
+        const showName = document.createElement('button');
+        showName.type = 'button';
+        showName.className = 'profile-card-gift-send profile-card-gift-show';
+        showName.textContent = t('profileCard.showOthers');
+        showName.addEventListener('click', () => {
+          offerWornNamePublish(nft.label)
+            .then(() => { if (profileCardSubject === subjectAtRender) renderProfileCardNames(result, own, flags); })
+            .catch((error) => console.error(error));
+        });
+        tile.append(showName);
+      }
+    }
+    profileCardNames.append(tile);
+  }
+}
+
+/**
+ * Wear a name, or take the worn one off. Null means "presented by the address again".
+ *
+ * The two writes are the pair the Profile pane's control makes: the LINK is what rides outgoing messages, and the
+ * DISPLAY identity is what the app shows — clearLinkedPlathoUsername switches the display itself, so the off path
+ * needs no second write.
+ */
+function wearPlathoUsername(label) {
+  const wallet = plathoWallet?.address;
+  if (!wallet) return;
+  if (!label) {
+    clearLinkedPlathoUsername(wallet);
+    flashWalletIdentityStatus(t('username.nameUnlinked'));
+  } else {
+    const identity = normalizeLinkedPlathoUsername(label);
+    if (!identity) return;
+    writeLinkedPlathoUsername(identity, wallet);
+    writeWalletDisplayIdentity(identity, wallet);
+    flashWalletIdentityStatus(t('username.linkedName', { name: canonicalUsernameDisplay(identity.label) }));
+  }
+  try { renderWalletIdentity(); } catch (error) { console.error(error); }
+}
+
+function renderProfileCardGifts(result, own, { retrying = false, unconfirmed = false } = {}) {
+  if (!profileCardGifts) return;
+  profileCardGifts.replaceChildren();
+  // UNCONFIRMED: the list a card showed last time, painted while the chain is asked again. Its tiles are real
+  // enough to wear (wearing is local) and not real enough to SEND from — Transfer is present in every tile from
+  // the first paint, and this attribute is what keeps it invisible until the read lands.
+  profileCardGifts.dataset.confirmed = unconfirmed ? 'false' : 'true';
+  // Whatever re-renders a tile from inside it — wear, unwear, a transfer — must say the same thing about the list.
+  const flags = { retrying, unconfirmed };
+  const gifts = result?.gifts ?? [];
+  const subjectAtRender = profileCardSubject;
+  profileCardGiftsLastRender = { result, own, flags };
+  // The hero is dressed from THIS list — the subject's own — on every paint of it, stored or chain-read: the gift
+  // the subject PUBLISHED as worn, if the list holds it (wornGiftAmong); never the first of the list.
+  if (!own) dressProfileCardPeerHero(profileCardSubject, wornGiftAmong(profileCardSubject, gifts));
+  if (profileCardGiftsNote) {
+    // ORDER IS THE WHOLE POINT. An unfinished read must never be dressed up as an empty wallet — and it WAS,
+    // because the empty branch came first and an unfinished read is also empty. "I could not look" now wins over
+    // "you own nothing" whether or not anything was found.
+    //
+    // …AND WHILE ANOTHER ATTEMPT IS COMING, "I could not look" is not true either. It is a verdict, and printing
+    // one at the moment the app is about to ask again reads as having given up — which is what the owner saw. The
+    // note only reports a failure nobody is still working on.
+    if (retrying || unconfirmed) profileCardGiftsNote.textContent = '';
+    else if (!result || result.complete === false) profileCardGiftsNote.textContent = t('profileCard.giftsIncomplete');
+    else if (gifts.length === 0) profileCardGiftsNote.textContent = t('profileCard.giftsEmpty');
+    else profileCardGiftsNote.textContent = own ? t('profileCard.wearHint') : '';
+    // A contact's card has nothing to say here, and an empty paragraph still spends the section's grid gap.
+    profileCardGiftsNote.hidden = profileCardGiftsNote.textContent === '';
+  }
+  for (const gift of gifts) {
+    const worn = own && wornGiftTheme?.itemAddress === gift.itemAddress;
+    // A DIV WITH BUTTONS INSIDE, not a button — a gift now has two things you can do with it, and a button inside a
+    // button is not markup a browser will honour.
+    const tile = document.createElement('div');
+    tile.className = 'profile-card-gift';
+    tile.dataset.worn = worn ? 'true' : 'false';
+    const face = document.createElement(own ? 'button' : 'div');
+    face.className = 'profile-card-gift-face';
+    if (own) {
+      face.type = 'button';
+      face.addEventListener('click', () => {
+        const wasPublished = worn && wornGiftPublished(gift.itemAddress);
+        const done = worn ? Promise.resolve(unwearTelegramGift()) : wearTelegramGift(gift);
+        done.then(() => { renderProfileCardGifts(result, own, flags); dressProfileCardHero(own); })
+          // Then the half that others see: offer the publication (priced, never silent) — or, when the gift just
+          // taken off is still on chain, offer to take it off there too — and repaint the tile once the answer is in.
+          .then(() => (worn ? (wasPublished ? offerWornGiftPublish(gift, { remove: true }) : false) : offerWornGiftPublish(gift)))
+          .then(() => { if (profileCardSubject === subjectAtRender) renderProfileCardGifts(result, own, flags); })
+          .catch((error) => console.error(error));
+      });
+    }
+    const art = document.createElement('div');
+    art.className = 'profile-card-gift-art';
+    const name = document.createElement('span');
+    name.className = 'profile-card-gift-name';
+    name.textContent = gift.name;
+    face.append(art, name);
+    tile.append(face);
+    // SENDING IT ON, and only from one's own card — a gift on somebody else's is not yours to move. Labelled
+    // rather than an icon: this one signs a transaction and hands away an asset.
+    if (own) {
+      const send = document.createElement('button');
+      send.type = 'button';
+      send.className = 'profile-card-gift-send';
+      send.textContent = t('username.transferName');
+      send.dataset.i18n = 'username.transferName';
+      send.addEventListener('click', () => {
+        openTelegramGiftTransferDialog(gift)
+          .then((sent) => {
+            // A sent gift leaves the grid at once: submitTelegramGiftTransfer has already dropped the wallet's
+            // remembered list, and a tile that stays would offer a second send that can only bounce.
+            if (sent) result = { ...result, gifts: gifts.filter((item) => item.itemAddress !== gift.itemAddress) };
+            renderProfileCardGifts(result, own, flags);
+            dressProfileCardHero(own);
+          })
+          .catch((error) => console.error(error));
+      });
+      tile.append(send);
+    }
+    // WORN GOES LAST [owner, 2026-09-07]. Between the name and the button it made the worn tile taller ABOVE the
+    // button, so Transfer sat lower on that one tile and the row's buttons no longer lined up.
+    if (worn) {
+      // The mark says "worn", as before [owner, 2026-09-09]; whether others see it yet is the button's business.
+      const shown = wornGiftPublished(gift.itemAddress);
+      const state = document.createElement('span');
+      state.className = 'profile-card-gift-state';
+      state.textContent = t('profileCard.worn');
+      tile.append(state);
+      if (!shown && hasActivePlathoAccount()) {
+        const show = document.createElement('button');
+        show.type = 'button';
+        show.className = 'profile-card-gift-send profile-card-gift-show';
+        show.textContent = t('profileCard.showOthers');
+        show.addEventListener('click', () => {
+          offerWornGiftPublish(gift)
+            .then(() => { if (profileCardSubject === subjectAtRender) renderProfileCardGifts(result, own, flags); })
+            .catch((error) => console.error(error));
+        });
+        tile.append(show);
+      }
+    }
+    profileCardGifts.append(tile);
+    // The picture arrives after the tile: a grid that waits for its slowest image shows nothing at all until then.
+    loadTelegramGiftArt(gift).then((url) => {
+      if (url) art.style.backgroundImage = `url("${url}")`;
+    }).catch(() => { /* a tile with no picture still names its gift */ });
+  }
+}
+
+/**
+ * The .ath names a wallet owns.
+ *
+ * Our own wallet goes through the existing loader, which also reconciles this device's memory with what the chain
+ * said — that reconcile is what stops a transferred name from haunting the list, and it must never run for somebody
+ * else's wallet. A contact's names come from the indexer alone, settled by the same on-chain proof.
+ */
+async function loadUsernameNftsForWallet(wallet, own) {
+  if (own) return loadOwnedUsernameNfts();
+  const registryAddress = requireUsernameRegistryAddress();
+  let indexerAddresses = null;
+  let indexerError = null;
+  try {
+    indexerAddresses = await discoverUsernameNftAddresses({ ownerWallet: wallet, collectionAddress: registryAddress });
+  } catch (error) {
+    indexerError = error;
+  }
+  return collectOwnedUsernameNfts({
+    ownerWallet: wallet,
+    candidateAddresses: [],
+    indexerAddresses,
+    indexerError,
+    verifyItem: verifyOwnedUsernameNft,
+  });
+}
+
+/**
+ * Open the card for a wallet.
+ *
+ * `wallet` decides everything; `thread` is only there to reuse a name and a picture this device already resolved for
+ * a contact, so opening a contact's card does not re-derive what the row beside it is already showing.
+ */
+async function openProfileCardDialog(subject) {
+  if (!profileCardDialog) return;
+  let raw = null;
+  try {
+    raw = parseTonAddress(subject?.wallet).raw;
+  } catch {
+    return;
+  }
+  const thread = subject?.thread ?? null;
+  const own = sameWalletAddress(raw, plathoWallet?.address ?? '');
+  profileCardSubject = raw;
+  profileCardPeerGiftTheme = null;   // the previous card's gift is not this one's
+  profileCardPeerGiftKey = '';
+  renderBrandGift();
+
+  const label = dressProfileCardTitle({ thread, raw, own });
+  // THE ADDRESS A HUMAN USES. The raw `0:…` form is what the chain and this code pass around; nobody types it,
+  // pastes it or recognises it. Everything the user sees — and the copy button under it — is the user-friendly
+  // form, which is what every other surface in the app already shows.
+  setText(profileCardWallet, displayWalletAddress(raw));
+  dressProfileCardFace({ node: profileCardAvatar, thread, raw, own, label });
+  // A FACE THE CACHE DOES NOT HOLD IS FETCHED FOR THE CARD [owner, 2026-09-08: "no avatar" on a fresh session,
+  // fine on the machine whose cache was warm]. The card read the cache and stopped; the sync warms that cache for
+  // the channels it walks, on its own schedule. One profile read for this wallet, through the lane the feed
+  // uses, and the face is dressed again when it lands — for this subject only, if the card still shows it.
+  // Dressed again if the map holds a face AFTERWARDS, whoever put it there: the boot's own restore
+  // (restoreOwnAvatarFromCacheFast) can land while this read is in flight, and this read then finds the map
+  // already fed and reports nothing changed — the card must not stay on its letters for that.
+  // ONE'S OWN FACE TAKES THE SETTINGS PANE'S OWN ROAD [owner, 2026-09-08: "in the settings the avatar is there, in
+  // the hero it is not"]. That pane runs refreshOwnProfileAvatar — the cache first, then the chain's current
+  // pointer, then the parts — and feeds the map the card reads; the feed's reader asked the registry another way
+  // and came back with nothing for the very wallet the pane could dress. Same function, same face. A contact's
+  // takes the feed's road.
+  if (profileCardAvatar && !profileCardAvatar.classList.contains('has-image')) {
+    const fetchFace = own ? refreshOwnProfileAvatar() : hydrateProfileAvatarsForWallets([raw]);
+    void fetchFace.then(() => {
+      if (profileCardSubject === raw && publicAvatarUrlForWallet(raw)) dressProfileCardFace({ node: profileCardAvatar, thread, raw, own, label });
+    }).catch(() => { /* the letters stay */ });
+  }
+  dressProfileCardHero(own);
+  renderProfileCardActions(raw, own);
+  // THE WORDS ITS OWNER PUBLISHED, from the record the channel popover and the discovery cards already read. No
+  // request of its own: a description that has never been fetched simply has nothing to show yet, and the feed walk
+  // that fetches it is running anyway.
+  renderProfileCardAbout(raw);
+  // …AND THE LATEST POST, which discovery already reads and already renders. `retry` because a read orphaned by a
+  // Discover reset leaves the state at 'loading' with nothing in flight, and without it the card would shimmer
+  // forever waiting for an answer nobody is coming back for.
+  renderProfileCardLatestPost(raw);
+  void restoreOrQueueLatestPost(raw);
+  // Own card only: these are THIS DEVICE's settings, not a property of the wallet being looked at.
+  if (profileCardSettingsRow) profileCardSettingsRow.hidden = !own;
+  if (profileCardMintNameRow) profileCardMintNameRow.hidden = !own;
+  // Network and version belong to THIS app, not to a contact — and they are the two facts the corner's pill used to
+  // carry before a gift took its place.
+  profileCardLanesDone = new Set();
+  renderProfileCardMeta();
+  if (profileCardNames) profileCardNames.replaceChildren();
+  if (profileCardGifts) profileCardGifts.replaceChildren();
+  // BOTH NOTES SAY "reading the chain" FROM THE FIRST PAINT [owner, 2026-09-08: the gifts said so, the names said
+  // nothing] — and both are shown again: a contact's card can leave a note hidden and empty.
+  // The notes say nothing while the chain is read — the line at the foot of the card says it once for everything.
+  for (const cardNote of [profileCardNamesNote, profileCardGiftsNote]) {
+    if (!cardNote) continue;
+    cardNote.textContent = '';
+    cardNote.hidden = true;
+  }
+
+  profileCardDialog.classList.remove('is-closing');
+  profileCardDialog.hidden = false;
+  applyGiftAppearance();   // out of the channel's dress for the card's duration — see channelOnScreen
+
+  // Both reads are slow and independent, and either failing must not blank the other half of the card — nor end
+  // there: an unfinished one keeps asking for as long as the card is open.
+  clearProfileCardRetries();
+  // LAST TIME'S NAMES FIRST [owner, 2026-09-08: "do it like the gifts"] — the gifts' lane below, twinned.
+  profileCardNamesConfirmedFor = null;
+  const nameLane = { stored: null };
+  void readStoredUsernameNftList(raw).then((stored) => {
+    if (!stored || profileCardSubject !== raw || profileCardNamesConfirmedFor === raw) return;
+    nameLane.stored = stored;
+    renderProfileCardNames(stored, own, { unconfirmed: true });
+  });
+  driveProfileCardRead(raw, {
+    load: () => loadUsernameNftsForWallet(raw, own),
+    render: (result, state) => {
+      if (state?.retrying && nameLane.stored) {
+        renderProfileCardNames(nameLane.stored, own, { unconfirmed: true, retrying: true });
+        return;
+      }
+      renderProfileCardNames(result, own, state);
+      if (result?.complete) {
+        profileCardNamesConfirmedFor = raw;
+        void writeStoredUsernameNftList(raw, result);
+        markProfileCardLaneDone(raw, 'names');
+      }
+    },
+  });
+  // LAST TIME'S LIST FIRST [owner, 2026-09-07]. Painted as unconfirmed the moment it is read back, unless the
+  // chain has already answered for this wallet; then the live read runs exactly as before and paints over it.
+  profileCardGiftsConfirmedFor = null;
+  const giftLane = { stored: null };
+  void readStoredTelegramGiftList(raw).then((stored) => {
+    if (!stored || profileCardSubject !== raw || profileCardGiftsConfirmedFor === raw) return;
+    giftLane.stored = stored;
+    renderProfileCardGifts(stored, own, { unconfirmed: true });
+  });
+  driveProfileCardRead(raw, {
+    load: () => loadTelegramGiftsForWallet(raw),
+    render: (result, state) => {
+      // An INCOMPLETE answer must not replace a complete list from last time with a shorter one: while another
+      // attempt is on its way, the remembered list stays up, still unconfirmed.
+      if (state?.retrying && giftLane.stored) {
+        renderProfileCardGifts(giftLane.stored, own, { unconfirmed: true, retrying: true });
+        return;
+      }
+      renderProfileCardGifts(result, own, state);
+      if (result?.complete) {
+        profileCardGiftsConfirmedFor = raw;
+        void writeStoredTelegramGiftList(raw, result);
+        markProfileCardLaneDone(raw, 'gifts');
+      }
+    },
+  });
+  // THE CLAIM THE HERO IS DRESSED BY comes from the wallet's published profile. The card opens onto the cached copy;
+  // a wallet never seen in the feed has none yet, so ask the chain once and re-dress the same gift list when it lands.
+  if (!own && !cachedChannelProfile(raw)?.fetchedAt) {
+    void resolveChannelProfile(raw).then(() => {
+      if (profileCardSubject !== raw || !profileCardGiftsLastRender) return;
+      const last = profileCardGiftsLastRender;
+      renderProfileCardGifts(last.result, last.own, last.flags);
+    }).catch(() => { /* the hero stays plain — a claim that could not be read dresses nothing */ });
+  }
+}
+
+/**
+ * Settings: what used to be the fourth tab.
+ *
+ * WHY IT IS NOT A TAB [decided 2026-09-07]: nobody navigates BETWEEN settings and a feed. You come here once to pick
+ * a language, once to activate, once to import a key. The rail is for the three places a reader actually moves
+ * between, and this is one gear away from the profile card.
+ */
+function openProfileSettings() {
+  if (!profileSettingsDialog) return;
+  profileSettingsDialog.hidden = false;
+  // The three chain reads the old tab ran on entry, in the same order and for the same reason (see the comment on
+  // refreshProfilePaneReads: concurrent toncenter reads stall the WebKit run loop).
+  if (plathoWallet?.address) refreshProfilePaneReads();
+}
+
+function closeProfileSettings() {
+  hideDialogAnimated(profileSettingsDialog, () => clearWalletTonProfileBalanceRetry());
+}
+
+document.querySelector('#profileSettingsCloseButton')?.addEventListener('click', closeProfileSettings);
+closeOnBackdropClick(profileSettingsDialog, closeProfileSettings);
+// From the card: the gear replaces the card rather than stacking on it — two dimmed backdrops over each other read
+// as a bug, and the card is one tap away again from the same corner.
+/**
+ * The corner is the only door to both, so it is NEVER a dead end [owner asked, 2026-09-07: "when does the profile
+ * button become available? activation was on that tab — I would not want us locking everything in there"].
+ *
+ * With a wallet it opens the card, and the card's gear opens the settings. WITHOUT one there is no card to draw —
+ * so it opens the settings directly, which is where activation, the language and the key import live. Creating or
+ * importing the wallet itself is on the Wallet tab, and that tab has never been gated.
+ */
+document.querySelector('#brandProfileButton')?.addEventListener('click', () => {
+  const wallet = plathoWallet?.address;
+  if (!wallet) {
+    openProfileSettings();
+    return;
+  }
+  openProfileCardDialog({ wallet }).catch((error) => console.error(error));
+});
+// It REPLACES the card rather than stacking on it: two dimmed backdrops over each other read as a bug, and the card
+// is one tap away again from the same corner.
+document.querySelector('#profileCardSettingsButton')?.addEventListener('click', () => {
+  closeProfileCardDialog();
+  openProfileSettings();
+});
+document.querySelector('#profileCardCloseButton')?.addEventListener('click', closeProfileCardDialog);
+closeOnBackdropClick(profileCardDialog, closeProfileCardDialog);
+/**
+ * Copy the address, and SAY SO.
+ *
+ * A control that does its job in silence reads as a dead one. There is no global toast in this app, so the
+ * confirmation is the same one the identity menu's copy button uses: tint the control and relabel it for a moment,
+ * then put it back. Only on SUCCESS — a clipboard the browser refused must not claim it copied.
+ */
+let profileCardCopyTimer = 0;
+profileCardCopyButton?.addEventListener('click', async () => {
+  const address = profileCardWallet?.textContent?.trim();
+  if (!address) return;
+  try {
+    await copyTextToClipboard(address);
+  } catch (error) {
+    console.warn(error);
+    return;
+  }
+  profileCardCopyButton.classList.add('is-copied');
+  setText(profileCardWalletLabel, t('wallet.addressCopied'));
+  // Restarting the timer matters: a second tap during the first confirmation would otherwise put the caption back
+  // early and leave the row tinted with the wrong label under it.
+  window.clearTimeout(profileCardCopyTimer);
+  profileCardCopyTimer = window.setTimeout(() => {
+    profileCardCopyButton.classList.remove('is-copied');
+    setText(profileCardWalletLabel, t('common.wallet'));
+  }, 1200);
+});
+
+// The runtime is complete: the corner may paint, and the app may wear what it was wearing last time.
+globalThis.__plathoGiftRuntimeReady = true;
+// THE MIGRATION RUNS BEFORE ANYTHING CAN DESTROY ITS SOURCE. The choice used to live inside the worn gift's
+// record, and taking that gift off is precisely what nulls it — so a device that has never written the new key
+// copies the old answer across now, while the record is still there to be read. Lazily, on first use, it would
+// have been too late for exactly the user who unwears before opening Appearance.
+try {
+  // ONLY WHEN THERE IS SOMETHING TO MIGRATE FROM. Seeding unconditionally stamped "not chosen" on any launch that
+  // found no gift record — including one where the record was simply not there yet — and that stamp then outranks
+  // the fallback forever. With no record the key stays absent, and the old answer can still be found later.
+  if (localStorage.getItem(GIFT_THEME_CHOICE_STORAGE_KEY) === null && localStorage.getItem(GIFT_THEME_STORAGE_KEY)) {
+    writeGiftThemeChoice(giftThemeChosenInStorage());
+  }
+} catch { /* storage unavailable: the lazy read still answers, it just cannot be remembered */ }
+applyGiftAppearance();
+// AND THE CONTROLS ARE ASKED AGAIN, HERE. refreshAppearanceUi() also runs during module evaluation, where
+// giftThemeChosen() is guarded to false because the flag above is not set yet — so the theme select was filled in
+// with "dark" and never corrected. The app wore the gift and the control said it did not, which reads as the
+// choice having been thrown away. It is the only reader of that flag that had no second chance.
+refreshAppearanceUi();
+renderBrandGift();
+// The picture is not in storage (only its colours are), so the corner's gift arrives one fetch later — from the
+// HTTP cache on every launch after the first.
+if (wornGiftTheme) {
+  loadTelegramGiftArt(wornGiftTheme)
+    .then(() => { renderBrandGift(); refreshGiftNodeMark(); })
+    .catch(() => { /* corner keeps the logo */ });
+}
 
 // LAST TOP-LEVEL STATEMENT, deliberately: nothing after this line can be in a temporal dead zone, whatever
 // top-level awaits suspended above. If the browser offered the install prompt while evaluation was suspended,

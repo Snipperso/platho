@@ -10,7 +10,7 @@ import {
 // SUMMARISES one did not, so the marker went straight to the screen:
 //
 //   OBSERVED 2026-08-08 (owner): a message sent as a heading rendered as a heading inside the conversation and as
-//   the literal "# Каеф" in the conversation list beside it.
+//   the literal  in the conversation list beside it.
 //
 // The summarising readers are four (thread list, channel card, reply quote strip, and the matcher that compares a
 // quote against message text), which is why the projection is a shared primitive rather than a strip at one site.
@@ -144,7 +144,7 @@ describe('previews say words, not markup, and say them in the reader’s languag
   });
 
   it('PREVIEW-06: the key checker reads every module, not only app.js', () => {
-    // public-channel-subscriptions.mjs now calls t(). A checker that scans app.js alone would report "чисто" while
+    // public-channel-subscriptions.mjs now calls t. A checker that scans app.js alone would report  while
     // a card on screen renders [public.previewWaitingFeed].
     const checker = readFileSync('scripts/check_i18n_keys.mjs', 'utf8');
     expect(checker).toMatch(/readdirSync\('web'\)/);

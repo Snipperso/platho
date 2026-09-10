@@ -20,10 +20,10 @@
 //     degrades on its own as the network grows.
 //   - Nothing runs while the app is hidden. Background polling is battery the user did not agree to spend.
 
-import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=23';
-import { scanIntroWindow, INTRO_SCAN_EPOCHS_BACK, INTRO_SCAN_EPOCHS_FORWARD } from './intro-receive.mjs';
-import { planIntroScan, DEFAULT_POLICY } from './intro-scan-policy.mjs?v=1';
-import { pruneCursors, pruneDelivered, deliveryKey } from './intro-cursor-store.mjs?v=1';
+import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=58';
+import { scanIntroWindow, INTRO_SCAN_EPOCHS_BACK, INTRO_SCAN_EPOCHS_FORWARD } from './intro-receive.mjs?v=36';
+import { planIntroScan, DEFAULT_POLICY } from './intro-scan-policy.mjs?v=2';
+import { pruneCursors, pruneDelivered, deliveryKey } from './intro-cursor-store.mjs?v=6';
 
 export const epochNow = (nowMs) => Math.floor(nowMs / 1000 / 86400);
 
@@ -125,6 +125,10 @@ export function createIntroScanRunner({
         readSpace,
         currentEpoch,
         msSinceFullSweep,
+        // WHAT THE NETWORK IS WRITING, as measured by this client's own passes — the term the cost model was
+        // missing entirely until 2026-08-29 (see BYTES_PER_RECORD). Zero until a pass has run, which is exactly
+        // the old behaviour for a client that has never scanned.
+        recordsPerDay: Number(meta.recordsPerDay ?? 0),
         policy,
       });
 
@@ -214,6 +218,20 @@ export function createIntroScanRunner({
         highestLiveBucket: plan.full ? seenHighest : Math.max(meta.highestLiveBucket ?? -1, seenHighest),
         lastFullSweepAt: plan.full ? now() : (meta.lastFullSweepAt ?? 0),
         lastPassAt: now(),
+        // HOW MANY RECORDS A DAY THIS CLIENT ACTUALLY DOWNLOADS, as a decaying rate rather than a counter.
+        //
+        // `candidates` is every (r, view_tag) pair this pass pulled — the scan trial-decrypts all of them, which is
+        // the privacy property, and each is 47 B on the wire. Cursors mean each record is pulled exactly once, so
+        // summing them over a day IS the day's traffic. The estimate decays with a one-day time constant: a cold
+        // first pass (which really does download the whole live window) shows up in full and then fades out of the
+        // estimate within a day instead of pinning it high forever, and a network that goes quiet is noticed just
+        // as fast. Fixed point: with R records a day, the estimate settles at R.
+        recordsPerDay: (() => {
+          const previous = Math.max(0, Number(meta.recordsPerDay ?? 0));
+          const elapsedMs = Math.max(1, now() - Number(meta.lastPassAt ?? now()));
+          const decay = Math.exp(-Math.min(elapsedMs, 7 * 86_400_000) / 86_400_000);
+          return previous * decay + Math.max(0, Number(result.stats.candidates ?? 0));
+        })(),
       };
 
       const oldestUseful = currentEpoch - INTRO_SCAN_EPOCHS_BACK;
@@ -221,7 +239,21 @@ export function createIntroScanRunner({
       await store.saveDelivered?.(pruneDelivered(delivered, oldestUseful));
       await store.saveMeta(nextMeta);
 
-      lastStats = { ...result.stats, delivered: deliveries, replays, unfetchable: unfetchable.size, plan: { full: plan.full, intervalMs: plan.intervalMs, estimatedDailyBytes: plan.estimatedDailyBytes } };
+      lastStats = {
+        ...result.stats,
+        delivered: deliveries,
+        replays,
+        unfetchable: unfetchable.size,
+        // `records` rides in the stats so the cost the scan cannot avoid is visible rather than inferred: at a
+        // million first contacts a day network-wide the records alone are 44.8 MB against a 30 MiB budget, and no
+        // poll interval changes that — each record is downloaded exactly once however often the client asks.
+        plan: {
+          full: plan.full,
+          intervalMs: plan.intervalMs,
+          estimatedDailyBytes: plan.estimatedDailyBytes,
+          records: plan.records,
+        },
+      };
       return { hits: result.hits.length, delivered: deliveries, stats: lastStats, nextIntervalMs: plan.intervalMs };
     } finally {
       passInFlight = false;

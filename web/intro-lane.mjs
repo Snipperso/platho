@@ -13,12 +13,12 @@
 // been wrong twice in ways that cost real money on a phone, and app.js cannot be tested without a browser. Here
 // the whole thing runs against a fake clock and a stub transport.
 
-import { createIntroScanRunner } from './intro-scan-runner.mjs?v=23';
-import { createIntroCursorStore } from './intro-cursor-store.mjs?v=1';
-import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './intro-transport.mjs?v=28';
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=24';
-import { readAccountStates } from './shard-reader.mjs?v=26';
-import { introShardAddress } from './shard-discovery.mjs?v=23';
+import { createIntroScanRunner } from './intro-scan-runner.mjs?v=63';
+import { createIntroCursorStore } from './intro-cursor-store.mjs?v=6';
+import { createScanPageReader, createEntryReader, fetchIntroCapsule } from './intro-transport.mjs?v=63';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=40';
+import { readAccountStates } from './shard-reader.mjs?v=61';
+import { introShardAddress } from './shard-discovery.mjs?v=58';
 import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=2';
 
 /**
@@ -43,6 +43,9 @@ export async function createIntroLane({
   apiKey = null,
   fetch: fetchImpl = null,
   store = null,
+  // WHERE THE CURSORS LIVE. The app passes a WALLET-SCOPED name — intro-cursor-store's header says what sharing one
+  // cost: a second identity resumed from the first one's position and never looked below it.
+  cursorDbName = undefined,
   readSpace = undefined,   // narrowable for tests; production uses INTRO_READ_SPACE
   // THE CLOCK IS INJECTABLE AND MUST BE. The runner derives the epoch window from it, and an epoch that does not
   // match the chain's puts the whole ten-epoch window somewhere the shards are not — the scan then reads real
@@ -85,7 +88,7 @@ export async function createIntroLane({
     }),
     onIntro,
     onError,
-    store: store ?? await createIntroCursorStore(),
+    store: store ?? await createIntroCursorStore(cursorDbName === undefined ? {} : { dbName: cursorDbName }),
     policy,
     ...(readSpace === undefined ? {} : { readSpace }),
     ...(now === undefined ? {} : { now }),

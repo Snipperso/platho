@@ -239,8 +239,7 @@ describe('PEERNAME — the peer .ath travels on the wire and is verified before 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 // PEERNAME-SEL — a name once PROVEN for the wallet stays on the dialog; only a proven transfer takes it off.
 //
-// [OWNER 2026-08-26] "even if he sent anonymously, the name must not fall off — I still see his wallet; he
-// wrote to me non-anonymously before." The reported screen: the header and the thread row wore the raw address
+// [decided 2026-08-26] The reported screen: the header and the thread row wore the raw address
 // while the "Display as" menu listed TWO proven names for that very wallet. Mechanics: thread.identity latches
 // onto the FIRST history snapshot applied at rebirth (an address-era one), and only a LIVE verified claim could
 // re-dress it — which a peer who unlinked, toggled anonymity, or linked a name held by their other wallet never

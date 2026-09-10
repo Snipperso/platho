@@ -32,6 +32,45 @@
     }
   } catch (e) { /* storage unavailable -- system theme applies */ }
 
+  // A worn Telegram gift lights the loading screen too, and everything it needs is cached beside the choice, so
+  // it can be applied here -- before first paint -- with no network and no app state. The gift does NOT paint the
+  // page: the background is the theme's, and --bg is left exactly where the theme block above put it. What the
+  // gift owns is the plasma's colour, and the pattern that only the plasma reveals.
+  try {
+    var plathoGift = JSON.parse(localStorage.getItem('platho.giftTheme.v1') || 'null');
+    // The choice lives in its own key since it stopped being a property of whichever gift happened to be worn;
+    // an absent key falls back to the old place, which is the whole migration. Same rule as app.js
+    // giftThemeChosenInStorage, and PWA-GIFT-08 pins the two together.
+    var plathoGiftChoice = localStorage.getItem('platho.giftTheme.choice.v1');
+    var plathoWearsGiftTheme = plathoGiftChoice === 'true'
+      || (plathoGiftChoice !== 'false' && !!plathoGift && plathoGift.theme === true);
+    if (plathoGift && plathoWearsGiftTheme && plathoGift.tint && plathoGift.tint.length === 3) {
+      var glow = (plathoGift.inner && plathoGift.inner.length === 3) ? plathoGift.inner : plathoGift.tint;
+      var root = document.documentElement;
+      root.setAttribute('data-gift-theme', 'true');
+      root.style.setProperty('--aurora-rgb', glow[0] + ', ' + glow[1] + ', ' + glow[2]);
+      // The pattern travels with the choice as a MASK, so it needs no decode and no network here -- just the two
+      // properties the stylesheet reads. 256 is app.js's GIFT_PATTERN_TILE_CSS_PX, written out because this file
+      // runs before any module does; PWA-GIFT-06 pins the two together.
+      if (typeof plathoGift.patternTile === 'string' && plathoGift.patternTile) {
+        root.style.setProperty('--gift-pattern', 'url("' + plathoGift.patternTile + '")');
+        root.style.setProperty('--gift-pattern-size', '256px');
+        root.setAttribute('data-gift-pattern', 'true');
+      }
+    }
+  } catch (e) { /* storage unavailable -- the app applies it a moment later */ }
+
+  // WHICH BACKGROUND WAS CHOSEN, before first paint, because the gift's wallpaper belongs to the plasma and the
+  // loading screen is where it is seen first. Same key and same default as app.js readBackgroundMode: an absent
+  // key means the user never chose, and the app arrives quiet.
+  try {
+    var plathoBackground = localStorage.getItem('platho.background.v1');
+    document.documentElement.setAttribute(
+      'data-background',
+      (plathoBackground === 'plasma' || plathoBackground === 'nodes') ? plathoBackground : 'none',
+    );
+  } catch (e) { /* storage unavailable -- the app sets it during module evaluation */ }
+
   // Post-load grace for the app to reach 'ready'. Small on purpose: 'ready' is set at the
   // end of the module's top-level execution, which completes before 'load' fires, so a
   // healthy boot is already 'ready' here; the grace only covers minor async settling.
