@@ -1,0 +1,322 @@
+import { describe, expect, it, beforeEach } from 'vitest';
+import { Address, beginCell, contractAddress, toNano } from '@ton/core';
+import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
+import { keyPairFromSeed, sign, KeyPair } from '@ton/crypto';
+import { RecoveryShard } from '../build/RecoveryShard/RecoveryShard_RecoveryShard';
+
+
+const RECOVERY_DOMAIN = 0x42525331n;
+const SLOT_DOMAIN = 0x52534C4Bn;
+const EVICT_DOMAIN = 0x52534556n;
+const MAX_SLOTS = 256;
+const NAMED_SLOTS = 16;
+const RETENTION = 94608000;
+const bufToInt = (b: Buffer): bigint => BigInt('0x' + b.toString('hex'));
+const cellOf = (b: Buffer) => beginCell().storeBuffer(b).endCell();
+
+const slotKeyForOwner = (ownerPub: bigint, slotIndex = 0): bigint =>
+  bufToInt(beginCell().storeUint(SLOT_DOMAIN, 32).storeUint(ownerPub, 256)
+    .storeUint(slotIndex, 32).endCell().hash());
+const selfOf = (owner: KeyPair, slotIndex = 0): bigint => slotKeyForOwner(bufToInt(owner.publicKey), slotIndex);
+
+function digest(shard: Address, selfBucket: bigint, seq: bigint, h0: bigint, h1: bigint, bh: bigint): Buffer {
+  return beginCell()
+    .storeUint(RECOVERY_DOMAIN, 32)
+    .storeAddress(shard)
+    .storeUint(selfBucket, 256)
+    .storeUint(seq, 64)
+    .storeRef(beginCell().storeUint(h0, 256).storeUint(h1, 256).storeUint(bh, 256).endCell())
+    .endCell()
+    .hash();
+}
+
+function store(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, fill: number, sigOwner?: KeyPair,
+               slotIndex = 0n) {
+  const h0 = 0x100n + BigInt(fill), h1 = 0x200n + BigInt(fill);
+  const body = beginCell().storeUint(0xDEADBEEFn + BigInt(fill), 256).endCell();
+  const bh = bufToInt(body.hash());
+  const d = digest(shard, selfBucket, seq, h0, h1, bh);
+  return {
+    $$type: 'RecoveryStore' as const,
+    owner_pubkey: bufToInt(owner.publicKey),
+    slot_index: slotIndex,
+    seq, h0, h1, bh, body,
+    owner_sig: cellOf(sign(d, (sigOwner ?? owner).secretKey)),
+  };
+}
+
+function evictDigest(shard: Address, selfBucket: bigint, seq: bigint, refundTo: Address): Buffer {
+  return beginCell()
+    .storeUint(EVICT_DOMAIN, 32)
+    .storeAddress(shard)
+    .storeUint(selfBucket, 256)
+    .storeUint(seq, 64)
+    .storeAddress(refundTo)
+    .endCell()
+    .hash();
+}
+
+function evict(owner: KeyPair, shard: Address, selfBucket: bigint, seq: bigint, refundTo: Address, sigOwner?: KeyPair) {
+  return {
+    $$type: 'EvictRecovery' as const,
+    refund_to: refundTo,
+    owner_sig: cellOf(sign(evictDigest(shard, selfBucket, seq, refundTo), (sigOwner ?? owner).secretKey)),
+  };
+}
+
+function exitOf(res: any, dest: Address): number {
+  const tx: any = res.transactions.find(
+    (t: any) => t.inMessage?.info?.type === 'internal' && t.inMessage?.info?.dest?.toString() === dest.toString());
+  return Number(tx?.description?.computePhase?.exitCode ?? -999);
+}
+
+describe('RECOVERY-SHARD — owner-signed, rollback-proof, 3-year durability', () => {
+  let blockchain: Blockchain;
+  let relay: SandboxContract<TreasuryContract>;
+
+  beforeEach(async () => {
+    blockchain = await Blockchain.create();
+    blockchain.now = 1_790_000_000;
+    relay = await blockchain.treasury('rec-relay');
+  });
+
+  async function shard(selfBucket: bigint): Promise<SandboxContract<RecoveryShard>> {
+    const init = await RecoveryShard.init(selfBucket);
+    const c = blockchain.openContract(new RecoveryShard(contractAddress(0, init), init));
+    await c.send(relay.getSender(), { value: toNano('0.05') }, null);
+    return c;
+  }
+
+  it('RECOVERY-01: the first publish binds the owner and stores the blob; the change is returned', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x10));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    const before = await relay.getBalance();
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    expect(exitOf(res, rs.address)).toBe(0);
+    const v = await rs.getGetView();
+    expect(v.bound).toBe(true);
+    expect(v.owner_pubkey).toBe(bufToInt(owner.publicKey));
+    expect(v.seq).toBe(1n);
+    expect(before - await relay.getBalance()).toBeLessThan(toNano('0.04'));
+    expect((await blockchain.getContract(rs.address)).balance).toBeGreaterThan(20_000_000n);
+  }, 120_000);
+
+  it('RECOVERY-02: the owner updates forward with a higher seq', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x11));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 5n, 1) as any);
+    expect(exitOf(res, rs.address)).toBe(0);
+    expect((await rs.getGetView()).seq).toBe(5n);
+  }, 120_000);
+
+  it('RECOVERY-03: a DIFFERENT owner cannot overwrite the bound slot (13563) — no hijack', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x12));
+    const attacker = keyPairFromSeed(Buffer.alloc(32, 0x99));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, rs.address, self, 9n, 2) as any);
+    expect(exitOf(res, rs.address)).toBe(13563);
+    expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
+  }, 120_000);
+
+  it('RECOVERY-04: a stale (lower-or-equal seq) publish is refused (13564) — no rollback of K_root', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x13));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 5n, 0) as any);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, rs.address, self, 5n, 0) as any), rs.address)).toBe(13564);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, rs.address, self, 3n, 9) as any), rs.address)).toBe(13564);
+    expect((await rs.getGetView()).seq).toBe(5n);
+  }, 120_000);
+
+  it('RECOVERY-05: a forged owner signature is refused (13574)', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x14));
+    const forger = keyPairFromSeed(Buffer.alloc(32, 0xEE));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(owner, rs.address, self, 1n, 0, forger) as any);
+    expect(exitOf(res, rs.address)).toBe(13574);
+    expect((await rs.getGetView()).bound).toBe(false);
+  }, 120_000);
+
+  it('RECOVERY-06: an underfunded self-funded publish is refused (13572)', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x15));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    const res = await rs.send(relay.getSender(), { value: toNano('0.02'), bounce: true }, store(owner, rs.address, self, 1n, 0) as any);
+    expect(exitOf(res, rs.address)).toBe(13572);
+  }, 120_000);
+
+  it('RECOVERY-07: eviction is OWNER-SIGNED — a stranger cannot clear a slot, the owner reclaims on demand to the address it signed', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x16));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    const keeper = await blockchain.treasury('rec-keeper');
+    const stranger = keyPairFromSeed(Buffer.alloc(32, 0xE7));
+
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true },
+      evict(owner, rs.address, self, 1n, keeper.address, stranger) as any), rs.address), 'stranger sig -> 13565').toBe(13565);
+    expect((await rs.getGetView()).bound, 'a forged eviction leaves the slot intact').toBe(true);
+
+    blockchain.now = blockchain.now! + RETENTION + 86400;
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true },
+      evict(owner, rs.address, self, 1n, keeper.address, stranger) as any), rs.address), 'stranger sig, aged -> 13565').toBe(13565);
+    expect((await rs.getGetView()).bound).toBe(true);
+
+    const refund = await blockchain.treasury('rec-refund');
+    const refundBefore = await refund.getBalance();
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') },
+      evict(owner, rs.address, self, 1n, refund.address) as any), rs.address), 'owner-signed eviction succeeds').toBe(0);
+    expect((await rs.getGetView()).bound, 'slot cleared').toBe(false);
+    expect(await refund.getBalance() > refundBefore, 'the reclaimed endowment went to the signed refund_to, not the relayer').toBe(true);
+  }, 120_000);
+
+  it('RECOVERY-07b: [re-audit LOW] a non-basechain refund_to is REFUSED before any state change — the endowment cannot be silently stranded', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x1b));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+    await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any);
+    const keeper = await blockchain.treasury('rec-keeper7b');
+
+    const foreignRefund = new Address(5, Buffer.alloc(32, 0x1));
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05'), bounce: true },
+      evict(owner, rs.address, self, 1n, foreignRefund) as any), rs.address), 'foreign-workchain refund_to -> 13566').toBe(13566);
+    expect((await rs.getGetView()).bound, 'the slot survives — no silent strand').toBe(true);
+
+    const ok = await blockchain.treasury('rec-refund7b');
+    expect(exitOf(await rs.send(keeper.getSender(), { value: toNano('0.05') },
+      evict(owner, rs.address, self, 1n, ok.address) as any), rs.address), 'a basechain refund still works').toBe(0);
+    expect((await rs.getGetView()).bound).toBe(false);
+  }, 120_000);
+
+  it('RECOVERY-09: the anti-rollback seq SURVIVES eviction — a freed slot cannot be re-bound with a stale blob', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x18));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+
+    const stale = store(owner, rs.address, self, 3n, 0);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, stale as any), rs.address)).toBe(0);
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 7n, 1) as any), rs.address)).toBe(0);
+    expect((await rs.getGetView()).seq).toBe(7n);
+
+    blockchain.now = blockchain.now! + RETENTION + 86400;
+    const keeper = await blockchain.treasury('rec-keeper9');
+    await rs.send(keeper.getSender(), { value: toNano('0.05') }, evict(owner, rs.address, self, 7n, keeper.address) as any);
+    const freed = await rs.getGetView();
+    expect(freed.bound, 'slot freed').toBe(false);
+    expect(freed.seq, 'but the high-water mark is retained').toBe(7n);
+
+    expect((await blockchain.getContract(rs.address)).balance, 'the retained seq is funded, not merely written')
+      .toBeGreaterThan(40_000_000n);
+
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, stale as any), rs.address),
+      'stale replay into a freed slot -> 13573').toBe(13573);
+    expect((await rs.getGetView()).bound, 'slot stays unbound').toBe(false);
+
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 8n, 2) as any), rs.address)).toBe(0);
+    expect((await rs.getGetView()).seq).toBe(8n);
+  }, 120_000);
+
+  it('RECOVERY-08: [SQUAT-CLOSE] only the key that names the slot can bind it — fresh AND after eviction (13575)', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x17));
+    const attacker = keyPairFromSeed(Buffer.alloc(32, 0x9A));
+    const self = selfOf(owner);
+    const rs = await shard(self);
+
+    const squat1 = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, rs.address, self, 1n, 0) as any);
+    expect(exitOf(squat1, rs.address), 'squat on a fresh slot -> 13575').toBe(13575);
+    expect((await rs.getGetView()).bound).toBe(false);
+
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 1n, 0) as any), rs.address)).toBe(0);
+    blockchain.now = blockchain.now! + RETENTION + 86400;
+    const keeper = await blockchain.treasury('rec-keeper8');
+    await rs.send(keeper.getSender(), { value: toNano('0.05') }, evict(owner, rs.address, self, 1n, keeper.address) as any);
+    expect((await rs.getGetView()).bound, 'slot freed by eviction').toBe(false);
+
+    const squat2 = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true }, store(attacker, rs.address, self, 99n, 3) as any);
+    expect(exitOf(squat2, rs.address), 'squat after eviction -> 13575').toBe(13575);
+    expect((await rs.getGetView()).bound).toBe(false);
+
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs.address, self, 2n, 5) as any), rs.address), 'owner re-binds').toBe(0);
+    expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
+  }, 120_000);
+
+
+  it('RECOVERY-10: each slot index is a SEPARATE account with its own blob and its own seq', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x31));
+    const s0 = selfOf(owner, 0), s1 = selfOf(owner, 1), s255 = selfOf(owner, 255);
+    expect(new Set([s0, s1, s255]).size, 'three indices, three distinct slot keys').toBe(3);
+
+    const rs0 = await shard(s0);
+    const rs1 = await shard(s1);
+    expect(rs0.address.toString()).not.toBe(rs1.address.toString());
+
+    expect(exitOf(await rs0.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs0.address, s0, 1n, 0, undefined, 0n) as any), rs0.address)).toBe(0);
+    expect(exitOf(await rs1.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs1.address, s1, 90n, 1, undefined, 1n) as any), rs1.address)).toBe(0);
+    expect(exitOf(await rs0.send(relay.getSender(), { value: toNano('0.1') }, store(owner, rs0.address, s0, 2n, 2, undefined, 0n) as any), rs0.address)).toBe(0);
+
+    const v0 = await rs0.getGetView(), v1 = await rs1.getGetView();
+    expect(v0.seq, 'slot 0 keeps its own seq').toBe(2n);
+    expect(v1.seq, 'slot 1 keeps its own seq').toBe(90n);
+    expect(v0.bh, 'and its own blob').not.toBe(v1.bh);
+    expect(v0.max_slots, 'the cap is readable so a client need not mirror it blind').toBe(256n);
+  }, 120_000);
+
+  it('RECOVERY-11: an out-of-range slot index is refused (13576) — no write the scan would never find', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x32));
+    const overCap = selfOf(owner, MAX_SLOTS + NAMED_SLOTS);
+    const rs = await shard(overCap);
+
+    const res = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
+      store(owner, rs.address, overCap, 1n, 0, undefined, BigInt(MAX_SLOTS + NAMED_SLOTS)) as any);
+    expect(exitOf(res, rs.address), 'slot 272 -> 13576').toBe(13576);
+    expect((await rs.getGetView()).bound, 'nothing was stored').toBe(false);
+
+    const last = selfOf(owner, MAX_SLOTS + NAMED_SLOTS - 1);
+    const rsLast = await shard(last);
+    expect(exitOf(await rsLast.send(relay.getSender(), { value: toNano('0.1') },
+      store(owner, rsLast.address, last, 1n, 0, undefined, BigInt(MAX_SLOTS + NAMED_SLOTS - 1)) as any), rsLast.address),
+      'index 271 is legal').toBe(0);
+    expect((await rsLast.getGetView()).bound).toBe(true);
+
+    const named = selfOf(owner, MAX_SLOTS);
+    const rsNamed = await shard(named);
+    expect(exitOf(await rsNamed.send(relay.getSender(), { value: toNano('0.1') },
+      store(owner, rsNamed.address, named, 1n, 0, undefined, BigInt(MAX_SLOTS)) as any), rsNamed.address),
+      'the first named slot 256 is legal').toBe(0);
+    expect((await rsNamed.getGetView()).bound).toBe(true);
+  }, 120_000);
+
+  it('RECOVERY-12: [SQUAT-CLOSE] the index is part of the slot identity — a right-key/wrong-index bind is refused', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x33));
+    const s7 = selfOf(owner, 7);
+    const rs = await shard(s7);
+
+    const wrongIndex = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
+      store(owner, rs.address, s7, 1n, 0, undefined, 0n) as any);
+    expect(exitOf(wrongIndex, rs.address), 'right owner, wrong index -> 13575').toBe(13575);
+    expect((await rs.getGetView()).bound).toBe(false);
+
+    expect(exitOf(await rs.send(relay.getSender(), { value: toNano('0.1') },
+      store(owner, rs.address, s7, 1n, 0, undefined, 7n) as any), rs.address), 'index 7 matches the address').toBe(0);
+    expect((await rs.getGetView()).owner_pubkey).toBe(bufToInt(owner.publicKey));
+  }, 120_000);
+
+  it('RECOVERY-13: a squatter still cannot name ANY of the owner\'s slots', async () => {
+    const owner = keyPairFromSeed(Buffer.alloc(32, 0x34));
+    const attacker = keyPairFromSeed(Buffer.alloc(32, 0x35));
+    for (const idx of [0, 1, 42, 255]) {
+      const slot = selfOf(owner, idx);
+      const rs = await shard(slot);
+      const squat = await rs.send(relay.getSender(), { value: toNano('0.1'), bounce: true },
+        store(attacker, rs.address, slot, 5n, 0, undefined, BigInt(idx)) as any);
+      expect(exitOf(squat, rs.address), `squat on slot ${idx} -> 13575`).toBe(13575);
+      expect((await rs.getGetView()).bound, `slot ${idx} still free`).toBe(false);
+    }
+  }, 180_000);
+});

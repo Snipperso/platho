@@ -1,0 +1,854 @@
+import { t, tPlural } from './i18n.mjs?v=289';
+import { messagePreviewText } from './message-plain-text.mjs?v=5';
+
+export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
+export const PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY = 'platho.publicSubscriptions.v1';
+export const PUBLIC_CHANNEL_FEED_CACHE_KEY = 'platho.publicChannelFeeds.v1';
+export const PUBLIC_CHANNEL_PROFILE_CACHE_KEY = 'platho.publicChannelProfiles.v1';
+
+export const DEFAULT_PUBLIC_CHANNEL_ID = 'platho.app';
+export const DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET = 'UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH';
+
+export const DEFAULT_PUBLIC_CHANNELS = Object.freeze([
+  Object.freeze({
+    id: DEFAULT_PUBLIC_CHANNEL_ID,
+    name: 'platho',
+    avatar: 'P',
+    subtitle: 'official read-only channel',
+    authorWallet: DEFAULT_PUBLIC_CHANNEL_AUTHOR_WALLET,
+  }),
+]);
+
+function isObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function rawAddressOrNull(value) {
+  const address = String(value ?? '').trim().toLowerCase();
+  return /^-?\d{1,3}:[0-9a-f]{64}$/.test(address) ? address : null;
+}
+
+function safeClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeRegistryChannel(channel) {
+  if (!isObject(channel)) return null;
+  const id = nonEmptyString(channel.id);
+  const sourceUrl = nonEmptyString(channel.sourceUrl);
+  const authorWallet = nonEmptyString(channel.authorWallet ?? channel.author_wallet);
+  if (!id || (!sourceUrl && !authorWallet)) return null;
+  return {
+    id,
+    name: nonEmptyString(channel.name) ?? id,
+    avatar: (nonEmptyString(channel.avatar) ?? id.slice(0, 1) ?? 'P').slice(0, 2).toUpperCase(),
+    subtitle: nonEmptyString(channel.subtitle) ?? 'read-only public channel',
+    sourceUrl,
+    authorWallet,
+  };
+}
+
+export function normalizePublicChannelRegistry(registry = DEFAULT_PUBLIC_CHANNELS) {
+  const channels = [];
+  const seen = new Set();
+  for (const item of registry ?? []) {
+    const channel = normalizeRegistryChannel(item);
+    if (!channel || seen.has(channel.id)) continue;
+    seen.add(channel.id);
+    channels.push(channel);
+  }
+  return channels.length > 0 ? channels : DEFAULT_PUBLIC_CHANNELS.map((item) => ({ ...item }));
+}
+
+export function createDefaultPublicChannelSubscriptions(registry = DEFAULT_PUBLIC_CHANNELS) {
+  const channels = normalizePublicChannelRegistry(registry).map((channel) => ({
+    id: channel.id,
+    subscribed: channel.id === DEFAULT_PUBLIC_CHANNEL_ID,
+  }));
+  const activeChannelId = channels.find((channel) => channel.subscribed)?.id ?? channels[0]?.id ?? DEFAULT_PUBLIC_CHANNEL_ID;
+  return {
+    version: PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION,
+    activeChannelId,
+    channels,
+  };
+}
+
+export function normalizePublicChannelSubscriptions(value, registry = DEFAULT_PUBLIC_CHANNELS) {
+  const defaults = createDefaultPublicChannelSubscriptions(registry);
+  if (!isObject(value) || value.version !== PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION) return defaults;
+
+  const storedById = new Map();
+  for (const item of Array.isArray(value.channels) ? value.channels : []) {
+    if (!isObject(item)) continue;
+    const id = nonEmptyString(item.id);
+    if (!id) continue;
+    storedById.set(id, {
+      id,
+      subscribed: item.subscribed === true,
+    });
+  }
+
+  const channels = normalizePublicChannelRegistry(registry).map((channel) => {
+    const stored = storedById.get(channel.id);
+    return {
+      id: channel.id,
+      subscribed: stored ? stored.subscribed : channel.id === DEFAULT_PUBLIC_CHANNEL_ID,
+    };
+  });
+
+  const activeCandidate = nonEmptyString(value.activeChannelId);
+  const activeChannelId = channels.some((channel) => channel.id === activeCandidate && channel.subscribed)
+    ? activeCandidate
+    : channels.find((channel) => channel.subscribed)?.id ?? defaults.activeChannelId;
+
+  return {
+    version: PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION,
+    activeChannelId,
+    channels,
+  };
+}
+
+export function subscribedPublicChannels(subscriptions, registry = DEFAULT_PUBLIC_CHANNELS) {
+  const normalized = normalizePublicChannelSubscriptions(subscriptions, registry);
+  const registryById = new Map(normalizePublicChannelRegistry(registry).map((channel) => [channel.id, channel]));
+  return normalized.channels
+    .filter((channel) => channel.subscribed)
+    .map((channel) => registryById.get(channel.id))
+    .filter(Boolean);
+}
+
+export function readPublicChannelSubscriptions(storage, registry = DEFAULT_PUBLIC_CHANNELS) {
+  if (!storage?.getItem) return createDefaultPublicChannelSubscriptions(registry);
+  try {
+    return normalizePublicChannelSubscriptions(JSON.parse(storage.getItem(PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY) ?? 'null'), registry);
+  } catch {
+    return createDefaultPublicChannelSubscriptions(registry);
+  }
+}
+
+export function writePublicChannelSubscriptions(storage, subscriptions) {
+  if (!storage?.setItem) return false;
+  try {
+    storage.setItem(PUBLIC_CHANNEL_SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function readPublicChannelFeedCache(storage) {
+  if (!storage?.getItem) return {};
+  try {
+    const parsed = JSON.parse(storage.getItem(PUBLIC_CHANNEL_FEED_CACHE_KEY) ?? '{}');
+    return isObject(parsed) ? stripStoredPublicFeedVerification(parsed) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function lightPublicFeedJson(value) {
+  return JSON.stringify(value, omitHeavyFeedMediaForPersist);
+}
+
+function omitHeavyFeedMediaForPersist(key, value) {
+  if (key === 'imageUrl' || key === 'avatarImageUrl' || key === 'url') return undefined;
+  if (key === 'boc') return undefined;
+  return value;
+}
+
+export function writePublicChannelFeedCache(storage, cache, { perChannelMax = null, onTrimmed = null } = {}) {
+  if (!storage?.setItem) return false;
+  const serialize = (value) => JSON.stringify(isObject(value) ? value : {}, omitHeavyFeedMediaForPersist);
+  const attempt = (value) => {
+    try {
+      storage.setItem(PUBLIC_CHANNEL_FEED_CACHE_KEY, serialize(value));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const postsOf = (record) => {
+    const feed = record?.feed ?? record;
+    return Array.isArray(feed?.posts) ? feed.posts : (Array.isArray(feed) ? feed : null);
+  };
+  const withPosts = (record, posts) => {
+    const feed = record?.feed ?? record;
+    if (Array.isArray(feed)) return posts;
+    const nextFeed = { ...feed, posts };
+    return record?.feed ? { ...record, feed: nextFeed } : nextFeed;
+  };
+  const timeOf = (post) => Date.parse(post?.createdAt ?? '') || 0;
+  const bounded = Number.isInteger(perChannelMax) && perChannelMax > 0
+    ? Object.fromEntries(Object.entries(isObject(cache) ? cache : {}).map(([channelId, record]) => {
+      const posts = postsOf(record);
+      if (!posts || posts.length <= perChannelMax) return [channelId, record];
+      const keep = new Set(posts.map((post, index) => ({ post, index, at: timeOf(post) }))
+        .sort((a, b) => b.at - a.at || b.index - a.index)
+        .slice(0, perChannelMax)
+        .map((entry) => entry.post));
+      return [channelId, withPosts(record, posts.filter((post) => keep.has(post)))];
+    }))
+    : cache;
+  if (attempt(bounded)) return true;
+  const dropOldestQuarter = (value) => {
+    const dated = [];
+    for (const [channelId, record] of Object.entries(value)) {
+      const posts = postsOf(record);
+      if (!posts) continue;
+      for (const post of posts) dated.push({ channelId, post, at: timeOf(post) });
+    }
+    if (dated.length === 0) return null;
+    dated.sort((a, b) => a.at - b.at);
+    const drop = Math.max(1, Math.floor(dated.length / 4));
+    const doomed = new Set(dated.slice(0, drop).map((entry) => entry.post));
+    const next = {};
+    for (const [channelId, record] of Object.entries(value)) {
+      const posts = postsOf(record);
+      if (!posts) continue;
+      const kept = posts.filter((post) => !doomed.has(post));
+      if (kept.length > 0) next[channelId] = withPosts(record, kept);
+    }
+    return next;
+  };
+
+  let trimmed = isObject(bounded) ? bounded : {};
+  for (let round = 0; round < 64; round += 1) {
+    trimmed = dropOldestQuarter(trimmed);
+    if (trimmed === null) return false;
+    if (attempt(trimmed)) {
+      const roomier = dropOldestQuarter(trimmed);
+      const kept = roomier !== null && attempt(roomier) ? roomier : trimmed;
+      if (typeof onTrimmed === 'function') onTrimmed(kept);
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeFeedPost(post) {
+  if (!isObject(post)) return null;
+  const id = nonEmptyString(post.id);
+  const text = nonEmptyString(post.text) ?? '';
+  const imageUrl = nonEmptyString(post.imageUrl);
+  const blocks = normalizeFeedBlocks(post.blocks);
+  if (!id || (!text && !imageUrl && blocks.length === 0)) return null;
+  return {
+    id,
+    entryId: nonEmptyString(post.entryId),
+    readEntryId: nonEmptyString(post.readEntryId),
+    hidden: post.hidden === true,
+    title: nonEmptyString(post.title),
+    text,
+    blocks,
+    imageUrl,
+    createdAt: nonEmptyString(post.createdAt),
+    author: nonEmptyString(post.author),
+    authorWallet: nonEmptyString(post.authorWallet ?? post.author_wallet),
+    profileVersion: Number.isSafeInteger(Number(post.profileVersion ?? post.profile_version))
+      ? Number(post.profileVersion ?? post.profile_version)
+      : 0,
+    avatarHash: nonEmptyString(post.avatarHash ?? post.avatar_hash),
+    avatarImageUrl: nonEmptyString(post.avatarImageUrl ?? post.avatar_image_url),
+    bodyHash: nonEmptyString(post.bodyHash),
+    entryUid: nonEmptyString(post.entryUid),
+    chainVerified: post.chainVerified === true,
+    publishStatus: nonEmptyString(post.publishStatus),
+    publishState: isObject(post.publishState) ? safeClone(post.publishState) : null,
+    commentsAllowed: post.commentsAllowed !== false,
+    comments: (Array.isArray(post.comments) ? post.comments : [])
+      .map(normalizeFeedComment)
+      .filter(Boolean),
+  };
+}
+
+function normalizeFeedComment(comment) {
+  if (!isObject(comment)) return null;
+  const id = nonEmptyString(comment.id);
+  const text = nonEmptyString(comment.text) ?? '';
+  const imageUrl = nonEmptyString(comment.imageUrl);
+  const blocks = normalizeFeedBlocks(comment.blocks);
+  if (!id || (!text && !imageUrl && blocks.length === 0)) return null;
+  return {
+    id,
+    entryId: nonEmptyString(comment.entryId),
+    readEntryId: nonEmptyString(comment.readEntryId),
+    parentEntryId: nonEmptyString(comment.parentEntryId),
+    parentHash: nonEmptyString(comment.parentHash),
+    text,
+    blocks,
+    imageUrl,
+    createdAt: nonEmptyString(comment.createdAt),
+    author: nonEmptyString(comment.author),
+    authorWallet: nonEmptyString(comment.authorWallet ?? comment.author_wallet),
+    profileVersion: Number.isSafeInteger(Number(comment.profileVersion ?? comment.profile_version))
+      ? Number(comment.profileVersion ?? comment.profile_version)
+      : 0,
+    avatarHash: nonEmptyString(comment.avatarHash ?? comment.avatar_hash),
+    avatarImageUrl: nonEmptyString(comment.avatarImageUrl ?? comment.avatar_image_url),
+    bodyHash: nonEmptyString(comment.bodyHash),
+    entryUid: nonEmptyString(comment.entryUid),
+    chainVerified: comment.chainVerified === true,
+    publishStatus: nonEmptyString(comment.publishStatus),
+    publishState: isObject(comment.publishState) ? safeClone(comment.publishState) : null,
+    hidden: comment.hidden === true,
+    partitionKey: nonEmptyString(comment.partitionKey),
+    epochTag: nonEmptyString(comment.epochTag),
+    threadShardSeq: Number.isSafeInteger(Number(comment.threadShardSeq)) ? Number(comment.threadShardSeq) : undefined,
+    generation: Number.isSafeInteger(Number(comment.generation)) ? Number(comment.generation) : undefined,
+    shardEntryId: nonEmptyString(comment.shardEntryId),
+  };
+}
+
+function normalizeFeedBlocks(blocks) {
+  if (!Array.isArray(blocks)) return [];
+  return blocks.map((block) => {
+    if (!isObject(block)) return null;
+    if (block.type === 'text') {
+      const text = nonEmptyString(block.text);
+      return text ? { type: 'text', text } : null;
+    }
+    if (block.type === 'image') {
+      const url = nonEmptyString(block.url);
+      return url ? { type: 'image', url } : null;
+    }
+    if (block.type === 'reply') {
+      const refEntryId = nonEmptyString(String(block.refEntryId ?? ''));
+      return refEntryId
+        ? { type: 'reply', refEntryId, author: String(block.author ?? ''), snippet: String(block.snippet ?? '') }
+        : null;
+    }
+    if (block.type === 'share') {
+      const entryId = nonEmptyString(String(block.entryId ?? ''));
+      const authorWallet = nonEmptyString(block.authorWallet);
+      return entryId && authorWallet
+        ? {
+          type: 'share',
+          entryId,
+          bodyHash: String(block.bodyHash ?? ''),
+          authorWallet,
+          author: String(block.author ?? ''),
+          title: String(block.title ?? ''),
+          snippet: String(block.snippet ?? ''),
+          hasImage: block.hasImage === true,
+          textTruncated: block.textTruncated === true,
+        }
+        : null;
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+function feedBlocksPreview(blocks) {
+  const text = (blocks ?? []).find((block) => block?.type === 'text' && nonEmptyString(block.text))?.text;
+  if (text) return text;
+  const imageCount = (blocks ?? []).filter((block) => block?.type === 'image').length;
+  if (imageCount > 0) return tPlural('chat.previewImages', imageCount);
+  if ((blocks ?? []).some((block) => block?.type === 'share')) return t('chat.previewSharedPost');
+  return null;
+}
+
+function publicChannelPreviewLine(latest) {
+  const title = nonEmptyString(latest?.title);
+  if (title) return messagePreviewText(title);
+  const fromBlocks = feedBlocksPreview(latest?.blocks);
+  if (fromBlocks) return messagePreviewText(fromBlocks);
+  const text = nonEmptyString(latest?.text);
+  if (text) return messagePreviewText(text);
+  return latest?.imageUrl ? t('chat.previewImage') : t('public.previewWaitingFeed');
+}
+
+function stripStoredPublicFeedVerification(cache) {
+  const cloned = safeClone(cache);
+  for (const record of Object.values(cloned)) {
+    const feed = record?.feed ?? record;
+    if (!Array.isArray(feed?.posts)) continue;
+    for (const post of feed.posts) {
+      post.chainVerified = false;
+      if (!Array.isArray(post.comments)) continue;
+      for (const comment of post.comments) comment.chainVerified = false;
+    }
+  }
+  return cloned;
+}
+
+export function normalizePublicChannelFeed(value, expectedChannelId) {
+  if (!isObject(value) || value.version !== 1) throw new Error('Unsupported public channel feed version');
+  const channelId = nonEmptyString(value.channelId);
+  if (!channelId) throw new Error('Public channel feed must include channelId');
+  if (expectedChannelId && channelId !== expectedChannelId) {
+    throw new Error('Public channel feed channel mismatch');
+  }
+  const posts = (Array.isArray(value.posts) ? value.posts : [])
+    .map(normalizeFeedPost)
+    .filter(Boolean);
+  return {
+    version: 1,
+    channelId,
+    updatedAt: nonEmptyString(value.updatedAt),
+    posts,
+  };
+}
+
+export function publicChannelThreadId(channelId) {
+  return `public:${channelId}`;
+}
+
+function shortTime(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function sortPublicFeedItemsByTime(items) {
+  const keyed = (items ?? []).map((item, index) => ({ item, index, at: Date.parse(String(item?.createdAt ?? '')) }));
+  const entryOf = (item) => { try { return BigInt(String(item?.entryId ?? '')); } catch { return null; } };
+  keyed.sort((a, b) => {
+    const ta = Number.isFinite(a.at) ? a.at : -Infinity;
+    const tb = Number.isFinite(b.at) ? b.at : -Infinity;
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    const ea = entryOf(a.item);
+    const eb = entryOf(b.item);
+    if (ea !== null && eb !== null && ea !== eb) return ea < eb ? -1 : 1;
+    return a.index - b.index;
+  });
+  return keyed.map((entry) => entry.item);
+}
+
+export function publicChannelFeedToThread(channel, feed) {
+  const normalizedChannel = normalizeRegistryChannel(channel);
+  if (!normalizedChannel) throw new Error('Invalid public channel');
+  const posts = feed?.posts ?? [];
+  const latest = posts[posts.length - 1] ?? null;
+  return {
+    id: publicChannelThreadId(normalizedChannel.id),
+    publicChannelId: normalizedChannel.id,
+    publicChannelAuthorWallet: normalizedChannel.authorWallet,
+    readOnly: true,
+    name: normalizedChannel.name,
+    avatar: normalizedChannel.avatar,
+    avatarImageUrl: latest?.avatarImageUrl,
+    subtitle: normalizedChannel.subtitle,
+    time: shortTime(latest?.createdAt) ?? 'public',
+    state: posts.length > 0 ? 'channel' : 'syncing',
+    preview: publicChannelPreviewLine(latest),
+    messages: posts.map((post) => ({
+      type: 'in',
+      text: post.title ? `${post.title}\n${post.text}` : (feedBlocksPreview(post.blocks) ?? post.text),
+      blocks: post.blocks,
+      meta: shortTime(post.createdAt) ?? '',
+      publicPostId: post.id,
+      publicCreatedAt: post.createdAt,
+      publicPostTitle: post.title,
+      publicPostText: post.text,
+      publicPostBlocks: post.blocks,
+      publicPostImageUrl: post.imageUrl,
+      publicAuthorWallet: post.authorWallet,
+      publicProfileVersion: post.profileVersion,
+      publicAvatarHash: post.avatarHash,
+      publicAvatarImageUrl: post.avatarImageUrl,
+      publicChannelId: normalizedChannel.id,
+      publicCreatedAt: post.createdAt ?? null,
+      publicEntryId: post.entryId,
+      publicReadEntryId: post.readEntryId,
+      publicBodyHash: post.bodyHash,
+      publicChainVerified: post.chainVerified === true,
+      publicHidden: post.hidden === true,
+      publicPublishStatus: post.publishStatus,
+      publicPublishState: post.publishState,
+      publicCommentsAllowed: post.commentsAllowed !== false,
+      publicComments: post.comments,
+      attachment: post.blocks?.length ? null : (post.imageUrl ? { type: 'image', url: post.imageUrl } : null),
+    })),
+  };
+}
+
+export function publicChannelsToThreads(channels, feedCache = {}) {
+  return (channels ?? []).map((channel) => {
+    let feed = null;
+    try {
+      const cached = feedCache?.[channel.id]?.feed ?? feedCache?.[channel.id] ?? null;
+      feed = cached ? normalizePublicChannelFeed(cached, channel.id) : null;
+    } catch {
+      feed = null;
+    }
+    return publicChannelFeedToThread(channel, feed);
+  });
+}
+
+export function publicChannelSubscriptionsToThreads(subscriptions, registry = DEFAULT_PUBLIC_CHANNELS, feedCache = {}) {
+  return publicChannelsToThreads(subscribedPublicChannels(subscriptions, registry), feedCache);
+}
+
+export function publicChannelThreadsToFeedItems(threads) {
+  const items = [];
+  for (const thread of threads ?? []) {
+    const messages = thread.messages ?? [];
+    if (messages.length === 0) continue;
+    for (const message of messages) {
+      items.push({
+        id: message.publicPostId,
+        createdAt: message.publicCreatedAt ?? null,
+        channelId: thread.publicChannelId,
+        entryId: message.publicEntryId,
+        readEntryId: message.publicReadEntryId,
+        bodyHash: message.publicBodyHash,
+        chainVerified: message.publicChainVerified === true,
+        hidden: message.publicHidden === true,
+        publishStatus: message.publicPublishStatus,
+        publishState: message.publicPublishState,
+        authorWallet: message.publicAuthorWallet,
+        profileVersion: message.publicProfileVersion,
+        avatarHash: message.publicAvatarHash,
+        avatarImageUrl: message.publicAvatarImageUrl,
+        commentsAllowed: message.publicCommentsAllowed !== false,
+        meta: [
+          thread.name,
+          message.meta,
+        ].filter(Boolean),
+        title: message.publicPostTitle ?? null,
+        text: feedBlocksPreview(message.publicPostBlocks) ?? message.publicPostText ?? message.text ?? thread.preview,
+        blocks: message.publicPostBlocks,
+        imageUrl: message.publicPostBlocks?.length ? null : (message.publicPostImageUrl ?? message.attachment?.url),
+        comments: message.publicComments ?? [],
+        compact: false,
+      });
+    }
+  }
+  return items.reverse();
+}
+
+export function clonePublicChannelSubscriptions(value) {
+  return safeClone(value);
+}
+
+export function normalizeChannelProfile(value) {
+  if (!isObject(value)) return null;
+  const description = typeof value.description === 'string' ? value.description : '';
+  const tags = (Array.isArray(value.tags) ? value.tags : [])
+    .map((tag) => nonEmptyString(tag))
+    .filter(Boolean)
+    .slice(0, 32);
+  const toInt = (n) => (Number.isSafeInteger(Number(n)) ? Number(n) : 0);
+  return {
+    description,
+    tags,
+    entryId: nonEmptyString(String(value.entryId ?? '')),
+    createdAtSec: toInt(value.createdAtSec ?? value.created_at_sec),
+    fetchedAt: toInt(value.fetchedAt),
+    ownerUsername: typeof value.ownerUsername === 'string' ? value.ownerUsername : '',
+    verifiedUsername: typeof value.verifiedUsername === 'string' ? value.verifiedUsername : '',
+    verifiedUsernameAt: toInt(value.verifiedUsernameAt),
+    appearance: normalizeProfileAppearanceRecord(value.appearance),
+    verifiedGift: normalizeVerifiedGiftRecord(value.verifiedGift),
+    wornGift: normalizeWornGiftAddress(value.wornGift),
+    groups: normalizeProfileGroupRecords(value.groups),
+    balanceCard: value.balanceCard === true,
+  };
+}
+
+function normalizeProfileGroupRecords(value) {
+  const out = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    const groupId = String(entry?.groupId ?? '').trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(groupId)) continue;
+    if (out.some((held) => held.groupId === groupId)) continue;
+    const keyHex = (value) => { const hex = String(value ?? '').trim().toLowerCase(); return /^[0-9a-f]{64}$/.test(hex) && !/^0{64}$/.test(hex) ? hex : null; };
+    const founder = keyHex(entry?.founder);
+    const owner = keyHex(entry?.owner);
+    out.push({ groupId, name: nonEmptyString(entry?.name) ?? '', ...(founder ? { founder } : {}), ...(owner ? { owner } : {}) });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+function normalizeWornGiftAddress(value) {
+  return rawAddressOrNull(value);
+}
+
+function normalizeProfileAppearanceRecord(value) {
+  if (!isObject(value)) return null;
+  const itemAddress = rawAddressOrNull(value.itemAddress);
+  if (value.kind === 'telegram-gift') return itemAddress ? { kind: 'telegram-gift', itemAddress } : null;
+  if (value.kind !== 'look') return null;
+  const theme = value.theme === 'light' ? 'light' : 'dark';
+  const background = ['none', 'plasma', 'nodes'].includes(value.background) ? value.background : null;
+  const settings = (Array.isArray(value.settings) ? value.settings : [])
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isSafeInteger(entry) && entry >= 0 && entry <= 65535)
+    .slice(0, 8);
+  return { kind: 'look', theme, background, settings, itemAddress };
+}
+
+function normalizeVerifiedGiftRecord(value) {
+  if (!isObject(value)) return null;
+  const itemAddress = String(value.itemAddress ?? '').trim().toLowerCase();
+  const slug = nonEmptyString(String(value.slug ?? ''));
+  const number = Number(value.number);
+  const verifiedAt = Number(value.verifiedAt);
+  if (!itemAddress || !slug || !Number.isSafeInteger(number) || number < 0) return null;
+  return { itemAddress, slug, number, verifiedAt: Number.isSafeInteger(verifiedAt) ? verifiedAt : 0 };
+}
+
+export function readPublicChannelProfileCache(storage) {
+  if (!storage?.getItem) return {};
+  try {
+    const parsed = JSON.parse(storage.getItem(PUBLIC_CHANNEL_PROFILE_CACHE_KEY) ?? '{}');
+    if (!isObject(parsed)) return {};
+    const out = {};
+    for (const [wallet, profile] of Object.entries(parsed)) {
+      const normalized = normalizeChannelProfile(profile);
+      if (normalized) out[wallet] = normalized;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function writePublicChannelProfileCache(storage, cache) {
+  if (!storage?.setItem) return false;
+  try {
+    storage.setItem(PUBLIC_CHANNEL_PROFILE_CACHE_KEY, JSON.stringify(isObject(cache) ? cache : {}));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+export const PREFS_SNAPSHOT_FORMAT = 2;
+const PREFS_CHUNK_HEADER_BYTES = 7;
+const PREFS_SECTION_HEADER_BYTES = 3;
+const PREFS_SECTION_CHANNELS = 1;
+const PREFS_SECTION_USERNAMES = 2;
+const PREFS_SECTION_LINKED = 3;
+const PREFS_CHANNEL_FOLLOWED = 0x01;
+const PREFS_CHANNEL_NAMED = 0x02;
+const PREFS_CHANNEL_MASTERCHAIN = 0x04;
+const PREFS_CHANNEL_FLAGS = PREFS_CHANNEL_FOLLOWED | PREFS_CHANNEL_NAMED | PREFS_CHANNEL_MASTERCHAIN;
+const PREFS_CHANNEL_FIXED_BYTES = 33;
+const PREFS_TEXT_MAX_BYTES = 255;
+const PREFS_USERNAMES_MAX_BYTES = 2048;
+const PREFS_JSON_FIRST_BYTE = 0x7b;
+
+function utf8Within(text, maxBytes = PREFS_TEXT_MAX_BYTES) {
+  const bytes = new TextEncoder().encode(String(text));
+  if (bytes.length <= maxBytes) return bytes;
+  let end = maxBytes;
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) end -= 1;
+  return bytes.slice(0, end);
+}
+
+function prefsChannelEntry(channel) {
+  const raw = rawAddressOrNull(channel?.w);
+  if (!raw) return null;
+  const [workchainText, hex] = raw.split(':');
+  const workchain = Number(workchainText);
+  if (workchain !== 0 && workchain !== -1) return null;
+  const nameText = nonEmptyString(channel?.name);
+  const name = nameText ? utf8Within(nameText) : null;
+  const named = Boolean(name && name.length > 0);
+  const entry = new Uint8Array(PREFS_CHANNEL_FIXED_BYTES + (named ? 1 + name.length : 0));
+  entry[0] = (channel.sub === true ? PREFS_CHANNEL_FOLLOWED : 0)
+    | (named ? PREFS_CHANNEL_NAMED : 0)
+    | (workchain === -1 ? PREFS_CHANNEL_MASTERCHAIN : 0);
+  for (let index = 0; index < 32; index += 1) entry[1 + index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
+  if (named) {
+    entry[PREFS_CHANNEL_FIXED_BYTES] = name.length;
+    entry.set(name, PREFS_CHANNEL_FIXED_BYTES + 1);
+  }
+  return entry;
+}
+
+function prefsSection(tag, payload) {
+  const out = new Uint8Array(PREFS_SECTION_HEADER_BYTES + payload.length);
+  out[0] = tag;
+  out[1] = (payload.length >> 8) & 0xff;
+  out[2] = payload.length & 0xff;
+  out.set(payload, PREFS_SECTION_HEADER_BYTES);
+  return out;
+}
+
+function concatBytes(parts) {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+export function encodePrefsSnapshotChunks(snapshot, { chunkBytes, maxChunks }) {
+  if (!Number.isInteger(chunkBytes) || chunkBytes <= PREFS_CHUNK_HEADER_BYTES + PREFS_SECTION_HEADER_BYTES || chunkBytes > 0xffff) {
+    throw new RangeError(`encodePrefsSnapshotChunks: chunkBytes must fit a u16 section, got ${chunkBytes}`);
+  }
+  if (!Number.isInteger(maxChunks) || maxChunks < 1 || maxChunks > 0xff) {
+    throw new RangeError(`encodePrefsSnapshotChunks: maxChunks must be in [1, 255], got ${maxChunks}`);
+  }
+  const writtenAt = Math.max(0, Math.min(0xffffffff, Math.floor(Number(snapshot?.writtenAt) || 0)));
+  const usernames = [];
+  let usernamesBytes = 0;
+  for (const label of snapshot?.usernames ?? []) {
+    const text = nonEmptyString(label);
+    if (!text) continue;
+    const bytes = utf8Within(text);
+    if (usernamesBytes + 1 + bytes.length > PREFS_USERNAMES_MAX_BYTES) break;
+    usernames.push(Uint8Array.of(bytes.length), bytes);
+    usernamesBytes += 1 + bytes.length;
+  }
+  const linkedText = nonEmptyString(snapshot?.linked);
+  const linked = linkedText ? utf8Within(linkedText) : null;
+  const headSections = [];
+  if (usernamesBytes > 0) headSections.push(prefsSection(PREFS_SECTION_USERNAMES, concatBytes(usernames)));
+  if (linked && linked.length > 0) headSections.push(prefsSection(PREFS_SECTION_LINKED, linked));
+  const headBytes = headSections.reduce((sum, section) => sum + section.length, 0);
+  const room = (index) => chunkBytes - PREFS_CHUNK_HEADER_BYTES - PREFS_SECTION_HEADER_BYTES - (index === 0 ? headBytes : 0);
+
+  const followed = [];
+  const markers = [];
+  let skipped = 0;
+  for (const channel of snapshot?.channels ?? []) {
+    const entry = prefsChannelEntry(channel);
+    if (!entry) { skipped += 1; continue; }
+    (channel.sub === true ? followed : markers).push(entry);
+  }
+  const lists = [[]];
+  const used = [0];
+  let followedOverflow = 0;
+  for (const entry of followed) {
+    let at = lists.length - 1;
+    if (used[at] + entry.length > room(at)) {
+      if (lists.length >= maxChunks || entry.length > room(lists.length)) { followedOverflow += 1; continue; }
+      lists.push([]);
+      used.push(0);
+      at += 1;
+    }
+    lists[at].push(entry);
+    used[at] += entry.length;
+  }
+  let markersDropped = 0;
+  for (const entry of markers) {
+    const at = lists.findIndex((_, index) => used[index] + entry.length <= room(index));
+    if (at < 0) { markersDropped += 1; continue; }
+    lists[at].push(entry);
+    used[at] += entry.length;
+  }
+  const chunkCount = lists.length;
+  const chunks = lists.map((entries, chunkIndex) => concatBytes([
+    Uint8Array.of(PREFS_SNAPSHOT_FORMAT, (writtenAt >>> 24) & 0xff, (writtenAt >>> 16) & 0xff, (writtenAt >>> 8) & 0xff, writtenAt & 0xff,
+      chunkIndex, chunkCount),
+    prefsSection(PREFS_SECTION_CHANNELS, concatBytes(entries)),
+    ...(chunkIndex === 0 ? headSections : []),
+  ]));
+  return { chunks, followedOverflow, markersDropped, skipped };
+}
+
+function decodePrefsSnapshotJson(data) {
+  let snapshot;
+  try { snapshot = JSON.parse(new TextDecoder().decode(data)); } catch { return null; }
+  if (!isObject(snapshot) || snapshot.v !== 1 || !Array.isArray(snapshot.channels)) return null;
+  const channels = [];
+  for (const channel of snapshot.channels) {
+    if (!isObject(channel)) continue;
+    const id = nonEmptyString(channel.id);
+    const w = nonEmptyString(channel.w);
+    if (!id && !w) continue;
+    channels.push({ id, w, sub: channel.sub === true, name: nonEmptyString(channel.name) });
+  }
+  return {
+    version: 1,
+    writtenAt: Math.max(0, Math.floor(Number(snapshot.writtenAt) || 0)),
+    chunkIndex: 0,
+    chunkCount: 1,
+    channels,
+    usernames: (Array.isArray(snapshot.usernames) ? snapshot.usernames : []).filter((label) => typeof label === 'string'),
+    linked: typeof snapshot.linked === 'string' ? snapshot.linked : null,
+  };
+}
+
+export function decodePrefsSnapshotChunk(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
+  if (data.length === 0) return null;
+  if (data[0] === PREFS_JSON_FIRST_BYTE) return decodePrefsSnapshotJson(data);
+  if (data[0] !== PREFS_SNAPSHOT_FORMAT || data.length < PREFS_CHUNK_HEADER_BYTES) return null;
+  const writtenAt = (data[1] * 0x1000000) + (data[2] << 16) + (data[3] << 8) + data[4];
+  const chunkIndex = data[5];
+  const chunkCount = data[6];
+  if (chunkCount === 0 || chunkIndex >= chunkCount) return null;
+  const decoder = new TextDecoder();
+  const channels = [];
+  const usernames = [];
+  let linked = null;
+  let offset = PREFS_CHUNK_HEADER_BYTES;
+  while (offset < data.length) {
+    if (offset + PREFS_SECTION_HEADER_BYTES > data.length) return null;
+    const tag = data[offset];
+    const end = offset + PREFS_SECTION_HEADER_BYTES + ((data[offset + 1] << 8) | data[offset + 2]);
+    if (end > data.length) return null;
+    let at = offset + PREFS_SECTION_HEADER_BYTES;
+    if (tag === PREFS_SECTION_CHANNELS) {
+      while (at < end) {
+        const flags = data[at];
+        if ((flags & ~PREFS_CHANNEL_FLAGS) !== 0 || at + PREFS_CHANNEL_FIXED_BYTES > end) return null;
+        let hex = '';
+        for (let index = 1; index <= 32; index += 1) hex += data[at + index].toString(16).padStart(2, '0');
+        const w = `${(flags & PREFS_CHANNEL_MASTERCHAIN) !== 0 ? -1 : 0}:${hex}`;
+        at += PREFS_CHANNEL_FIXED_BYTES;
+        let name = null;
+        if ((flags & PREFS_CHANNEL_NAMED) !== 0) {
+          if (at >= end || at + 1 + data[at] > end) return null;
+          name = decoder.decode(data.subarray(at + 1, at + 1 + data[at])) || null;
+          at += 1 + data[at];
+        }
+        channels.push({ id: `wallet:${w}`, w, sub: (flags & PREFS_CHANNEL_FOLLOWED) !== 0, name });
+      }
+    } else if (tag === PREFS_SECTION_USERNAMES) {
+      while (at < end) {
+        if (at + 1 + data[at] > end) return null;
+        usernames.push(decoder.decode(data.subarray(at + 1, at + 1 + data[at])));
+        at += 1 + data[at];
+      }
+    } else if (tag === PREFS_SECTION_LINKED) {
+      linked = decoder.decode(data.subarray(at, end)) || null;
+    }
+    offset = end;
+  }
+  return { version: PREFS_SNAPSHOT_FORMAT, writtenAt, chunkIndex, chunkCount, channels, usernames, linked };
+}
+
+export function mergePrefsSnapshotChunks(chunks) {
+  const decoded = new Map();
+  for (const chunk of chunks ?? []) {
+    const part = decodePrefsSnapshotChunk(chunk?.bytes);
+    if (part && part.chunkIndex === Number(chunk?.chunkIndex)) decoded.set(part.chunkIndex, part);
+  }
+  const head = decoded.get(0);
+  if (!head) return null;
+  const parts = [...decoded.values()]
+    .filter((part) => part.chunkIndex < head.chunkCount)
+    .sort((a, b) => (b.writtenAt - a.writtenAt) || (a.chunkIndex - b.chunkIndex));
+  const byWallet = new Map();
+  for (const part of parts) {
+    for (const channel of part.channels) {
+      const key = rawAddressOrNull(channel.w) ?? channel.w ?? `id:${channel.id}`;
+      if (!byWallet.has(key)) byWallet.set(key, channel);
+    }
+  }
+  return {
+    v: head.version,
+    writtenAt: head.writtenAt,
+    channels: [...byWallet.values()],
+    usernames: head.usernames,
+    linked: head.linked,
+    chunkCount: head.chunkCount,
+    chunksRead: parts.length,
+  };
+}
+

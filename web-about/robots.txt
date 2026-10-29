@@ -1,0 +1,6 @@
+# Platho — about.platho.app
+# Static informational site. Everything is public and crawlable.
+User-agent: *
+Allow: /
+
+Sitemap: https://about.platho.app/sitemap.xml

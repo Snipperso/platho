@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en" translate="no">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#0a0f12" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#e9f0ee" media="(prefers-color-scheme: light)">
+    <meta name="color-scheme" content="dark light">
+    <meta name="google" content="notranslate">
+    <title>Platho</title>
+    <link rel="manifest" href="/manifest.webmanifest?v=3">
+    <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="/assets/platho-icon-192.png?v=3">
+    <link rel="stylesheet" href="/styles.css?v=610">
+    <script src="/boot-guard.js?v=17"></script>
+  </head>
+  <body>
+    <div class="app-shell" data-view="wallet">
+      <aside class="sidebar" aria-label="Navigation" data-i18n-aria-label="nav.navigation">
+        <div class="brand" data-brand-gift="false">
+          <button class="brand-mark-button" id="brandProfileButton" type="button" aria-label="Profile" title="Profile" aria-haspopup="dialog" data-i18n-aria-label="profileCard.open" data-i18n-title="profileCard.open">
+            <img class="brand-mark" id="brandMarkImage" src="/assets/platho-icon-192.png?v=3" alt="" width="58" height="58">
+            <canvas class="brand-mark" id="brandMarkMotion" width="58" height="58" aria-hidden="true" hidden></canvas>
+          </button>
+          <div class="brand-meta" id="brandMeta">
+            <div class="brand-name">Platho</div>
+            <div class="network-pill" id="brandNetworkPill">
+              <span class="status-dot"></span>
+              <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
+              <span class="app-version-label" id="appVersionLabel">1.5.23</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="rail" aria-label="Primary" data-i18n-aria-label="nav.primary">
+          <button class="rail-item rail-item-wallet is-active" type="button" data-tab="wallet" aria-label="Wallet" title="Wallet" data-i18n-aria-label="common.wallet" data-i18n-title="common.wallet">
+            <span class="rail-vault-balance is-pending" aria-hidden="true" data-nav-vault-balance>
+              <span data-i18n="nav.balance">Balance</span>
+              <strong data-nav-vault-ton>0 GRAM</strong>
+              <strong data-nav-vault-ath>0 ATH</strong>
+            </span>
+            <span class="rail-item-wallet-face">
+              <span class="icon icon-wallet"></span>
+              <span data-i18n="common.wallet">Wallet</span>
+            </span>
+          </button>
+          <button class="rail-item" type="button" data-tab="public" aria-label="Public" title="Public" data-i18n-aria-label="nav.public" data-i18n-title="nav.public">
+            <span class="icon icon-broadcast"></span>
+            <span data-i18n="nav.public">Public</span>
+          </button>
+          <button class="rail-item" type="button" data-tab="chats" aria-label="Private" title="Private" data-i18n-aria-label="nav.private" data-i18n-title="nav.private">
+            <span class="icon icon-chat"></span>
+            <span data-i18n="nav.private">Private</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <section class="public-nav-pane" aria-label="Public" data-i18n-aria-label="nav.public">
+          <header class="pane-header">
+            <div class="pane-title-block">
+              <h1>Platho.app</h1>
+              <p data-i18n="public.channels">Public channels</p>
+            </div>
+          </header>
+          <div class="public-tabs public-nav-tabs" id="publicNavTabs" role="tablist" aria-label="Public" data-i18n-aria-label="public.tabsLabel">
+            <button class="public-tab" type="button" role="tab" id="publicNavTabFollowing" data-public-tab="following" aria-controls="publicFeed" aria-selected="true" data-i18n="public.tabFollowing">Following</button>
+            <button class="public-tab" type="button" role="tab" id="publicNavTabAll" data-public-tab="all" aria-controls="publicDiscovery" aria-selected="false" tabindex="-1" data-i18n="public.tabAll">All</button>
+          </div>
+          <div class="public-nav-groups">
+            <div class="private-list-actions public-tab-actions">
+              <button class="discovery-cta-action" id="publicNavNewGroupButton" type="button" data-i18n="group.createAction">New group</button>
+            </div>
+            <div class="thread-list public-groups-list" id="publicNavGroupsList"></div>
+          </div>
+        </section>
+
+        <section class="content-pane public-pane view-panel" data-panel="public" data-public-tab="following" aria-label="Public feed" data-i18n-aria-label="public.feed">
+          <header class="pane-header inline">
+            <div class="pane-title-block">
+              <h1>Platho.app</h1>
+              <p id="publicSubtitle" data-i18n="public.channels">Public channels</p>
+              <h1 class="public-section-heading" id="publicSectionHeading" data-i18n="public.tabFollowing">Following</h1>
+            </div>
+          </header>
+          <div class="public-header-actions">
+            <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
+              <span class="icon icon-open-app"></span>
+            </button>
+            <button class="icon-button edit-channel-profile-button" id="editChannelProfileButton" type="button" hidden aria-label="Edit channel description" title="Edit channel description" data-i18n-aria-label="public.editChannelDescription" data-i18n-title="public.editChannelDescription">
+              <span class="icon icon-about"></span>
+            </button>
+            <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
+              <span class="icon icon-info"></span>
+            </button>
+            <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
+          </div>
+          <div class="public-tabs" id="publicTabs" role="tablist" aria-label="Public" data-i18n-aria-label="public.tabsLabel">
+            <button class="public-tab" type="button" role="tab" id="publicTabFollowing" data-public-tab="following" aria-controls="publicFeed" aria-selected="true" data-i18n="public.tabFollowing">Following</button>
+            <button class="public-tab" type="button" role="tab" id="publicTabAll" data-public-tab="all" aria-controls="publicDiscovery" aria-selected="false" tabindex="-1" data-i18n="public.tabAll">All</button>
+            <button class="public-tab" type="button" role="tab" id="publicTabGroups" data-public-tab="groups" aria-controls="publicGroups" aria-selected="false" tabindex="-1" data-i18n="public.tabGroups">Groups</button>
+          </div>
+          <div class="search-row has-action public-channel-search-row" id="publicChannelSearchRow">
+            <span class="icon icon-search"></span>
+            <input id="publicChannelSearch" type="search" placeholder="Search public" autocomplete="off" data-i18n-placeholder="public.searchPublic">
+            <button class="discovery-cta-action search-row-action" id="publicAddChannelButton" type="button">
+              <span class="icon icon-plus" aria-hidden="true"></span>
+              <span class="search-row-action-label" data-i18n="public.discoverCtaAddAction">Add channel</span>
+            </button>
+          </div>
+          <div class="public-moderation-notice" id="moderationNotice" hidden></div>
+          <div class="public-feed" id="publicFeed" role="tabpanel" aria-labelledby="publicTabFollowing"></div>
+          <button class="public-jump-down-button" id="publicJumpDownButton" type="button" aria-label="Jump to newest public posts" title="Jump to newest public posts" hidden data-i18n-aria-label="public.jumpToNewest" data-i18n-title="public.jumpToNewest">
+            <span class="icon icon-up"></span>
+          </button>
+          <div class="public-discovery" id="publicDiscovery" role="tabpanel" aria-labelledby="publicTabAll" hidden>
+            <div class="search-row has-action discovery-search-row" id="publicDiscoverySearchRow">
+              <span class="icon icon-search"></span>
+              <input id="publicDiscoverySearch" type="search" placeholder="Search posts" autocomplete="off" data-i18n-placeholder="public.discoverSearchPlaceholder">
+              <button class="discovery-cta-action search-row-action" id="publicAllAddChannelButton" type="button">
+                <span class="icon icon-plus" aria-hidden="true"></span>
+                <span class="search-row-action-label" data-i18n="public.discoverCtaAddAction">Add channel</span>
+              </button>
+            </div>
+            <div class="public-feed public-all-feed" id="publicAllFeed" data-public-mode="feed"></div>
+          </div>
+          <div class="public-groups" id="publicGroups" role="tabpanel" aria-labelledby="publicTabGroups" hidden>
+            <div class="private-list-actions public-tab-actions">
+              <button class="discovery-cta-action" id="publicNewGroupButton" type="button" data-i18n="group.createAction">New group</button>
+            </div>
+            <div class="thread-list public-groups-list" id="publicGroupsList"></div>
+          </div>
+          <div class="public-groups-placeholder">
+            <p data-i18n="public.groupsPick">A group you open appears here.</p>
+          </div>
+          <div class="public-channel-view" id="publicChannelView" hidden>
+            <header class="conversation-header public-post-detail-header">
+              <button class="icon-button chat-back-button" id="publicChannelViewBackButton" type="button" aria-label="Back to public feed" title="Back to public feed" data-i18n-aria-label="public.backToFeed" data-i18n-title="public.backToFeed">
+                <span class="icon icon-back"></span>
+              </button>
+              <div class="avatar" id="publicChannelViewAvatar" aria-hidden="true">P</div>
+              <div class="conversation-title public-channel-profile-door" id="publicChannelViewProfileDoor">
+                <h2 id="publicChannelViewTitle" data-i18n="public.channel">Channel</h2>
+                <p id="publicChannelViewSubtitle" data-i18n="public.channelPosts">Channel posts</p>
+              </div>
+              <div class="header-actions">
+                <button class="icon-button public-channel-share-button" id="publicChannelViewShareButton" type="button" aria-label="Share" title="Share" data-i18n-aria-label="public.shareChannel" data-i18n-title="public.shareChannel" hidden>
+                  <span class="icon icon-share"></span>
+                </button>
+                <button class="icon-button public-channel-follow-button" id="publicChannelViewFollowButton" type="button" aria-label="Follow" title="Follow this channel" hidden>
+                  <span class="icon icon-bell-plus"></span>
+                </button>
+                <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
+                  <span class="icon icon-info"></span>
+                </button>
+                <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
+              </div>
+            </header>
+            <div class="public-channel-view-body" id="publicChannelViewBody"></div>
+          </div>
+          <div class="public-post-detail" id="publicPostDetail" hidden>
+            <header class="conversation-header public-post-detail-header">
+              <button class="icon-button chat-back-button" id="publicPostBackButton" type="button" aria-label="Back to public feed" title="Back to public feed" data-i18n-aria-label="public.backToFeed" data-i18n-title="public.backToFeed">
+                <span class="icon icon-back"></span>
+              </button>
+              <div class="avatar" id="publicPostDetailAvatar" aria-hidden="true">P</div>
+              <div class="conversation-title">
+                <h2 id="publicPostDetailTitle" data-i18n="public.post">Post</h2>
+                <p id="publicPostDetailSubtitle" data-i18n="public.publicPost">Public post</p>
+              </div>
+              <div class="header-actions">
+                <button class="icon-button identity-menu-button" id="publicPostAuthorIdentityButton" type="button" aria-label="Choose display name" title="Choose display name" aria-haspopup="menu" aria-expanded="false" hidden data-i18n-aria-label="chat.chooseDisplayName" data-i18n-title="chat.chooseDisplayName">
+                  <span class="icon icon-chevron-down"></span>
+                </button>
+                <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
+                  <span class="icon icon-open-app"></span>
+                </button>
+                <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
+                  <span class="icon icon-info"></span>
+                </button>
+                <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
+              </div>
+            </header>
+            <div class="public-post-detail-body" id="publicPostDetailBody"></div>
+          </div>
+          <form class="composer public-composer" id="publicComposer">
+            <div class="composer-context" id="publicCommentContext" hidden>
+              <span id="publicCommentContextText" data-i18n="public.commenting">Commenting</span>
+              <button type="button" id="publicCancelCommentButton" data-i18n="common.cancel">Cancel</button>
+            </div>
+            <div class="composer-context" id="publicShareContext" hidden>
+              <span id="publicShareContextText" data-i18n="composer.sharingPost">Sharing post</span>
+              <button type="button" id="publicShareCancelButton" data-i18n="common.cancel">Cancel</button>
+            </div>
+            <div class="composer-toolbar" id="publicComposerToolbar" role="toolbar" aria-label="Formatting" data-i18n-aria-label="composer.formatBar">
+              <div class="composer-toolbar-scroll">
+                <button class="composer-toolbar-button emoji-button" id="publicEmojiButton" type="button" aria-label="Emoji" title="Emoji" aria-haspopup="true" aria-expanded="false" data-i18n-aria-label="composer.emoji" data-i18n-title="composer.emoji"><span class="icon icon-smiley" aria-hidden="true"></span></button>
+                <button class="composer-toolbar-button" data-format="select" type="button" aria-label="Select word" title="Select word" data-i18n-aria-label="composer.selectWord" data-i18n-title="composer.selectWord"><span class="icon icon-text-select"></span></button>
+                <span class="composer-toolbar-sep" aria-hidden="true"></span>
+                <button class="composer-toolbar-button" data-format="heading" type="button" aria-label="Heading" title="Heading" data-i18n-aria-label="composer.formatHeading" data-i18n-title="composer.formatHeading"><span class="icon icon-heading"></span></button>
+                <button class="composer-toolbar-button" data-format="bold" type="button" aria-label="Bold" title="Bold" data-i18n-aria-label="composer.formatBold" data-i18n-title="composer.formatBold"><span class="icon icon-bold"></span></button>
+                <button class="composer-toolbar-button" data-format="italic" type="button" aria-label="Italic" title="Italic" data-i18n-aria-label="composer.formatItalic" data-i18n-title="composer.formatItalic"><span class="icon icon-italic"></span></button>
+                <span class="composer-toolbar-sep" aria-hidden="true"></span>
+                <button class="composer-toolbar-button link-button" id="publicLinkButton" type="button" aria-label="Insert link" title="Insert link" data-i18n-aria-label="composer.insertLink" data-i18n-title="composer.insertLink"><span class="icon icon-link"></span></button>
+                <button class="composer-toolbar-button attachment-button" id="publicImageButton" type="button" aria-label="Attach image" title="Attach image" data-i18n-aria-label="composer.attachImage" data-i18n-title="composer.attachImage"><span class="icon icon-image"></span></button>
+                <button class="composer-toolbar-button public-file-button" id="publicFileButton" type="button" aria-label="Attach file" title="Attach file (up to ~250 KB)" data-i18n-aria-label="composer.attachFile" data-i18n-title="composer.attachFileLimit"><span class="icon icon-download"></span></button>
+              </div>
+              <button class="composer-toolbar-maximize" id="publicToolbarMaximize" type="button" aria-pressed="false" aria-label="Maximize composer" title="Maximize composer" data-i18n-aria-label="composer.maximize" data-i18n-title="composer.maximize"><span class="icon icon-expand"></span></button>
+              <button class="composer-toolbar-dock" id="publicToolbarDock" type="button" aria-label="Move formatting bar up or down" title="Move formatting bar up or down" data-i18n-aria-label="composer.dockToolbar" data-i18n-title="composer.dockToolbar"><span class="icon icon-swap-vertical"></span></button>
+              <button class="composer-toolbar-hide" id="publicToolbarHide" type="button" aria-label="Hide formatting bar" title="Hide formatting bar" data-i18n-aria-label="composer.hideFormatBar" data-i18n-title="composer.hideFormatBar"><span class="icon icon-chevron-down"></span></button>
+            </div>
+            <input id="publicImageInput" type="file" accept="image/*" hidden>
+            <input id="publicFileInput" type="file" hidden>
+            <div class="composer-input-row">
+              <label class="composer-post-option" id="publicPostCommentsToggle" aria-label="Allow comments" title="Allow comments" data-i18n-aria-label="public.allowComments" data-i18n-title="public.allowComments">
+                <input id="publicComposerCommentsCheckbox" type="checkbox" checked>
+                <span class="icon icon-chat" aria-hidden="true"></span>
+                <span class="sr-only" data-i18n="public.allowComments">Allow comments</span>
+              </label>
+              <label class="sr-only" for="publicMessageInput" data-i18n="public.publicMessage">Public message</label>
+              <div id="publicMessageInput" class="composer-input is-empty" contenteditable="true" role="textbox" aria-multiline="true" tabindex="0" autocapitalize="sentences" placeholder="Public message" data-i18n-placeholder="composer.publicMessage"></div>
+              <button class="send-button" type="submit" aria-label="Publish" title="Publish" data-i18n-aria-label="public.publish" data-i18n-title="public.publish">
+                <span class="icon icon-bolt"></span>
+              </button>
+            </div>
+            <div class="composer-attachment" id="publicAttachmentPanel" hidden>
+              <span id="publicAttachmentLabel" data-i18n="composer.noImage">No image</span>
+              <select id="publicImageModeSelect" aria-label="Image compression" data-i18n-aria-label="composer.imageCompression">
+                <option value="low" data-i18n="composer.imageLow">Low 8 KiB</option>
+                <option value="medium" data-i18n="composer.imageMedium">Medium 16 KiB</option>
+                <option value="good" selected data-i18n="composer.imageGood">Good 32 KiB</option>
+                <option value="maximum" data-i18n="composer.imageMaximum">Maximum 64 KiB</option>
+              </select>
+              <button id="publicClearImageButton" type="button" data-i18n="common.remove">Remove</button>
+            </div>
+            <div class="composer-attachment composer-file-panel" id="publicFilePanel" hidden>
+              <span id="publicFileLabel" data-i18n="composer.noFiles">No files</span>
+              <button id="publicClearFilesButton" type="button" data-i18n="common.remove">Remove</button>
+            </div>
+            <div class="composer-cost-status" id="publicComposerCostStatus" data-i18n="composer.walletRequired">Wallet required</div>
+          </form>
+        </section>
+
+        <section class="list-pane view-panel" data-panel="chats" aria-label="Private" data-i18n-aria-label="nav.private">
+          <header class="pane-header">
+            <div class="pane-title-block">
+              <h1>Platho.app</h1>
+              <p id="chatCountLabel" data-i18n="chat.privateChats">Private chats</p>
+            </div>
+            <div class="header-actions">
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
+                <span class="icon icon-open-app"></span>
+              </button>
+              <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
+                <span class="icon icon-info"></span>
+              </button>
+              <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
+            </div>
+          </header>
+
+          <div class="search-row">
+            <span class="icon icon-search"></span>
+            <input id="threadSearch" type="search" placeholder="Search private" autocomplete="off" data-i18n-placeholder="chat.searchPrivate">
+          </div>
+
+          <div class="thread-list" id="threadList" role="group"></div>
+        </section>
+
+        <section class="content-pane chat-pane view-panel" data-panel="chats" aria-label="Conversation" data-i18n-aria-label="chat.conversation">
+          <header class="conversation-header">
+            <button class="icon-button chat-back-button" id="backToChatsButton" type="button" aria-label="Back to private" title="Back to private" data-i18n-aria-label="chat.backToPrivate" data-i18n-title="chat.backToPrivate">
+              <span class="icon icon-back"></span>
+            </button>
+            <div class="avatar" id="activeAvatar" aria-hidden="true">P</div>
+            <div class="conversation-title">
+              <h2 id="activeTitle" data-i18n="chat.noPrivateChat">No private chat</h2>
+              <p id="activeSubtitle" data-i18n="chat.createOrChooseChat">Create or choose a chat</p>
+            </div>
+            <div class="header-actions">
+              <button class="icon-button identity-menu-button" id="identityMenuButton" type="button" aria-label="Choose display name" title="Choose display name" aria-haspopup="menu" aria-expanded="false" data-i18n-aria-label="chat.chooseDisplayName" data-i18n-title="chat.chooseDisplayName">
+                <span class="icon icon-chevron-down"></span>
+              </button>
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
+                <span class="icon icon-open-app"></span>
+              </button>
+              <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
+                <span class="icon icon-info"></span>
+              </button>
+              <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
+            </div>
+          </header>
+
+          <div class="message-strip" id="messageStrip"></div>
+
+          <form class="composer" id="composer">
+            <div class="composer-context composer-reply-context" id="privateReplyContext" hidden>
+              <span id="privateReplyContextText" data-i18n="composer.replying">Replying</span>
+              <button type="button" id="privateReplyCancelButton" data-i18n="common.cancel">Cancel</button>
+            </div>
+            <div class="composer-context composer-reply-context" id="privateShareContext" hidden>
+              <span id="privateShareContextText" data-i18n="composer.sharingPost">Sharing post</span>
+              <button type="button" id="privateShareCancelButton" data-i18n="common.cancel">Cancel</button>
+            </div>
+            <div class="composer-toolbar" id="privateComposerToolbar" role="toolbar" aria-label="Formatting" data-i18n-aria-label="composer.formatBar">
+              <div class="composer-toolbar-scroll">
+                <button class="composer-toolbar-button emoji-button" id="privateEmojiButton" type="button" aria-label="Emoji" title="Emoji" aria-haspopup="true" aria-expanded="false" data-i18n-aria-label="composer.emoji" data-i18n-title="composer.emoji"><span class="icon icon-smiley" aria-hidden="true"></span></button>
+                <button class="composer-toolbar-button" data-format="select" type="button" aria-label="Select word" title="Select word" data-i18n-aria-label="composer.selectWord" data-i18n-title="composer.selectWord"><span class="icon icon-text-select"></span></button>
+                <span class="composer-toolbar-sep" aria-hidden="true"></span>
+                <button class="composer-toolbar-button" data-format="heading" type="button" aria-label="Heading" title="Heading" data-i18n-aria-label="composer.formatHeading" data-i18n-title="composer.formatHeading"><span class="icon icon-heading"></span></button>
+                <button class="composer-toolbar-button" data-format="bold" type="button" aria-label="Bold" title="Bold" data-i18n-aria-label="composer.formatBold" data-i18n-title="composer.formatBold"><span class="icon icon-bold"></span></button>
+                <button class="composer-toolbar-button" data-format="italic" type="button" aria-label="Italic" title="Italic" data-i18n-aria-label="composer.formatItalic" data-i18n-title="composer.formatItalic"><span class="icon icon-italic"></span></button>
+                <span class="composer-toolbar-sep" aria-hidden="true"></span>
+                <button class="composer-toolbar-button link-button" id="privateLinkButton" type="button" aria-label="Insert link" title="Insert link" data-i18n-aria-label="composer.insertLink" data-i18n-title="composer.insertLink"><span class="icon icon-link"></span></button>
+                <button class="composer-toolbar-button attachment-button" id="privateImageButton" type="button" aria-label="Attach image" title="Attach image" data-i18n-aria-label="composer.attachImage" data-i18n-title="composer.attachImage"><span class="icon icon-image"></span></button>
+                <button class="composer-toolbar-button private-file-button" id="privateFileButton" type="button" aria-label="Attach file" title="Attach file (up to ~250 KB)" data-i18n-aria-label="composer.attachFile" data-i18n-title="composer.attachFileLimit"><span class="icon icon-download"></span></button>
+              </div>
+              <button class="composer-toolbar-maximize" id="privateToolbarMaximize" type="button" aria-pressed="false" aria-label="Maximize composer" title="Maximize composer" data-i18n-aria-label="composer.maximize" data-i18n-title="composer.maximize"><span class="icon icon-expand"></span></button>
+              <button class="composer-toolbar-dock" id="privateToolbarDock" type="button" aria-label="Move formatting bar up or down" title="Move formatting bar up or down" data-i18n-aria-label="composer.dockToolbar" data-i18n-title="composer.dockToolbar"><span class="icon icon-swap-vertical"></span></button>
+              <button class="composer-toolbar-hide" id="privateToolbarHide" type="button" aria-label="Hide formatting bar" title="Hide formatting bar" data-i18n-aria-label="composer.hideFormatBar" data-i18n-title="composer.hideFormatBar"><span class="icon icon-chevron-down"></span></button>
+            </div>
+            <input id="privateImageInput" type="file" accept="image/*" hidden>
+            <input id="privateFileInput" type="file" hidden>
+            <div class="composer-input-row">
+              <button class="icon-button private-anonymous-button" id="privateAnonymousButton" type="button" aria-label="Send pseudonymously without wallet address" title="Pseudonymous: wallet address hidden, sender key may still link messages" aria-pressed="false" data-i18n-aria-label="composer.sendPseudonymously" data-i18n-title="composer.pseudonymousHint">
+                <span class="icon icon-eye-off"></span>
+              </button>
+              <label class="sr-only" for="messageInput" data-i18n="composer.message">Message</label>
+              <div id="messageInput" class="composer-input is-empty" contenteditable="true" role="textbox" aria-multiline="true" tabindex="0" autocapitalize="sentences" placeholder="Wallet required" data-i18n-placeholder="composer.walletRequired"></div>
+              <button class="send-button" type="submit" aria-label="Send" title="Send" data-i18n-aria-label="composer.send" data-i18n-title="composer.send">
+                <span class="icon icon-bolt"></span>
+              </button>
+            </div>
+            <div class="composer-attachment" id="privateAttachmentPanel" hidden>
+              <span id="privateAttachmentLabel" data-i18n="composer.noImage">No image</span>
+              <select id="privateImageModeSelect" aria-label="Image compression" data-i18n-aria-label="composer.imageCompression">
+                <option value="low" data-i18n="composer.imageLow">Low 8 KiB</option>
+                <option value="medium" data-i18n="composer.imageMedium">Medium 16 KiB</option>
+                <option value="good" selected data-i18n="composer.imageGood">Good 32 KiB</option>
+                <option value="maximum" data-i18n="composer.imageMaximum">Maximum 64 KiB</option>
+              </select>
+              <button id="privateClearImageButton" type="button" data-i18n="common.remove">Remove</button>
+            </div>
+            <div class="composer-attachment composer-file-panel" id="privateFilePanel" hidden>
+              <span id="privateFileLabel" data-i18n="composer.noFiles">No files</span>
+              <button id="privateClearFilesButton" type="button" data-i18n="common.remove">Remove</button>
+            </div>
+            <div class="composer-cost-status" id="privateComposerCostStatus" data-i18n="composer.walletRequired">Wallet required</div>
+          </form>
+        </section>
+
+        <section class="content-pane wallet-pane view-panel is-active" data-panel="wallet" aria-label="Wallet" data-i18n-aria-label="common.wallet">
+          <header class="pane-header inline">
+            <div class="pane-title-block">
+              <h1>Platho.app</h1>
+              <p id="walletSubtitle" data-i18n="common.wallet">Wallet</p>
+            </div>
+            <div class="header-actions">
+              <button class="icon-button install-header-button" type="button" aria-label="Open or install Platho" title="Open or install Platho" data-i18n-aria-label="install.openOrInstall" data-i18n-title="install.openOrInstall">
+                <span class="icon icon-open-app"></span>
+              </button>
+              <button class="icon-button docs-header-button" type="button" aria-label="Documents" title="Documents" data-i18n-aria-label="docs.documents" data-i18n-title="docs.documents">
+                <span class="icon icon-info"></span>
+              </button>
+              <button type="button" class="global-sync-indicator" data-syncing="false" aria-label="Synced - tap to sync now" title="Synced - tap to sync now" data-i18n-aria-label="sync.syncNow" data-i18n-title="sync.syncNow"></button>
+            </div>
+          </header>
+
+          <div class="wallet-scroll-content">
+            <div class="wallet-card-stage" id="walletCardStage" hidden>
+              <article class="wallet-card" id="walletCard" aria-label="Wallet" data-i18n-aria-label="common.wallet">
+                <span class="wallet-card-surface" aria-hidden="true"><span class="wallet-card-pattern"></span><span class="wallet-card-glare"></span></span>
+                <img class="wallet-card-gift" id="walletCardGift" alt="" hidden>
+                <canvas class="wallet-card-gift" id="walletCardGiftMotion" width="120" height="120" aria-hidden="true" hidden></canvas>
+                <div class="wallet-card-face">
+                  <div class="wallet-headline is-pending" data-nav-vault-balance aria-hidden="true">
+                    <strong class="wallet-card-gram" data-nav-vault-ton>0 GRAM</strong>
+                    <strong class="wallet-card-ath" data-nav-vault-ath>0 ATH</strong>
+                  </div>
+                  <p class="wallet-card-empty" id="walletCardEmpty"></p>
+                  <div class="wallet-card-doors">
+                    <button class="wallet-card-qr" id="walletCardQr" type="button" aria-label="Receive" title="Receive" data-i18n-aria-label="wallet.actionReceive" data-i18n-title="wallet.actionReceive">
+                      <span class="icon icon-qr" aria-hidden="true"></span>
+                    </button>
+                    <button class="wallet-card-door" id="walletSendAction" type="button" aria-label="Send" title="Send" data-i18n-aria-label="wallet.actionSend" data-i18n-title="wallet.actionSend" hidden>
+                      <span class="icon icon-send" aria-hidden="true"></span>
+                    </button>
+                    <button class="wallet-card-door" id="walletSwapAction" type="button" aria-label="Swap" title="Swap" data-i18n-aria-label="wallet.actionSwap" data-i18n-title="wallet.actionSwap" hidden>
+                      <span class="icon icon-swap-circular" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <button class="wallet-card-name wallet-card-copyable" id="walletCardName" type="button" aria-label="Copy username" title="Copy username" data-i18n-aria-label="wallet.copyUsername" data-i18n-title="wallet.copyUsername" hidden></button>
+                </div>
+                <button class="wallet-card-address wallet-card-copyable" id="walletCardAddress" type="button" aria-label="Copy address" title="Copy address" data-i18n-aria-label="wallet.copyAddress" data-i18n-title="wallet.copyAddress"></button>
+                <button class="wallet-card-settings" id="walletCardSettings" type="button" aria-label="Wallet settings" title="Wallet settings" data-i18n-aria-label="wallet.groupSettings" data-i18n-title="wallet.groupSettings">
+                  <span class="icon icon-gear" aria-hidden="true"></span>
+                </button>
+              </article>
+            </div>
+
+            <section class="profile-section wallet-state-section" aria-label="Wallet" data-i18n-aria-label="common.wallet">
+              <div class="settings-list">
+                <button id="walletBackupWarning" class="wallet-backup-warning" type="button" hidden><span data-i18n="wallet.keyNotBackedUp">Wallet key not backed up</span><strong data-i18n="wallet.saveNow">Save now</strong></button>
+                <button id="chatKeysBackupWarning" class="wallet-backup-warning" type="button" hidden><span data-i18n="wallet.chatKeysNotBackedUp">Chat keys not backed up</span><strong id="chatKeysBackupStatus"></strong></button>
+                <button id="unlockWalletButton" type="button"><span data-i18n="wallet.unlock">Unlock wallet</span><strong id="unlockWalletStatus" data-i18n="wallet.statusNotStored">not stored</strong></button>
+                <button id="registerVaultKeysButton" type="button"><span data-i18n="wallet.activateAccount">Activate Platho account</span><strong class="profile-action-status" id="vaultDraftStatus" data-i18n="wallet.statusWalletRequired">wallet required</strong></button>
+              </div>
+              <div class="wallet-legacy-rows" hidden>
+                <div class="wallet-ton-group" id="walletTonGroup" aria-label="Wallet GRAM" data-i18n-aria-label="wallet.walletGram" hidden>
+                  <button id="receiveWalletTonButton" type="button"><span data-i18n="wallet.receiveGram">Receive GRAM</span><strong id="receiveWalletTonStatus" data-i18n="wallet.statusQr">QR</strong></button>
+                  <button id="sendWalletTonButton" type="button"><span data-i18n="wallet.sendGram">Send GRAM</span><strong class="profile-action-status" id="sendWalletTonStatus" data-i18n="wallet.statusWallet">wallet</strong></button>
+                </div>
+                <button id="createWalletButton" type="button"><span data-i18n="wallet.create">Create wallet</span><strong id="createWalletStatus" data-i18n="wallet.statusRecommended">recommended</strong></button>
+                <button id="importWalletButton" type="button"><span data-i18n="wallet.import">Import wallet</span><strong id="importWalletStatus" data-i18n="wallet.status24Words">24 words</strong></button>
+              </div>
+            </section>
+
+            <div class="public-tabs wallet-tabs" id="walletTabs" role="tablist" aria-label="Wallet" data-i18n-aria-label="common.wallet" hidden>
+              <button class="public-tab" type="button" role="tab" id="walletTabTokens" data-wallet-tab="tokens" aria-controls="walletTokensPanel" aria-selected="true" data-i18n="wallet.tabTokens">Tokens</button>
+              <button class="public-tab" type="button" role="tab" id="walletTabNft" data-wallet-tab="nft" aria-controls="walletNftPanel" aria-selected="false" data-i18n="wallet.tabNft">NFT</button>
+              <button class="public-tab" type="button" role="tab" id="walletTabHistory" data-wallet-tab="history" aria-controls="walletHistoryPanel" aria-selected="false" data-i18n="wallet.tabHistory">History</button>
+              <button class="public-tab" type="button" role="tab" id="walletTabMarket" data-wallet-tab="market" aria-controls="walletMarketPanel" aria-selected="false" data-i18n="wallet.tabMarket">Market</button>
+            </div>
+            <div class="wallet-assets" id="walletTokensPanel" role="tabpanel" aria-labelledby="walletTabTokens" hidden></div>
+            <div class="wallet-assets" id="walletNftPanel" role="tabpanel" aria-labelledby="walletTabNft" hidden></div>
+            <div class="wallet-assets" id="walletHistoryPanel" role="tabpanel" aria-labelledby="walletTabHistory" hidden></div>
+            <div class="wallet-assets" id="walletMarketPanel" role="tabpanel" aria-labelledby="walletTabMarket" hidden></div>
+
+          </div>
+        </section>
+
+        <div class="modal-backdrop" id="walletGroupDialog" hidden>
+        <section class="content-pane profile-pane profile-settings-dialog wallet-group-dialog" role="dialog" aria-modal="true" aria-labelledby="walletGroupTitle">
+          <header class="pane-header inline">
+            <button class="icon-button" id="walletGroupBackButton" type="button" aria-label="Back" title="Back" data-i18n-aria-label="common.back" data-i18n-title="common.back" hidden>
+              <span class="icon icon-back" aria-hidden="true"></span>
+            </button>
+            <div class="pane-title-block">
+              <h1 id="walletGroupTitle" tabindex="-1">Wallet settings</h1>
+            </div>
+            <button class="icon-button" id="walletGroupCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="wallet-group-body">
+            <section class="profile-section" data-wallet-group="menu" hidden>
+              <div class="settings-list">
+                <button id="lockWalletNowButton" type="button"><span data-i18n="wallet.lockNow">Lock wallet</span></button>
+              </div>
+              <div class="settings-list">
+                <button id="changeWalletPasswordButton" type="button"><span data-i18n="wallet.changePassword">Change password</span><strong id="changeWalletPasswordStatus" data-i18n="wallet.statusEncrypted">encrypted</strong></button>
+                <button id="exportWalletKeyButton" type="button"><span data-i18n="wallet.exportKey">Export wallet key</span><strong id="exportWalletKeyStatus" data-i18n="wallet.statusEncryptedFile">encrypted file</strong></button>
+                <button id="importWalletKeyButton" type="button"><span data-i18n="wallet.importKey">Import wallet key</span><strong id="importWalletKeyStatus" data-i18n="wallet.statusFile">file</strong></button>
+                <input id="walletKeyBackupInput" type="file" accept="application/json,.json" hidden>
+                <button id="exportWalletSeedButton" type="button"><span data-i18n="wallet.exportRecoveryPhrase">Export recovery phrase</span><strong id="walletAddressStatus" data-i18n="wallet.statusNotCreated">not created</strong></button>
+                <button id="walletImportPhraseButton" type="button"><span data-i18n="wallet.importPhrase">Import recovery phrase</span><strong data-i18n="wallet.status24Words">24 words</strong></button>
+              </div>
+              <div class="settings-list">
+                <label class="settings-select-row compact-select-row" for="walletShowHiddenSelect">
+                  <span data-i18n="wallet.showHidden">Show hidden tokens and NFTs</span>
+                  <select id="walletShowHiddenSelect" aria-label="Show hidden tokens and NFTs" data-i18n-aria-label="wallet.showHidden">
+                    <option value="no" data-i18n="wallet.showHiddenNo">No</option>
+                    <option value="yes" data-i18n="wallet.showHiddenYes">Yes</option>
+                  </select>
+                </label>
+              </div>
+              <div class="settings-list">
+                <button id="walletCreateNewButton" type="button"><span data-i18n="wallet.createNew">Create a new wallet</span></button>
+              </div>
+              <p class="wallet-menu-note" id="walletMenuNote" data-i18n="wallet.addHint" hidden>The wallet in use now stays under Other wallets.</p>
+            </section>
+            <section class="profile-section wallet-token-card" data-wallet-group="token" hidden>
+              <div class="wallet-token-card-head" id="walletTokenCardHead"></div>
+              <div class="profile-stat-list" id="walletTokenCardStats"></div>
+            </section>
+            <section class="profile-section" data-wallet-group="ath" aria-label="ATH" hidden>
+              <div class="settings-list">
+                <button id="buyAthButton" type="button"><span data-i18n="profile.buyAth">Buy ATH</span><strong class="profile-action-status" id="buyAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <button id="feeDiscountButton" type="button"><span data-i18n="profile.feeDiscount">Fee discount</span><strong class="profile-action-status" id="feeDiscountStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <button id="vaultRestoreButton" type="button" hidden><span data-i18n="profile.vaultRestore">Fee vault frozen</span><strong class="profile-action-status" id="vaultRestoreStatus" data-i18n="profile.vaultRestoreAction">Unfreeze</strong></button>
+                <button id="unstakeAthButton" type="button" hidden><span data-i18n="profile.unstake">Withdraw stake</span><strong class="profile-action-status" id="unstakeAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <button id="recoverAthButton" type="button" hidden><span data-i18n="profile.recoverAth">Recover uncounted ATH</span><strong class="profile-action-status" id="recoverAthStatus" data-i18n="profile.statusChecking">checking</strong></button>
+                <button id="vaultFloatButton" type="button" hidden><span data-i18n="profile.vaultFloat">GRAM parked in the vault</span><strong class="profile-action-status" id="vaultFloatStatus"></strong></button>
+              </div>
+              <div class="profile-stat-list">
+                <div class="profile-stat-row">
+                  <span data-i18n="profile.currentSupply">Current supply</span>
+                  <strong id="athSupplyStatus">-</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+        </div>
+
+        <div class="modal-backdrop" id="profileSettingsDialog" hidden>
+        <section class="content-pane profile-pane profile-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="profileSettingsTitle">
+          <header class="pane-header inline">
+            <div class="pane-title-block">
+              <h1 id="profileSettingsTitle" data-i18n="profile.settingsTitle">Settings</h1>
+              <p id="profileHandle" data-i18n="profile.settingsLead">This device and this account</p>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.5.23</span>
+            </div>
+            <button class="icon-button" id="profileSettingsCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+
+          <div class="profile-scroll-content">
+            <div class="profile-sections">
+            <section class="profile-section" id="moderationSection" aria-label="Moderation" data-i18n-aria-label="moderation.section" hidden>
+              <h2 data-i18n="moderation.section">Moderation</h2>
+              <div class="settings-list">
+                <button id="moderationQueueButton" type="button"><span data-i18n="profile.moderationQueue">Moderation queue</span></button>
+              </div>
+            </section>
+            <section class="profile-section" aria-label="Language" data-i18n-aria-label="profile.language.title">
+              <h2 data-i18n="profile.language.title">Language</h2>
+              <div class="settings-list">
+                <label class="settings-select-row compact-select-row" for="appLanguageSelect">
+                  <span data-i18n="profile.language.row">App language</span>
+                  <select id="appLanguageSelect" aria-label="App language" data-i18n-aria-label="profile.language.row"></select>
+                </label>
+              </div>
+            </section>
+
+            <section class="profile-section" aria-label="Messages" data-i18n-aria-label="chat.messages">
+              <h2 data-i18n="chat.messages">Messages</h2>
+              <div class="settings-list">
+                <label class="settings-select-row compact-select-row" for="privateSenderModeSelect">
+                  <span data-i18n="chat.privateSender">Send private messages</span>
+                  <select id="privateSenderModeSelect" aria-label="Send private messages by default" data-i18n-aria-label="chat.defaultPrivateSenderMode">
+                    <option value="share" data-i18n="chat.senderModeWithWallet">With wallet address</option>
+                    <option value="anonymous" data-i18n="chat.anonymous">Anonymous</option>
+                  </select>
+                </label>
+                <button id="replaceVaultKeysButton" type="button"><span data-i18n="sync.replaceMessageKeys">Replace message keys</span><strong id="vaultRotateStatus" data-i18n="sync.statusActivateAccountFirst">activate account first</strong></button>
+              </div>
+            </section>
+
+            <section class="profile-section" aria-label="Public channels" data-i18n-aria-label="public.channels">
+              <h2 data-i18n="public.channels">Public channels</h2>
+              <div class="settings-list">
+                <label class="settings-select-row compact-select-row" for="publicCommentsDefaultSelect">
+                  <span data-i18n="public.comments">Comments</span>
+                  <select id="publicCommentsDefaultSelect" aria-label="Default public comment setting" data-i18n-aria-label="public.defaultCommentSetting">
+                    <option value="disabled" data-i18n="public.commentsClosed">Closed</option>
+                    <option value="enabled" data-i18n="public.commentsAllowedNotRecommended">Allowed - not recommended</option>
+                  </select>
+                </label>
+                <label class="settings-select-row compact-select-row" for="feedTimestampModeSelect">
+                  <span data-i18n="public.timestampMode">Post timestamps</span>
+                  <select id="feedTimestampModeSelect" aria-label="Post timestamps" data-i18n-aria-label="public.timestampMode">
+                    <option value="datetime" selected data-i18n="public.timestampDateTime">Date and time</option>
+                    <option value="date" data-i18n="public.timestampDateOnly">Date only</option>
+                  </select>
+                </label>
+                <label class="settings-select-row compact-select-row" for="channelAppearanceSelect">
+                  <span data-i18n="public.channelAppearance">Channel appearance</span>
+                  <select id="channelAppearanceSelect" aria-label="Channel appearance" data-i18n-aria-label="public.channelAppearance">
+                    <option value="none" data-i18n="public.channelAppearanceNone">None</option>
+                    <option value="custom" data-i18n="public.channelAppearanceCustom">Custom</option>
+                  </select>
+                </label>
+                <label class="settings-select-row compact-select-row" for="channelAppearancesSelect">
+                  <span data-i18n="public.channelAppearances">Other channels' appearances</span>
+                  <select id="channelAppearancesSelect" aria-label="Other channels' appearances" data-i18n-aria-label="public.channelAppearances">
+                    <option value="show" data-i18n="public.channelAppearancesShow">Show</option>
+                    <option value="hide" data-i18n="public.channelAppearancesHide">Hide</option>
+                  </select>
+                </label>
+                <button id="savePrefsButton" type="button"><span data-i18n="wallet.saveSubscriptions">Save subscriptions</span><strong id="savePrefsStatus" class="profile-action-status" data-i18n="wallet.statusNotSaved">not saved</strong></button>
+              </div>
+            </section>
+            <section class="profile-section" aria-label="Appearance" data-i18n-aria-label="profile.appearance">
+              <h2 data-i18n="profile.appearance">Appearance</h2>
+              <div class="settings-list">
+                <button id="appearanceButton" type="button">
+                  <span data-i18n="appearance.open">Appearance settings</span>
+                  <strong class="profile-action-status" id="appearanceStatus" data-i18n="appearance.backgroundNone">None</strong>
+                </button>
+              </div>
+            </section>
+
+            <section class="profile-section" aria-label="Usernames and avatars" data-i18n-aria-label="username.usernamesAndAvatarsLabel">
+              <h2 data-i18n="username.usernamesAndAvatars">Usernames and Avatars</h2>
+              <div class="settings-list">
+                <button id="setAvatarButton" type="button"><span data-i18n="avatar.setAvatar">Set avatar</span><strong class="profile-action-status" id="setAvatarStatus">100 ATH + GRAM</strong></button>
+                <input id="profileAvatarInput" type="file" accept="image/*" hidden>
+                <input id="groupAvatarInput" type="file" accept="image/*" hidden>
+                <label class="settings-select-row compact-select-row" for="profileBalanceCardSelect">
+                  <span data-i18n="profile.balanceCard">Balance card in profile</span>
+                  <select id="profileBalanceCardSelect" aria-label="Balance card in profile" data-i18n-aria-label="profile.balanceCard">
+                    <option value="hide" data-i18n="profile.balanceCardHide">Hidden</option>
+                    <option value="show" data-i18n="profile.balanceCardShow">Shown</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="profile-section" aria-label="RPC access" data-i18n-aria-label="profile.rpcAccess">
+              <h2 data-i18n="profile.rpcAccessRecommended">TON Center key (recommended)</h2>
+              <div class="settings-list">
+                <div class="settings-rpc-row" id="rpcKeyRow">
+                  <label class="rpc-key-label" for="toncenterApiKeyInput" data-i18n="profile.rpcKey">Key</label>
+                  <input id="toncenterApiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="paste a key" data-i18n-placeholder="profile.rpcKeyPlaceholderShort" title="paste to speed up reads" data-i18n-title="profile.rpcKeyPlaceholder">
+                  <strong id="toncenterKeyStatus" class="rpc-key-status"></strong>
+                  <button id="getToncenterKeyButton" type="button" class="rpc-key-get" data-i18n="profile.rpcKeyGet">Get</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="profile-section" aria-label="Device" data-i18n-aria-label="profile.device">
+              <h2 data-i18n="profile.device">Device</h2>
+              <div class="settings-list">
+                <button id="walletNameButton" type="button" hidden><span data-i18n="wallet.nameButton">Wallet name</span><strong class="profile-action-status" id="walletNameStatus"></strong></button>
+                <button id="walletHomeButton" type="button" hidden><span data-i18n="profile.walletHome">Where the wallet is kept</span><strong class="profile-action-status" id="walletHomeStatus"></strong></button>
+                <button id="otherWalletsButton" type="button" hidden><span data-i18n="wallet.otherWallets">Other wallets</span><strong class="profile-action-status" id="otherWalletsStatus"></strong></button>
+                <button id="clearLocalDataButton" type="button"><span data-i18n="wallet.clearLocalData">Clear local data</span><strong id="clearLocalDataStatus" data-i18n="wallet.statusDeviceOnly">device only</strong></button>
+              </div>
+            </section>
+
+            </div>
+          </div>
+        </section>
+        </div>
+      </main>
+
+      <div class="modal-backdrop" id="newChatDialog" hidden>
+        <form class="recipient-dialog" id="newChatForm" role="dialog" aria-modal="true" aria-labelledby="newChatTitle" aria-describedby="recipientHint">
+          <header>
+            <div>
+              <h2 id="newChatTitle" data-i18n="dialog.newChat">New Chat</h2>
+              <p id="recipientHint" aria-live="polite" data-i18n="dialog.newChatHint">Use a Platho name, .ath, .ton, or wallet address. Local label is only shown on this device.</p>
+            </div>
+            <button class="icon-button" id="closeNewChatButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="action-field">
+            <label for="recipientInput" data-i18n="dialog.recipient">Recipient</label>
+            <input id="recipientInput" type="text" spellcheck="false" autocomplete="off" placeholder="alex, alex.ath, alex.ton, or EQ..." data-i18n-placeholder="dialog.recipientPlaceholder">
+          </div>
+          <div class="action-field">
+            <label for="recipientLocalLabel" data-i18n="dialog.localLabel">Local label</label>
+            <input id="recipientLocalLabel" type="text" spellcheck="false" autocomplete="off" placeholder="Optional, e.g. Anonymous" data-i18n-placeholder="dialog.localLabelPlaceholder">
+          </div>
+          <button class="recipient-submit" id="newChatSubmitButton" type="submit" data-i18n="dialog.start">Start</button>
+        </form>
+      </div>
+
+      <div class="emoji-picker" id="emojiPicker" role="dialog" aria-label="Emoji" data-i18n-aria-label="composer.emoji" hidden>
+        <div class="emoji-picker-grid" id="emojiPickerGrid"></div>
+      </div>
+      <div class="modal-backdrop" id="sharePostDialog" hidden>
+        <section class="recipient-dialog share-post-dialog" role="dialog" aria-modal="true" aria-labelledby="sharePostTitle">
+          <header>
+            <div>
+              <h2 id="sharePostTitle" data-i18n="dialog.sharePost" tabindex="-1">Share post</h2>
+              <p data-i18n="dialog.sharePostHint">Send this post to your notes, a private contact, or your own channel.</p>
+            </div>
+            <button class="icon-button" id="sharePostCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="share-post-list" id="sharePostList"></div>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="reportPostDialog" hidden>
+        <section class="recipient-dialog share-post-dialog" role="dialog" aria-modal="true" aria-labelledby="reportPostTitle">
+          <header>
+            <div>
+              <h2 id="reportPostTitle" data-i18n="dialog.reportPost" tabindex="-1">Report</h2>
+              <p data-i18n="dialog.reportPostHint">Tell the moderators why. A report is paid and public on the chain; what it takes is below.</p>
+              <p class="report-price-line" id="reportPriceLine" hidden></p>
+            </div>
+            <button class="icon-button" id="reportPostCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="share-post-list" id="reportReasonList"></div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="moderationQueueDialog" hidden>
+        <section class="moderation-dialog" role="dialog" aria-modal="true" aria-labelledby="moderationQueueTitle">
+          <header>
+            <div>
+              <h2 id="moderationQueueTitle" data-i18n="dialog.moderationQueue" tabindex="-1">Moderation queue</h2>
+              <p data-i18n="dialog.moderationQueueHint">Reports from readers: the entries with new reports first.</p>
+            </div>
+            <button class="icon-button" id="moderationQueueCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <p class="public-moderation-notice" id="moderationQueueStatus" hidden></p>
+          <div class="moderation-queue-list" id="moderationQueueList"></div>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="actionDialog" hidden>
+        <form class="action-dialog" id="actionForm" role="dialog" aria-modal="true" aria-labelledby="actionTitle" aria-describedby="actionHint">
+          <header>
+            <div>
+              <h2 id="actionTitle" data-i18n="dialog.action" tabindex="-1">Action</h2>
+              <p id="actionHint" data-i18n="dialog.reviewDetailsBeforeSigning">Review details before signing.</p>
+            </div>
+            <button class="icon-button" id="actionCancelButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="action-fields" id="actionFields"></div>
+          <div class="action-summary" id="actionSummary"></div>
+          <div class="action-dialog-actions">
+            <p class="action-dialog-sticky-note" id="actionStickyNote" hidden></p>
+            <button class="recipient-submit action-dialog-dismiss" id="actionDismissButton" type="button" hidden>OK</button>
+            <button class="recipient-submit" id="actionSubmitButton" type="submit" data-i18n="common.continue">Continue</button>
+          </div>
+          <ul class="action-footnotes" id="actionFootnotes" hidden></ul>
+        </form>
+      </div>
+
+      <div class="modal-backdrop image-lightbox-backdrop" id="imageLightboxDialog" hidden>
+        <section class="image-lightbox-dialog" role="dialog" aria-modal="true" aria-labelledby="imageLightboxTitle">
+          <header>
+            <div>
+              <h2 id="imageLightboxTitle" data-i18n="dialog.fullSizePreview">Full size</h2>
+              <p id="imageLightboxMeta" data-i18n="dialog.finalCompressedImage">Final compressed image</p>
+            </div>
+            <div class="image-lightbox-actions">
+              <button class="icon-button" id="imageLightboxDownloadButton" type="button" aria-label="Download image" title="Download image" data-i18n-aria-label="dialog.downloadImage" data-i18n-title="dialog.downloadImage">
+                <span class="icon icon-download"></span>
+              </button>
+              <button class="icon-button" id="imageLightboxCloseButton" type="button" aria-label="Close full-size preview" title="Close" data-i18n-aria-label="dialog.closeFullSizePreview" data-i18n-title="common.close">
+                <span class="icon icon-close" aria-hidden="true"></span>
+              </button>
+            </div>
+          </header>
+          <div class="image-lightbox-viewport">
+            <img id="imageLightboxImage" alt="Full-size final image preview" draggable="false" data-i18n-alt="dialog.fullSizeImageAlt">
+          </div>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="appearanceDialog" hidden>
+        <section class="action-dialog appearance-dialog" role="dialog" aria-modal="true" aria-labelledby="appearanceTitle">
+          <header>
+            <div>
+              <h2 id="appearanceTitle" data-i18n="appearance.title">Appearance</h2>
+              <p data-i18n="appearance.lead">Theme and the animation behind the app.</p>
+            </div>
+            <button class="icon-button" id="appearanceCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="settings-list">
+            <label class="settings-select-row compact-select-row" for="appearanceThemeSelect">
+              <span data-i18n="appearance.theme">Theme</span>
+              <select id="appearanceThemeSelect">
+                <option value="dark" data-i18n="appearance.themeDark">Dark</option>
+                <option value="light" data-i18n="appearance.themeLight">Light</option>
+                <option value="gift" data-i18n="appearance.themeGift">Telegram gift</option>
+              </select>
+            </label>
+            <label class="settings-select-row compact-select-row" for="appearanceBackgroundSelect">
+              <span data-i18n="appearance.background">Background animation</span>
+              <select id="appearanceBackgroundSelect">
+                <option value="plasma" data-i18n="appearance.backgroundPlasma">Plasma</option>
+                <option value="nodes" data-i18n="appearance.backgroundNodes">Nodes</option>
+                <option value="none" data-i18n="appearance.backgroundNone">None</option>
+              </select>
+            </label>
+            <label class="settings-select-row compact-select-row" for="appearanceCardTiltSelect">
+              <span data-i18n="appearance.cardTilt">Card tilt (turn off on a slow device)</span>
+              <select id="appearanceCardTiltSelect">
+                <option value="on" data-i18n="appearance.cardTiltOn">On</option>
+                <option value="off" data-i18n="appearance.cardTiltOff">Off</option>
+              </select>
+            </label>
+          </div>
+          <div class="settings-list appearance-group" id="appearancePlasmaGroup" hidden>
+            <h3 data-i18n="appearance.backgroundPlasma">Plasma</h3>
+            <label class="settings-select-row compact-select-row settings-range-row" for="auroraLevelRange">
+              <span data-i18n="profile.auroraBrightness">Background glow</span>
+              <input id="auroraLevelRange" type="range" min="0" max="100" step="5" value="30" aria-label="Background glow" data-i18n-aria-label="profile.auroraBrightness">
+            </label>
+            <label class="settings-select-row compact-select-row settings-range-row" for="auroraCountRange">
+              <span data-i18n="profile.auroraCount">Plasma count</span>
+              <input id="auroraCountRange" type="range" min="1" max="16" step="1" value="5" aria-label="Plasma count" data-i18n-aria-label="profile.auroraCount">
+            </label>
+            <label class="settings-select-row compact-select-row settings-range-row" for="auroraSpeedRange">
+              <span data-i18n="profile.auroraSpeed">Plasma speed</span>
+              <input id="auroraSpeedRange" type="range" min="25" max="600" step="25" value="175" aria-label="Plasma speed" data-i18n-aria-label="profile.auroraSpeed">
+            </label>
+            <label class="settings-select-row compact-select-row settings-range-row" for="auroraEnergyRange">
+              <span data-i18n="profile.auroraEnergy">Plasma activity</span>
+              <input id="auroraEnergyRange" type="range" min="0" max="200" step="10" value="50" aria-label="Plasma activity" data-i18n-aria-label="profile.auroraEnergy">
+            </label>
+          </div>
+          <div class="settings-list appearance-group" id="appearanceNodesGroup" hidden>
+            <h3 data-i18n="appearance.backgroundNodes">Nodes</h3>
+            <label class="settings-select-row compact-select-row settings-range-row" for="nodesLevelRange">
+              <span data-i18n="appearance.nodesBrightness">Lattice brightness</span>
+              <input id="nodesLevelRange" type="range" min="0" max="300" step="10" value="100" aria-label="Lattice brightness" data-i18n-aria-label="appearance.nodesBrightness">
+            </label>
+            <label class="settings-select-row compact-select-row settings-range-row" for="nodesRunnersRange">
+              <span data-i18n="appearance.nodesRunners">Signals</span>
+              <input id="nodesRunnersRange" type="range" min="0" max="300" step="10" value="100" aria-label="Signals" data-i18n-aria-label="appearance.nodesRunners">
+            </label>
+            <label class="settings-select-row compact-select-row settings-range-row" for="nodesSpeedRange">
+              <span data-i18n="appearance.nodesSpeed">Signal speed</span>
+              <input id="nodesSpeedRange" type="range" min="25" max="300" step="5" value="100" aria-label="Signal speed" data-i18n-aria-label="appearance.nodesSpeed">
+            </label>
+            <label class="settings-select-row compact-select-row settings-range-row" for="nodesLightsRange">
+              <span data-i18n="appearance.nodesLights">Flashlights</span>
+              <input id="nodesLightsRange" type="range" min="0" max="300" step="10" value="100" aria-label="Flashlights" data-i18n-aria-label="appearance.nodesLights">
+            </label>
+          </div>
+          <p class="appearance-note" data-i18n="appearance.bootNote">The loading screen uses the same background.</p>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="profileCardDialog" hidden>
+        <section class="action-dialog profile-card-dialog" role="dialog" aria-modal="true" aria-labelledby="profileCardTitle">
+          <h2 id="profileCardTitle" class="sr-only" data-i18n="profileCard.title">Profile</h2>
+          <div class="profile-card-hero" id="profileCardHero" data-tier="none">
+            <span class="profile-card-hero-pattern" aria-hidden="true"></span>
+            <button class="icon-button profile-card-hero-close" id="profileCardCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+            <div class="profile-card-hero-face">
+              <div class="avatar profile-card-avatar" id="profileCardAvatar" aria-hidden="true"></div>
+              <img class="profile-card-hero-gift" id="profileCardHeroGift" alt="" hidden>
+              <canvas class="profile-card-hero-gift" id="profileCardHeroGiftMotion" width="44" height="44" aria-hidden="true" hidden></canvas>
+            </div>
+            <strong class="profile-card-hero-name" id="profileCardName"></strong>
+            <span class="profile-card-hero-sub" id="profileCardSubtitle"></span>
+          </div>
+          <p class="profile-card-about" id="profileCardAbout" hidden></p>
+          <div class="profile-card-latest" id="profileCardLatest" hidden></div>
+          <div class="profile-card-actions" id="profileCardActions" hidden></div>
+          <div class="wallet-card-stage profile-card-balance" id="profileCardBalance" hidden></div>
+          <button class="profile-card-wallet" id="profileCardCopyButton" type="button" title="Copy wallet address" data-i18n-title="profile.copyWalletAddress">
+            <span id="profileCardWalletLabel" data-i18n="common.wallet">Wallet</span>
+            <code id="profileCardWallet"></code>
+          </button>
+          <div class="discovery-cta-actions" id="profileCardSettingsRow" hidden>
+            <button class="discovery-cta-action" id="profileCardSettingsButton" type="button" aria-haspopup="dialog" data-i18n="profile.settingsTitle">Settings</button>
+          </div>
+          <div class="profile-card-section">
+            <h3 data-i18n="profileCard.names">.ath names</h3>
+            <p class="profile-card-note" id="profileCardNamesNote"></p>
+            <div class="profile-card-rows" id="profileCardNames"></div>
+            <div class="discovery-cta-actions" id="profileCardMintNameRow" hidden>
+              <button class="discovery-cta-action" id="profileCardMintNameButton" type="button">
+                <span class="discovery-cta-action-stack">
+                  <span data-i18n="username.mintAthName">Mint .ath name</span>
+                  <small class="discovery-cta-action-note" id="profileCardMintNameStatus">100-10k ATH + 1.1 GRAM</small>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="profile-card-section">
+            <h3 data-i18n="profileCard.gifts">Telegram gifts</h3>
+            <p class="profile-card-note" id="profileCardGiftsNote"></p>
+            <div class="profile-card-gifts" id="profileCardGifts"></div>
+          </div>
+          <p class="profile-card-meta" id="profileCardMeta" role="status"></p>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="docsDialog" hidden>
+        <section class="docs-dialog" role="dialog" aria-modal="true" aria-labelledby="docsTitle">
+          <header>
+            <div>
+              <h2 id="docsTitle" data-i18n="docs.documents">Documents</h2>
+              <p id="docsLead" data-i18n="docs.lead">Protocol notes and application model.</p>
+            </div>
+            <button class="icon-button" id="docsCloseButton" type="button" aria-label="Close documents" title="Close" data-i18n-aria-label="docs.closeDocuments" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <div class="docs-layout">
+            <nav class="docs-nav" id="docsNav" aria-label="Documents" data-i18n-aria-label="docs.documents"></nav>
+            <article class="docs-content" id="docsContent" tabindex="0"></article>
+          </div>
+          <p class="sr-only" id="docsAnnouncer" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="installDialog" hidden>
+        <section class="install-dialog" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+          <header>
+            <div>
+              <h2 id="installTitle" data-i18n="install.openOrInstall">Open or install Platho</h2>
+              <p id="installLead" data-i18n="install.lead">Use it as an app, outside stores and platform gates.</p>
+            </div>
+            <button class="icon-button" id="installCloseButton" type="button" aria-label="Close install prompt" title="Close" data-i18n-aria-label="install.closePrompt" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <p id="installBody" data-i18n="install.body">Platho installs as an app on this device. Once installed, the app itself, its guides and your recent encrypted history are kept here, so it opens faster and recovers better — but that is not a backup. It still needs the network to read the chain, update public feeds, fetch message history and send. No server account can read your messages or hold your keys.</p>
+          <ol class="install-steps" id="installSteps" hidden></ol>
+          <p class="install-help" id="installHelp" data-i18n="install.help">If your browser does not show the install sheet, use the browser menu and choose Install app or Add to Home screen.</p>
+          <div class="install-dialog-actions">
+            <button class="recipient-submit" id="installConfirmButton" type="button" data-i18n="install.install">Install</button>
+            <button class="secondary-button" id="installDismissButton" type="button" data-i18n="install.notNow">Not now</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="activationWelcomeDialog" hidden>
+        <section class="activation-welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="activationWelcomeTitle">
+          <header>
+            <div>
+              <h2 id="activationWelcomeTitle" data-i18n="welcome.activatedTitle">Account activated</h2>
+              <p id="activationWelcomeLead" data-i18n="welcome.lead">Welcome to Platho. Your wallet is connected to the network - you can begin.</p>
+            </div>
+            <button class="icon-button" id="activationWelcomeCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+          <p class="activation-welcome-mission" data-i18n="welcome.mission">Platho exists to secure a person's right to private correspondence, and is built so that this right depends on nobody's decision.</p>
+          <h3 data-i18n="welcome.availableTitle">What is available now</h3>
+          <ul class="activation-welcome-list">
+            <li data-i18n="welcome.availablePrivate">private conversations with any activated wallet</li>
+            <li data-i18n="welcome.availablePublic">reading and publishing in the public feed</li>
+            <li data-i18n="welcome.availableComments">comments wherever the author left them open</li>
+          </ul>
+          <h3 data-i18n="welcome.knowTitle">What to know before your first message</h3>
+          <p><strong data-i18n="welcome.irreversibleTitle">Nothing written can be taken back.</strong> <span data-i18n="welcome.irreversibleBody">Messages and posts cannot be edited or deleted - they go into the blockchain and stay there forever.</span></p>
+          <p><strong data-i18n="welcome.publicTitle">Public means public.</strong> <span data-i18n="welcome.publicBody">Posts and comments are visible to everyone, both in the app and in the blockchain, in clear text. The author's wallet is visible too.</span></p>
+          <p><strong data-i18n="welcome.privateTitle">Private stays private.</strong> <span data-i18n="welcome.privateBody">Your correspondence is encrypted on your device: end-to-end, with post-quantum strength. Neither we nor the network hold the keys - only you and the person you write to can read it.</span></p>
+          <h3 data-i18n="welcome.responsibilityTitle">Responsibility</h3>
+          <p data-i18n="welcome.responsibilityBody">Weigh what you publish, especially in public threads. Every record in the blockchain has an author: a public post or comment may carry legal responsibility for them under the laws of their country, like any other publication.</p>
+          <div class="activation-welcome-actions">
+            <button class="recipient-submit" id="activationWelcomeStartButton" type="button" data-i18n="welcome.start">Start</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" id="quickStartDialog" hidden>
+        <section class="quick-start-dialog" role="dialog" aria-modal="true" aria-labelledby="quickStartTitle">
+          <header>
+            <div>
+              <h2 id="quickStartTitle" data-i18n="quickstart.welcome">Welcome to Platho</h2>
+              <p id="quickStartLead" data-i18n="quickstart.lead">A keyless, end-to-end encrypted messenger on TON.</p>
+            </div>
+            <button class="icon-button" id="quickStartCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
+              <span class="icon icon-close" aria-hidden="true"></span>
+            </button>
+          </header>
+
+          <div class="quick-start-view" id="quickStartWelcomeView">
+            <label class="quick-start-language-row" for="quickStartLanguageSelect">
+              <span class="quick-start-language-label" data-i18n="quickstart.language">Language</span>
+              <select id="quickStartLanguageSelect" aria-label="Language" data-i18n-aria-label="quickstart.language"></select>
+            </label>
+            <p class="quick-start-pitch" data-i18n="quickstart.pitch">Your keys live only on this device, and your messages travel through the TON chain encrypted &mdash; there is no server account that can read them or hold your keys. Private chats are end-to-end and post-quantum encrypted; everything is client-direct on TON, with no central gateway to block or censor.</p>
+            <ul class="quick-start-highlights">
+              <li data-i18n="quickstart.highlightEncrypted">End-to-end + post-quantum encrypted private chats</li>
+              <li data-i18n="quickstart.highlightOwnKeys">Your own keys &mdash; no server can read or hold them</li>
+              <li data-i18n="quickstart.highlightClientDirect">Client-direct: no central point to block or censor</li>
+            </ul>
+            <div class="quick-start-actions">
+              <button class="recipient-submit" id="quickStartBeginButton" type="button" data-i18n="quickstart.quickStart">Quick start</button>
+              <button class="secondary-button" id="quickStartImportButton" type="button" data-i18n="wallet.importKey">Import wallet key</button>
+            </div>
+            <p class="quick-start-foot" data-i18n="quickstart.foot">Prefer to set everything up by hand? Close this and use the Profile tab.</p>
+          </div>
+
+          <div class="quick-start-view" id="quickStartStepsView" hidden>
+            <div class="quick-start-progress" id="quickStartProgress" aria-hidden="true"></div>
+            <div class="quick-start-step-head">
+              <span class="quick-start-step-counter" id="quickStartStepCounter">Step 1 of 5</span>
+              <h3 id="quickStartStepTitle" data-i18n="quickstart.createYourWallet">Create your wallet</h3>
+            </div>
+            <p class="quick-start-step-why" id="quickStartStepWhy"></p>
+            <div class="quick-start-step-body" id="quickStartStepBody"></div>
+            <p class="quick-start-status" id="quickStartStepStatus" aria-live="polite"></p>
+            <div class="quick-start-actions quick-start-step-actions">
+              <button class="secondary-button" id="quickStartBackButton" type="button" data-i18n="common.back" data-nav-back="true">Back</button>
+              <button class="recipient-submit" id="quickStartActionButton" type="button" data-i18n="wallet.create">Create wallet</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="boot-screen" id="bootScreen" data-phase="idle">
+        <canvas class="boot-signal" id="bootSignal" aria-hidden="true"></canvas>
+        <div class="boot-screen-inner">
+          <div class="boot-brand" aria-hidden="true">Platho<span class="boot-brand-suffix">.app</span></div>
+          <div class="boot-center">
+            <div class="boot-spinner" aria-hidden="true">
+              <div class="boot-spinner-ring boot-spinner-ring-outer"></div>
+              <div class="boot-spinner-ring boot-spinner-ring-inner"></div>
+              <div class="boot-spinner-core"></div>
+            </div>
+            <p class="boot-loading-label" id="bootLoadingLabel" data-i18n="boot.loading">Loading…</p>
+            <div class="boot-elsewhere" id="bootElsewhere" role="group" aria-labelledby="bootElsewhereTitle" hidden>
+              <p class="boot-elsewhere-title" id="bootElsewhereTitle" data-i18n="window.elsewhereTitle">Platho is open in another tab</p>
+              <p class="boot-elsewhere-hint" data-i18n="window.elsewhereHint">One tab at a time. Press “Use here” to continue in this one: the other tab finishes what it is sending, then steps aside.</p>
+              <button type="button" class="boot-elsewhere-button" id="bootUseHere" data-i18n="window.useHere">Use here</button>
+              <p class="boot-elsewhere-status" id="bootElsewhereStatus" role="status" tabindex="-1"></p>
+            </div>
+          </div>
+          <p class="boot-tagline" data-i18n="boot.tagline">End-to-end + post-quantum encrypted. Client-direct on TON.</p>
+        </div>
+      </div>
+    </div>
+    <output class="app-notice" id="appNotice" role="status" aria-live="polite" hidden></output>
+    <div class="sr-only" id="chatAnnouncer" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="cutover-screen" id="cutoverScreen" role="dialog" aria-modal="true"
+         aria-labelledby="cutoverTitle" aria-describedby="cutoverBody" hidden>
+      <div class="cutover-screen-inner">
+        <h2 class="cutover-title" id="cutoverTitle" data-i18n="cutover.updateRequiredTitle">Update required</h2>
+        <p class="cutover-body" id="cutoverBody" data-i18n="cutover.updateRequiredBody">The network has moved to a new contract generation, and this version can no longer send or receive. Reload to update — your keys, history and balance are untouched.</p>
+        <button type="button" class="cutover-reload-button" id="cutoverReloadButton" data-i18n="cutover.reloadNow">Reload and update</button>
+      </div>
+    </div>
+    <script src="/vendor/telegram-web-app.js?v=3"></script>
+    <script src="/app.js?v=bd1544dc0" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+*.boc binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+
+artifacts/** -whitespace
+build/** -whitespace
+web/vendor/** -whitespace

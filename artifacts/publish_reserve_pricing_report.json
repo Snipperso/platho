@@ -1,0 +1,130 @@
+{
+  "profile": "PLATHO.V1.PUBLISH_RESERVE_PRICING",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "model": "clean-17 direct-pay: a flat per-lane wallet send whose floor is the receiving shard gate; the shard reserves its rent and returns the surplus. No hold, no max_charge, no size classes — those belonged to the deleted Vault batch model.",
+  "code_hashes": {
+    "ath_wallet": "8ab0003bb57c01a359cb9d7642a3c15d7a1550d989fcf8bca6677f7da874e077",
+    "record_shard": "255fbc8d0830bb205be87570ddb8afbb75c59f7768c90dff4fbb14fe494a269a",
+    "intro_shard": "449745b73f829d89139d777ada29e8d9f85a416bbcf798b51dc16d4b6fd378de",
+    "public_shard": "23c541bdd0bac25a63a49be0096f06d217e93ac5b23502f0db81c0a4a10a0a57",
+    "recovery_shard": "a73538d916df635a126354bfa8f53c9f43c75085002977911f4c7e4228d4e0d3",
+    "key_shard": "81761197119847160003106cbbe7d9751f80d6683e0f5f609a61c9c8f9857dbd"
+  },
+  "fee_config_snapshot": {
+    "config_18_latest_utime_since": "1777500000",
+    "config_18_latest_bit_price_ps": "0",
+    "config_18_latest_cell_price_ps": "135",
+    "config_21_flat_gas_price": "6667",
+    "config_21_gas_price": "4369067",
+    "config_25_lump_price": "66667",
+    "config_25_bit_price": "4369067",
+    "config_25_cell_price": "436906667"
+  },
+  "cases": [
+    {
+      "id": "conv_first_publish",
+      "lane": "CONV",
+      "contract": "RecordShard",
+      "contract_gate": "RS_DEPLOY_MIN_VALUE",
+      "contract_floor_nanotons": "19100000",
+      "client_attaches_nanotons": "19100000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "conv_steady_publish",
+      "lane": "CONV",
+      "contract": "RecordShard",
+      "contract_gate": "RS_MIN_VALUE",
+      "contract_floor_nanotons": "15600000",
+      "client_attaches_nanotons": "19100000",
+      "margin_nanotons": "3500000",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "intro_first_publish",
+      "lane": "INTRO",
+      "contract": "IntroShard",
+      "contract_gate": "IS_DEPLOY_MIN_VALUE",
+      "contract_floor_nanotons": "17810000",
+      "client_attaches_nanotons": "17810000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "intro_steady_publish",
+      "lane": "INTRO",
+      "contract": "IntroShard",
+      "contract_gate": "IS_MIN_VALUE",
+      "contract_floor_nanotons": "15310000",
+      "client_attaches_nanotons": "17810000",
+      "margin_nanotons": "2500000",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "recovery_write",
+      "lane": "RECOVERY",
+      "contract": "RecoveryShard",
+      "contract_gate": "RS_MIN_VALUE",
+      "contract_floor_nanotons": "38400000",
+      "client_attaches_nanotons": "38400000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "keyshard_register",
+      "lane": "KEY",
+      "contract": "KeyShard",
+      "contract_gate": "KS_MIN_REGISTER_VALUE",
+      "contract_floor_nanotons": "57000000",
+      "client_attaches_nanotons": "60000000",
+      "margin_nanotons": "3000000",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "public_channel_first",
+      "lane": "PUBLIC/CHANNEL",
+      "contract": "PublicShard",
+      "contract_gate": "deployMinValue(POST)",
+      "contract_floor_nanotons": "20300000",
+      "client_attaches_nanotons": "20300000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "public_thread_first",
+      "lane": "PUBLIC/THREAD",
+      "contract": "PublicShard",
+      "contract_gate": "deployMinValue(POST)",
+      "contract_floor_nanotons": "20300000",
+      "client_attaches_nanotons": "20300000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "public_beacon_first",
+      "lane": "PUBLIC/BEACON",
+      "contract": "PublicShard",
+      "contract_gate": "deployMinValue(BEACON)",
+      "contract_floor_nanotons": "31400000",
+      "client_attaches_nanotons": "31400000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    },
+    {
+      "id": "public_avatar_first",
+      "lane": "PUBLIC/AVATAR",
+      "contract": "PublicShard",
+      "contract_gate": "deployMinValue(AVATAR)",
+      "contract_floor_nanotons": "39500000",
+      "client_attaches_nanotons": "39500000",
+      "margin_nanotons": "0",
+      "protocol_fee_nanotons": "10000000"
+    }
+  ],
+  "worst_margin_nanotons": "0",
+  "underfunded_lanes": [],
+  "zero_margin_note": "A margin of ZERO on the first-publish lanes is the DESIGN, not a shortfall: the client attaches exactly the shard deploy floor and the sending wallet pays forward fees from its own balance, so the full value arrives. tests/publish-price.test.ts PP-02 measures a real first publish and a real steady publish in sandbox against the compiled shards; PP-03 measures that the STEADY figure is refused on a fresh shard, which is why the client must always attach the deploy figure. Recorded explicitly because a zero-margin money path is otherwise indistinguishable from an unnoticed one.",
+  "note": "Both sides are read from their own source — the contract floor from contracts/*.tact, the attached value from web/publish-price.mjs — so this artefact cannot be satisfied by copying one into the other. The proof that the figures are CORRECT is tests/publish-price.test.ts (PP-01..PP-04), which pins the mirrors against the .tact sources and measures a first and a steady publish in sandbox."
+}

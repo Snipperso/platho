@@ -1,0 +1,12 @@
+{
+  "document": "PLATHO.V1.MAINNET_ATH_MASTER_DERIVATION_INPUT",
+  "network": "mainnet",
+  "status": "DRAFT_MAINNET_ATH_MASTER_INPUT",
+  "treasuryOwnerAddress": "REQUIRED_FINAL_MAINNET_ATH_TREASURY_OWNER_ADDRESS",
+  "contentBocBase64": "REQUIRED_FINAL_ATH_METADATA_CONTENT_CELL_BOC_BASE64",
+  "proofRefs": {
+    "treasuryOwnerProof": "required: immutable treasury owner proof path/hash",
+    "contentCellProof": "required: immutable ATH metadata/content cell proof path/hash",
+    "athMasterBuildArtifact": "required: immutable ATHMaster build artifact path/hash"
+  }
+}

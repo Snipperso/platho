@@ -1,0 +1,486 @@
+{
+  "asset-pictures.mjs": {
+    "version": "7",
+    "sha256": "df66320629397a8b4b0fe8fd3a7a3627ac44876537046380e8de2b22da41e1bd"
+  },
+  "at-rest-seal.mjs": {
+    "version": "5",
+    "sha256": "91f8cb578819dbf7ec12045f880a1cc7b2cb39547a2d0f4192279d153f2def6a"
+  },
+  "ath-request-reserve.mjs": {
+    "version": "10",
+    "sha256": "36a80dc63743d3e2d4d013a444f99213d72c2fefb23fafdc9194757901333c1a"
+  },
+  "ath-ton-rpc-provider.mjs": {
+    "version": "93",
+    "sha256": "9767ff260ac64199839474437f71aa081b7051b6c21ea2c1f91d26f5bf25b693"
+  },
+  "ath-wallet-code.mjs": {
+    "version": "2",
+    "sha256": "2714b8dbccce9a44d0dc852eb5e4fbf0750f7517445366130bbf368c3889e742"
+  },
+  "boot-guard.js": {
+    "version": "17",
+    "sha256": "d8fbc426facee74e117fe49167c6115378e200136e54df5414a8a0e71922f5e1"
+  },
+  "boot-signal-field.mjs": {
+    "version": "16",
+    "sha256": "cfc702a8a2e0d94b4e05797e6f9660fef976d91a290bd3789fbf5aa31aaa57a2"
+  },
+  "boot-signal-worker.js": {
+    "version": "19",
+    "sha256": "b255b642847824e2938743cb3cb2182a98e7bc63c14776e2e2afce786770e097"
+  },
+  "capsule-part-policy.mjs": {
+    "version": "23",
+    "sha256": "f3c0d9b74847ee8e7f5788768557dfbfdf849aa66cb1d971faffe2ed7eb50231"
+  },
+  "conv-discovery.mjs": {
+    "version": "104",
+    "sha256": "b030d2980f702b8f9837b2ab731ea4c3e68c5c6a20e0066d2e64f1d65239df40"
+  },
+  "conv-key-persist.mjs": {
+    "version": "44",
+    "sha256": "9d2255421467f02c34c38f3ac15d57c99e71ce2f885cac65dd8009f4df119dd8"
+  },
+  "conv-key-store.mjs": {
+    "version": "27",
+    "sha256": "57f9a3eddd2d9f20ff123e6f67958fca2a602bd96a25b5ce7de1720da7d726ab"
+  },
+  "conv-lane-read.mjs": {
+    "version": "121",
+    "sha256": "6e08c7b3cb4d7c1535bc27ceeb66b53d5b8492713d079b83e2421030397a6fcd"
+  },
+  "conv-lane-send.mjs": {
+    "version": "136",
+    "sha256": "4a732f14f7fafc9208b28244e72356775b3670169dae8d2a7bf2d9a554f0b140"
+  },
+  "conv-lane.mjs": {
+    "version": "133",
+    "sha256": "946eddea9b54f47e26050b204fc1cb8057fc813bebbd9d4ea3ebe386acb6cfc9"
+  },
+  "conv-publish-browser.mjs": {
+    "version": "48",
+    "sha256": "c1c3203cfd400c1610037ea3140cce656e0fc7e0d95457db62549f4ac001d2d5"
+  },
+  "conv-reply-bundle.mjs": {
+    "version": "29",
+    "sha256": "2d935753f2e4c9b88dee3b475c4ed7a34f19a016d4f659df13f000284b048f65"
+  },
+  "conv-routing.mjs": {
+    "version": "9",
+    "sha256": "c84564d3ba8b141ce5d001e6d54aeb31bc4fb8ed13469181373384d0f7fec85a"
+  },
+  "cutover-epoch.mjs": {
+    "version": "7",
+    "sha256": "7dff0a3ca355a5de8e7170b80cc853ea4ee10b79aeca4779fe1367fb29ddeb7c"
+  },
+  "dedust-pools.mjs": {
+    "version": "6",
+    "sha256": "898496a6fb87654904154b3856f17f96eec447f899a57bbd3779f14c32415b31"
+  },
+  "device-secret-store.mjs": {
+    "version": "11",
+    "sha256": "a26e1cdc9631acfdd22422d667cbf1fa6a7e8d9e7867ddd4b37845846fd0af03"
+  },
+  "encrypted-message-store.mjs": {
+    "version": "22",
+    "sha256": "78a6ed7fd015ed167fc1a04021101487278372035ff82f039c640943985fa296"
+  },
+  "fee-vault-read.mjs": {
+    "version": "54",
+    "sha256": "53c4ac964cc00d2ba8dec07a19b2b409c90a204653fa810d22e9a265a271a978"
+  },
+  "fee-vault.mjs": {
+    "version": "39",
+    "sha256": "582d67fac609aee7fd6cab57bb80267536409e8cc92b9d3bdd776b656429486b"
+  },
+  "frozen-account.mjs": {
+    "version": "24",
+    "sha256": "f16e3d5fd1a4c694677b7f99bbd5abcb16d3324b1bdb42ba293b56c515a001dd"
+  },
+  "group-entry-fee.mjs": {
+    "version": "13",
+    "sha256": "8830ce11b9cb683fe2b07a7bef7913967582068fc557f1d105f3b89a078b95f0"
+  },
+  "group-lane-read.mjs": {
+    "version": "74",
+    "sha256": "72b5fa711cc61a2b5bf5f00c8c4c477d415013a61999e3dc22177e0d378c7df7"
+  },
+  "group-lane-send.mjs": {
+    "version": "97",
+    "sha256": "d431de516eddf149d0b2ec277bd5a6d8311d44fac1044729dd96c3261a12decb"
+  },
+  "group-lane.mjs": {
+    "version": "8",
+    "sha256": "1f78db80597794b2df147004344430f2611f5354673c28d741c8ae7d38f373a4"
+  },
+  "group-protocol.mjs": {
+    "version": "31",
+    "sha256": "c6e455c9f8c46460d6dc941904ce1fc4463131709adaf13b2ce6f012c53fd289"
+  },
+  "group-record-store.mjs": {
+    "version": "15",
+    "sha256": "ce90bb6b9d1d7cea95524786b835d26c7376f44e0b97c0cc41c096fa3a9afa51"
+  },
+  "group-runtime.mjs": {
+    "version": "117",
+    "sha256": "86beaabf2d1d10dd733a5391bf67b54608a5789c2841cbb72fdd5dea4212226c"
+  },
+  "group-store.mjs": {
+    "version": "42",
+    "sha256": "5e5b417527f76296389fbd9cc5c9592d0d0f576a7a9ea473ec36327b8bab37ad"
+  },
+  "i18n-strings.mjs": {
+    "version": "289",
+    "sha256": "758a2436d20f8ae42c8063b5fff40e9520aab26ff838a8b5846dbdc494567a8e"
+  },
+  "i18n.mjs": {
+    "version": "289",
+    "sha256": "400c51f34f21668d289aa8ff19054416ef9df8099739fc3f40373a0e36a9479d"
+  },
+  "intro-bucket.mjs": {
+    "version": "103",
+    "sha256": "b1bc6e2a2337d6c3e1667b74ceeb05e810a97f81058b9442f80ed80f1f0e0c97"
+  },
+  "intro-codec.mjs": {
+    "version": "4",
+    "sha256": "dc36343f79035b50e117f4c0bbd858fdb256d194596128560a808556d26cc200"
+  },
+  "intro-cursor-store.mjs": {
+    "version": "16",
+    "sha256": "d51776a5437493a8ebb857c772034fd66b1586bb6ad3302b9fe92199779588c6"
+  },
+  "intro-handshake.mjs": {
+    "version": "8",
+    "sha256": "4acb52e882706c6ede347421b79534366c896d619366432ced523d45ce37287c"
+  },
+  "intro-lane-send.mjs": {
+    "version": "135",
+    "sha256": "3690e7a74426dcd4b839a7b0ec5e1701f88c03af86f3c198323df1470feb71b2"
+  },
+  "intro-lane.mjs": {
+    "version": "135",
+    "sha256": "3eb7f693c548e11babfa0ad55221e044ea479f688c46497862cbbc05f7bb9dd8"
+  },
+  "intro-publish-browser.mjs": {
+    "version": "104",
+    "sha256": "5fcb7c4adaf08a13d8fedf74fbfebd8452e3fa93b22382086838737e97ba9553"
+  },
+  "intro-receive-handler.mjs": {
+    "version": "32",
+    "sha256": "48343186667696a189b86d8698ec4668ed1425f993cc5cf9b01bd96bc3d70c99"
+  },
+  "intro-receive.mjs": {
+    "version": "83",
+    "sha256": "bafb761b8c05855d21eee106b8ed7cec53c696eb379b1db6f2f9868b9bd9dd38"
+  },
+  "intro-scan-policy.mjs": {
+    "version": "6",
+    "sha256": "f02c2b4a24c7aeeb01fc6033065d9e084a52d83ee834059bec074b3e86887aac"
+  },
+  "intro-scan-runner.mjs": {
+    "version": "113",
+    "sha256": "a54e4f98b01b9f8407e602d04b36ab1efb3b31229e71cece4a77ef4d5b076745"
+  },
+  "intro-scan.mjs": {
+    "version": "16",
+    "sha256": "630aafcaaeefd6dc4d98480a8459f073d36baeec9fb166175d74b4452989a28b"
+  },
+  "intro-send-coords.mjs": {
+    "version": "105",
+    "sha256": "b58f85c93cbdc009b728eb097a5a7572d2e69452f25e7af677559e60afed633d"
+  },
+  "intro-send-state.mjs": {
+    "version": "5",
+    "sha256": "28bace4aa8444840b11205df0a84be73c9d51bc90eee8fc4cf8d56f89e0d66f1"
+  },
+  "intro-transport.mjs": {
+    "version": "111",
+    "sha256": "d81c16569dd5ff2671896e45346b6e01d283e0f865a3c6775d677849ac307607"
+  },
+  "key-shard-register-browser.mjs": {
+    "version": "46",
+    "sha256": "4e8c70665caf1b9de7966f97973e2b2a25ab3f8c2c01de934d8e7a9530a0b8b4"
+  },
+  "key-shard-register-send.mjs": {
+    "version": "90",
+    "sha256": "76b1cb8f32f21a0d43cc5c274cd780ab378ed796e7cb73cd82a6da4679ab9e71"
+  },
+  "key-shard-ton-rpc-provider.mjs": {
+    "version": "45",
+    "sha256": "36c3b8615dd2e06d15d5478ef9477468c665ee4966c6c967289e3a2100791da8"
+  },
+  "keyed-rows.mjs": {
+    "version": "3",
+    "sha256": "616225d310ce9142aaca055274d205b32017319d6226db767b6b1da2a4790086"
+  },
+  "lottie_light_canvas.min.js": {
+    "version": "1",
+    "sha256": "18f59c1b4e5a8768068d67bd07c794ee9b8bc0f14c21f6eb61b58915d44734a6"
+  },
+  "m21c-envelope.mjs": {
+    "version": "5",
+    "sha256": "18f510629f4b1568594e9c4c03ec755865de0abeee2757f61de1878f71c1339a"
+  },
+  "market-stability-buy-send.mjs": {
+    "version": "64",
+    "sha256": "5b542246f659ee847e5b745903baf0e84bf653d794dc64e9011a26aa6692479e"
+  },
+  "market-stability-read.mjs": {
+    "version": "3",
+    "sha256": "669a0ab28fa2b954c02ed4a89aff8bd63fb83a7dcfd3c05c3db0dba19d293e58"
+  },
+  "message-plain-text.mjs": {
+    "version": "5",
+    "sha256": "488099d03c8b099ba596eda1c2247a57e253755cd44c72efde32cf5f542a5f90"
+  },
+  "message-pricing-policy.mjs": {
+    "version": "15",
+    "sha256": "801154b78d65f297b370025277770f58666673a8dc4757c013f4baebea7fad44"
+  },
+  "moderation.mjs": {
+    "version": "79",
+    "sha256": "7224991c449e8ae61e3d60a6bf77e5649da530ac6bcccf361044593365ddd26c"
+  },
+  "nft-market.mjs": {
+    "version": "5",
+    "sha256": "6101cf6fc2938e744c40fc46925c7ea0f2a46ef8c3ae146d31bd3abe53fc1d0a"
+  },
+  "notes-lane.mjs": {
+    "version": "112",
+    "sha256": "09c1abe96c7a4bdc000b9479b631287df6b6ba1d201e2e08e1412c820f46c758"
+  },
+  "platho-config.mjs": {
+    "version": "175",
+    "sha256": "c6267284593a18765b589530c04bb65574a272489de6aa3e972d3f065bd863f1"
+  },
+  "platho-crypto.mjs": {
+    "version": "31",
+    "sha256": "bf3e54853f4c43e650088ce9861c5dd54d4f69403e0bf3a8354001102528a52c"
+  },
+  "platho-wallet.mjs": {
+    "version": "93",
+    "sha256": "279b0890216e03586ac000f25dcc109bc6fba2724912ac4e232fa834d8e029c8"
+  },
+  "pool-activity.mjs": {
+    "version": "5",
+    "sha256": "5371cabe322f5e5cf2174656c645940eb4ec3a673d5f8cbb08eef2c3b9e15016"
+  },
+  "pool-state.mjs": {
+    "version": "5",
+    "sha256": "1b5fbcba7a1788b0224bc3f87790a6e96230e106598042c17a60df7102c8eec9"
+  },
+  "price-history.mjs": {
+    "version": "12",
+    "sha256": "0429ba05aedd23f52da741b3cbe6e6b51c51359a91ba2c07b1de35c3e0c55bb1"
+  },
+  "profile-avatar-media-store.mjs": {
+    "version": "7",
+    "sha256": "4475e6eca0776e80c9ec338a4ca7db75576c7ada0f2364073ccf6d492f1990b8"
+  },
+  "profile-registry-ton-rpc-provider.mjs": {
+    "version": "94",
+    "sha256": "d8cf15c9c76f6e1bbcac40087b6001c42591772e408d584ace8d2c2fe198126c"
+  },
+  "public-channel-subscriptions.mjs": {
+    "version": "274",
+    "sha256": "13932b3ab388c8db4f1dd678f9b5ff7659d25f1148abdc566a506579bdc76a65"
+  },
+  "public-group-protocol.mjs": {
+    "version": "11",
+    "sha256": "0d3567b183afef2dcc5cf954134b343c2448f39b2aa1c003ebaf751ba7d83eaa"
+  },
+  "public-group-runtime.mjs": {
+    "version": "28",
+    "sha256": "91a545002603d903845328ae6de12772d967c159ed2ba1f558fc3a7ee5a2dc51"
+  },
+  "public-lane-send.mjs": {
+    "version": "144",
+    "sha256": "29b6e42dee05482ff4f1125f2b51fb9b8d607ceb4dda8d5a79a89a40092d0c78"
+  },
+  "public-lane.mjs": {
+    "version": "164",
+    "sha256": "502b9da49ace83752a767c4d5444188078d702f2f5beee143901e9029295e387"
+  },
+  "public-publish-browser.mjs": {
+    "version": "83",
+    "sha256": "8ab18ba59f5e1a9d57a567b281dd0479f0bba6c06531c7ec68929008471ede68"
+  },
+  "public-reactions.mjs": {
+    "version": "31",
+    "sha256": "e4b5172dceef4ea491f6451ba71611f28af55eee4daeeed2a11076a8d7218d99"
+  },
+  "public-shard-ton-rpc-provider.mjs": {
+    "version": "44",
+    "sha256": "1546358610c122926c7669c376cf12ac3f165d44be2dd198f576c4ab4a606e05"
+  },
+  "publish-final-cost.mjs": {
+    "version": "18",
+    "sha256": "b85e2d4873816730c557e7b5526e0b590e26db4dc072d13dc0cb297162912300"
+  },
+  "publish-price.mjs": {
+    "version": "17",
+    "sha256": "c85cf05177305fabef59b6df703001c242fc440a0a537e25e205059868b13223"
+  },
+  "pwa-contract-transactions.mjs": {
+    "version": "59",
+    "sha256": "be61194ace8b9877da5155b1ee0565e3089bd2ce1de4eedd911af8d1b5f8c7a2"
+  },
+  "qr-code.mjs": {
+    "version": "1",
+    "sha256": "1e57a437e0328a21087d0ecd324b52f07f51e5a996759fd94ef0d663223b3eae"
+  },
+  "recipient-identities.mjs": {
+    "version": "105",
+    "sha256": "cb2a9e33572f02733b56638454ac8c78aa072689d78023ed2acab2b818f9d011"
+  },
+  "recovery-blob.mjs": {
+    "version": "31",
+    "sha256": "2c82d7b2ab742b6bd3ece3025212f3d26375c79892314d54d11cd4856540d5a9"
+  },
+  "recovery-lane.mjs": {
+    "version": "133",
+    "sha256": "b71dc75b78d04a56981a735d1d3920bb0a2fb8ec9c0f832f0c14acab5ab38797"
+  },
+  "recovery-publish-browser.mjs": {
+    "version": "102",
+    "sha256": "35aea94f98336f79695f7087332571aa5759acbd39afc427ebe11318751ef159"
+  },
+  "recovery-transport.mjs": {
+    "version": "110",
+    "sha256": "f75662e5d70fe9e9f57e049aece5a90679398c30fba7f53ac31d3e4532b2a453"
+  },
+  "replay-store.mjs": {
+    "version": "8",
+    "sha256": "95aa12dda3baae2221ca926e63f56d35c2a01edfe18631ec9b7253f262b57b0f"
+  },
+  "sealed-cache.mjs": {
+    "version": "6",
+    "sha256": "0ba882358fcd452b04924e24fa7de0d271af1f6b35569104b381977af03905c9"
+  },
+  "shard-address.mjs": {
+    "version": "47",
+    "sha256": "58ec0a87bdd41d50c58ac7c35f10e03e1d24748d5466548ddf22ffa5c5e383d2"
+  },
+  "shard-code-18.mjs": {
+    "version": "2",
+    "sha256": "d893025e4bdbd873ea993c6d8517c09eaa80c373091777c825a4b087d8c4eda4"
+  },
+  "shard-code.mjs": {
+    "version": "6",
+    "sha256": "b5a7db414fbf04b87a4511e28abe1540ea0f0340290cab86e2244e4cea94c21d"
+  },
+  "shard-debt.mjs": {
+    "version": "82",
+    "sha256": "0477d17b200dedf52044d8826fc90f2b542c6a73e69db02a8e1e0bca3d8ae571"
+  },
+  "shard-discovery.mjs": {
+    "version": "103",
+    "sha256": "04bcbd807bd36c5d8959029f3aaab9dcbe9ecfbcc2406bfc80d70653ca24c15c"
+  },
+  "shard-reader.mjs": {
+    "version": "108",
+    "sha256": "204f7251a88d2631e8f12e4ab97e5fdc6bd8dc34f8d2054e5217f8c86abe4af2"
+  },
+  "shard-rpc.mjs": {
+    "version": "69",
+    "sha256": "1eb196eaba643e853e71443f7298a81713fd0566fb308e8a1d3b755404865618"
+  },
+  "storage-resecure.mjs": {
+    "version": "20",
+    "sha256": "924160f362a34c76e4f5f0ce13d06365f8c9038bda7da0a741145589bc3d3a23"
+  },
+  "styles.css": {
+    "version": "610",
+    "sha256": "637e2612c48d8f2339dabb1c24568ee399861fc68f304fa58f6d75dfefdf2eea"
+  },
+  "swap-pools.mjs": {
+    "version": "5",
+    "sha256": "bf08498a57a21de39db4e27b297e3d9eb4034e2e03b1b3e255273598dcd90933"
+  },
+  "swap-routes.mjs": {
+    "version": "21",
+    "sha256": "161548b530c651efe92c6b3966d8a059922af6fa9a64e2bc64183b4a2a8d7e1b"
+  },
+  "telegram-gift-nfts.mjs": {
+    "version": "27",
+    "sha256": "7e61a64fb1445facaefbbf78f74b9f5a7058216095b86e4d3162137c0d05e93c"
+  },
+  "telegram-launch.mjs": {
+    "version": "2",
+    "sha256": "a3ef841ff5ffd9b9f47e919010b8e4f38c8e33d67617e3694a1dbab479cb2b9c"
+  },
+  "telegram-web-app.js": {
+    "version": "3",
+    "sha256": "568427eea9fc9c289529d34e83fb6d41f9213d249ada8e9a6abd4351ffca341b"
+  },
+  "thread-list-order.mjs": {
+    "version": "5",
+    "sha256": "956e16e69c0a7803b06429f51a295ef5ff17c3f20b295a47ec766577b335e6ea"
+  },
+  "ton-dns-provider.mjs": {
+    "version": "95",
+    "sha256": "af732758902b1182c3eb8a82ae416a4ba4399105bcec09c3f947f3ead69fe566"
+  },
+  "ton-mnemonic-wordlist.mjs": {
+    "version": "2",
+    "sha256": "d159bdd3cc8bfecff4c9b95f63f5203d2f2a6f52fe60da2b02b3edca2cca6544"
+  },
+  "ton-rpc-transport.mjs": {
+    "version": "111",
+    "sha256": "841b37ac0dcffa7ab97d0ec7513f50e8d6e60173a83cd541bbec5a080e1fa33c"
+  },
+  "ton-stack-num.mjs": {
+    "version": "2",
+    "sha256": "5bd7c3a72eeaa14bf5969acb68f3380128cda773345e57c62ce34f5334765bde"
+  },
+  "username-nft-owned.mjs": {
+    "version": "38",
+    "sha256": "76bca76f1c94ef7425e6473e42593f533aedf37bcd68eff0de40d50d7fe4a8e6"
+  },
+  "username-nft-transfer.mjs": {
+    "version": "23",
+    "sha256": "ea3a296b6b832cf9754313f7ff98c2f7272bf46edbb0e9637c73f47013391c58"
+  },
+  "username-ton-rpc-provider.mjs": {
+    "version": "95",
+    "sha256": "4d66bb7ad5f643a9401f9e7811b5f241802d2dfec0955e86bdad50dc863fe76f"
+  },
+  "vault-account.mjs": {
+    "version": "73",
+    "sha256": "e2b9c2cad50025e74b3be4ce090aa5ec6ab32f4a29e9ac654d88ea3002c25f60"
+  },
+  "verified-assets.mjs": {
+    "version": "5",
+    "sha256": "a52fe3a687f285a748b0406cae86fd15766e2b693c0fab11c048b6881c360f38"
+  },
+  "wallet-assets.mjs": {
+    "version": "29",
+    "sha256": "08eca66b32ad888d7b82da59b177a0ebe5f551898083fa56ef8da8270950be49"
+  },
+  "wallet-keyring.mjs": {
+    "version": "7",
+    "sha256": "f8d9b2c1a13370fa00fd10a143f493f32d60592c4115fe7cc5968802f7860009"
+  },
+  "wallet-send-fee.mjs": {
+    "version": "65",
+    "sha256": "16b6d70d575228019d2925bc4872c160fb16008345f9ac18c11e48b67ad5ee5b"
+  },
+  "wallet-swap-dedust.mjs": {
+    "version": "13",
+    "sha256": "34389375d45514a1ee28becbcf80a87904578919d1f3dd75dad8e396a3645769"
+  },
+  "wallet-swap.mjs": {
+    "version": "20",
+    "sha256": "3128109561797984f4ca50319ba7ee7330dbdfdc7ae1133088c4688bd4cd7c68"
+  },
+  "wallet-transfers.mjs": {
+    "version": "15",
+    "sha256": "8a8b017fa274f8a15c53dde2db147ea88aba3bf22517503f44b587cb0aa23ea6"
+  },
+  "webp-encoder.mjs": {
+    "version": "1",
+    "sha256": "0ecbbc627b232ecda048978dafc942870751369896650712d36830ba8649d9b3"
+  }
+}

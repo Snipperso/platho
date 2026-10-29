@@ -1,0 +1,50 @@
+{
+  "name": "platho",
+  "version": "1.5.23",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "build": "node scripts/tact_build.js --config tact.config.json",
+    "vectors": "ts-node scripts/generate_ath_wallet_vectors.ts",
+    "test": "vitest run --config vitest.all.config.ts",
+    "lint": "node scripts/check_undeclared_identifiers.mjs && node scripts/check_tdz.mjs",
+    "test:regression:file": "vitest run --testTimeout=30000",
+    "test:all": "vitest run --config vitest.all.config.ts --reporter=verbose",
+    "test:debug": "PLATHO_VITEST_DEBUG_LOG=vitest-full-debug.log vitest run --config vitest.debug.config.ts --reporter=verbose",
+    "test:file": "vitest run --testTimeout=30000",
+    "crypto:selftest": "node scripts/platho_web_crypto_selftest.mjs",
+    "mainnet:ath-master:derive": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_ath_master_derivation.ts",
+    "mainnet:ath-metadata": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate_ath_metadata_content.ts",
+    "m20f:preflight": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_mainnet_route_freeze_preflight.ts",
+    "mainnet:genesis:verify": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_genesis_verify.ts artifacts/mainnet_genesis_verify_input.json",
+    "web:deploy:prepare": "node scripts/prepare_static_web_deploy.mjs --mode both",
+    "lists:refresh": "node scripts/refresh_lists.mjs",
+    "pricing:report": "node scripts/publish_reserve_pricing_report.mjs"
+  },
+  "keywords": [],
+  "author": "Platho",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Snipperso/platho.git"
+  },
+  "homepage": "https://platho.app",
+  "license": "SEE LICENSE IN LICENSE",
+  "description": "No-backend encrypted messenger PWA and TON smart-contract suite",
+  "dependencies": {
+    "@noble/post-quantum": "^0.6.1"
+  },
+  "devDependencies": {
+    "@ston-fi/api": "0.32.0",
+    "@ston-fi/sdk": "2.7.0",
+    "@tact-lang/compiler": "^1.6.13",
+    "@tgcloud/cli": "0.2.0",
+    "@ton/core": "^0.63.1",
+    "@ton/sandbox": "^0.42.0",
+    "@ton/test-utils": "^0.12.0",
+    "@ton/ton": "^16.2.4",
+    "fake-indexeddb": "^6.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}

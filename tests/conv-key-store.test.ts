@@ -1,0 +1,128 @@
+import { describe, expect, it } from 'vitest';
+import { createMemoryConvKeyStore, conversationId, adoptKRoot, PEER_WALLET_CANDIDATES_MAX } from '../web/conv-key-store.mjs';
+
+
+const kid = (b: number) => new Uint8Array(32).fill(b);
+const kroot = (b: number) => new Uint8Array(32).fill(b);
+const nonce = (b: number) => new Uint8Array(16).fill(b);
+const A = kid(0x11);
+const B = kid(0x22);
+
+describe('CONV-KEY-STORE', () => {
+  it('CKS-01: conversationId is the SAME join key from both sides (order-independent)', () => {
+    expect(conversationId(A, B), 'initiator and responder must land on one record').toBe(conversationId(B, A));
+  });
+
+  it('CKS-02: re-INTRO adoption is last-writer-WINS by createdAt, not by arrival order', async () => {
+    const store = createMemoryConvKeyStore();
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerEncPublicKey: kid(0x33) })).toBe('created');
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 50, introNonce: nonce(2) })).toBe('retained');
+    let rec = store.getConversation(A, B)!;
+    expect([...rec.kRootCurrent], 'the newer root stays current').toEqual([...kroot(1)]);
+    expect(rec.kRootsForRead.length, 'the older root is kept for decrypting its history').toBe(1);
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(3), createdAt: 150, introNonce: nonce(3) })).toBe('adopted');
+    rec = store.getConversation(A, B)!;
+    expect([...rec.kRootCurrent], 'the newest root now drives derivation').toEqual([...kroot(3)]);
+    expect(rec.kRootsForRead.length, 'both older roots remain readable').toBe(2);
+  });
+
+  it('CKS-03: adoption ties on createdAt break by introNonce (deterministic on both sides)', () => {
+    const base = adoptKRoot(undefined, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(5), peerKeyId: B }).record;
+    expect(adoptKRoot(base, { kRoot: kroot(2), createdAt: 100, introNonce: nonce(9), peerKeyId: B }).outcome).toBe('adopted');
+    expect(adoptKRoot(base, { kRoot: kroot(2), createdAt: 100, introNonce: nonce(2), peerKeyId: B }).outcome).toBe('retained');
+  });
+
+  it('CKS-04: re-adopting the identical intro is idempotent (no duplicate read-roots)', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    expect(await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) })).toBe('duplicate');
+    expect(store.getConversation(A, B)!.kRootsForRead.length, 'no phantom read-root from a replayed intro').toBe(0);
+  });
+
+  it('CKS-05: outgoing seq is locally monotonic — two fast messages never collide, coldFloor only seeds', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    const first = await store.nextOutgoingSeq(A, B, 19000, 7);
+    const second = await store.nextOutgoingSeq(A, B, 19000, 7);
+    expect(first).toBe(8);
+    expect(second, 'a stale coldFloor must not reset the local counter').toBe(9);
+    expect(await store.nextOutgoingSeq(A, B, 19001, 0)).toBe(1);
+  });
+
+  it('CKS-09: the floor pushes a WARM counter forward — a device behind its sibling cannot re-claim committed seqs', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    expect(await store.nextOutgoingSeq(A, B, 19100, 0)).toBe(1);
+    expect(await store.nextOutgoingSeq(A, B, 19100, 6), 'the floor lifts a lagging warm counter past the sibling').toBe(7);
+    expect(await store.nextOutgoingSeq(A, B, 19100, 2), 'a stale floor never rolls the counter back').toBe(8);
+  });
+
+  it('CKS-06: peerWallet (the INTRO tx src) is stored on create and preserved across a re-INTRO', async () => {
+    const store = createMemoryConvKeyStore();
+    const walletA = '0:' + 'ab'.repeat(32);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerWallet: walletA });
+    expect(store.getConversation(A, B)!.peerWallet, 'wallet captured on first contact').toBe(walletA);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 200, introNonce: nonce(2) });
+    expect(store.getConversation(A, B)!.peerWallet, 'a walletless re-INTRO keeps the known wallet').toBe(walletA);
+    const walletA2 = '0:' + 'cd'.repeat(32);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(3), createdAt: 300, introNonce: nonce(3), peerWallet: walletA2 });
+    expect(store.getConversation(A, B)!.kRootCurrent, 'the newer root is adopted').toEqual(kroot(3));
+    expect(store.getConversation(A, B)!.peerWallet, 'the wallet already known stays').toBe(walletA);
+    expect(store.getConversation(A, B)!.peerWalletCandidates, 'and the new source is a candidate').toContain(walletA2);
+  });
+
+  it('CKS-07: the receive scan cursor is null on create, advances MONOTONICALLY, and survives a re-INTRO', async () => {
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1) });
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'never scanned yet').toBeNull();
+    await store.advanceConvScanCursor(A, B, 19000);
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'cursor set').toBe(19000);
+    await store.advanceConvScanCursor(A, B, 18990);
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'monotonic — never rewinds').toBe(19000);
+    await store.advanceConvScanCursor(A, B, 19005);
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'advances forward').toBe(19005);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 200, introNonce: nonce(2) });
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'cursor survives a re-INTRO').toBe(19005);
+    await store.advanceConvScanCursor(A, kroot(9), 5);
+  });
+
+  it('CKS-08: importConversations rehydrates records (restore), and a NEWER live root is not rolled back by an older backup', async () => {
+    const hx = (b: Uint8Array) => Buffer.from(b).toString('hex');
+    const backup = createMemoryConvKeyStore();
+    await backup.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerWallet: 'w-A' });
+    await backup.advanceConvScanCursor(A, B, 19005);
+    const backupMap = backup.snapshot();
+
+    const fresh = createMemoryConvKeyStore();
+    expect(await fresh.importConversations(backupMap), 'one record imported').toBe(1);
+    expect(hx(fresh.getConversation(A, B)!.kRootCurrent)).toBe(hx(kroot(1)));
+    expect(fresh.getConversation(A, B)!.lastScannedEpoch, 'a restored record has NO cursor on this device').toBeNull();
+    expect(fresh.getConversation(A, B)!.peerWallet).toBe('w-A');
+    expect(backupMap.get(conversationId(A, B))!.lastScannedEpoch, 'the backup itself still carries its own cursor').toBe(19005);
+
+    const live = createMemoryConvKeyStore();
+    await live.upsertConversationKRoot(A, B, { kRoot: kroot(9), createdAt: 300, introNonce: nonce(9) });
+    expect(await live.importConversations(backupMap), 'older backup does not overwrite a newer live root').toBe(0);
+    expect(hx(live.getConversation(A, B)!.kRootCurrent), 'the live (rotated) root stays current').toBe(hx(kroot(9)));
+
+    const stale = createMemoryConvKeyStore();
+    await stale.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 50, introNonce: nonce(1) });
+    await stale.advanceConvScanCursor(A, B, 19010);
+    expect(await stale.importConversations(backupMap), 'newer backup replaces the older local root').toBe(1);
+    expect(hx(stale.getConversation(A, B)!.kRootCurrent)).toBe(hx(kroot(1)));
+    expect(stale.getConversation(A, B)!.lastScannedEpoch, 'replaced root → no cursor').toBeNull();
+  });
+
+  it('CKS-07: every wallet that published the INTRO commitment is kept beside the recorded one, merged on a re-INTRO, bounded [audit 2026-09-23, round 5]', async () => {
+    const created = adoptKRoot(undefined, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(5), peerKeyId: B, peerWallet: 'w-replay', peerWalletCandidates: ['w-replay', 'w-real'] }).record;
+    expect(created.peerWalletCandidates).toEqual(['w-replay', 'w-real']);
+    const merged = adoptKRoot(created, { kRoot: kroot(2), createdAt: 200, introNonce: nonce(9), peerKeyId: B, peerWalletCandidates: ['w-real', 'w-third'] }).record;
+    expect(merged.peerWalletCandidates, 'merged, each once').toEqual(['w-replay', 'w-real', 'w-third']);
+    const flooded = adoptKRoot(merged, { kRoot: kroot(3), createdAt: 300, introNonce: nonce(10), peerKeyId: B, peerWalletCandidates: Array.from({ length: 100 }, (_, i) => `w-${i}`) }).record;
+    expect(flooded.peerWalletCandidates.length, 'bounded').toBe(PEER_WALLET_CANDIDATES_MAX);
+    const store = createMemoryConvKeyStore();
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 100, introNonce: nonce(1), peerWallet: 'w-replay', peerWalletCandidates: ['w-replay', 'w-real'] });
+    expect(store.getConversation(A, B)!.peerWalletCandidates).toEqual(['w-replay', 'w-real']);
+  });
+
+});

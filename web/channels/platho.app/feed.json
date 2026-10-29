@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "channelId": "platho.app",
+  "updatedAt": "2026-05-21T12:00:00.000Z",
+  "posts": [
+    {
+      "id": "platho-app-genesis-2026-05-21",
+      "createdAt": "2026-05-21T12:00:00.000Z",
+      "author": "platho.app",
+      "authorWallet": "UQDU48m_nYC12oqHJnKG9nBE4ljGpUYHHLPS-owij9BEOATH",
+      "title": "platho.app",
+      "text": "Official public channel is live.",
+      "bodyHash": null,
+      "entryUid": null
+    }
+  ]
+}

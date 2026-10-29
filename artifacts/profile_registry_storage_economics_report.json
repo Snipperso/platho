@@ -1,0 +1,75 @@
+{
+  "profile": "PLATHO.V1.PROFILE_REGISTRY_STORAGE_ECONOMICS",
+  "status": "PASS",
+  "generated_at": "DETERMINISTIC_ARTIFACT",
+  "code_hashes": {
+    "profile_registry": "f01d981c4f4d7a519eaaa04c43aca1a22e58b05d221af50007fb9d316bbacbc1"
+  },
+  "note": "Sandbox evidence for the two properties that survived the 2026-07-21 pointer move: the registry account does NOT grow with the number of profiles (it used to grow 5.0000 cells each, capping the product at 13,076 profiles silently), and a settled purchase does not cost the registry TON. Per-profile storage endowments are gone with the state they funded; the buyer KeyShard funds its own rent, measured in tests/key-shard.test.ts KS-RENT-01. This is not a mainnet rent oracle; it is a release gate.",
+  "constants": {
+    "profile_key_shard_write_value_nanotons": "50000000",
+    "profile_avatar_settle_exec_reserve_nanotons": "5000000",
+    "profile_state_growth_exec_reserve_nanotons": "3000000",
+    "profile_ath_notification_ack_value_nanotons": "1000000",
+    "profile_ath_notification_refund_value_nanotons": "45000000",
+    "profile_excess_refund_forward_reserve_nanotons": "200000",
+    "profile_retained_model_nanotons": "58000000",
+    "minimum_storage_margin_nanotons": "1000000"
+  },
+  "cases": [
+    {
+      "label": "DIRECT_FIRST_AVATAR",
+      "owners": 1,
+      "updates": 1,
+      "raw_balance_delta_nanotons": "55654729",
+      "expected_permanent_endowment_nanotons": "0",
+      "expected_retained_model_nanotons": "58000000",
+      "retained_margin_vs_permanent_endowment_nanotons": "55654729",
+      "profile_count": "1",
+      "pending_avatar_write_count": "0",
+      "registry_data_cells": "3",
+      "data_cells_per_owner": "0"
+    },
+    {
+      "label": "DIRECT_REPEAT_AVATAR",
+      "owners": 1,
+      "updates": 1,
+      "raw_balance_delta_nanotons": "55628595",
+      "expected_permanent_endowment_nanotons": "0",
+      "expected_retained_model_nanotons": "58000000",
+      "retained_margin_vs_permanent_endowment_nanotons": "55628595",
+      "profile_count": "1",
+      "pending_avatar_write_count": "0",
+      "registry_data_cells": "3",
+      "data_cells_per_owner": "0"
+    },
+    {
+      "label": "DIRECT_MANY_OWNERS_12",
+      "owners": 12,
+      "updates": 12,
+      "raw_balance_delta_nanotons": "667852728",
+      "expected_permanent_endowment_nanotons": "0",
+      "expected_retained_model_nanotons": "696000000",
+      "retained_margin_vs_permanent_endowment_nanotons": "667852728",
+      "profile_count": "12",
+      "pending_avatar_write_count": "0",
+      "registry_data_cells": "3",
+      "data_cells_per_owner": "0"
+    },
+    {
+      "label": "DIRECT_MANY_UPDATES_ONE_OWNER_10",
+      "owners": 1,
+      "updates": 10,
+      "raw_balance_delta_nanotons": "556308734",
+      "expected_permanent_endowment_nanotons": "0",
+      "expected_retained_model_nanotons": "580000000",
+      "retained_margin_vs_permanent_endowment_nanotons": "556308734",
+      "profile_count": "1",
+      "pending_avatar_write_count": "0",
+      "registry_data_cells": "3",
+      "data_cells_per_owner": "0"
+    }
+  ],
+  "worst_margin_vs_permanent_endowment_nanotons": "55628595",
+  "worst_data_cells_per_owner": "0"
+}

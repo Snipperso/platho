@@ -1,0 +1,476 @@
+{
+ "taken": "2026-10-29",
+ "transfers": {
+  "nft_transfers": [
+   {
+    "nft_address": "0:CF1FA2F2B2B993ADFC5A1ABD44212C01A84850078EDA1BF1D57D16F0908579C4",
+    "nft_collection": "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B",
+    "transaction_now": 1793267662,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:6B0C00B5CCDBFF4D09700D377BA4ED81537FD7F31DB79F05F18207256082899C",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:99F484E4B19111FB6FA86044C5243C605055298185F7B8A53AF877BCC0A1F152",
+    "nft_collection": "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B",
+    "transaction_now": 1793267610,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:DD0C4996BF4505864564DF7DBD5E6909203423306C889F51E9C53F572C3CE190",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:CB366921C03CA1426B4B6AF75956C2A24D5BBED60077446D1266D3154DC20615",
+    "nft_collection": "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B",
+    "transaction_now": 1793267556,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:884337514D36F74BA4A7121F58810B108A929F3455ED3317D189BAEC9FD4E25A",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:81B9A4B2B7BFBC2C0FCCEB25E113A7E315AEC1883DB5E0B5CC11609224305593",
+    "nft_collection": "0:46FA0E9A864014196A5E7D66F1F83FFDB10F2859BBF2EA9BAEABBF14D9CE0D50",
+    "transaction_now": 1793267283,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:2A97ECC58B06585B51CB3DC61FFC438ACCF72BBE94814C5B002D547F9BA494A7",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:7073D4A3C68334560771F7C0F837B009EADBF86E54566A22D9084C08F861CA97",
+    "nft_collection": "0:2731CCD5EC363AAD90B91CBC1B9F921D8BC1339A9A69E2A58C3F2C36E1A323F8",
+    "transaction_now": 1793267225,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:D2602642978FD30F0FFB0E27538DEC8B312D6BA03905D7D632205147455DE102",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:94D76BBEACCDC0C26C4D0E82547078550265EB306E76B4A097F1711567F3D772",
+    "nft_collection": "0:7501368A18D624E93E51D9C035F01385F8A07F89D68A2A2830608DA3B635AE2E",
+    "transaction_now": 1793267224,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:2FBF23D4A8D998A44109399FE24F7E52D5363225BCF41F0AFA54E895EDFEEA87",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:C2E206E87B6D30C6D1A7887D22E334AB3F8B0A37EDBCD3F1B74D5D82556CFB45",
+    "nft_collection": "0:BC5955BD0D23783CF7C59425B60072645F10541C116CBE7857898A924E90FBB5",
+    "transaction_now": 1793267075,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:494AC249DDD0BBAC59E0D5670E092EDCDF928BE4A9BADD0B7406F647DF58459C",
+    "forward_amount": "0"
+   },
+   {
+    "nft_address": "0:EE6D8E09E2DD1AD1EC7D91DC95587EA3A509D3259B0969835EBA635620C7F57F",
+    "nft_collection": "0:BD7E11E928ABAD09B7E0F6BF56DCA5BF2FFA4C3236405BC1DED41AA9ABEA61C1",
+    "transaction_now": 1793267055,
+    "transaction_aborted": false,
+    "old_owner": "0:39D63083E48F46452FF8A04CD0D3733A90C8BE299AA5951B62741759B2C17E0E",
+    "new_owner": "0:43797D984BDF3FB2375C4A4112AA6450CFB67FF1760D7576C4FC44D8D4BB7BE9",
+    "forward_amount": "0"
+   }
+  ]
+ },
+ "sales": {
+  "nft_sales": [
+   {
+    "type": "getgems_sale",
+    "address": "0:6B0C00B5CCDBFF4D09700D377BA4ED81537FD7F31DB79F05F18207256082899C",
+    "nft_address": "0:CF1FA2F2B2B993ADFC5A1ABD44212C01A84850078EDA1BF1D57D16F0908579C4",
+    "nft_owner_address": "0:8E0228EED2F3C78469DFF19EAFFE233D4D3F903EE40082E616A3210E39BD32AB",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267656,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "350000000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "2000",
+     "royalty_address": "0:FC1283AC8AA89425DCF78BBCF6D8EB3DEFA4F81D8EA6D861029A4CA494CD5BDC",
+     "royalty_amount": "0"
+    },
+    "nft_item": {
+     "address": "0:CF1FA2F2B2B993ADFC5A1ABD44212C01A84850078EDA1BF1D57D16F0908579C4",
+     "index": "61170848402657757218321052704481677137748322002709526240962755035681932705675",
+     "collection_address": "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B",
+     "owner_address": "0:6B0C00B5CCDBFF4D09700D377BA4ED81537FD7F31DB79F05F18207256082899C"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:DD0C4996BF4505864564DF7DBD5E6909203423306C889F51E9C53F572C3CE190",
+    "nft_address": "0:99F484E4B19111FB6FA86044C5243C605055298185F7B8A53AF877BCC0A1F152",
+    "nft_owner_address": "0:8E0228EED2F3C78469DFF19EAFFE233D4D3F903EE40082E616A3210E39BD32AB",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267605,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "350000000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "2000",
+     "royalty_address": "0:FC1283AC8AA89425DCF78BBCF6D8EB3DEFA4F81D8EA6D861029A4CA494CD5BDC",
+     "royalty_amount": "0"
+    },
+    "nft_item": {
+     "address": "0:99F484E4B19111FB6FA86044C5243C605055298185F7B8A53AF877BCC0A1F152",
+     "index": "91709508201946349454648448495735998557927783166010115906025788038983155321222",
+     "collection_address": "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B",
+     "owner_address": "0:DD0C4996BF4505864564DF7DBD5E6909203423306C889F51E9C53F572C3CE190"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:884337514D36F74BA4A7121F58810B108A929F3455ED3317D189BAEC9FD4E25A",
+    "nft_address": "0:CB366921C03CA1426B4B6AF75956C2A24D5BBED60077446D1266D3154DC20615",
+    "nft_owner_address": "0:8E0228EED2F3C78469DFF19EAFFE233D4D3F903EE40082E616A3210E39BD32AB",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267547,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "1050000000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "2000",
+     "royalty_address": "0:FC1283AC8AA89425DCF78BBCF6D8EB3DEFA4F81D8EA6D861029A4CA494CD5BDC",
+     "royalty_amount": "0"
+    },
+    "nft_item": {
+     "address": "0:CB366921C03CA1426B4B6AF75956C2A24D5BBED60077446D1266D3154DC20615",
+     "index": "97132056036948563341652011922366561520355215984334509266711384197176288796511",
+     "collection_address": "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B",
+     "owner_address": "0:884337514D36F74BA4A7121F58810B108A929F3455ED3317D189BAEC9FD4E25A"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:2A97ECC58B06585B51CB3DC61FFC438ACCF72BBE94814C5B002D547F9BA494A7",
+    "nft_address": "0:81B9A4B2B7BFBC2C0FCCEB25E113A7E315AEC1883DB5E0B5CC11609224305593",
+    "nft_owner_address": "0:D9CF5006DA1C98EED67FEA0133863C0419CCBAE3376565865EF54872E2B3ACFE",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267255,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "15000000000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "2000",
+     "royalty_address": "0:FC1283AC8AA89425DCF78BBCF6D8EB3DEFA4F81D8EA6D861029A4CA494CD5BDC",
+     "royalty_amount": "0"
+    },
+    "nft_item": {
+     "address": "0:81B9A4B2B7BFBC2C0FCCEB25E113A7E315AEC1883DB5E0B5CC11609224305593",
+     "index": "66450708044315311844902325830312141200407339262802573526181821255313271625991",
+     "collection_address": "0:46FA0E9A864014196A5E7D66F1F83FFDB10F2859BBF2EA9BAEABBF14D9CE0D50",
+     "owner_address": "0:2A97ECC58B06585B51CB3DC61FFC438ACCF72BBE94814C5B002D547F9BA494A7"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:D2602642978FD30F0FFB0E27538DEC8B312D6BA03905D7D632205147455DE102",
+    "nft_address": "0:7073D4A3C68334560771F7C0F837B009EADBF86E54566A22D9084C08F861CA97",
+    "nft_owner_address": "0:24466BC558446D8D3455417DC4D85D790266D972C855BB90DB5727D1CF6C8579",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267214,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "1200000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "5000",
+     "royalty_address": "0:9EC5BF0E54274931DBC6F57F66E1499C4C5F16F0C223EBEC60EF29CAD1D67B8D",
+     "royalty_amount": "7500"
+    },
+    "nft_item": {
+     "address": "0:7073D4A3C68334560771F7C0F837B009EADBF86E54566A22D9084C08F861CA97",
+     "index": "432",
+     "collection_address": "0:2731CCD5EC363AAD90B91CBC1B9F921D8BC1339A9A69E2A58C3F2C36E1A323F8",
+     "owner_address": "0:D2602642978FD30F0FFB0E27538DEC8B312D6BA03905D7D632205147455DE102"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:2FBF23D4A8D998A44109399FE24F7E52D5363225BCF41F0AFA54E895EDFEEA87",
+    "nft_address": "0:94D76BBEACCDC0C26C4D0E82547078550265EB306E76B4A097F1711567F3D772",
+    "nft_owner_address": "0:3687D4BDB8E5DFD98064514113200CD9F3632E5AB9D409722AAB62B2A9F1D8ED",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267213,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "29894900000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "2000",
+     "royalty_address": "0:FC1283AC8AA89425DCF78BBCF6D8EB3DEFA4F81D8EA6D861029A4CA494CD5BDC",
+     "royalty_amount": "0"
+    },
+    "nft_item": {
+     "address": "0:94D76BBEACCDC0C26C4D0E82547078550265EB306E76B4A097F1711567F3D772",
+     "index": "65118048057536118123251661625498978580098052698624313807437097424343510013790",
+     "collection_address": "0:7501368A18D624E93E51D9C035F01385F8A07F89D68A2A2830608DA3B635AE2E",
+     "owner_address": "0:2FBF23D4A8D998A44109399FE24F7E52D5363225BCF41F0AFA54E895EDFEEA87"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:494AC249DDD0BBAC59E0D5670E092EDCDF928BE4A9BADD0B7406F647DF58459C",
+    "nft_address": "0:C2E206E87B6D30C6D1A7887D22E334AB3F8B0A37EDBCD3F1B74D5D82556CFB45",
+    "nft_owner_address": "0:87A6F3BB568DA67F206963D33A7A542ED146E374A6A523E0804BF208873C5076",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267068,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "7000000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "2000",
+     "royalty_address": "0:FC1283AC8AA89425DCF78BBCF6D8EB3DEFA4F81D8EA6D861029A4CA494CD5BDC",
+     "royalty_amount": "0"
+    },
+    "nft_item": {
+     "address": "0:C2E206E87B6D30C6D1A7887D22E334AB3F8B0A37EDBCD3F1B74D5D82556CFB45",
+     "index": "21629241099739080921238206672837272552613491233586224902393446929137736475270",
+     "collection_address": "0:BC5955BD0D23783CF7C59425B60072645F10541C116CBE7857898A924E90FBB5",
+     "owner_address": "0:494AC249DDD0BBAC59E0D5670E092EDCDF928BE4A9BADD0B7406F647DF58459C"
+    }
+   },
+   {
+    "type": "getgems_sale",
+    "address": "0:43797D984BDF3FB2375C4A4112AA6450CFB67FF1760D7576C4FC44D8D4BB7BE9",
+    "nft_address": "0:EE6D8E09E2DD1AD1EC7D91DC95587EA3A509D3259B0969835EBA635620C7F57F",
+    "nft_owner_address": "0:62DDEE60D80228A27DF978F362F514CB814512F1450EC2D43E8035C4D0436362",
+    "marketplace_address": "0:584EE61B2DFF0837116D0FCB5078D93964BCBE9C05FD6A141B1BFCA5D6A43E18",
+    "created_at": 1793267050,
+    "code_hash": "a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=",
+    "details": {
+     "is_complete": false,
+     "full_price": "2550000000000",
+     "marketplace_fee_address": "0:BEE7A3D7B8C06F9552032C3880A56A74B702AD8B224F42BFB1AC1C33BD719080",
+     "marketplace_fee": "5000",
+     "royalty_address": "0:7A72521CB3042E7A3933A01BC42815602FD7A672928A67ED76FAD7EF394BB754",
+     "royalty_amount": "5000"
+    },
+    "nft_item": {
+     "address": "0:EE6D8E09E2DD1AD1EC7D91DC95587EA3A509D3259B0969835EBA635620C7F57F",
+     "index": "1145",
+     "collection_address": "0:BD7E11E928ABAD09B7E0F6BF56DCA5BF2FFA4C3236405BC1DED41AA9ABEA61C1",
+     "owner_address": "0:43797D984BDF3FB2375C4A4112AA6450CFB67FF1760D7576C4FC44D8D4BB7BE9"
+    }
+   }
+  ],
+  "metadata": {
+   "0:2731CCD5EC363AAD90B91CBC1B9F921D8BC1339A9A69E2A58C3F2C36E1A323F8": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_collections",
+      "name": "Durovson Ultra",
+      "image": "https://storage.googleapis.com/goodies-api-prod.firebasestorage.app/images/collection/8505c587-cd70-4871-998b-23f3ac57d92c",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/FTGSkmnlA9jbpC75O9loDVynrPM8rwsP1tjNiqECAOI/pr:small/bG9jYWw6Ly8vMDQvNjMvMDQ2M2U2OWM2NDRlNjQxN2Y4YTllNmQ3ZTkyYWUzNzA4YzY5NmQ3NWQyYWMyYzQ5NWVjMzRhNmNkNGM5OGViMw",
+       "_image_medium": "https://proxy.toncenter.com/tDTtMwDYCXmZDkllNNQ1hVAAd2xf-FF-j5-_FlF1vfc/pr:medium/bG9jYWw6Ly8vMDQvNjMvMDQ2M2U2OWM2NDRlNjQxN2Y4YTllNmQ3ZTkyYWUzNzA4YzY5NmQ3NWQyYWMyYzQ5NWVjMzRhNmNkNGM5OGViMw"
+      }
+     }
+    ]
+   },
+   "0:46FA0E9A864014196A5E7D66F1F83FFDB10F2859BBF2EA9BAEABBF14D9CE0D50": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_collections",
+      "name": "Plush Pepes",
+      "image": "https://nft.fragment.com/collection/plushpepe.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/3SiL898yNafS3zytDkq50VPrs66taFc6tI2-TTJgdvI/pr:small/bG9jYWw6Ly8vNTIvN2MvNTI3Y2Q5MmQyZjZjYWEyZDExZTliNTQ4NGVkOWY1YjdkMjFhYzIxODE5ZGVlN2FiM2Q2YThlODRkODhkZjVmOA",
+       "_image_medium": "https://proxy.toncenter.com/158VT98ElYpYt4Ej9qyNe0dF7x_QCku8UxEgP0qolvk/pr:medium/bG9jYWw6Ly8vNTIvN2MvNTI3Y2Q5MmQyZjZjYWEyZDExZTliNTQ4NGVkOWY1YjdkMjFhYzIxODE5ZGVlN2FiM2Q2YThlODRkODhkZjVmOA"
+      }
+     }
+    ]
+   },
+   "0:7073D4A3C68334560771F7C0F837B009EADBF86E54566A22D9084C08F861CA97": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Durovson Ultra #1309",
+      "image": "https://storage.googleapis.com/goodies-api-prod.firebasestorage.app/images/collection/8505c587-cd70-4871-998b-23f3ac57d92c",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/FTGSkmnlA9jbpC75O9loDVynrPM8rwsP1tjNiqECAOI/pr:small/bG9jYWw6Ly8vMDQvNjMvMDQ2M2U2OWM2NDRlNjQxN2Y4YTllNmQ3ZTkyYWUzNzA4YzY5NmQ3NWQyYWMyYzQ5NWVjMzRhNmNkNGM5OGViMw",
+       "_image_medium": "https://proxy.toncenter.com/tDTtMwDYCXmZDkllNNQ1hVAAd2xf-FF-j5-_FlF1vfc/pr:medium/bG9jYWw6Ly8vMDQvNjMvMDQ2M2U2OWM2NDRlNjQxN2Y4YTllNmQ3ZTkyYWUzNzA4YzY5NmQ3NWQyYWMyYzQ5NWVjMzRhNmNkNGM5OGViMw"
+      }
+     }
+    ]
+   },
+   "0:7501368A18D624E93E51D9C035F01385F8A07F89D68A2A2830608DA3B635AE2E": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_collections",
+      "name": "Happy Brownies",
+      "image": "https://nft.fragment.com/collection/happybrownie.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/aV1Il12Ztk5BzE5MJplj-kvXC_dyCJN54droHsLApPQ/pr:small/bG9jYWw6Ly8vODYvMDQvODYwNGMyZmNkMmZmODAxMjA2NjRlMWFjZjNhZWRkNDE0NTFiNTM1OWMxN2UzNWI1Y2YwYjE0ZGFkYmQyZDMzZA",
+       "_image_medium": "https://proxy.toncenter.com/pXSAnZSDCxKVVfIlkDA6iYyzdBJ6OGm6gD0-Cyu3woo/pr:medium/bG9jYWw6Ly8vODYvMDQvODYwNGMyZmNkMmZmODAxMjA2NjRlMWFjZjNhZWRkNDE0NTFiNTM1OWMxN2UzNWI1Y2YwYjE0ZGFkYmQyZDMzZA"
+      }
+     }
+    ]
+   },
+   "0:81B9A4B2B7BFBC2C0FCCEB25E113A7E315AEC1883DB5E0B5CC11609224305593": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Plush Pepe #1273",
+      "image": "https://nft.fragment.com/gift/plushpepe-1273.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/PrZiFWDIg-oQRYs6NIjgNzhGxQCsKBCOv7YByFC948E/pr:small/bG9jYWw6Ly8vMDgvOWUvMDg5ZWM5Njk3M2YxYjBiNDIyNzdhNmRjYTE0MjAzY2Y3ZDNkMzQzMDg5YjYyNDEzM2ZjNGU2YmNhNzBiYmI1Nw",
+       "_image_medium": "https://proxy.toncenter.com/9M2iZVgRxZ1D6KiXwxrxqk3-7pzrOMcYzrBBF8ItSPg/pr:medium/bG9jYWw6Ly8vMDgvOWUvMDg5ZWM5Njk3M2YxYjBiNDIyNzdhNmRjYTE0MjAzY2Y3ZDNkMzQzMDg5YjYyNDEzM2ZjNGU2YmNhNzBiYmI1Nw"
+      }
+     }
+    ]
+   },
+   "0:8DB26A47A91498FC3C67CA1E8FD0C30EEF370005FF2C56F1B4C2BDB8E690733B": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_collections",
+      "name": "Voodoo Dolls",
+      "image": "https://nft.fragment.com/collection/voodoodoll.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/5Xv6fugFGOkegqYTDi6mqR-Jst7rQo3Fupcm4c-qgAM/pr:small/bG9jYWw6Ly8vYjIvYmQvYjJiZGYwMGFhNjJlMzZkOTA1NWEwZjZlNmZkNzBmNjUwNzMzMzQxMTUxY2UyNjUwYmQ1YTg3OGEyZDcwMTg0Ng",
+       "_image_medium": "https://proxy.toncenter.com/gk50JQc1Bgo5nguRj6ujj-_1qIZ7kELNrHu-GSyo-Lc/pr:medium/bG9jYWw6Ly8vYjIvYmQvYjJiZGYwMGFhNjJlMzZkOTA1NWEwZjZlNmZkNzBmNjUwNzMzMzQxMTUxY2UyNjUwYmQ1YTg3OGEyZDcwMTg0Ng"
+      }
+     }
+    ]
+   },
+   "0:94D76BBEACCDC0C26C4D0E82547078550265EB306E76B4A097F1711567F3D772": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Happy Brownie #214369",
+      "image": "https://nft.fragment.com/gift/happybrownie-214369.webp",
+      "extra": {}
+     }
+    ]
+   },
+   "0:99F484E4B19111FB6FA86044C5243C605055298185F7B8A53AF877BCC0A1F152": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Voodoo Doll #1467",
+      "image": "https://nft.fragment.com/gift/voodoodoll-1467.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/Wl0L3fgHRXB67zgnStwzXohIZ-YxSLVhi1Z3dIZKgM8/pr:small/bG9jYWw6Ly8vNmQvY2EvNmRjYTZjZTZmNDkzYWUxZjEwZGM3OTMzYTQxODFkM2ZiOTM4ZGU2ZWM1NjY0MTAwYmYwYTY1MTY3N2E4Mzc3MA",
+       "_image_medium": "https://proxy.toncenter.com/rqrQHgH1eFuC9ZP0yjp8sYCl7F6BFZN8rf0yDYT2WeU/pr:medium/bG9jYWw6Ly8vNmQvY2EvNmRjYTZjZTZmNDkzYWUxZjEwZGM3OTMzYTQxODFkM2ZiOTM4ZGU2ZWM1NjY0MTAwYmYwYTY1MTY3N2E4Mzc3MA"
+      }
+     }
+    ]
+   },
+   "0:BC5955BD0D23783CF7C59425B60072645F10541C116CBE7857898A924E90FBB5": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_collections",
+      "name": "Winter Wreaths",
+      "image": "https://nft.fragment.com/collection/winterwreath.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/Zcg1UEHc21osdeW73bYvgFTnY7eIw4t4u5BI0Tpwz6Q/pr:small/bG9jYWw6Ly8vYWYvZjUvYWZmNTE1ZDIxNjExN2MxMTQ0ZGJjYjgzMTY2ZGMwNTU1Njg3NjYyZDYxNWE3ZDAxN2EzZDA5YjQ0Njk1MjRlZg",
+       "_image_medium": "https://proxy.toncenter.com/2ZdnDwZlrCFWRgYEnhIIA9KiDUANzXqY6odITsmI9E4/pr:medium/bG9jYWw6Ly8vYWYvZjUvYWZmNTE1ZDIxNjExN2MxMTQ0ZGJjYjgzMTY2ZGMwNTU1Njg3NjYyZDYxNWE3ZDAxN2EzZDA5YjQ0Njk1MjRlZg"
+      }
+     }
+    ]
+   },
+   "0:BD7E11E928ABAD09B7E0F6BF56DCA5BF2FFA4C3236405BC1DED41AA9ABEA61C1": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_collections",
+      "name": "Lobsters",
+      "image": "https://s.getgems.io/nft/b/c/69e901d82f8465e4ee175f60/Collection_avatar.png",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/L3JGffNCVBHpQlNPcvkslFhitsx8q8R3Jj58VW3clao/pr:small/bG9jYWw6Ly8vc2hhMjU2L2NjYTkwYTFjMmJhYmZmMGNlNmZhYWE3MmNiZjcxMWQ1MjhjOWQ2ZmY5YTI0MjE0MjQ5ZTg1YmNhNWE0YzU2ZjU",
+       "_image_medium": "https://proxy.toncenter.com/0q0ys8arxim3QwcxBhbdbo21A8R0YoTACX9BimiKy_g/pr:medium/bG9jYWw6Ly8vc2hhMjU2L2NjYTkwYTFjMmJhYmZmMGNlNmZhYWE3MmNiZjcxMWQ1MjhjOWQ2ZmY5YTI0MjE0MjQ5ZTg1YmNhNWE0YzU2ZjU"
+      }
+     }
+    ]
+   },
+   "0:C2E206E87B6D30C6D1A7887D22E334AB3F8B0A37EDBCD3F1B74D5D82556CFB45": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Winter Wreath #19235",
+      "image": "https://nft.fragment.com/gift/winterwreath-19235.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/HoJ9ay0ftt1C4ejJrItO6enPuhEs68SUVzKlIYsYlQk/pr:small/bG9jYWw6Ly8vOTAvZmUvOTBmZTE3MzY5NTI2OTljZDE1MmU3OTkzMzAyZWY1OThlYWYzMDk4NWIyNWMwYWZiYmI1MTIwZDI4NWMyMzRiNQ",
+       "_image_medium": "https://proxy.toncenter.com/VUJQa8cy8iBB1bc1tM7IzkyXnnRPAGQftOXxJcoPC0s/pr:medium/bG9jYWw6Ly8vOTAvZmUvOTBmZTE3MzY5NTI2OTljZDE1MmU3OTkzMzAyZWY1OThlYWYzMDk4NWIyNWMwYWZiYmI1MTIwZDI4NWMyMzRiNQ"
+      }
+     }
+    ]
+   },
+   "0:CB366921C03CA1426B4B6AF75956C2A24D5BBED60077446D1266D3154DC20615": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Voodoo Doll #20982",
+      "image": "https://nft.fragment.com/gift/voodoodoll-20982.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/JdkCBG_bK-bWQreFew5McufmRsMW8s6tQ5K7YXmuL0o/pr:small/bG9jYWw6Ly8vODgvYzQvODhjNDdiZjY3NGMwYjZlZTIxMjVlMzE0OGM5ZjYxYjZmYWZmYWI0MGNkOTc4M2ZiM2JkNGY2YjIxMWE5ODIwOQ",
+       "_image_medium": "https://proxy.toncenter.com/8JozXQTKklL9yCCs2egfgc18rSN8qoEqUwTXs8Gte6M/pr:medium/bG9jYWw6Ly8vODgvYzQvODhjNDdiZjY3NGMwYjZlZTIxMjVlMzE0OGM5ZjYxYjZmYWZmYWI0MGNkOTc4M2ZiM2JkNGY2YjIxMWE5ODIwOQ"
+      }
+     }
+    ]
+   },
+   "0:CF1FA2F2B2B993ADFC5A1ABD44212C01A84850078EDA1BF1D57D16F0908579C4": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Voodoo Doll #3340",
+      "image": "https://nft.fragment.com/gift/voodoodoll-3340.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/CUVjQXeW5WOx0Ebl9-psdpBpLxlaDybQwxZoWHUK7Vg/pr:small/bG9jYWw6Ly8vNTkvN2QvNTk3ZDVlYTMyZDY4NDgzNGFhM2Y3Yzk5NTRhZDNjNmY0MTE1YWI0NzM4NDIxNDI3ZDRlYzM0MTYyZGU5OTYwYw",
+       "_image_medium": "https://proxy.toncenter.com/fw130MnfGIrhQe8F4z-FiY-xUr6-sJPf0kmRg5OLNJ8/pr:medium/bG9jYWw6Ly8vNTkvN2QvNTk3ZDVlYTMyZDY4NDgzNGFhM2Y3Yzk5NTRhZDNjNmY0MTE1YWI0NzM4NDIxNDI3ZDRlYzM0MTYyZGU5OTYwYw"
+      }
+     }
+    ]
+   },
+   "0:EE6D8E09E2DD1AD1EC7D91DC95587EA3A509D3259B0969835EBA635620C7F57F": {
+    "is_indexed": true,
+    "token_info": [
+     {
+      "valid": true,
+      "type": "nft_items",
+      "name": "Lobster #5765",
+      "image": "https://lobster.family/nft/5765.webp",
+      "extra": {
+       "_image_small": "https://proxy.toncenter.com/wR4lV0Sbyk9sKmk-wCJhtPLSBdoX0Me_DaNZHedAE44/pr:small/bG9jYWw6Ly8vNTIvODUvNTI4NTIzNjgzM2NiMjJmZGQzODA0MzI1NTA0NjM5NTRkM2YzZTZhNDViNzU0MzI4YjUwNjU0NjA0NzhlZmVhMg",
+       "_image_medium": "https://proxy.toncenter.com/B9bUsvyEGgIg4qviNHhqjRJ__hXzCCIM6HluExYhlaQ/pr:medium/bG9jYWw6Ly8vNTIvODUvNTI4NTIzNjgzM2NiMjJmZGQzODA0MzI1NTA0NjM5NTRkM2YzZTZhNDViNzU0MzI4YjUwNjU0NjA0NzhlZmVhMg"
+      }
+     }
+    ]
+   }
+  }
+ }
+}
