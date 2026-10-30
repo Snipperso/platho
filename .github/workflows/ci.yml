@@ -17,9 +17,13 @@ concurrency:
 
 jobs:
   build-test:
-    name: Build and test
+    name: Build and test (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout
@@ -44,4 +48,4 @@ jobs:
         run: npm run crypto:selftest
 
       - name: Run test suite
-        run: npm test
+        run: npm test -- --shard=${{ matrix.shard }}/3
