@@ -1,8 +1,8 @@
-import { selfRecoveryShard } from './conv-discovery.mjs?v=104';
+import { selfRecoveryShard } from './conv-discovery.mjs?v=105';
 import { sealNotesBlob, openNotesBlob } from './recovery-blob.mjs?v=31';
-import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=102';
-import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=103';
-import { probeActiveAddresses } from './shard-reader.mjs?v=108';
+import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=103';
+import { NOTES_NAMED_SLOT_BASE, NOTES_NAMED_SLOT_COUNT, addrKey } from './shard-discovery.mjs?v=104';
+import { probeActiveAddresses } from './shard-reader.mjs?v=109';
 
 const RS_MAX_BLOB_CELLS = 79;
 

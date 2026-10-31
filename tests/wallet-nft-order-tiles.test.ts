@@ -30,7 +30,7 @@ describe('the NFT tab: order and tiles', () => {
       append(...more: any[]) { this.children.push(...more); }, addEventListener(_kind: string, handler: any) { this.listeners.push(handler); } });
     const tile = lift({
       walletNftTiles: tiles, document: { createElement: (tag: string) => { if (tag === 'button') made += 1; return node(tag); } },
-      walletAssetIcon: () => node('span'), paintWalletAssetIcon: (_icon: any, picture: string) => painted.push(picture),
+      walletAssetIcon: () => node('span'), paintWalletAssetIcon: (_icon: any, picture: string) => painted.push(picture), walletNftDomainFace: () => {},
       shortAddress: (a: string) => a, openWalletNftCard: (item: any) => opened.push(item),
     }, [fn('function walletNftTile(item) {')], 'walletNftTile');
     const first = tile({ address: addr(1), name: 'sample.ath', picture: '', verified: true });

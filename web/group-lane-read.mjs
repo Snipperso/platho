@@ -1,5 +1,5 @@
 
-import { createConvReadLane } from './conv-lane.mjs?v=133';
+import { createConvReadLane } from './conv-lane.mjs?v=134';
 import { groupAvatarKey, groupAvatarLanePublicKey, groupContentKey, groupLanePublicKey } from './crypto/group-lane.mjs?v=8';
 import {
   assembleGroupParts, decodeGroupPayload, groupAvatarHash, groupAvatarSecretIn, openGroupCapsule, GROUP_AVATAR_SENDER, GROUP_KIND,

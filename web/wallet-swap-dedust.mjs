@@ -1,8 +1,8 @@
-import { DEDUST_POOLS, DEDUST_TOKENS, DEDUST_GRAM_VAULT } from './dedust-pools.mjs?v=6';
+import { DEDUST_POOLS, DEDUST_TOKENS, DEDUST_GRAM_VAULT } from './dedust-pools.mjs?v=7';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
 import { beginCell, bytesToBase64, parseBocBase64, serializeBoc } from './pwa-contract-transactions.mjs?v=59';
-import { buildJettonTransferBody, getMethodStack, stackInteger } from './wallet-transfers.mjs?v=15';
-import { GRAM } from './wallet-swap.mjs?v=20';
+import { buildJettonTransferBody, getMethodStack, stackInteger } from './wallet-transfers.mjs?v=16';
+import { GRAM } from './wallet-swap.mjs?v=22';
 
 export const DEDUST_NATIVE_SWAP_OPCODE = 0xEA06185Dn;
 export const DEDUST_JETTON_SWAP_OPCODE = 0xE3A0D482n;

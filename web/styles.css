@@ -10030,7 +10030,7 @@ button.wallet-asset-row:focus-visible {
   font-weight: 700;
   cursor: pointer;
 }
-.wallet-market-mode[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink, #fff); }
+.wallet-market-mode[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 button.wallet-market-trade {
   width: 100%;
   margin: 0;
@@ -10073,6 +10073,111 @@ button.wallet-market-trade:focus-visible { outline-offset: -2px; }
 .swap-picker-section-note { font-size: 13px; line-height: 1.4; color: var(--text-muted); }
 .wallet-market-row .wallet-asset-sub { display: flex; flex-wrap: wrap; column-gap: 14px; row-gap: 2px; font-size: 12.5px; }
 .wallet-market-stat { display: inline-flex; flex-wrap: wrap; column-gap: 5px; }
+.wallet-token-card-head.has-hero { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; gap: 12px; }
+.wallet-token-card-head.has-hero .wallet-asset-text { justify-items: center; max-width: 100%; }
+.wallet-token-card-head.has-hero .wallet-asset-name { font-size: 20px; font-weight: 800; }
+.wallet-nft-hero { position: relative; width: min(100%, 340px); aspect-ratio: 1; overflow: hidden; border-radius: 22px; background: var(--a16); }
+.wallet-nft-hero-picture { position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); font-size: 72px; font-weight: 800; }
+.wallet-nft-hero-motion { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wallet-nft-hero-picture.has-picture,
+.wallet-nft-card-picture.has-picture { color: transparent; forced-color-adjust: none; background-size: cover; background-position: center; }
+.wallet-nft-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+.wallet-nft-cards[hidden] { display: none; }
+.wallet-nft-card {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 8px 10px;
+  border: 1px solid var(--line, rgba(127, 127, 127, 0.25));
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wallet-nft-card:hover { border-color: rgba(46, 189, 133, 0.45); }
+.wallet-nft-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wallet-nft-card-picture {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  margin-bottom: 5px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--a16);
+  color: var(--accent);
+  font-size: 32px;
+  font-weight: 800;
+}
+.wallet-nft-card-name,
+.wallet-nft-card-collection { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-nft-card-name { font-size: 14px; font-weight: 700; }
+.wallet-nft-card-collection { color: var(--text-muted); font-size: 12px; }
+.wallet-nft-card-price { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wallet-nft-view-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.wallet-nft-card-picture.is-domain,
+.wallet-nft-hero-picture.is-domain,
+.wallet-nft-picture.is-domain {
+  padding: 10%;
+  background: linear-gradient(140deg, #0098ea, #0b4f9c);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.wallet-nft-card-picture.is-domain { font-size: calc(17px * var(--domain-scale, 1)); }
+.wallet-nft-hero-picture.is-domain { font-size: calc(32px * var(--domain-scale, 1)); }
+.wallet-nft-picture.is-domain { font-size: calc(14px * var(--domain-scale, 1)); }
+.wallet-nft-card-picture.is-domain,
+.wallet-nft-hero-picture.is-domain,
+.wallet-nft-picture.is-domain { align-content: center; gap: 0.15em; }
+.wallet-nft-domain-name { display: block; }
+.wallet-nft-domain-zone { display: block; font-size: 0.72em; opacity: 0.8; }
+.wallet-nft-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wallet-nft-filter-traits { display: contents; }
+.wallet-nft-filter-search { flex: 1 1 100%; }
+.wallet-nft-filter-search,
+.wallet-nft-filter-trait,
+.wallet-nft-filter-price {
+  height: 38px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line, rgba(127, 127, 127, 0.25));
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.wallet-nft-filter-trait { flex: 1 1 150px; max-width: 260px; }
+.wallet-nft-filter-price { flex: 0 1 128px; width: 128px; }
+
+.wallet-nft-filter-search:focus-visible,
+.wallet-nft-filter-trait:focus-visible,
+.wallet-nft-filter-price:focus-visible { outline: none; border-color: rgba(46, 189, 133, 0.6); box-shadow: 0 0 0 3px rgba(46, 189, 133, 0.15); }
+.wallet-nft-filter-price[aria-invalid="true"],
+.wallet-nft-filter-price[aria-invalid="true"]:focus-visible { border-color: var(--danger); }
+.wallet-nft-filter-reset {
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.wallet-nft-filter-reset[hidden] { display: none; }
+.modal-backdrop.is-nft-view .wallet-group-body,
+.wallet-nft-detail { overflow-anchor: none; }
+.wallet-nft-sorts { justify-self: start; }
 .wallet-market-stat-key,
 .wallet-market-stat-value { white-space: nowrap; }
 .wallet-market-stat-key { color: var(--text-muted); }

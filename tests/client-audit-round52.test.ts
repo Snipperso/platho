@@ -38,7 +38,7 @@ describe('client audit round 52', () => {
       navVaultBalanceHasKnownValue: () => state.wallet.ton_balance !== null && state.wallet.ath_balance !== null,
       setText: () => {}, walletBalanceRowText: () => '', walletFormattedBalance: () => '1', navVaultTonBalances: [], navVaultAthBalances: [],
       syncProfileBalanceCardBalances: () => {},
-    }, [fn('function walletShortAmount(text) {'), fn('function refreshNavVaultBalance() {')], 'refreshNavVaultBalance');
+    }, [fn('function walletShortAmount(text) {'), fn('function walletCardAmount(formatted, symbol) {'), fn('function refreshNavVaultBalance() {')], 'refreshNavVaultBalance');
     refresh();
     expect([[...attrs], containers[0].own.get('aria-hidden')], 'nothing known, nothing kept: hidden, nothing flagged').toEqual([[], 'true']);
     snapshot = true;

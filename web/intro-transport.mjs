@@ -1,5 +1,5 @@
 
-import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=108';
+import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=109';
 import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=4';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
 import { parseBocBase64, computeCellHashAndDepth, beginCell, bytesToBigUint } from './pwa-contract-transactions.mjs?v=59';

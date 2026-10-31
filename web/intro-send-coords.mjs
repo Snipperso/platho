@@ -1,7 +1,7 @@
 
-import { chooseIntroBucket } from './intro-bucket.mjs?v=103';
-import { introShardAddress } from './shard-discovery.mjs?v=103';
-import { unpackScanPage } from './intro-receive.mjs?v=83';
+import { chooseIntroBucket } from './intro-bucket.mjs?v=104';
+import { introShardAddress } from './shard-discovery.mjs?v=104';
+import { unpackScanPage } from './intro-receive.mjs?v=84';
 
 export async function readIntroBucketFill({ readScanPage, epoch, bucket }) {
   const page = await readScanPage(await introShardAddress(epoch, bucket), 0, 1);

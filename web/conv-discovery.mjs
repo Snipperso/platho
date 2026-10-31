@@ -2,7 +2,7 @@
 import { outgoingBucketKey, incomingBucketKeys, outgoingBucketKeys, recoveryOwnerPublicKey } from './crypto/conv-routing.mjs?v=9';
 import {
   addrKey, recordShardAddress, recoveryShardAddress, recoveryOwnerSlotKey, RECOVERY_MAX_SLOTS, epochIsDerivable,
-} from './shard-discovery.mjs?v=103';
+} from './shard-discovery.mjs?v=104';
 import { generationForEpoch } from './cutover-epoch.mjs?v=7';
 
 const bytesToInt = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };

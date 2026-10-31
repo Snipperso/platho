@@ -10,7 +10,7 @@ import {
 import { feeVaultCodeBoc, feeVaultCodeAvailable } from './shard-address.mjs?v=47';
 import { createAthWalletMessage } from './pwa-contract-transactions.mjs?v=59';
 import { athTransferTopUpNanotons, buildAthWalletTopUpMessage } from './ath-request-reserve.mjs?v=10';
-import { buildUnfreezeMessage } from './frozen-account.mjs?v=24';
+import { buildUnfreezeMessage } from './frozen-account.mjs?v=25';
 
 export const VAULT_UNAVAILABLE = 'unavailable';
 export const VAULT_ABSENT = 'absent';
@@ -25,7 +25,7 @@ export async function vaultAddressFor(ownerWallet) {
   return feeVaultAddress(feeVaultCodeBoc(), ownerWallet);
 }
 
-export { decodeFeeVaultViewStack, createFeeVaultReader, FEE_VAULT_VIEW_ARITY } from './fee-vault-read.mjs?v=54';
+export { decodeFeeVaultViewStack, createFeeVaultReader, FEE_VAULT_VIEW_ARITY } from './fee-vault-read.mjs?v=55';
 
 export function vaultSnapshot(view, { nowSec = 0, chainSec = nowSec, clockMarginSec = 0, state, frozenHash = null, custodyFrozen = null } = {}) {
   const empty = (kind) => ({

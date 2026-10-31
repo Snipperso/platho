@@ -1,11 +1,11 @@
 
-import { incomingRecordShards } from './conv-discovery.mjs?v=104';
+import { incomingRecordShards } from './conv-discovery.mjs?v=105';
 import {
   parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature, convReadOpcodesForGeneration, convHeader0BucketKey,
-} from './conv-lane-read.mjs?v=121';
+} from './conv-lane-read.mjs?v=122';
 import { computeKEpoch, computeBucketKey } from './crypto/conv-routing.mjs?v=9';
-import { changeMarkerOf } from './shard-reader.mjs?v=108';
-import { addrKey } from './shard-discovery.mjs?v=103';
+import { changeMarkerOf } from './shard-reader.mjs?v=109';
+import { addrKey } from './shard-discovery.mjs?v=104';
 
 const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
 const CONV_READ_THROUGH_SLACK_SEC = 3_600;

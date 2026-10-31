@@ -1,14 +1,14 @@
 
-import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=104';
+import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=105';
 import {
   sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob, sealGroupsBlob, openGroupsBlob, PREFS_SEAL_OVERHEAD_BYTES,
 } from './recovery-blob.mjs?v=31';
-import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=102';
+import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=103';
 import {
   RECOVERY_MAX_SLOTS, GROUPS_NAMED_SLOT_BASE, GROUPS_NAMED_SLOT_COUNT, PREFS_CHUNK_COUNT, prefsChunkSlotIndex, addrKey,
-} from './shard-discovery.mjs?v=103';
+} from './shard-discovery.mjs?v=104';
 import { groupsRecoveryBytes, parseGroupsRecovery } from './group-store.mjs?v=42';
-import { probeActiveAddresses } from './shard-reader.mjs?v=108';
+import { probeActiveAddresses } from './shard-reader.mjs?v=109';
 
 const RS_MAX_BLOB_CELLS = 79;
 const SNAKE_CELL_BYTES = 127;

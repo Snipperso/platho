@@ -109,12 +109,21 @@ describe('a new build is offered where the person is [2026-10-27]', () => {
     w.answers[0]({});
     await new Promise((resolve) => setImmediate(resolve));
     expect(w.reloads(), 'MEASURED before: "Update now" reloaded 100 ms later, the transfer\'s watch gone').toBe(0);
+    expect(w.notices.at(-1), 'the press is kept, and said so').toBe('app.updateAfterSend');
     w.state.sending = false;
     w.timers.pop()!();
-    expect(w.dialogs, 'offered again once it is done').toHaveLength(2);
-    w.answers[1]({});
+    expect([w.dialogs.length, w.reloads()], 'once the send is done it reloads, no second window').toEqual([1, 1]);
+    const typed = world({ sending: true });
+    typed.api.pending(true);
+    typed.state.sending = false;
+    typed.api.offer();
+    typed.state.sending = true;
+    typed.answers[0]({});
     await new Promise((resolve) => setImmediate(resolve));
-    expect(w.reloads()).toBe(1);
+    typed.state.sending = false;
+    typed.state.typing = true;
+    typed.timers.pop()!();
+    expect([typed.dialogs.length, typed.reloads()], 'a sentence being written: asked again, not reloaded').toEqual([2, 0]);
   });
 
   it('UPDATE-OFFER-05: one door opening at a time — presses while it reads are not taken; its window lets go; a money door meets a waiting build first [2026-10-27; round 76 — C1-3]', async () => {
@@ -198,7 +207,7 @@ describe('a new build is offered where the person is [2026-10-27]', () => {
     expect(w.cleared, 'MEASURED before: the asked wait cleared, never offered again').not.toContain(askedWait);
     w.state.sending = false;
     w.timers.pop()!();
-    expect(w.dialogs.map((d) => d.unprompted), 'the asked one, offered once the send is done').toEqual([true, false]);
+    expect([w.dialogs.length, w.reloads()], 'the press kept: reloaded once the send is done').toEqual([1, 1]);
     expect(app).toContain("hintAction = error?.code === 'PLATHO_ATH_REQUIRED' && buyAthButton ? { label: t('profile.buyAth'), run: doorPress(openBuyAthDialog, { money: true }) } : null;");
   });
 });

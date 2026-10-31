@@ -1,5 +1,5 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=111';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=112';
 import { beginCell, parseBocBase64 } from './pwa-contract-transactions.mjs?v=59';
 
 export const JETTON_TRANSFER_OPCODE = 0x0F8A7EA5n;

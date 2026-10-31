@@ -1,4 +1,4 @@
-import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=95';
+import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=96';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
 
 const TONAPI_ORIGIN = 'https://tonapi.io';
@@ -37,6 +37,25 @@ export async function discoverUsernameNftAddresses({
       proposedName: normalizeUsernameLabel(item?.metadata?.name),
       proposedImage: safeInlineImage(item?.metadata?.image_data ?? item?.metadata?.image),
     });
+  }
+  return out;
+}
+
+export const USERNAME_NFT_ART_BATCH = 20;
+export async function readUsernameNftArt({ itemAddresses = [], fetchImpl = globalThis.fetch } = {}) {
+  if (typeof fetchImpl !== 'function') throw new Error('username nft art: no fetch available');
+  const ids = [...new Set(itemAddresses.map(rawAddress).filter(Boolean))].slice(0, USERNAME_NFT_ART_BATCH);
+  const out = new Map();
+  if (!ids.length) return out;
+  const response = await fetchImpl(`${TONAPI_ORIGIN}/v2/nfts/_bulk`, {
+    method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ account_ids: ids }), cache: 'no-store',
+  });
+  if (!response?.ok) throw new Error(`username nft art: indexer answered ${response?.status ?? 'nothing'}`);
+  const payload = await response.json();
+  for (const item of Array.isArray(payload?.nft_items) ? payload.nft_items : []) {
+    const address = rawAddress(item?.address);
+    const image = safeInlineImage(item?.metadata?.image_data ?? item?.metadata?.image);
+    if (address && image && ids.includes(address)) out.set(address, image);
   }
   return out;
 }

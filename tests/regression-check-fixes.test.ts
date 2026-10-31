@@ -24,6 +24,7 @@ describe('the regression check\'s fixes', () => {
       walletGroupDialog: dialog, t: (key: string) => key, setText: () => {}, fitWalletGroupTitle: () => {}, document: { querySelector: () => null },
       dialogReturnFocusTarget: () => ({ id: 'gear' }), holdPageBehindModal: () => holds.push('hold'), releaseModalHold: () => holds.push('release'),
       restoreDialogFocus: () => {}, window: { matchMedia: () => ({ matches: false }), setTimeout: (run: () => void) => { timers.push(run); return 1; } },
+      stopWalletNftHero: () => {},
     }, ['let walletGroupReturnFocus = null;', fn('function hideDialogAnimated(backdrop, onHidden = null) {'),
       fn('function openWalletGroup(group, { title = t(\'wallet.groupSettings\'), back = false, also = [] } = {}) {'), fn('function closeWalletGroup() {')],
     '{ openWalletGroup, closeWalletGroup }');

@@ -1,6 +1,6 @@
 {
   "name": "platho",
-  "version": "1.5.23",
+  "version": "1.5.24",
   "private": true,
   "main": "index.js",
   "scripts": {
@@ -13,10 +13,8 @@
     "test:debug": "PLATHO_VITEST_DEBUG_LOG=vitest-full-debug.log vitest run --config vitest.debug.config.ts --reporter=verbose",
     "test:file": "vitest run --testTimeout=30000",
     "crypto:selftest": "node scripts/platho_web_crypto_selftest.mjs",
-    "mainnet:ath-master:derive": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_ath_master_derivation.ts",
     "mainnet:ath-metadata": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate_ath_metadata_content.ts",
     "m20f:preflight": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/m20f_mainnet_route_freeze_preflight.ts",
-    "mainnet:genesis:verify": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/mainnet_genesis_verify.ts artifacts/mainnet_genesis_verify_input.json",
     "web:deploy:prepare": "node scripts/prepare_static_web_deploy.mjs --mode both",
     "lists:refresh": "node scripts/refresh_lists.mjs",
     "pricing:report": "node scripts/publish_reserve_pricing_report.mjs"

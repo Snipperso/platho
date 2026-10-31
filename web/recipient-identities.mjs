@@ -1,4 +1,4 @@
-import { t } from './i18n.mjs?v=289';
+import { t } from './i18n.mjs?v=298';
 
 export const RECIPIENT_IDENTITY_TYPES = Object.freeze({
   WALLET_ADDRESS: 'wallet_address',

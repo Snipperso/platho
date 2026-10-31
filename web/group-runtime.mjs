@@ -32,8 +32,8 @@ function rosterReadsOfPreviousGeneration(record, today) {
   for (let e = adoptionEpoch; e <= Number(today.epoch); e += 1) epochs.push(e);
   return [{ rosterKey, generation: previousGeneration, epochs }];
 }
-import { buildGroupAvatarPublishMessages, buildGroupPublishMessages } from './group-lane-send.mjs?v=97';
-import { createGroupReadLane, groupLaneBuckets, groupRosterBuckets } from './group-lane-read.mjs?v=74';
+import { buildGroupAvatarPublishMessages, buildGroupPublishMessages } from './group-lane-send.mjs?v=98';
+import { createGroupReadLane, groupLaneBuckets, groupRosterBuckets } from './group-lane-read.mjs?v=75';
 import { CUTOVER_EPOCH, generationForEpochAt } from './cutover-epoch.mjs?v=7';
 
 const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');

@@ -8,7 +8,6 @@
   "scripts/bump_module_versions.mjs": 12,
   "scripts/check_app_imports.mjs": 2,
   "scripts/check_i18n_keys.mjs": 4,
-  "scripts/collect_genesis_verify_snapshot.ts": 4,
   "tests/ath-notify-theft-w1004.test.ts": 1,
   "tests/ath-transfer-cost-anatomy.test.ts": 14,
   "tests/buy-ath-dialog.test.ts": 3,

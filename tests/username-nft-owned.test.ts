@@ -14,6 +14,8 @@ import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   normalizeUsernameLabel,
+  readUsernameNftArt,
+  USERNAME_NFT_ART_BATCH,
 } from '../web/username-nft-owned.mjs';
 import { computeUsernameNameHash } from '../web/username-ton-rpc-provider.mjs';
 
@@ -214,5 +216,31 @@ describe('username NFT — the owned list', () => {
     expect(weak.owned).toEqual([]);
     expect(weak.transferred, 'nothing proven transferred').toEqual([]);
     expect(weak.complete, 'and nothing here made the list incomplete either — it is simply not an answer about those names').toBe(true);
+  });
+});
+
+describe('the registry art of strangers\' names [2026-10-30]', () => {
+  it('UNFT-ART-01: one call for a page of names, at most a batch, through the profile\'s own check — a whole SVG drawn, a remote picture never', async () => {
+    const svg = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8"/></svg>').toString('base64')}`;
+    const a = `0:${'aa'.repeat(32)}`;
+    const b = `0:${'bb'.repeat(32)}`;
+    const asked: any[] = [];
+    const fetchImpl = async (url: string, init: any) => {
+      asked.push({ url, init });
+      return { ok: true, json: async () => ({ nft_items: [
+        { address: a.toUpperCase(), metadata: { image_data: svg.split(',')[1] } },
+        { address: b, metadata: { image: 'https://evil.example/x.png' } },
+        { address: `0:${'cc'.repeat(32)}`, metadata: { image_data: svg.split(',')[1] } },
+      ] }) };
+    };
+    const ids = Array.from({ length: USERNAME_NFT_ART_BATCH + 5 }, (_, i) => `0:${String(i).padStart(64, '0')}`);
+    const art = await readUsernameNftArt({ itemAddresses: [a, b, ...ids], fetchImpl });
+    expect(asked).toHaveLength(1);
+    expect(asked[0].url).toBe('https://tonapi.io/v2/nfts/_bulk');
+    expect(asked[0].init.method).toBe('POST');
+    expect(JSON.parse(asked[0].init.body).account_ids, 'a batch at most').toHaveLength(USERNAME_NFT_ART_BATCH);
+    expect([...art.keys()], 'a whole SVG of a name asked; a remote picture never; a name not asked never').toEqual([a]);
+    expect(art.get(a)).toMatch(/^data:image\/svg\+xml/);
+    await expect(readUsernameNftArt({ itemAddresses: [a], fetchImpl: async () => ({ ok: false, status: 429 }) })).rejects.toThrow('429');
   });
 });

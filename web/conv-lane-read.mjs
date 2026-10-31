@@ -1,6 +1,6 @@
 
 import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=59';
-import { toWireAddress } from './shard-reader.mjs?v=108';
+import { toWireAddress } from './shard-reader.mjs?v=109';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
 import { parseVaultPublishEnvelope, M21C_VAULT_PUBLISH_OPCODE } from './m21c-envelope.mjs?v=5';
 import { WRITES_GENERATION } from './cutover-epoch.mjs?v=7';

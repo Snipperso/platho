@@ -129,4 +129,15 @@ describe('PROFILE BALANCE CARD — published with the profile, shown on it', () 
     const refused = async () => ({ ok: false, status: 429, json: async () => ({}) });
     await expect(readCardBalances({ owner: `0:${'b1'.repeat(32)}`, jettonMaster: `0:${'93'.repeat(32)}`, fetchImpl: refused, origin: 'https://toncenter.test' })).rejects.toMatchObject({ status: 429 });
   });
+  it('PROFILE-CARD-03: a profile\'s card says its amounts as the Wallet tab\'s card does — one writer, short, for one\'s own and for another\'s [2026-10-31: "1101074.1442 ATH" against "1.1M ATH"]', () => {
+    const at = (start: string) => { const from = app.indexOf(start); expect(from, start).toBeGreaterThan(-1); return app.slice(from, app.indexOf('\n}\n', from)); };
+    expect(at('function walletCardAmount(formatted, symbol) {')).toContain('return `${walletShortAmount(formatted)} ${symbol}`;');
+    const wallet = at('function refreshNavVaultBalance(');
+    expect(wallet).toContain("const athBalance = walletCardAmount(walletFormattedBalance('ATH'), 'ATH');");
+    const profile = at('function writeProfileBalanceCardBalances(raw, own) {');
+    expect(profile).toContain("ath = walletCardAmount(walletFormattedBalance('ATH'), 'ATH');");
+    expect(profile).toContain("ath = walletCardAmount(formatAthAtomic(BigInt(read.jetton)), 'ATH');");
+    expect(profile).toContain("gram = walletCardAmount(formatTonNanotons(BigInt(read.gram)), 'GRAM');");
+    expect(profile, 'no amount written past the shared writer').not.toMatch(/\} (GRAM|ATH)`/);
+  });
 });

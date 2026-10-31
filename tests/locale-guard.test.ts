@@ -100,6 +100,7 @@ describe('LOCALE-GUARD', () => {
       /^\.claude\//,
       /^artifacts\/[^/]*\/Default\/Extensions\//,
       /^tests\/locale-guard\.test\.ts$/,
+      /^artifacts\/local\/public-export\/baseline\//,
     ];
     const offenders: string[] = [];
     for (const file of walkTree('.')) {

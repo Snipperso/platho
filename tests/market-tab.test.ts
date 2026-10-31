@@ -164,9 +164,9 @@ describe('the Market', () => {
       const page = { scrollTop, scrollHeight: 1000 + max, clientHeight: 1000, to: null as number | null, scrollTo(o: { top: number }) { this.to = o.top; } };
       const column = { scrollTop: columnTop };
       const state = { box: { isConnected: true, contains: () => true }, wheelTo: 0, wheelAt: -1e9, columnRun: false };
-      const handler = new Function('walletMarket', 'walletAssetsState', 'isDesktopLayout', 'performance',
+      const handler = new Function('walletMarket', 'walletNftMarket', 'walletAssetsState', 'isDesktopLayout', 'performance',
         `${sourceBlock(app, 'function walletMarketHeading(')}\n${sourceBlock(app, 'function walletMarketWheel(')}\nreturn walletMarketWheel;`)(
-        state, { tab: 'market' }, () => true, { now: () => 0 });
+        state, { mode: 'tokens', box: null }, { tab: 'market' }, () => true, { now: () => 0 });
       const send = (deltaY: number, cancelable = true, over: unknown = column) => {
         let kept = false;
         handler({ currentTarget: page, deltaY, deltaMode: 0, ctrlKey: false, cancelable, target: { closest: () => over }, preventDefault: () => { kept = true; } });

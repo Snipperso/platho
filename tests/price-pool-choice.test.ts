@@ -47,7 +47,7 @@ describe('the pool a chart is drawn from, chosen by the person [2026-10-27]', ()
     expect(chart).toContain('void walletPriceRoute(first ? [first] : candidates, ask, first && first.pair.pool !== candidates[0].pair.pool ? null : givenPool, undefined, () => box.isConnected)'); expect(chart).toContain('.then((read) => { if (firstEra === readEra) adopt(read); });');
     expect(chart).toContain('void walletPriceRoute([one], ask, null, undefined, () => box.isConnected).then((read) => { if (era === readEra) adopt(read); });');
     expect(chart).toContain('const readKey = key;');
-    expect(chart).toContain('walletPriceReads.set(readKey, { at: Date.now(), points: fresh });');
+    expect(chart).toContain('walletPriceReads.set(readKey, { at: Date.now(), points: fresh, swaps, whole });');
     const press = chart.slice(chart.indexOf('const choosePool = (one, { follow = false } = {}) => {'));
     expect(press.indexOf('route = one;'), 'the pool taken at the press').toBeLessThan(press.indexOf('void walletPriceRoute([one]'));
     expect(press).toContain('walletPricePoolChoices.set(choiceKey, one.pair.pool);');
@@ -62,7 +62,7 @@ describe('the pool a chart is drawn from, chosen by the person [2026-10-27]', ()
     const choose = chart.slice(chart.indexOf('const choosePool = (one, { follow = false } = {}) => {'));
     expect(choose).toContain('readEra += 1;');
     expect(chart).toContain('if (!box.isConnected || era !== readEra) return;');
-    expect(chart).toMatch(/if \(era !== readEra\) return;\s+if \(box\.isConnected && shown < 0\) draw\(fresh, intro && !chart\);/);
+    expect(chart).toMatch(/if \(era !== readEra\) return;\s+if \(box\.isConnected && shown < 0\) \{ swapsRead = \{ swaps, whole \}; draw\(fresh, intro && !chart\); \}/);
     expect(chart).toContain("depthShown = depth === null ? '' : depthText(depth);");
   });
 

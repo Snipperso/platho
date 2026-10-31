@@ -85,11 +85,13 @@ describe('the trader behind a trade', () => {
     expect(open).toContain("if (!mine.length) return '0';");
     expect(open, 'the slowest read last: it shifts nothing above it').toContain('box.append(stats, scope, tokensHead, list, moreTokens, rest, explorer, profileSlot);');
     expect(app).toContain("const TRADER_EXPLORER_ORIGIN = 'https://tonviewer.com';");
-    expect((app.match(/TRADER_EXPLORER_ORIGIN/g) ?? []).length, 'declared once, used once').toBe(2);
+    expect((app.match(/TRADER_EXPLORER_ORIGIN/g) ?? []).length, "declared once; the trader's link and an NFT's [2026-10-30]").toBe(3);
+    expect(code(sourceBlock(app, 'function walletNftExplorerButton(address) {'))).toContain('activateExternalLink(`${TRADER_EXPLORER_ORIGIN}/${encodeURIComponent(shown)}`)');
     expect(open).toContain("explorer.addEventListener('click', () => activateExternalLink(`${TRADER_EXPLORER_ORIGIN}/${encodeURIComponent(shown)}`));");
     expect(open).toContain('const shown = displayWalletAddress(trader);');
     expect(open, 'MEASURED cold at background: 21.5 s').toContain("resolveChannelProfile(trader, { requestClass: () => (wanted() ? 'focus' : 'idle') })");
     expect(code(sourceBlock(app, 'async function resolveChannelProfile(authorWallet, options = {}) {'))).toContain('...(options.requestClass ? { requestClass: options.requestClass } : {})');
-    expect(open, 'MEASURED: 4.9749 total over a 4.9748 balance').toContain('formatUnits(String(BigInt(Math.floor(grams * 1e9))), 9)');
+    expect(open, 'MEASURED: 4.9749 total over a 4.9748 balance; round 82 — C1-2: 0.0156 under 0.0157').toContain('BigInt(balance) + BigInt(Math.max(0, Math.floor((holdings.total - holdings.gram) * 1e9)))');
+    expect(code(sourceBlock(app, 'function restoreDialogFocus(target) {'))).toContain('.wallet-market-trades [data-trade-id="${CSS.escape(target.dataset.tradeId)}"]');
   });
 });

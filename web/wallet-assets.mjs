@@ -1,10 +1,11 @@
-import { isVerifiedJettonMaster, isVerifiedNftCollection } from './verified-assets.mjs?v=5';
+import { isVerifiedJettonMaster, isVerifiedNftCollection } from './verified-assets.mjs?v=6';
 import { parseTelegramGiftItemUri } from './telegram-gift-nfts.mjs?v=27';
 
 export const WALLET_TOKEN_PAGE = 1000;
 export const WALLET_NFT_PAGE = 1000;
 export const WALLET_LIST_PAGES = 5;
 export const WALLET_HISTORY_PAGE = 30;
+export const WALLET_GRAM_DUST_NANOTONS = 10_000_000n;
 export const WALLET_HISTORY_READ_ON = 6;
 
 export function rawAccount(value) {
@@ -71,6 +72,20 @@ export function listedNftCollection(collection) {
 }
 function pictureOf(info, size = '_image_small') {
   return toncenterPicture(info?.extra?.[size]) || toncenterPicture(info?.extra?._image_medium) || toncenterPicture(info?.image);
+}
+function attributesOf(info) {
+  const out = [];
+  for (const one of Array.isArray(info?.extra?.attributes) ? info.extra.attributes : []) {
+    const trait = text(one?.trait_type, 32);
+    const value = typeof one?.value === 'number' && Number.isFinite(one.value) ? String(one.value) : text(one?.value, 48);
+    if (trait && value) out.push({ trait, value });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+function contentUriOf(content) {
+  const uri = content?.uri;
+  return typeof uri === 'string' && uri.length <= 512 ? uri : '';
 }
 function text(value, max = 80) {
   return typeof value === 'string'
@@ -185,7 +200,11 @@ export function parseNftItems(payload, { verifiedItems = [], verifiedCollections
       collection,
       collectionName: text(collectionInfo?.name) || text(row?.collection?.collection_content?.name),
       name: text(info?.name) || text(row?.content?.domain) || '',
+      domain: text(row?.content?.domain, 126),
       picture: verified ? pictureOf(info, '_image_medium') : '',
+      pictureBig: verified ? pictureOf(info, '_image_big') : '',
+      attributes: verified ? attributesOf(info) : [],
+      uri: contentUriOf(row?.content),
       scam,
       verified,
       lastLt: String(row?.last_transaction_lt ?? ''),
@@ -238,6 +257,7 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
   const out = [];
   const ownTraces = ownTracesOf(payload, self);
   const services = serviceCallsOf(payload, self);
+  const traded = marketTradesOf(payload);
   for (const action of Array.isArray(payload?.actions) ? payload.actions : []) {
     const details = action?.details ?? {};
     const at = Number(action?.end_utime ?? action?.start_utime) || 0;
@@ -275,9 +295,38 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
       };
       out.push({ ...base, kind: 'swap', direction: 'out', counterparty: rawAccount(given.destination), amount: String(given.amount ?? '0'), ...side(given.asset ?? details.asset_in),
         got: { amount: rawAccount(got.destination) === self ? String(got.amount ?? '0') : '0', ...side(got.asset ?? details.asset_out) }, nftName: '', comment: '' });
+    } else if (MARKET_NFT_ACTIONS.has(action?.type)) {
+      const item = rawAccount(details.nft_item);
+      const collection = rawAccount(details.nft_collection);
+      const info = infoOf(payload?.metadata, details.nft_item);
+      if (info?.is_scam === true || (collection && infoOf(payload?.metadata, details.nft_collection)?.is_scam === true)) continue;
+      const grams = (value) => (/^\d+$/.test(String(value ?? '')) ? String(value) : '0');
+      let trade = null;
+      let way = null;
+      let amount = '0';
+      if (action.type === 'nft_purchase') {
+        const seller = rawAccount(details.real_old_owner) || rawAccount(details.old_owner);
+        if (rawAccount(details.new_owner) === self && seller !== self) {
+          trade = 'bought';
+          way = { direction: 'in', counterparty: seller };
+          amount = grams(details.price);
+        } else if (seller === self && rawAccount(details.new_owner) !== self) {
+          trade = 'sold';
+          way = { direction: 'out', counterparty: rawAccount(details.new_owner) };
+          amount = rawAccount(details.payout_address) === self ? grams(details.payout_amount) : '0';
+        }
+      } else if (rawAccount(details.owner) === self) {
+        trade = action.type === 'nft_put_on_sale' ? 'listed' : 'unlisted';
+        way = { direction: trade === 'listed' ? 'out' : 'in', counterparty: rawAccount(details.sale_address) };
+        amount = trade === 'listed' ? grams(details.full_price) : '0';
+      }
+      if (!trade) continue;
+      out.push({ ...base, ...way, kind: 'nft', trade, nftName: text(info?.name), master: item, amount, decimals: 9, symbol: 'GRAM', comment: '',
+        verified: listedNftCollection(collection) || ownCollections.has(collection) || provenItems.has(item) ? true : (nftVerdictsKnown ? false : null) });
     } else if (action?.type === 'nft_transfer') {
       const way = directed(details.old_owner, details.new_owner);
       if (!way) continue;
+      if (traded.get(String(action?.trace_id ?? ''))?.has(rawAccount(details.nft_item))) continue;
       const info = infoOf(payload?.metadata, details.nft_item);
       const collection = rawAccount(details.nft_collection);
       if (info?.is_scam === true || (collection && infoOf(payload?.metadata, details.nft_collection)?.is_scam === true)) continue;
@@ -286,21 +335,71 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
         verified: listedNftCollection(collection) || ownCollections.has(collection) || provenItems.has(item) ? true : (nftVerdictsKnown ? false : null) });
     }
   }
+  const paid = paymentsInOwnTraces(payload, self);
+  for (const row of out) {
+    const payment = paid(row);
+    if (payment) row.payment = payment;
+  }
   return withoutServiceStorage(withoutOwnChange(out, ownTraces), services.keys()).sort((a, b) => b.at - a.at);
+}
+function paymentsInOwnTraces(payload, self) {
+  const nftTo = new Set();
+  const nftItems = new Set();
+  const nftTraces = new Set();
+  const gramTraces = new Set();
+  const sentTo = new Map();
+  for (const action of Array.isArray(payload?.actions) ? payload.actions : []) {
+    const details = action?.details ?? {};
+    const trace = String(action?.trace_id ?? '');
+    if (!trace) continue;
+    if (action.type === 'nft_transfer' && rawAccount(details.old_owner) === self) {
+      nftTo.add(`${trace} ${rawAccount(details.new_owner)}`);
+      nftItems.add(`${trace} ${rawAccount(details.nft_item)}`);
+      nftTraces.add(trace);
+    } else if ((action.type === 'ton_transfer' || action.type === 'call_contract') && rawAccount(details.source) === self) {
+      gramTraces.add(trace);
+      const at = `${trace} ${rawAccount(details.destination)}`;
+      let value = 0n;
+      try { value = BigInt(String(details.value ?? '0')); } catch { value = 0n; }
+      sentTo.set(at, (sentTo.get(at) ?? 0n) + value);
+    }
+  }
+  return (row) => {
+    if (row.kind !== 'gram' || row.direction !== 'in' || !row.trace) return null;
+    const at = `${row.trace} ${row.counterparty}`;
+    if (nftTo.has(at)) return 'sale';
+    let amount = 0n;
+    try { amount = BigInt(row.amount || '0'); } catch { amount = 0n; }
+    if (amount < WALLET_GRAM_DUST_NANOTONS) return null;
+    if (nftTraces.has(row.trace) && !gramTraces.has(row.trace) && !nftItems.has(at)) return 'sale';
+    return sentTo.has(at) && amount > sentTo.get(at) ? 'refund' : null;
+  };
+}
+const MARKET_NFT_ACTIONS = new Set(['nft_purchase', 'nft_put_on_sale', 'nft_cancel_sale']);
+function marketTradesOf(payload) {
+  const traces = new Map();
+  for (const action of Array.isArray(payload?.actions) ? payload.actions : []) {
+    if (!MARKET_NFT_ACTIONS.has(action?.type) || !action?.trace_id) continue;
+    const trace = String(action.trace_id);
+    if (!traces.has(trace)) traces.set(trace, new Set());
+    traces.get(trace).add(rawAccount(action.details?.nft_item));
+  }
+  return traces;
 }
 export function ownTracesOf(payload, account) {
   const self = rawAccount(account);
   const traces = new Set();
   for (const action of Array.isArray(payload?.actions) ? payload.actions : []) {
     const details = action?.details ?? {};
-    const from = [details.source, details.sender, details.old_owner].map(rawAccount);
+    const market = action?.type === 'nft_purchase' ? [details.new_owner] : MARKET_NFT_ACTIONS.has(action?.type) ? [details.owner] : [];
+    const from = [details.source, details.sender, details.old_owner, ...market].map(rawAccount);
     if (self && action?.trace_id && from.includes(self)) traces.add(String(action.trace_id));
   }
   return traces;
 }
 export function withoutOwnChange(rows, ownTraces) {
   const own = ownTraces instanceof Set ? ownTraces : new Set(ownTraces ?? []);
-  return rows.filter((row) => !(row.kind === 'gram' && row.direction === 'in' && row.trace && own.has(row.trace)));
+  return rows.filter((row) => !(row.kind === 'gram' && row.direction === 'in' && row.trace && own.has(row.trace) && !row.payment));
 }
 export function withoutServiceStorage(rows, serviceTraces) {
   const services = new Set(serviceTraces ?? []);
@@ -332,4 +431,4 @@ export async function readWalletHistoryPages({ pages = WALLET_HISTORY_READ_ON, w
   return page;
 }
 
-export { infoOf as assetInfoOf, pictureOf as assetPictureOf, text as assetText };
+export { infoOf as assetInfoOf, pictureOf as assetPictureOf, text as assetText, attributesOf as assetAttributesOf, contentUriOf as assetContentUriOf };

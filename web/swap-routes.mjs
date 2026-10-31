@@ -1,9 +1,9 @@
-import { amountInFor, buildSwapMessage, quoteSwap, readSwapPool, swapAttachedNanotons, swapPairsFrom, swapToken } from './wallet-swap.mjs?v=20';
+import { amountInFor, buildSwapMessage, quoteSwap, readSwapPool, swapAttachedNanotons, swapPairsFrom, swapToken } from './wallet-swap.mjs?v=22';
 import {
   DEDUST, buildDedustSwapMessage, dedustAmountInFor, dedustPairsFrom, dedustSwapAttachedNanotons, dedustToken, estimateDedustSwap, quoteDedustSwap,
   readDedustPool,
-} from './wallet-swap-dedust.mjs?v=13';
-import { POOL_ACTIVITY, POOL_ACTIVITY_NEW, POOL_ACTIVITY_TAKEN } from './pool-activity.mjs?v=5';
+} from './wallet-swap-dedust.mjs?v=15';
+import { POOL_ACTIVITY, POOL_ACTIVITY_NEW, POOL_ACTIVITY_TAKEN } from './pool-activity.mjs?v=6';
 
 export const STONFI = 'stonfi';
 export { DEDUST };

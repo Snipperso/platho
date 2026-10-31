@@ -1,4 +1,4 @@
-import { t, tPlural } from './i18n.mjs?v=289';
+import { t, tPlural } from './i18n.mjs?v=298';
 import { messagePreviewText } from './message-plain-text.mjs?v=5';
 
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;

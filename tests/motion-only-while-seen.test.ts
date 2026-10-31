@@ -77,10 +77,23 @@ describe('what moves is what is seen', () => {
       const hero = player();
       const dialog = {};
       lift({ globalThis: { __plathoGiftRuntimeReady: true }, giftMotionAllowed: () => true, pageOnScreen: () => true, modalOnScreen: () => false,
-        modalInFront: () => null, profileCardDialog: dialog, brandGiftMotion: brand, heroGiftMotion: hero, ...over(dialog) },
+        modalInFront: () => null, profileCardDialog: dialog, brandGiftMotion: brand, heroGiftMotion: hero, walletGroupDialog: {}, walletNftHeroMotion: null,
+        ...over(dialog) },
       [fn('function syncGiftMarkMotion() {')], 'syncGiftMarkMotion')();
       return { brand: brand.anim.playing, hero: hero.anim.playing };
     };
+    const nft = (over: (dialog: object) => Record<string, any>) => {
+      const gift = player();
+      const window = {};
+      lift({ globalThis: { __plathoGiftRuntimeReady: true }, giftMotionAllowed: () => true, pageOnScreen: () => true, modalOnScreen: () => true,
+        modalInFront: () => window, profileCardDialog: {}, brandGiftMotion: null, heroGiftMotion: null, walletGroupDialog: window,
+        walletNftHeroMotion: Object.assign(gift, { inView: true }), ...over(window) },
+      [fn('function syncGiftMarkMotion() {')], 'syncGiftMarkMotion')();
+      return gift.anim.playing;
+    };
+    expect(nft(() => ({})), 'the NFT card in front, its gift in view').toBe(true);
+    expect(nft(() => ({ modalInFront: () => ({}) })), 'a dialog over the NFT card').toBe(false);
+    expect(nft((w) => ({ walletNftHeroMotion: Object.assign(player(), { inView: false }) })), 'scrolled out of its view').toBe(false);
     expect(marks(), 'nothing open').toEqual({ brand: true, hero: false });
     expect(marks((d) => ({ modalOnScreen: () => true, modalInFront: () => d })), 'the card open, in front').toEqual({ brand: false, hero: true });
     expect(marks(() => ({ modalOnScreen: () => true, modalInFront: () => ({}) })), 'a dialog over the card').toEqual({ brand: false, hero: false });

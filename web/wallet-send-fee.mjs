@@ -3,7 +3,7 @@ import {
   PLATHO_WALLET_CHUNK_EXTERNAL_BYTE_BUDGET,
   PLATHO_WALLET_MAX_MESSAGES_PER_TRANSFER,
   PLATHO_WALLET_MESSAGE_FRAMING_BYTES,
-} from './platho-wallet.mjs?v=93';
+} from './platho-wallet.mjs?v=94';
 
 export const WALLET_SEND_FEE_BASE_NANOTONS = 1_100_000n;
 

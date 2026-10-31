@@ -110,6 +110,7 @@ describe('the blind audit\'s LOW findings', () => {
       walletGroupDialog: dialog, t: (key: string) => key, setText: () => {}, fitWalletGroupTitle: () => {}, document: { querySelector: (id: string) => (id === '#walletGroupTitle' ? title : id === '#walletGroupBackButton' ? back : null) },
       dialogReturnFocusTarget: () => (dialog.hidden ? opener : { id: 'a button inside the window' }), holdPageBehindModal: () => calls.push('hold'), releaseModalHold: () => calls.push('release'),
       hideDialogAnimated: (one: any) => { one.hidden = true; calls.push('hide'); }, restoreDialogFocus: (target: any) => calls.push(`restore ${target?.id}`),
+      stopWalletNftHero: () => {},
     }, ['let walletGroupReturnFocus = null;', fn('function openWalletGroup(group, { title = t(\'wallet.groupSettings\'), back = false, also = [] } = {}) {'), fn('function closeWalletGroup() {')],
     '{ openWalletGroup, closeWalletGroup }');
     api.openWalletGroup('menu');

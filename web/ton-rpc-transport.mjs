@@ -56,6 +56,7 @@ const TONCENTER_RUN_GET_METHOD_PRIORITIES = Object.freeze({
 });
 const TONCENTER_REQUEST_PRIORITY_WEIGHTS = Object.freeze({
   critical: 0,
+  asked: 0.25,
   focus: 0.5,
   messages: 1,
   wallet: 2,

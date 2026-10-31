@@ -47,7 +47,9 @@ describe('new incoming transfers, counted', () => {
     expect(api.walletIncomingCount(rows, { at: 300, ids: [] })).toBe(0);
     const dust = [row('d1', 400, { amount: '1' }), row('d2', 390, { amount: '9999999' }), row('ok', 380, { amount: '10000000' }), row('bad', 370, { amount: 'x' })];
     expect(api.walletIncomingCount(dust, { at: 0, ids: [] })).toBe(1);
-    expect(app).toContain('const WALLET_INCOMING_GRAM_FLOOR_NANOTONS = 10_000_000n;');
+    expect(app).toContain('const WALLET_INCOMING_GRAM_FLOOR_NANOTONS = WALLET_GRAM_DUST_NANOTONS;');
+    expect(code(sourceBlock(app, 'function walletIncomingCount(rows, seen) {')), 'a cancel\'s refund is this wallet\'s own doing [round 86 — C1-3]').toContain("if (row.payment === 'refund') continue;");
+    expect(readFileSync('web/wallet-assets.mjs', 'utf8')).toContain('export const WALLET_GRAM_DUST_NANOTONS = 10_000_000n;');
   });
 
   it('INCOMING-02: the first read sees what is there; new rows are counted on both places; History on screen sees them; 99+; locked: none', () => {

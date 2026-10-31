@@ -1,5 +1,5 @@
 
-import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=103';
+import { INTRO_READ_SPACE } from './shard-discovery.mjs?v=104';
 import { INTRO_SAFE_CAP } from './intro-scan-policy.mjs?v=6';
 
 export const INTRO_BUCKET_HEADROOM = 64;

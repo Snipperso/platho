@@ -2,6 +2,8 @@ export const PRICE_TRADES = 100;
 export const PRICE_SCAN = 200;
 export const PRICE_PAGES = 3;
 export const PRICE_REFRESH_SCAN = 50;
+export const PRICE_MONTH_MS = 30 * 86_400_000;
+export const PRICE_SWAPS_KEPT = 1000;
 export const PRICE_USDT = '0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe';
 
 export function priceTradesUrl(origin, pool, limit = PRICE_SCAN, offset = 0) {
@@ -44,27 +46,50 @@ export function joinPricePoints(...lists) {
   for (const list of lists) for (const point of list) byTrade.set(point.id || `${point.at}|${point.price}|${point.amount}`, point);
   return [...byTrade.values()].sort((a, b) => a.at - b.at).slice(-PRICE_TRADES);
 }
-export async function readPriceHistory({ fetchImpl, origin, pool, known = null, wanted = null, ...pair }) {
+export function joinPoolSwaps(...lists) {
+  const byId = new Map();
+  for (const list of lists) for (const swap of list ?? []) byId.set(swap.id, swap);
+  return [...byId.values()].sort((a, b) => a.at - b.at).slice(-PRICE_SWAPS_KEPT);
+}
+export async function readPriceHistory({ fetchImpl, origin, pool, known = null, knownSwaps = null, knownWhole = false, wanted = null, ...pair }) {
   const page = async (limit, offset) => {
     const response = await fetchImpl(priceTradesUrl(origin, pool, limit, offset));
     if (!response?.ok) throw Object.assign(new Error(`price history: HTTP ${response?.status}`), { status: response?.status });
     const body = await response.json();
     const actions = Array.isArray(body?.actions) ? body.actions : [];
     const oldest = Math.min(...actions.map((action) => Number(action.end_utime ?? action.start_utime ?? 0) * 1000).filter((at) => at > 0), Number.POSITIVE_INFINITY);
-    return { points: pricePoints(body, pair), count: actions.length, oldest };
+    const swaps = [];
+    for (const action of actions) {
+      const at = Number(action?.end_utime ?? action?.start_utime ?? 0) * 1000;
+      if (action?.type === 'jetton_swap' && action.success !== false && at > 0) swaps.push({ id: String(action.action_id ?? action.trace_id ?? at), at });
+    }
+    return { points: pricePoints(body, pair), swaps, count: actions.length, oldest };
   };
   if (known?.length) {
     const fresh = await page(PRICE_REFRESH_SCAN, 0);
-    if (fresh.count < PRICE_REFRESH_SCAN || fresh.oldest <= known.at(-1).at) return joinPricePoints(known, fresh.points);
+    if (fresh.count < PRICE_REFRESH_SCAN || fresh.oldest <= known.at(-1).at) {
+      const swaps = joinPoolSwaps(knownSwaps, fresh.swaps);
+      return { points: joinPricePoints(known, fresh.points), swaps, whole: knownWhole && swaps.length < PRICE_SWAPS_KEPT };
+    }
   }
   let points = [];
+  let swaps = [];
+  let whole = false;
   for (let at = 0; at < PRICE_PAGES; at += 1) {
     if (at > 0 && wanted && !wanted()) throw Object.assign(new Error('price history: no longer wanted'), { code: 'NOT_WANTED' });
     const read = await page(PRICE_SCAN, at * PRICE_SCAN);
     points = joinPricePoints(points, read.points);
+    swaps = joinPoolSwaps(swaps, read.swaps);
+    whole = read.count < PRICE_SCAN && swaps.length < PRICE_SWAPS_KEPT;
     if (points.length >= PRICE_TRADES || read.count < PRICE_SCAN) break;
   }
-  return points;
+  return { points, swaps, whole };
+}
+export function swapsPerMonth(swaps, whole, now = Date.now()) {
+  if (!swaps.length) return whole ? 0 : null;
+  const from = now - PRICE_MONTH_MS;
+  if (whole || swaps[0].at <= from) return swaps.filter((swap) => swap.at > from).length;
+  return Math.round((swaps.length * PRICE_MONTH_MS) / Math.max(now - swaps[0].at, 1));
 }
 
 export function priceMids(points, ease = 0.35) {

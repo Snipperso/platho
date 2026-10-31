@@ -73,7 +73,21 @@ describe('NFTs', () => {
         [collection]: { token_info: [{ valid: true, type: 'nft_collections', name: 'Telegram Usernames' }] },
       },
     };
-    expect(parseNftItems(payload)).toEqual([{ address: item.toLowerCase(), collection: collection.toLowerCase(), collectionName: 'Telegram Usernames', name: '@name', picture: proxy('nft'), scam: false, verified: true, lastLt: '' }]);
+    expect(parseNftItems(payload)).toEqual([{ address: item.toLowerCase(), collection: collection.toLowerCase(), collectionName: 'Telegram Usernames', name: '@name', picture: proxy('nft'),
+      domain: 'name.t.me', pictureBig: proxy('nft'), attributes: [], uri: '', scam: false, verified: true, lastLt: '' }]);
+    const gift = { nft_items: [{ address: item, collection_address: collection, content: { uri: 'https://nft.fragment.com/gift/tophat-4841.json' } }],
+      metadata: { [item]: { token_info: [{ valid: true, name: 'Top Hat #4841', extra: { _image_big: proxy('big'), attributes: [
+        { trait_type: 'Model', value: 'Burned Brass' }, { trait_type: 'Backdrop', value: 'Chocolate' }, { trait_type: 'Symbol\u202e', value: 'x'.repeat(60) },
+        { trait_type: '', value: 'no trait' }, { trait_type: 'Rank', value: 7 }, ...Array.from({ length: 20 }, (_, i) => ({ trait_type: `t${i}`, value: 'v' })),
+      ] } }] } } };
+    const [whole] = parseNftItems(gift);
+    expect(whole.pictureBig).toBe(proxy('big'));
+    expect(whole.uri).toBe('https://nft.fragment.com/gift/tophat-4841.json');
+    expect(whole.attributes.slice(0, 4)).toEqual([{ trait: 'Model', value: 'Burned Brass' }, { trait: 'Backdrop', value: 'Chocolate' }, { trait: 'Symbol', value: 'x'.repeat(48) },
+      { trait: 'Rank', value: '7' }]);
+    expect(whole.attributes).toHaveLength(12);
+    const spam = parseNftItems({ ...gift, nft_items: [{ ...gift.nft_items[0], collection_address: `0:${'55'.repeat(32)}`, content: {} }] })[0];
+    expect([spam.pictureBig, spam.attributes], 'an unverified item draws nothing of a stranger\'s').toEqual(['', []]);
     expect([VERIFIED_COLLECTION_COUNT > 10, isVerifiedNftCollection(collection), isVerifiedNftCollection(SPAMMY)]).toEqual([true, true, false]);
     const airdrop = { nft_items: [{ address: SPAMMY, collection_address: `0:${'55'.repeat(32)}` }], metadata: { [SPAMMY]: { token_info: [{ valid: true, name: 'Airdrop - claim.com' }] } } };
     expect(parseNftItems(airdrop).map((one: any) => one.verified), 'a collection off the list: unverified, shown apart').toEqual([false]);
@@ -141,6 +155,70 @@ describe('history', () => {
     const traces = new Set([...ownTracesOf(page, SELF), ...ownTracesOf(next, SELF)]);
     expect(withoutOwnChange([...rows, ...parseWalletHistory(next, SELF)], traces).map((row: any) => row.id)).toEqual(['gift']);
     expect([...ownTracesOf(page, SELF)], 'only the traces this wallet sent in').toEqual(['T1']);
+  });
+
+  it('ASSETS-09: a marketplace\'s buy, sale, listing and withdrawal are one row each — the GRAM with the NFT; the rest of a buy is its change [2026-10-30]', () => {
+    const SALE = '0:' + '5b'.repeat(32);
+    const ITEM = '0:' + '6c'.repeat(32).toUpperCase();
+    const COLLECTION = '0:80D78A35F955A14B679FAA887FF4CD5BFC0F43B4A4EEA2A7E6927F3701B273C2';
+    const meta = { [ITEM]: { token_info: [{ valid: true, name: '@name' }] } };
+    const bought = { actions: [
+      { type: 'nft_purchase', success: true, end_utime: 900, action_id: 'buy', trace_id: 'B', details: { nft_collection: COLLECTION, nft_item: ITEM, old_owner: SALE,
+        new_owner: SELF, real_old_owner: OTHER, price: '18300000000', payout_address: OTHER, payout_amount: '17934000000' } },
+      { type: 'ton_transfer', success: true, end_utime: 901, action_id: 'rest', trace_id: 'B', details: { source: ITEM, destination: SELF, value: '90000000' } },
+    ], metadata: meta };
+    expect(parseWalletHistory(bought, SELF).map((row: any) => [row.id, row.trade, row.direction, row.amount, row.nftName, row.verified]),
+      'bought, for its price; the rest that came back with the NFT is the buy\'s change').toEqual([['buy', 'bought', 'in', '18300000000', '@name', true]]);
+    expect(parseWalletHistory(bought, OTHER).map((row: any) => [row.trade, row.direction, row.amount]), 'the seller: sold, for the payout it got').toEqual([['sold', 'out', '17934000000']]);
+    const elsewhere = structuredClone(bought);
+    elsewhere.actions[0].details.payout_address = '0:' + '7d'.repeat(32);
+    expect(parseWalletHistory(elsewhere, OTHER)[0].amount, 'a payout to another wallet is not this one\'s').toBe('0');
+    const listed = { actions: [
+      { type: 'nft_put_on_sale', success: true, end_utime: 800, action_id: 'list', trace_id: 'L', details: { nft_collection: COLLECTION, nft_item: ITEM, owner: SELF, sale_address: SALE, full_price: '5794900000' } },
+      { type: 'nft_cancel_sale', success: true, end_utime: 700, action_id: 'cancel', trace_id: 'C', details: { nft_collection: COLLECTION, nft_item: ITEM, owner: SELF, sale_address: SALE } },
+      { type: 'nft_transfer', success: true, end_utime: 700, action_id: 'back', trace_id: 'C', details: { nft_collection: COLLECTION, nft_item: ITEM, old_owner: SALE, new_owner: SELF } },
+      { type: 'nft_put_on_sale', success: true, end_utime: 600, action_id: 'theirs', trace_id: 'X', details: { nft_collection: COLLECTION, nft_item: ITEM, owner: OTHER, sale_address: SALE, full_price: '1' } },
+    ], metadata: meta };
+    expect(parseWalletHistory(listed, SELF).map((row: any) => [row.id, row.trade, row.amount]), 'the NFT a withdrawn sale sends back is the withdrawal\'s; a stranger\'s listing is not here')
+      .toEqual([['list', 'listed', '5794900000'], ['cancel', 'unlisted', '0']]);
+    expect([...ownTracesOf({ actions: [...bought.actions, ...listed.actions] }, SELF)].sort(), 'this wallet\'s buy, listing and withdrawal are its own traces').toEqual(['B', 'C', 'L']);
+    const scam = structuredClone(bought);
+    scam.metadata[ITEM].token_info[0].is_scam = true;
+    expect(parseWalletHistory(scam, SELF), 'a scam item is not history').toEqual([]);
+  });
+
+  it('ASSETS-10: GRAM inside an own trace that is not its change stays — what an NFT\'s new owner paid for it, what an address paid back past what was sent it; a rest, a jetton\'s rest and dust do not [round 85 — C1-1: accepted and cancelled Getgems offers]', () => {
+    const OFFER = '0:' + '7e'.repeat(32);
+    const SHARD = '0:' + '5a'.repeat(32);
+    const ITEM = '0:' + '6c'.repeat(32);
+    const JETTON_WALLET = '0:' + '3d'.repeat(32);
+    const page = { actions: [
+      { type: 'nft_transfer', success: true, end_utime: 900, action_id: 'nft', trace_id: 'A', details: { nft_item: ITEM, old_owner: SELF, new_owner: OFFER } },
+      { type: 'ton_transfer', success: true, end_utime: 901, action_id: 'profit', trace_id: 'A', details: { source: OFFER, destination: SELF, value: '85850000000', comment: 'Profit' } },
+      { type: 'ton_transfer', success: true, end_utime: 901, action_id: 'item-rest', trace_id: 'A', details: { source: ITEM, destination: SELF, value: '40000000' } },
+      { type: 'ton_transfer', success: true, end_utime: 800, action_id: 'cancel', trace_id: 'C', details: { source: SELF, destination: OFFER, value: '30000000', comment: 'cancel' } },
+      { type: 'ton_transfer', success: true, end_utime: 801, action_id: 'refund', trace_id: 'C', details: { source: OFFER, destination: SELF, value: '150028101834' } },
+      { type: 'call_contract', success: true, end_utime: 700, action_id: 'write', trace_id: 'S', details: { source: SELF, destination: SHARD, value: '61000000', opcode: '0x52535031' } },
+      { type: 'ton_transfer', success: true, end_utime: 701, action_id: 'change', trace_id: 'S', details: { source: SHARD, destination: SELF, value: '37500000' } },
+      { type: 'jetton_transfer', success: true, end_utime: 600, action_id: 'jetton', trace_id: 'J', details: { asset: USDT, sender: SELF, receiver: OTHER, amount: '1000000' } },
+      { type: 'ton_transfer', success: true, end_utime: 601, action_id: 'jetton-rest', trace_id: 'J', details: { source: JETTON_WALLET, destination: SELF, value: '50000000' } },
+      { type: 'call_contract', success: false, end_utime: 500, action_id: 'tiny', trace_id: 'D', details: { source: SELF, destination: OTHER, value: '3333', opcode: '0xffffffff' } },
+      { type: 'ton_transfer', success: false, end_utime: 501, action_id: 'dust', trace_id: 'D', details: { source: OTHER, destination: SELF, value: '70000' } },
+    ], metadata: { [USDT]: master('Tether USD', 'USD₮', { decimals: '6' }) } };
+    const rows = parseWalletHistory(page, SELF);
+    const ids = rows.filter((row: any) => row.kind === 'gram' && row.direction === 'in').map((row: any) => row.id);
+    expect(ids, 'the payment and the refund stay; every rest and the dust go').toEqual(['profit', 'refund']);
+    expect(rows.filter((row: any) => row.payment).map((row: any) => [row.id, row.payment])).toEqual([['profit', 'sale'], ['refund', 'refund']]);
+    const ROUTER = '0:' + '4e'.repeat(32);
+    const VAULT = '0:' + '9a'.repeat(32);
+    const pool = { actions: [
+      { type: 'nft_transfer', success: true, end_utime: 400, action_id: 'to-pool', trace_id: 'P', details: { nft_item: ITEM, old_owner: SELF, new_owner: ROUTER } },
+      { type: 'ton_transfer', success: true, end_utime: 401, action_id: 'pool-pays', trace_id: 'P', details: { source: VAULT, destination: SELF, value: '4030000000' } },
+      { type: 'ton_transfer', success: true, end_utime: 401, action_id: 'pool-item-rest', trace_id: 'P', details: { source: ITEM, destination: SELF, value: '40000000' } },
+    ] };
+    expect(parseWalletHistory(pool, SELF).filter((row: any) => row.kind === 'gram').map((row: any) => [row.id, row.payment]), 'the vault\'s payment stays, the NFT\'s rest goes')
+      .toEqual([['pool-pays', 'sale']]);
+    expect(withoutOwnChange(rows, ownTracesOf(page, SELF)).filter((row: any) => row.kind === 'gram' && row.direction === 'in').map((row: any) => row.id)).toEqual(['profit', 'refund']);
   });
 
   it('ASSETS-06: a page asks the index from its offset; a full page says there is more', async () => {

@@ -51,7 +51,7 @@ import {
   walletMessageToRecord,
   WALLET_EXTERNAL_DEATH_GRACE_MS,
   WALLET_EXTERNAL_VALIDITY_S,
-} from './platho-wallet.mjs?v=93';
+} from './platho-wallet.mjs?v=94';
 import { createMemoryReplayStore, createSealedReplayGuard } from './replay-store.mjs?v=8';
 import { createMemoryIntroCursorStore } from './intro-cursor-store.mjs?v=16';
 import {
@@ -64,7 +64,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=22';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=175';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=176';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -74,7 +74,7 @@ import {
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
   BROADCAST_VERDICT,
-} from './ton-rpc-transport.mjs?v=111';
+} from './ton-rpc-transport.mjs?v=112';
 import {
   PUBLIC_CHANNEL_PROFILE_CACHE_KEY,
   DEFAULT_PUBLIC_CHANNELS,
@@ -99,7 +99,7 @@ import {
   lightPublicFeedJson,
   encodePrefsSnapshotChunks,
   mergePrefsSnapshotChunks,
-} from './public-channel-subscriptions.mjs?v=274';
+} from './public-channel-subscriptions.mjs?v=283';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -117,7 +117,7 @@ import {
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=105';
+} from './recipient-identities.mjs?v=114';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
@@ -179,15 +179,15 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
 } from './pwa-contract-transactions.mjs?v=59';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=93';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=94';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=94';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=95';
 import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=45';
-import { createPublicLane } from './public-lane.mjs?v=164';
+import { createPublicLane } from './public-lane.mjs?v=165';
 import { createPublicShardTonRpcProvider, extractStack, readInt } from './public-shard-ton-rpc-provider.mjs?v=44';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage, chooseBeaconBucket } from './public-lane-send.mjs?v=144';
-import { squatCushionNanotons, applyShardSurcharge, surchargeExtraNanotons, defaultShardDebtResolver, LANE_PUBLIC, LANE_CONV, LANE_INTRO, LANE_REPORT, LANE_SANCTION, LANE_KEY, LANE_RECOVERY } from './shard-debt.mjs?v=82';
-import { GROUPS_NAMED_SLOT_COUNT, NOTES_NAMED_SLOT_COUNT, PREFS_CHUNK_COUNT, RECOVERY_MAX_SLOTS } from './shard-discovery.mjs?v=103';
-import { moderationSupported, moderationGateAddress, moderationLedgerTrusted, verdictMinimumCeiling, createModerationLedgerReader, createSanctionCache, createReportQueueReader, buildReportMessage, buildVerdictMessage, readPublicEntry, reportShardPrices, reportAttachValue, walletHashOf, sanctionShardAddressFor, reportEraOf, callGetter, REPORT_REASONS, VERDICT_ACTION, WARNINGS_TO_RESTRICT, SANCTION_RETENTION_SECONDS, MODERATION_GENERATION, sanctionStandingForVerdict, verdictLiveSurchargeNanotons, REPORT_DEPLOY_VALUE } from './moderation.mjs?v=79';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage, chooseBeaconBucket } from './public-lane-send.mjs?v=145';
+import { squatCushionNanotons, applyShardSurcharge, surchargeExtraNanotons, defaultShardDebtResolver, LANE_PUBLIC, LANE_CONV, LANE_INTRO, LANE_REPORT, LANE_SANCTION, LANE_KEY, LANE_RECOVERY } from './shard-debt.mjs?v=83';
+import { GROUPS_NAMED_SLOT_COUNT, NOTES_NAMED_SLOT_COUNT, PREFS_CHUNK_COUNT, RECOVERY_MAX_SLOTS } from './shard-discovery.mjs?v=104';
+import { moderationSupported, moderationGateAddress, moderationLedgerTrusted, verdictMinimumCeiling, createModerationLedgerReader, createSanctionCache, createReportQueueReader, buildReportMessage, buildVerdictMessage, readPublicEntry, reportShardPrices, reportAttachValue, walletHashOf, sanctionShardAddressFor, reportEraOf, callGetter, REPORT_REASONS, VERDICT_ACTION, WARNINGS_TO_RESTRICT, SANCTION_RETENTION_SECONDS, MODERATION_GENERATION, sanctionStandingForVerdict, verdictLiveSurchargeNanotons, REPORT_DEPLOY_VALUE } from './moderation.mjs?v=80';
 import { publicShardAddressBytesFor, keyShardAddressBytesFor, rawAddress as rawShardAddress, feeVaultCodeBoc, publicShardCodeCellFor, publicShardDataCellFor } from './shard-address.mjs?v=47';
 import { FV_DEPLOY_FUNDING, FV_PROTOCOL_FEE, FV_FLOAT_TOPUP_BELOW, FV_MSG_FORWARD_PRICES, FV_PUBLIC_SHARD_PUBLISH_GAS_MAX, FV_REFERENCE_GAS_PRICES, FV_STAKE_FORWARD_NANOTONS, buildVaultDeployMessage, vaultInternalPublishValue, vaultTakeFor, publicPublishRoute, scaleByNetworkPrices, networkPricesWithin, directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX, feeVaultInitializedDataCell } from './fee-vault.mjs?v=39';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=17';
@@ -196,47 +196,47 @@ import {
   stakeBandVerdict, strandedAtoms, planVaultRestore,
   vaultAddressFor, vaultSnapshot, vaultSupported, FV_ATOMIC_PER_ATH, FV_CUSTODY_TOPUP, FV_STAKE_MAX_ATH,
   FV_STAKE_MIN_ATH, VAULT_LIVE, VAULT_UNKNOWN, VAULT_ABSENT, VAULT_FROZEN,
-} from './vault-account.mjs?v=73';
+} from './vault-account.mjs?v=74';
 import {
   ACCOUNT_FROZEN, ACCOUNT_NONEXIST, ACCOUNT_UNINIT, accountStateRow, cellToBoc, frozenAccountDebtNanotons,
   matchFrozenState, preFreezeStateFromArchive,
-} from './frozen-account.mjs?v=24';
-import { walletSendFeeNanotons, walletSendPayloadBytesFor, walletSendSizeClassForPayloadBytes, WALLET_SEND_FEE_PER_PART_NANOTONS, WALLET_SEND_FIRST_EXTERNAL_EXTRA_NANOTONS } from './wallet-send-fee.mjs?v=65';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=90';
-import { createIntroLane } from './intro-lane.mjs?v=135';
+} from './frozen-account.mjs?v=25';
+import { walletSendFeeNanotons, walletSendPayloadBytesFor, walletSendSizeClassForPayloadBytes, WALLET_SEND_FEE_PER_PART_NANOTONS, WALLET_SEND_FIRST_EXTERNAL_EXTRA_NANOTONS } from './wallet-send-fee.mjs?v=66';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=91';
+import { createIntroLane } from './intro-lane.mjs?v=136';
 import { createIndexedDbDeviceSecretStore } from './device-secret-store.mjs?v=11';
 import { deriveAtRestKeys, openAtRest, sealAtRest, withAtRestLock } from './at-rest-seal.mjs?v=5';
 import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=32';
 import { createMemoryConvKeyStore, conversationId, conversationSafetyCode } from './conv-key-store.mjs?v=27';
 import { telegramLaunchSignedFor } from './telegram-launch.mjs?v=2';
-import { WALLET_NFT_PAGE, formatUnits, inlinePictureOf, listedNftCollection, rawAccount, readCardBalances, readJettonBalances, readNftItems, readWalletHistoryPages, withoutOwnChange, withoutServiceStorage } from './wallet-assets.mjs?v=29';
+import { WALLET_GRAM_DUST_NANOTONS, WALLET_NFT_PAGE, assetAttributesOf, formatUnits, inlinePictureOf, listedNftCollection, rawAccount, readCardBalances, readJettonBalances, readNftItems, readWalletHistoryPages, withoutOwnChange, withoutServiceStorage } from './wallet-assets.mjs?v=34';
 import { BURN_ADDRESS, BURN_VALUE_NANOTONS, JETTON_TRANSFER_VALUE_NANOTONS, NFT_TRANSFER_VALUE_NANOTONS, TRANSFER_COMMENT_MAX_BYTES, 
   buildJettonTransferBody, buildNftTransferBody, buildTextCommentBody, getMethodStack, nextTransferQueryId, parseUnits, readJettonWalletAddress, readNftHolder, readNftOwner,
-  stackInteger } from './wallet-transfers.mjs?v=15';
-import { GRAM, SWAP_DEFAULT_SLIPPAGE_BPS, SWAP_SLIPPAGE_CHOICES_BPS, amountInFor, minimumOut, readSwapPool, swapDeadline, swapPair } from './wallet-swap.mjs?v=20';
+  stackInteger } from './wallet-transfers.mjs?v=16';
+import { GRAM, SWAP_DEFAULT_SLIPPAGE_BPS, SWAP_SLIPPAGE_CHOICES_BPS, amountInFor, minimumOut, readSwapPool, swapDeadline, swapPair } from './wallet-swap.mjs?v=22';
 import { DEDUST, STONFI, SWAP_EXCHANGE_NAMES, buildRouteMessage, estimateRoute, quoteRoute, readRoutePool, routeAmountInFor, routeAttachedNanotons, routeLocked,
   routePoolFeeBps, routeRate, swapAsksFrom, swapListedToken, swapRoutes, swapRoutesFrom, routeActivity, routeScore, swapAskEntries, POOL_BUSY_TRADES, POOL_SHALLOW_DEPTH_GRAM, POOL_LIVELY_DEPTH_GRAM, POOL_LIVELY_TRADES, SWAP_NEW_ID,
-  swapTokenIsNew } from './swap-routes.mjs?v=21';
-import { ASSET_PICTURES } from './asset-pictures.mjs?v=7';
+  swapTokenIsNew } from './swap-routes.mjs?v=23';
+import { ASSET_PICTURES } from './asset-pictures.mjs?v=8';
 import { readBalanceAndReserves, readPoolReserves } from './pool-state.mjs?v=5';
-import { NFT_FEE_BASE, NFT_FEED_PAGE, buyValue, nftBuyBody, priceSplit, readLatestListings, readSaleFresh } from './nft-market.mjs?v=5';
-import { PRICE_USDT, formatPrice, priceChart, priceLinePaths, priceSummary, readPriceHistory } from './price-history.mjs?v=12';
+import { NFT_COLLECTION_DEEP_PAGES, NFT_COLLECTION_PAGE, NFT_COLLECTION_SEARCH_PAGES, NFT_FEE_BASE, NFT_PINNED_COLLECTIONS, NFT_SALES_MAX, buyValue, nftBuyBody, nftIndexOfName, priceSplit, readCollectionNames, readLatestListings, readListingsByIndex, readSaleFresh, readSalesNow } from './nft-market.mjs?v=14';
+import { PRICE_USDT, formatPrice, priceChart, priceLinePaths, priceSummary, readPriceHistory, swapsPerMonth } from './price-history.mjs?v=14';
 import {
   DEVICE_OTHER_WALLETS_KEY, DEVICE_WALLETS_MAX, cloudFormOf, cloudKeyFor, cloudValueFor, counted, isCloudWalletKey, isSigned, isUntaggedCloudKey, keyringFind,
   keyringForget, keyringPut, keyringRecords, keyringWithout, newerSeal, nextSeq, normalizeKeyring, parseCloudValue, planWalletSync, recordOwner, recordSeq,
   sameSeal, sameWallet as sameWalletRecords, sealedFieldsText, supersedes,
 } from './wallet-keyring.mjs?v=7';
 import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=44';
-import { outgoingRecordShard, createRecordShardPlanner, selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=104';
-import { publishConvLaneParts, quoteConvVaultMessageNanotons } from './conv-lane-send.mjs?v=136';
+import { outgoingRecordShard, createRecordShardPlanner, selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=105';
+import { publishConvLaneParts, quoteConvVaultMessageNanotons } from './conv-lane-send.mjs?v=137';
 import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=29';
-import { createConvReadLane } from './conv-lane.mjs?v=133';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, createRecordShardPageReader, confirmConvRecordsLanded, CONV_READ_OPCODES } from './conv-lane-read.mjs?v=121';
-import { createShardMessagesWithSourceReader, createShardStatesRequest, createShardLastTransactionReader, createToncenterRestFetch, toncenterRestOrigin, createAccountHistoryReader, createAccountStateAtReader } from './shard-rpc.mjs?v=69';
+import { createConvReadLane } from './conv-lane.mjs?v=134';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, createRecordShardPageReader, confirmConvRecordsLanded, CONV_READ_OPCODES } from './conv-lane-read.mjs?v=122';
+import { createShardMessagesWithSourceReader, createShardStatesRequest, createShardLastTransactionReader, createToncenterRestFetch, toncenterRestOrigin, createAccountHistoryReader, createAccountStateAtReader } from './shard-rpc.mjs?v=70';
 import { athRequestTopUpNanotons, athTransferTopUpPossible, athWalletRentOwedNanotons, buildAthWalletTopUpMessage, groupEntryLegValues, groupEntryLegsSettledNanotons, groupEntryTopUpNanotons, groupEntryTopUpPossible, parseForwardPrices, parseGasPrices } from './ath-request-reserve.mjs?v=10';
 import { avatarRequestFinalCost, convMessageFinalCost, introFinalCost, publicPostFinalCost, reactionFinalCost, recoveryWriteFinalCost, walletOnceFinalCost, reportFinalCost, walletTransferFeeFinalCost, activationFinalCost } from './publish-final-cost.mjs?v=18';
-import { createGroupRuntime } from './group-runtime.mjs?v=117';
-import { forgetGroupLaneKeys, createGroupReadLane } from './group-lane-read.mjs?v=74';
+import { createGroupRuntime } from './group-runtime.mjs?v=118';
+import { forgetGroupLaneKeys, createGroupReadLane } from './group-lane-read.mjs?v=75';
 import { createGroupRecordStore, createGroupRequestQueue, GROUP_RECORD_DB_NAME, GROUP_REQUEST_DB_NAME, GROUP_REQUEST_STORE_NAME, PUBLIC_GROUP_RECORD_DB_NAME } from './group-record-store.mjs?v=15';
 import { createPublicGroupRuntime, publicGroupKeyOfWallet, publicGroupChatUid } from './public-group-runtime.mjs?v=28';
 import {
@@ -250,29 +250,29 @@ import {
   buildReactMessage, decodePublicReactions, reactionsGetterCall, reactionsShown, createOwnReactionStore,
   PUBLIC_REACTION_GLYPHS, PUBLIC_REACTION_COUNT, PUBLIC_REACTION_PAGE_CAP,
 } from './public-reactions.mjs?v=31';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, currentStatesBatchCeiling, changeMarkerOf, isActiveAccountState, isUnknownAccountState } from './shard-reader.mjs?v=108';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, currentStatesBatchCeiling, changeMarkerOf, isActiveAccountState, isUnknownAccountState } from './shard-reader.mjs?v=109';
 import { DEFAULT_POLICY as INTRO_SCAN_POLICY } from './intro-scan-policy.mjs?v=6';
 import { sha256 as nobleSha256 } from './vendor/@noble/hashes/sha2.js';
 import { orderThreadsForList } from './thread-list-order.mjs?v=5';
 import { reconcileKeyedRows } from './keyed-rows.mjs?v=3';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W, convForwardEpochs, CONV_EPOCH_SECONDS } from './crypto/conv-routing.mjs?v=9';
 import { INTRO_EPOCH_SIGNED_FROM } from './crypto/intro-handshake.mjs?v=8';
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=135';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=136';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet,
 } from './intro-send-state.mjs?v=5';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=105';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=111';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=106';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=112';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=3';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=64';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=65';
 import { TON_MNEMONIC_WORDLIST } from './ton-mnemonic-wordlist.mjs?v=2';
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsChunks, prefsChunkSlot, PREFS_CHUNK_PLAINTEXT_MAX, confirmRecoverySlotWrite, confirmRecoverySlotWrites, packGroupsForRecovery, prepareGroupsBackup, restoreGroupsEntries, groupsChunkSlot } from './recovery-lane.mjs?v=133';
-import { prepareNotesBackup, restoreNotes, notesChunkSlot, NOTES_SLOT_MAX_BLOB_BYTES } from './notes-lane.mjs?v=112';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=110';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsChunks, prefsChunkSlot, PREFS_CHUNK_PLAINTEXT_MAX, confirmRecoverySlotWrite, confirmRecoverySlotWrites, packGroupsForRecovery, prepareGroupsBackup, restoreGroupsEntries, groupsChunkSlot } from './recovery-lane.mjs?v=134';
+import { prepareNotesBackup, restoreNotes, notesChunkSlot, NOTES_SLOT_MAX_BLOB_BYTES } from './notes-lane.mjs?v=113';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=111';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -284,20 +284,21 @@ import {
   PUBLIC_BEACON_READ_SPACE,
   epochIsDerivable,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=103';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=95';
+} from './shard-discovery.mjs?v=104';
+import { createTonDnsProvider } from './ton-dns-provider.mjs?v=96';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=95';
+} from './username-ton-rpc-provider.mjs?v=96';
 import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
+  readUsernameNftArt,
   safeInlineImage,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=38';
+} from './username-nft-owned.mjs?v=40';
 import {
   TELEGRAM_GIFT_ASSET_ORIGIN,
   TELEGRAM_GIFT_COLLECTION_CODE_HASH,
@@ -310,6 +311,7 @@ import {
   decodeNftItemDataStack,
   discoverTelegramGiftItems,
   parseTelegramGiftCollectionUri,
+  parseTelegramGiftItemUri,
   telegramGiftImageSources,
 } from './telegram-gift-nfts.mjs?v=27';
 import {
@@ -330,7 +332,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=289';
+} from './i18n.mjs?v=298';
 import { createBootSignalField } from './boot-signal-field.mjs?v=16';
 import { cutoverUpdateRequired, generationForEpoch, generationForUnixSeconds, currentEpochUtc, CUTOVER_EPOCH, WRITES_GENERATION } from './cutover-epoch.mjs?v=7';
 import {
@@ -356,7 +358,7 @@ const RESECURE_WINDOW_WAIT_SHOW_MS = 300;
 await refuseWithoutDeviceStorage();
 await holdActiveWindow();
 await resecureStorageIfDue();
-const PLATHO_APP_RUNTIME_VERSION = '1.5.23';
+const PLATHO_APP_RUNTIME_VERSION = '1.5.24';
 
 const PLATHO_APP_BUILD_ID = plathoRunningBuildId();
 
@@ -1293,7 +1295,7 @@ const walletShowHiddenSelect = document.querySelector('#walletShowHiddenSelect')
 const WALLET_HIDDEN_ASSETS_KEY = 'platho.walletHiddenAssets.v1';
 const WALLET_HISTORY_SEEN_KEY = 'platho.walletHistorySeen.v1';
 const WALLET_INCOMING_CHECK_MS = 180_000;
-const WALLET_INCOMING_GRAM_FLOOR_NANOTONS = 10_000_000n;
+const WALLET_INCOMING_GRAM_FLOOR_NANOTONS = WALLET_GRAM_DUST_NANOTONS;
 const WALLET_SHOW_HIDDEN_KEY = 'platho.walletShowHidden.v1';
 const WALLET_HIDDEN_ASSETS_MAX = 5_000;
 const walletTabs = document.querySelector('#walletTabs');
@@ -1303,8 +1305,9 @@ const walletMarket = { box: null, list: null, scroller: null, items: [], rows: n
   columnRun: false, redraw: null, drawnDesktop: null };
 const walletPricePoolChoices = new Map();
 const walletPriceCharts = new Set();
-const walletNftMarket = { mode: 'tokens', box: null, list: null, more: null, note: null, listings: [], offset: 0, hasMore: false, at: 0,
-  reading: false, failed: false, giftVerdicts: new Map() };
+const walletNftMarket = { mode: 'tokens', box: null, picker: null, pickerNote: null, detail: null, parts: null, pickerRows: new Map(), cards: new Map(),
+  query: '', view: null, sort: 'cheap', collections: new Map(), giftVerdicts: new Map(), fitObserver: null, drawnDesktop: null, rowSeer: null, rowSeerList: null,
+  rowsInView: new Set(), rowReading: false, pinnedNamed: false, athArt: new Map(), athQueue: new Set(), athTimer: null, filter: { key: null, traits: new Map(), min: '', max: '', q: '' }, lookup: null, lookupDue: null, lookupTimer: 0 };
 const WALLET_MARKET_ROOM_MIN = 400;
 const WALLET_MARKET_BATCH = 32;
 const WALLET_MARKET_PAGE = 40;
@@ -7074,16 +7077,20 @@ function requireNoPendingServiceWorkerAppShellReload() {
   throw serviceWorkerUpdateReloadError();
 }
 
-function offerAppUpdate({ asked = false, said = false } = {}) {
+function offerAppUpdate({ asked = false, said = false, confirmed = false } = {}) {
   if (!pendingServiceWorkerAppShellReload) return;
   if (!asked && appUpdateOffered) return;
   if (appUpdateOfferTimer) { clearTimeout(appUpdateOfferTimer); appUpdateOfferTimer = null; }
   const sending = shouldDeferLockForActiveSend() || sendWorkInHand();
   const typing = !asked && (composerHoldsContent() || pageHoldsTyping());
+  if (confirmed && !sending && !activeActionDialog && !modalOnScreen() && !composerHoldsContent() && !pageHoldsTyping() && pageOnScreen()) {
+    reloadForPendingServiceWorkerAppShellUpdate();
+    return;
+  }
   if ((!asked && modalOnScreen()) || activeActionDialog || sending || typing || !pageOnScreen()) {
-    if (asked && sending && !said) showAppNotice(t('app.updateWaitsForSend'), 6_000);
+    if (asked && sending && !said) showAppNotice(t(confirmed ? 'app.updateAfterSend' : 'app.updateWaitsForSend'), 6_000);
     const told = said || (asked && sending);
-    appUpdateOfferTimer = setTimeout(() => { appUpdateOfferTimer = null; offerAppUpdate({ asked, said: told }); }, 5_000);
+    appUpdateOfferTimer = setTimeout(() => { appUpdateOfferTimer = null; offerAppUpdate({ asked, said: told, confirmed }); }, 5_000);
     return;
   }
   appUpdateOffered = true;
@@ -7096,7 +7103,7 @@ function offerAppUpdate({ asked = false, said = false } = {}) {
     unprompted: !asked,
   }).then((answer) => {
     if (!answer || !pendingServiceWorkerAppShellReload) return;
-    if (shouldDeferLockForActiveSend() || sendWorkInHand()) { offerAppUpdate({ asked: true }); return; }
+    if (shouldDeferLockForActiveSend() || sendWorkInHand()) { offerAppUpdate({ asked: true, confirmed: true }); return; }
     reloadForPendingServiceWorkerAppShellUpdate();
   });
 }
@@ -9347,6 +9354,12 @@ function modalInFront() {
 }
 
 function restoreDialogFocus(target) {
+  if (target && !target.isConnected) {
+    const key = target.dataset?.sale ? `.wallet-nft-cards [data-sale="${CSS.escape(target.dataset.sale)}"]`
+      : target.dataset?.tradeId ? `.wallet-market-trades [data-trade-id="${CSS.escape(target.dataset.tradeId)}"]`
+        : typeof target.dataset?.collection === 'string' ? `.wallet-nft-picker [data-collection="${CSS.escape(target.dataset.collection)}"]` : '';
+    target = (key && document.querySelector(key)) || target;
+  }
   if (!target?.isConnected || target.isContentEditable || target.matches('input, textarea, select')) return;
   if (target.closest('[inert]') || !elementRendered(target)) return;
   try { target.focus({ preventScroll: true }); } catch { }
@@ -35812,6 +35825,9 @@ function navVaultBalanceHasKnownValue() {
     && vaultPocketState.wallet?.ath_balance !== undefined;
 }
 
+function walletCardAmount(formatted, symbol) {
+  return `${walletShortAmount(formatted)} ${symbol}`;
+}
 function walletShortAmount(text) {
   const plain = String(text).replace(/\s/g, '').replace(',', '.');
   if (!/^-?\d+(\.\d+)?$/.test(plain)) {
@@ -35856,8 +35872,8 @@ function refreshNavVaultBalance() {
     if (root.hasAttribute('data-stale-balance')) container.setAttribute('aria-hidden', 'true');
     else container.removeAttribute('aria-hidden');
   }
-  const tonBalance = `${walletShortAmount(walletFormattedBalance('TON'))} GRAM`;
-  const athBalance = `${walletShortAmount(walletFormattedBalance('ATH'))} ATH`;
+  const tonBalance = walletCardAmount(walletFormattedBalance('TON'), 'GRAM');
+  const athBalance = walletCardAmount(walletFormattedBalance('ATH'), 'ATH');
   for (const node of navVaultTonBalances) {
     setText(node, tonBalance);
   }
@@ -41893,6 +41909,8 @@ let brandGiftMotion = null;
 let brandGiftMotionToken = 0;
 let heroGiftMotion = null;
 let heroGiftMotionToken = 0;
+let walletNftHeroMotion = null;
+let walletNftHeroToken = 0;
 const walletCardGiftMotion = { motion: null, token: 0 };
 const profileBalanceCardGiftMotion = { motion: null, token: 0 };
 const telegramGiftCropCache = new Map();
@@ -42888,7 +42906,8 @@ function syncHeroGiftMotion(theme) {
 function syncGiftMarkMotion() {
   if (!globalThis.__plathoGiftRuntimeReady) return;
   const allowed = giftMotionAllowed() && pageOnScreen();
-  for (const [motion, seen] of [[brandGiftMotion, () => !modalOnScreen()], [heroGiftMotion, () => modalInFront() === profileCardDialog]]) {
+  for (const [motion, seen] of [[brandGiftMotion, () => !modalOnScreen()], [heroGiftMotion, () => modalInFront() === profileCardDialog],
+    [walletNftHeroMotion, () => modalInFront() === walletGroupDialog && walletNftHeroMotion?.inView !== false]]) {
     if (!motion?.anim) continue;
     if (allowed && seen()) motion.anim.play();
     else motion.anim.pause();
@@ -44203,14 +44222,14 @@ function writeProfileBalanceCardBalances(raw, own) {
   let ath = null;
   if (own) {
     if (navVaultBalanceHasKnownValue()) {
-      gram = `${walletFormattedBalance('TON')} GRAM`;
-      ath = `${walletFormattedBalance('ATH')} ATH`;
+      gram = walletCardAmount(walletFormattedBalance('TON'), 'GRAM');
+      ath = walletCardAmount(walletFormattedBalance('ATH'), 'ATH');
     }
   } else {
     const read = profileBalanceCardReads.get(raw);
     if (read) {
-      gram = `${formatTonNanotons(BigInt(read.gram))} GRAM`;
-      ath = `${formatAthAtomic(BigInt(read.jetton))} ATH`;
+      gram = walletCardAmount(formatTonNanotons(BigInt(read.gram)), 'GRAM');
+      ath = walletCardAmount(formatAthAtomic(BigInt(read.jetton)), 'ATH');
     }
     if (!read || Date.now() - read.at > PROFILE_BALANCE_CARD_TTL_MS) void readProfileBalanceCard(raw);
   }
@@ -45101,6 +45120,19 @@ function paintWalletAssetIcon(icon, picture, { shared = false } = {}) {
     icon.classList.add('has-picture');
   }));
 }
+function paintWalletAssetIconFirst(icon, pictures, { shared = false } = {}) {
+  const tried = pictures.filter(Boolean);
+  if (!tried.length) return;
+  whenWalletIconSeen(icon, () => void (async () => {
+    for (const picture of tried) {
+      const url = await walletPicture(picture, { shared });
+      if (!url) continue;
+      icon.style.backgroundImage = `url("${url}")`;
+      icon.classList.add('has-picture');
+      return;
+    }
+  })());
+}
 function whenWalletIconSeen(icon, start) {
   if (typeof IntersectionObserver !== 'function') { start(); return; }
   const watch = new IntersectionObserver((entries) => {
@@ -45185,6 +45217,7 @@ function walletNftTile(item) {
   name.className = 'wallet-nft-name';
   name.textContent = label;
   entry.icon = walletAssetIcon(item.picture, item.name || '?', 'wallet-nft-picture');
+  if (verified) walletNftDomainFace(entry.icon, item.picture ? [item.picture] : [], item.domain);
   tile.append(entry.icon, name);
   tile.addEventListener('click', () => openWalletNftCard(entry.item));
   entry.tile = tile;
@@ -45235,6 +45268,17 @@ function renderWalletHistory(panel) {
         className: `wallet-history-row is-swap${row.success && came ? '' : ' is-failed'}` }));
       continue;
     }
+    if (row.trade) {
+      const when = row.at ? dateOf(row.at) : '';
+      const grams = BigInt(row.amount || '0') > 0n ? `${formatUnits(row.amount, 9)} GRAM` : '';
+      const amount = row.trade === 'bought' && grams ? `−${grams}` : row.trade === 'sold' && grams ? `+${grams}` : '';
+      const unverified = row.trade === 'bought' && row.verified === false ? t('wallet.tokenUnverified') : '';
+      const sub = [unverified, row.nftName, row.trade === 'listed' ? grams : '', when, row.success ? '' : t('wallet.historyFailed')].filter(Boolean).join(' · ');
+      const title = t({ bought: 'wallet.historyNftBought', sold: 'wallet.historyNftSold', listed: 'wallet.historyNftListed' }[row.trade] ?? 'wallet.historyNftUnlisted');
+      list.append(walletAssetRow({ title, letter: row.direction === 'in' ? '↓' : '↑', subtitle: sub, amount,
+        className: `wallet-history-row ${row.trade === 'sold' ? 'is-in' : 'is-out'}${row.success ? '' : ' is-failed'}` }));
+      continue;
+    }
     const stranger = incoming && row.kind === 'jetton' && row.verified === false;
     const title = row.kind === 'nft' ? t(incoming ? 'wallet.historyNftIn' : 'wallet.historyNftOut')
       : t(stranger ? 'wallet.historyUnverifiedIn' : incoming ? 'wallet.historyIn' : 'wallet.historyOut');
@@ -45260,6 +45304,7 @@ function renderWalletHistory(panel) {
 }
 
 let walletGroupReturnFocus = null;
+let walletGroupBack = null;
 function openWalletGroup(group, { title = t('wallet.groupSettings'), back = false, also = [] } = {}) {
   if (!walletGroupDialog) return;
   const closing = walletGroupDialog.classList.contains('is-closing');
@@ -45269,12 +45314,14 @@ function openWalletGroup(group, { title = t('wallet.groupSettings'), back = fals
     section.hidden = section.dataset.walletGroup !== group && !also.includes(section.dataset.walletGroup);
   }
   if (group !== 'token' && !also.includes('token')) {
+    stopWalletNftHero();
     document.querySelector('#walletTokenCardHead')?.replaceChildren();
     document.querySelector('#walletTokenCardStats')?.replaceChildren();
   }
   setText(document.querySelector('#walletGroupTitle'), title);
   const backButton = document.querySelector('#walletGroupBackButton');
   if (backButton) backButton.hidden = !back;
+  walletGroupBack = typeof back === 'function' ? back : null;
   walletGroupDialog.hidden = false;
   fitWalletGroupTitle();
   holdPageBehindModal(walletGroupDialog);
@@ -45343,6 +45390,8 @@ window.addEventListener('resize', () => {
 }, { passive: true });
 function closeWalletGroup() {
   if (!walletGroupDialog || walletGroupDialog.hidden) return;
+  stopWalletNftHero();
+  walletGroupDialog.classList.remove('is-nft-view');
   releaseModalHold(walletGroupDialog);
   hideDialogAnimated(walletGroupDialog, () => {
     document.querySelector('#walletTokenCardHead')?.replaceChildren();
@@ -45355,6 +45404,7 @@ function forgetWalletGroup() {
   const dialog = document.querySelector('#walletGroupDialog');
   if (dialog) dialog.hidden = true;
   try { if (dialog) releaseModalHold(dialog); walletGroupReturnFocus = null; } catch { }
+  stopWalletNftHero();
   document.querySelector('#walletTokenCardHead')?.replaceChildren();
   document.querySelector('#walletTokenCardStats')?.replaceChildren();
 }
@@ -45480,7 +45530,7 @@ function walletPriceChart(base, quote, { intro = true, route: given = null, pool
   const change = part('span', 'wallet-price-change');
   now.append(value, unit, change);
   const detail = part('span', 'wallet-price-detail', t('wallet.readingChain'));
-  let monthly = null;
+  let swapsRead = { swaps: [], whole: false };
   let depthShown = '';
   let supply = null;
   let supplyPending = offer.id !== GRAM;
@@ -45599,6 +45649,7 @@ function walletPriceChart(base, quote, { intro = true, route: given = null, pool
     box.dataset.tone = change.dataset.tone;
     const cap = supply !== null && supply > 0n && now > 0 ? (Number(supply) / 10 ** offer.decimals) * now : null;
     const focused = document.activeElement === poolButton;
+    const monthly = swapsPerMonth(swapsRead.swaps, swapsRead.whole);
     detail.replaceChildren(...[
       monthly !== null ? fact(t('wallet.marketSwapsLabel'), t('wallet.marketPerMonth', { count: walletCompact(monthly) })) : null,
       cap !== null ? fact(t('wallet.priceCapLabel'), `${walletCompact(cap)} ${ask.symbol}`) : supplyPending ? fact(t('wallet.priceCapLabel'), '\u2014') : null,
@@ -45794,13 +45845,13 @@ function walletPriceChart(base, quote, { intro = true, route: given = null, pool
     if (!force && kept && Date.now() - kept.at < WALLET_PRICE_FRESH_MS) { again(); return; }
     const wanted = () => box.isConnected && era === readEra;
     void readPriceHistory({ fetchImpl: createToncenterRestFetch({ requestOptions: { priority: 'profile', wanted } }), origin: toncenterRestOrigin(), pool: route.pair.pool,
-      known: force ? kept?.points ?? null : null, wanted, ...pair })
-      .then((fresh) => {
+      known: force ? kept?.points ?? null : null, knownSwaps: force ? kept?.swaps ?? null : null, knownWhole: kept?.whole ?? false, wanted, ...pair })
+      .then(({ points: fresh, swaps, whole }) => {
         walletPriceReads.delete(readKey);
-        walletPriceReads.set(readKey, { at: Date.now(), points: fresh });
+        walletPriceReads.set(readKey, { at: Date.now(), points: fresh, swaps, whole });
         while (walletPriceReads.size > 24) walletPriceReads.delete(walletPriceReads.keys().next().value);
         if (era !== readEra) return;
-        if (box.isConnected && shown < 0) draw(fresh, intro && !chart);
+        if (box.isConnected && shown < 0) { swapsRead = { swaps, whole }; draw(fresh, intro && !chart); }
         again();
       })
       .catch((error) => {
@@ -45819,7 +45870,6 @@ function walletPriceChart(base, quote, { intro = true, route: given = null, pool
     key = `${route.pair.pool}|${offer.id}`;
     exchange = SWAP_EXCHANGE_NAMES[route.dex] ?? '';
     plot.setAttribute('aria-label', t('wallet.priceHint', { exchange }));
-    monthly = routeActivity(route)?.trades ?? null;
     const thin = depth !== null && ask.id === GRAM && depth < WALLET_PRICE_THIN_GRAM;
     depthShown = depth === null ? '' : depthText(depth);
     depthLine.textContent = thin ? t('wallet.priceThin') : '';
@@ -45827,7 +45877,7 @@ function walletPriceChart(base, quote, { intro = true, route: given = null, pool
     depthLine.hidden = !thin;
     if (chart && shown < 0) release();
     const kept = walletPriceReads.get(key);
-    if (kept) draw(kept.points, intro);
+    if (kept) { swapsRead = { swaps: kept.swaps ?? [], whole: kept.whole }; draw(kept.points, intro); }
     read();
     if (offer.id !== GRAM && supply === null) {
       const readSupply = (again) => walletJettonSupply(offer.id, () => box.isConnected).then((total) => {
@@ -45886,10 +45936,65 @@ function walletPriceChart(base, quote, { intro = true, route: given = null, pool
     .then((read) => { if (firstEra === readEra) adopt(read); });
   return box;
 }
-function fillWalletCard({ picture, letter, title, subtitle, stats }) {
+function walletNftHero({ pictures = [], letter, gift = null, shared = false, domain = '', nft = '' }) {
+  const hero = document.createElement('div');
+  hero.className = 'wallet-nft-hero';
+  if (nft) hero.dataset.nft = nft;
+  const still = walletAssetIcon('', letter, 'wallet-nft-hero-picture');
+  walletNftDomainFace(still, pictures, domain);
+  paintWalletAssetIconFirst(still, pictures, { shared });
+  hero.append(still);
+  if (gift?.slug && Number.isSafeInteger(gift.number)) {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'wallet-nft-hero-motion';
+    canvas.hidden = true;
+    canvas.setAttribute('aria-hidden', 'true');
+    hero.append(canvas);
+    hero.giftMotion = { canvas, gift: { slug: gift.slug, number: gift.number }, key: `${gift.slug}-${gift.number}` };
+  }
+  return hero;
+}
+function playWalletNftHero(hero) {
+  if (!globalThis.__plathoGiftRuntimeReady || !hero?.giftMotion) return;
+  const { canvas, gift } = hero.giftMotion;
+  const token = ++walletNftHeroToken;
+  mountGiftMotion(canvas, gift, null, {
+    twin: hero.querySelector('.wallet-nft-hero-picture'),
+    onBoxChange: () => { if (token !== walletNftHeroToken) return; dropWalletNftHeroMotion(); playWalletNftHero(hero); },
+  }).then((motion) => {
+    if (token !== walletNftHeroToken || !hero.isConnected) { stopGiftMotion(motion); return; }
+    const seer = motion && typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => {
+      if (walletNftHeroMotion?.hero !== hero) return;
+      walletNftHeroMotion.inView = entries[entries.length - 1]?.isIntersecting !== false;
+      syncGiftMarkMotion();
+    }) : null;
+    seer?.observe(hero);
+    walletNftHeroMotion = motion ? { ...motion, hero, seer, inView: true } : null;
+    canvas.hidden = !motion;
+    syncGiftMarkMotion();
+  }).catch(() => { });
+}
+function dropWalletNftHeroMotion() {
+  walletNftHeroMotion?.seer?.disconnect();
+  stopGiftMotion(walletNftHeroMotion);
+  walletNftHeroMotion = null;
+}
+function stopWalletNftHero() {
+  if (!globalThis.__plathoGiftRuntimeReady) return;
+  walletNftHeroToken += 1;
+  dropWalletNftHeroMotion();
+}
+function walletNftTraitRows(attributes) {
+  const named = { Model: 'nft.traitModel', Backdrop: 'nft.traitBackdrop', Symbol: 'nft.traitSymbol' };
+  return (Array.isArray(attributes) ? attributes : []).map((one) => walletCardStat(named[one.trait] ? t(named[one.trait]) : one.trait, one.value));
+}
+function fillWalletCard({ picture, letter, title, subtitle, stats, hero = null }) {
   const head = document.querySelector('#walletTokenCardHead');
   const list = document.querySelector('#walletTokenCardStats');
   if (!head || !list) return;
+  walletGroupDialog?.classList.remove('is-nft-view');
+  const kept = hero?.giftMotion && walletNftHeroMotion?.key === hero.giftMotion.key && walletNftHeroMotion.hero?.isConnected ? walletNftHeroMotion.hero : null;
+  if (!kept) stopWalletNftHero();
   const words = document.createElement('span');
   words.className = 'wallet-asset-text';
   const name = document.createElement('span');
@@ -45902,8 +46007,10 @@ function fillWalletCard({ picture, letter, title, subtitle, stats }) {
     sub.textContent = subtitle;
     words.append(sub);
   }
-  head.replaceChildren(walletAssetIcon(picture, letter, 'wallet-card-picture'), words);
+  head.classList.toggle('has-hero', Boolean(hero));
+  head.replaceChildren(hero ? kept ?? hero : walletAssetIcon(picture, letter, 'wallet-card-picture'), words);
   list.replaceChildren(...stats);
+  if (hero && !kept) playWalletNftHero(hero);
 }
 function openWalletGramCard() {
   const chart = walletPriceChart(GRAM, PRICE_USDT);
@@ -45950,13 +46057,20 @@ function openWalletTokenCard(token, { refill = false } = {}) {
 }
 function openWalletNftCard(item, { refill = false } = {}) {
   const friendly = (() => { try { return formatTonUserFriendlyAddress(item.address, { bounceable: true, testOnly: false }); } catch { return item.address; } })();
+  const proven = item.verified ? (provenTelegramGiftsForWallet(plathoWallet?.address ?? '')?.gifts ?? []).find((gift) => rawAccount(gift.itemAddress) === item.address) ?? null : null;
+  const gift = proven ? { slug: proven.slug, number: proven.number } : (item.verified ? walletNftGiftOf(item.collection, item.uri) : null);
+  const traits = item.attributes?.length ? item.attributes : assetAttributesOf({ extra: { attributes: proven?.attributes } });
   fillWalletCard({
     picture: item.picture, letter: item.name || '?', title: item.name || shortAddress(item.address), subtitle: item.collectionName,
+    hero: walletNftHero({ pictures: item.verified ? walletNftPictures(gift, item.pictureBig, item.picture) : [], letter: item.name || '?', gift,
+      domain: item.verified ? item.domain : '' }),
     stats: [
+      ...walletNftTraitRows(item.verified ? traits : []),
       ...(item.collectionName ? [walletCardStat(t('wallet.nftCollection'), item.collectionName)] : []),
       walletCardStat(t('wallet.tokenStatus'), t(item.scam ? 'wallet.tokenScam' : item.verified ? 'wallet.tokenVerified' : item.verified === null ? 'wallet.nftChecking' : 'wallet.tokenUnverified')),
       walletCardStat(t('wallet.nftAddress'), shortAddress(friendly), { copy: friendly, copied: 'wallet.nftAddressCopied' }),
       walletCardNftActions(item),
+      ...(item.verified ? [walletNftExplorerButton(item.address)] : []),
     ],
   });
   walletAssetsState.openCard = { tab: 'nft', id: item.address };
@@ -46006,6 +46120,8 @@ function walletIncomingCount(rows, seen) {
   for (const row of rows) {
     const at = Number(row.at) || 0;
     if (at < seen.at || (at === seen.at && seen.ids.includes(String(row.id)))) continue;
+    if (row.trade) { if (row.trade === 'sold' && row.success) count += 1; continue; }
+    if (row.payment === 'refund') continue;
     if (row.direction !== 'in' || !row.success) continue;
     if (row.kind === 'gram' ? walletIncomingGram(row.amount) >= WALLET_INCOMING_GRAM_FLOOR_NANOTONS : row.verified === true) count += 1;
   }
@@ -46537,6 +46653,8 @@ function walletMarketPaint() {
   const usdPerGram = gram ? 1 / gram : null;
   const head = walletMarket.head;
   if (head && usdPerGram) head.querySelector('.wallet-market-gram-usd').textContent = `$${formatPrice(usdPerGram)}`;
+  const nftGram = walletNftMarket.box?.querySelector('.wallet-market-gram-usd');
+  if (nftGram && usdPerGram) nftGram.textContent = `$${formatPrice(usdPerGram)}`;
   for (const id of walletMarket.seen) {
     const row = walletMarket.rows.get(id);
     if (!row) continue;
@@ -46598,12 +46716,17 @@ function walletMarketTick() {
   walletMarket.timer = setTimeout(walletMarketTick, WALLET_MARKET_REFRESH_MS);
   if (isVaultViewActive() && pageOnScreen()) {
     void walletMarketRead({ beat: true });
-    if (walletNftMarket.mode === 'nft' && walletNftMarket.box?.isConnected && walletNftMarket.offset <= NFT_FEED_PAGE) void walletNftMarketRead();
+    if (walletNftMarket.mode === 'nft' && walletNftMarket.box?.isConnected) {
+      void walletNftCollectionRead(walletNftCollection(NFT_ALL));
+      const open = walletNftMarket.parts?.grid?.isConnected ? walletNftMarket.parts.key : NFT_ALL;
+      if (open !== NFT_ALL) { void walletNftCollectionRead(walletNftCollection(open)); walletNftLookupAgain(open); }
+    }
   }
 }
 function renderWalletMarket(panel) {
   if (walletNftMarket.mode === 'nft') { walletMarketPark(); renderWalletNftMarket(panel); return; }
-  walletNftMarket.box = null;
+  walletNftMarket.fitObserver?.disconnect();
+  Object.assign(walletNftMarket, { box: null, picker: null, pickerNote: null, detail: null, parts: null, fitObserver: null });
   if (walletMarket.box?.isConnected && panel.contains(walletMarket.box)) { walletMarketPaint(); return; }
   walletMarket.observer?.disconnect();
   walletMarket.rows.clear();
@@ -46616,19 +46739,10 @@ function renderWalletMarket(panel) {
   box.className = 'wallet-market';
   const head = document.createElement('div');
   head.className = 'wallet-market-head';
-  const gramLabel = document.createElement('span');
-  gramLabel.className = 'wallet-market-gram-label';
-  gramLabel.textContent = 'GRAM';
-  const gramUsd = document.createElement('strong');
-  gramUsd.className = 'wallet-market-gram-usd';
-  gramUsd.textContent = '\u2014';
   const live = document.createElement('span');
   live.className = 'wallet-market-live';
   live.textContent = t('wallet.marketLive', { seconds: WALLET_MARKET_REFRESH_MS / 1000 });
-  const gram = document.createElement('span');
-  gram.className = 'wallet-market-gram-box';
-  gram.append(gramLabel, gramUsd);
-  head.append(walletMarketModeSwitch(), gram, live);
+  head.append(walletMarketModeSwitch(), walletMarketGramBox(), live);
   walletMarket.head = head;
   const search = document.createElement('input');
   search.type = 'search';
@@ -46786,6 +46900,20 @@ function renderWalletMarket(panel) {
     walletMarket.wheelPage = page;
   }
 }
+function walletMarketGramBox() {
+  const gramLabel = document.createElement('span');
+  gramLabel.className = 'wallet-market-gram-label';
+  gramLabel.textContent = 'GRAM';
+  const gramUsd = document.createElement('strong');
+  gramUsd.className = 'wallet-market-gram-usd';
+  const usdRoute = walletMarketRouteOf(PRICE_USDT);
+  const gramPerUsd = usdRoute ? walletMarketPrice(usdRoute) : null;
+  gramUsd.textContent = gramPerUsd ? `$${formatPrice(1 / gramPerUsd)}` : '\u2014';
+  const gram = document.createElement('span');
+  gram.className = 'wallet-market-gram-box';
+  gram.append(gramLabel, gramUsd);
+  return gram;
+}
 function walletMarketModeSwitch() {
   const modes = document.createElement('div');
   modes.className = 'wallet-market-modes';
@@ -46812,6 +46940,9 @@ function walletMarketPark() {
     pageObserver: null, moreObserver: null, fitObserver: null, scroller: null });
   walletMarket.seen.clear();
 }
+const NFT_CARDS_PAGE = 40;
+const NFT_ALL = '';
+const NFT_PICKER_ROWS = 120;
 function renderWalletNftMarket(panel) {
   const box = document.createElement('div');
   box.className = 'wallet-market wallet-nft-market';
@@ -46820,32 +46951,106 @@ function renderWalletNftMarket(panel) {
   const live = document.createElement('span');
   live.className = 'wallet-market-live';
   live.textContent = t('wallet.marketLive', { seconds: WALLET_MARKET_REFRESH_MS / 1000 });
-  head.append(walletMarketModeSwitch(), live);
-  const title = document.createElement('div');
-  title.className = 'wallet-market-trades-head';
-  title.textContent = t('nft.latestListings');
-  const list = document.createElement('div');
-  list.className = 'wallet-asset-list wallet-nft-market-list';
-  const moreListings = document.createElement('button');
-  moreListings.type = 'button';
-  moreListings.className = 'wallet-assets-more';
-  moreListings.textContent = t('wallet.historyMore');
-  moreListings.hidden = true;
-  moreListings.addEventListener('click', () => void walletNftMarketRead({ more: true }));
-  const feedNote = document.createElement('p');
-  feedNote.className = 'wallet-assets-note';
-  feedNote.setAttribute('role', 'status');
-  box.append(head, title, list, moreListings, feedNote);
+  head.append(walletMarketModeSwitch(), walletMarketGramBox(), live);
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'swap-picker-search wallet-market-search';
+  search.placeholder = t('nft.searchCollections');
+  search.autocomplete = 'off';
+  search.spellcheck = false;
+  search.setAttribute('aria-label', t('nft.searchCollections'));
+  search.value = walletNftMarket.query;
+  const picker = document.createElement('div');
+  picker.className = 'wallet-asset-list wallet-market-list wallet-nft-picker';
+  const pickerNote = document.createElement('p');
+  pickerNote.className = 'wallet-assets-note';
+  pickerNote.setAttribute('role', 'status');
+  const side = document.createElement('div');
+  side.className = 'wallet-market-side';
+  side.append(search, picker, pickerNote);
+  const detail = document.createElement('section');
+  detail.className = 'wallet-market-detail wallet-nft-detail profile-stat-list';
+  box.append(head, side, detail);
   panel.replaceChildren(box);
-  Object.assign(walletNftMarket, { box, list, more: moreListings, note: feedNote });
+  walletNftMarket.pickerRows.clear();
+  Object.assign(walletNftMarket, { box, picker, pickerNote, detail, parts: null, drawnDesktop: isDesktopLayout() });
+  search.addEventListener('input', () => {
+    walletNftMarket.query = search.value;
+    walletNftPickerPaint();
+    void walletNftFindByAddress();
+  });
+  walletNftPickerPaint();
+  if (walletNftMarket.drawnDesktop) walletNftShow(walletNftMarket.view ?? '');
+  const page = panel.closest('.wallet-scroll-content');
+  walletNftMarket.fitObserver?.disconnect();
+  walletNftMarket.fitObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+    if (walletNftMarket.box !== box) return;
+    if (walletNftMarket.drawnDesktop !== isDesktopLayout()) { renderWalletNftMarket(panel); return; }
+    walletMarketFit();
+  }) : null;
+  if (page) walletNftMarket.fitObserver?.observe(page);
+  walletNftMarket.fitObserver?.observe(head);
+  if (page && walletMarket.wheelPage !== page) {
+    page.addEventListener('wheel', walletMarketWheel, { passive: false });
+    walletMarket.wheelPage = page;
+  }
+  void walletNftNamePinned();
+  walletNftViewStart(NFT_ALL);
+}
+function walletNftRegistryRaw() {
+  try { return rawAccount(parseTonAddress(requireUsernameRegistryAddress()).raw); } catch { return ''; }
+}
+const NFT_REGISTRY_PICTURE = '/assets/platho-icon-192.png';
+const NFT_ATH_ART_KEPT = 200;
+function walletNftAthArtOf(listing) {
+  if (!listing?.nft || !listing.collection || listing.collection !== walletNftRegistryRaw()) return [];
+  const art = walletNftMarket.athArt.get(listing.nft);
+  if (typeof art === 'string') return art ? [art] : [];
+  if (typeof art === 'number' && Date.now() < art) return [];
+  if ((art === undefined || typeof art === 'number') && !walletNftMarket.athQueue.has(listing.nft)) {
+    walletNftMarket.athQueue.add(listing.nft);
+    walletNftMarket.athTimer ??= setTimeout(() => void walletNftReadAthArt(), 120);
+  }
+  return [];
+}
+function walletNftKeepAthArt(nft, art) {
+  const kept = walletNftMarket.athArt;
+  kept.delete(nft);
+  kept.set(nft, art);
+  if (kept.size <= NFT_ATH_ART_KEPT) return;
+  const drawn = new Set();
+  for (const held of walletNftMarket.cards.values()) if (held.card?.isConnected && held.listing?.nft) drawn.add(held.listing.nft);
+  for (const hero of document.querySelectorAll('.wallet-nft-hero[data-nft]')) drawn.add(hero.dataset.nft);
+  for (const key of [...kept.keys()]) {
+    if (kept.size <= NFT_ATH_ART_KEPT) break;
+    if (!drawn.has(key)) kept.delete(key);
+  }
+}
+async function walletNftReadAthArt() {
+  walletNftMarket.athTimer = null;
+  const batch = [...walletNftMarket.athQueue].slice(0, 20);
+  for (const nft of batch) walletNftMarket.athQueue.delete(nft);
+  if (!batch.length) return;
+  for (const nft of batch) walletNftMarket.athArt.set(nft, false);
+  try {
+    const art = await readUsernameNftArt({ itemAddresses: batch });
+    for (const nft of batch) walletNftKeepAthArt(nft, art.get(nft) ?? '');
+  } catch {
+    const again = Date.now() + WALLET_MARKET_REFRESH_MS;
+    for (const nft of batch) walletNftKeepAthArt(nft, again);
+  }
   walletNftMarketPaint();
-  if (!walletNftMarket.listings.length || Date.now() - walletNftMarket.at > WALLET_MARKET_REFRESH_MS) void walletNftMarketRead();
+  for (const hero of document.querySelectorAll('.wallet-nft-hero[data-nft]')) {
+    const art = walletNftMarket.athArt.get(hero.dataset.nft);
+    const still = hero.querySelector('.wallet-nft-hero-picture');
+    if (typeof art === 'string' && art && still && !still.classList.contains('has-picture')) paintWalletAssetIconFirst(still, [art], { shared: true });
+  }
+  if (walletNftMarket.athQueue.size) walletNftMarket.athTimer ??= setTimeout(() => void walletNftReadAthArt(), 120);
 }
 function walletNftCollectionVerified(collection) {
   if (!collection) return 'no';
   if (listedNftCollection(collection)) return 'yes';
-  let registry = '';
-  try { registry = rawAccount(parseTonAddress(requireUsernameRegistryAddress()).raw); } catch { registry = ''; }
+  const registry = walletNftRegistryRaw();
   if (registry && collection === registry) return 'yes';
   return walletNftMarket.giftVerdicts.get(collection) ?? null;
 }
@@ -46860,71 +47065,790 @@ async function walletNftVerifyCollections(collections) {
     walletNftMarket.giftVerdicts.set(collection, row.status === 'active' && telegramGiftCollectionIsAuthentic({ codeHash: row.codeHash, dataBoc: row.dataBoc }) ? 'yes' : 'no');
   }
 }
-async function walletNftMarketRead({ more = false } = {}) {
-  if (walletNftMarket.reading) return;
-  walletNftMarket.reading = true;
-  walletNftMarketPaint();
-  const fetchImpl = createToncenterRestFetch({ requestOptions: { priority: 'focus', wanted: () => Boolean(walletNftMarket.box?.isConnected) } });
-  try {
-    const offset = more ? walletNftMarket.offset : 0;
-    const read = await readLatestListings({ fetchImpl, origin: toncenterRestOrigin(), offset });
-    await walletNftVerifyCollections(read.listings.map((listing) => listing.collection));
-    if (more) {
-      const known = new Set(walletNftMarket.listings.map((listing) => listing.sale));
-      walletNftMarket.listings.push(...read.listings.filter((listing) => !known.has(listing.sale)));
-    } else {
-      walletNftMarket.listings = read.listings;
-    }
-    walletNftMarket.offset = offset + NFT_FEED_PAGE;
-    walletNftMarket.hasMore = read.more;
-    walletNftMarket.at = Date.now();
-    walletNftMarket.failed = false;
-  } catch (error) {
-    walletNftMarket.failed = true;
-    if (!isTonRpcRateLimitError(error) && error?.code !== 'NOT_WANTED') console.warn('[market] nft listings', error);
-  } finally {
-    walletNftMarket.reading = false;
-    walletNftMarketPaint();
-  }
+function walletNftDomainFace(icon, pictures, domain) {
+  if (!domain || pictures.length) return;
+  const dot = domain.lastIndexOf('.');
+  const name = document.createElement('span');
+  name.className = 'wallet-nft-domain-name';
+  name.textContent = dot > 0 ? domain.slice(0, dot) : domain;
+  const zone = document.createElement('span');
+  zone.className = 'wallet-nft-domain-zone';
+  zone.textContent = dot > 0 ? domain.slice(dot) : '';
+  icon.replaceChildren(name, ...(zone.textContent ? [zone] : []));
+  const length = Array.from(name.textContent).length;
+  icon.style.setProperty('--domain-scale', length <= 6 ? '1.35' : length <= 10 ? '1.1' : length <= 16 ? '0.9' : '0.75');
+  icon.classList.add('is-domain');
+}
+function walletNftPictures(gift, ...indexed) {
+  return [...indexed, ...(gift ? telegramGiftImageSources({ slug: gift.slug, number: gift.number }) : [])].filter(Boolean);
+}
+function walletNftGiftOf(collection, uri) {
+  if (!collection || walletNftMarket.giftVerdicts.get(collection) !== 'yes') return null;
+  return parseTelegramGiftItemUri(uri);
 }
 function walletNftMarketPaint() {
-  const { list, more: moreListings, note: feedNote } = walletNftMarket;
-  if (!list?.isConnected) return;
-  const shown = walletNftMarket.listings.filter((listing) => walletNftCollectionVerified(listing.collection) === 'yes');
-  list.replaceChildren(...shown.map((listing) => walletAssetRow({ picture: listing.picture, letter: listing.name || '?',
-    title: listing.name || shortAddress(displayWalletAddress(listing.nft)), subtitle: listing.collectionName,
-    amount: `${formatUnits(String(listing.price), 9)} GRAM`, shared: true, onOpen: () => openWalletNftListing(listing), className: 'wallet-nft-market-row' })));
-  list.hidden = shown.length === 0;
-  moreListings.hidden = !walletNftMarket.hasMore || walletNftMarket.reading;
-  feedNote.textContent = shown.length ? ''
-    : walletNftMarket.reading ? t('profileCard.giftsLoading')
-      : walletNftMarket.failed ? t('nft.marketUnread') : t('nft.marketEmpty');
-  feedNote.hidden = !feedNote.textContent;
+  walletNftPickerPaint();
+  walletNftViewPaint();
 }
-function openWalletNftListing(listing) {
+function walletNftPinnedCollections() {
+  return [walletNftRegistryRaw(), ...NFT_PINNED_COLLECTIONS].filter(Boolean);
+}
+async function walletNftNamePinned() {
+  if (walletNftMarket.pinnedNamed) return;
+  walletNftMarket.pinnedNamed = true;
+  const unnamed = walletNftPinnedCollections().filter((key) => !walletNftCollection(key).name);
+  if (!unnamed.length) return;
+  try {
+    const fetchImpl = createToncenterRestFetch({ requestOptions: { priority: 'focus', wanted: () => Boolean(walletNftMarket.box?.isConnected) } });
+    const named = await readCollectionNames({ fetchImpl, origin: toncenterRestOrigin(), collections: unnamed });
+    for (const [key, info] of named) {
+      const entry = walletNftCollection(key);
+      entry.name ||= info.name;
+      entry.picture ||= info.picture;
+    }
+  } catch {
+    walletNftMarket.pinnedNamed = false;
+  }
+  walletNftPickerPaint();
+}
+function walletNftMarketSeen() {
+  return pageOnScreen() && isVaultViewActive() && walletAssetsState.tab === 'market';
+}
+function walletNftListInFront(entry) {
+  if (entry.collection !== NFT_ALL || !walletNftMarket.drawnDesktop) return true;
+  return !modalOnScreen();
+}
+function walletNftViewOpen(key) {
+  if (key === NFT_ALL && !walletNftMarket.drawnDesktop && walletNftMarketSeen() && Boolean(walletNftMarket.picker?.isConnected) && !modalOnScreen()) return true;
+  const parts = walletNftMarket.parts;
+  return walletNftMarketSeen() && parts?.key === key && Boolean(parts.grid?.isConnected);
+}
+function walletNftSearchReadsOn(key, pages) {
+  return walletNftFilterActive(key) && pages < NFT_COLLECTION_SEARCH_PAGES && !walletNftLookupOf(key)?.found;
+}
+function walletNftCollection(collection) {
+  let entry = walletNftMarket.collections.get(collection);
+  if (!entry) {
+    entry = { collection, name: '', picture: '', listings: new Map(), cursor: null, pages: 0, hasMore: true, newestAt: 0, at: 0, reading: false,
+      failed: false, moreWanted: false };
+    if (collection !== NFT_ALL) {
+      for (const listing of walletNftMarket.collections.get(NFT_ALL)?.listings.values() ?? []) if (listing.collection === collection) entry.listings.set(listing.sale, listing);
+    }
+    walletNftMarket.collections.set(collection, entry);
+  }
+  return entry;
+}
+async function walletNftCollectionRead(entry, { deeper = false, priority = 'focus', forList = false } = {}) {
+  if (entry.reading) {
+    if (deeper) entry.moreWanted = true;
+    return;
+  }
+  if (deeper && (!entry.cursor || Date.now() - entry.at > 2 * WALLET_MARKET_REFRESH_MS)) {
+    entry.moreWanted = true;
+    deeper = false;
+  }
+  entry.reading = true;
+  walletNftViewPaint();
+  const open = () => (entry.collection === NFT_ALL && !deeper ? walletNftMarketSeen() && Boolean(walletNftMarket.box?.isConnected)
+    : walletNftViewOpen(entry.collection));
+  const listed = () => walletNftMarketSeen() && Boolean(walletNftMarket.picker?.isConnected);
+  const fetchImpl = createToncenterRestFetch({ requestOptions: { priority, wanted: forList ? () => listed() || open() : open } });
+  try {
+    const read = await readLatestListings({ fetchImpl, origin: toncenterRestOrigin(), limit: NFT_COLLECTION_PAGE, collection: entry.collection || null,
+      endLt: deeper ? entry.cursor : null });
+    if (!deeper && entry.at && read.more && read.oldestAt > entry.newestAt) {
+      entry.listings.clear();
+      entry.pages = 0;
+    }
+    if (deeper || !entry.pages) {
+      entry.cursor = read.cursor ?? entry.cursor;
+      entry.pages += 1;
+      entry.hasMore = read.more;
+    }
+    const live = new Set(read.listings.map((listing) => listing.sale));
+    for (const sale of read.sales) if (!live.has(sale)) for (const one of walletNftMarket.collections.values()) one.listings.delete(sale);
+    for (const listing of read.listings) {
+      entry.listings.set(listing.sale, listing);
+      if (entry.collection === NFT_ALL) walletNftMarket.collections.get(listing.collection)?.listings.set(listing.sale, listing);
+    }
+    entry.newestAt = Math.max(entry.newestAt, read.newestAt);
+    if (entry.collection !== NFT_ALL) {
+      entry.name ||= read.listings.find((listing) => listing.collectionName)?.collectionName ?? '';
+      entry.picture ||= read.listings.find((listing) => listing.collectionPicture)?.collectionPicture ?? '';
+    }
+    walletNftMarketPaint();
+    await walletNftVerifyCollections(read.listings.map((listing) => listing.collection));
+    if (!deeper) await walletNftRecheckShown(entry, read.sales, fetchImpl);
+    entry.at = Date.now();
+    entry.failed = false;
+    const pulse = entry.collection === NFT_ALL && !deeper ? walletNftMarket.box?.querySelector('.wallet-market-live') : null;
+    if (pulse) {
+      const second = pulse.classList.contains('is-beat');
+      pulse.classList.toggle('is-beat', !second);
+      pulse.classList.toggle('is-beat-2', second);
+    }
+  } catch (error) {
+    entry.failed = error?.code !== 'NOT_WANTED';
+    if (!isTonRpcRateLimitError(error) && error?.code !== 'NOT_WANTED') console.warn('[market] nft collection', error);
+  } finally {
+    entry.reading = false;
+    walletNftMarketPaint();
+    const held = walletNftMarket.lookupDue?.key === entry.collection;
+    if (!held && walletNftViewOpen(entry.collection) && entry.hasMore && !entry.failed && (entry.moreWanted || entry.pages < NFT_COLLECTION_DEEP_PAGES
+      || walletNftSearchReadsOn(entry.collection, entry.pages))) {
+      const pressed = entry.moreWanted;
+      entry.moreWanted = false;
+      void walletNftCollectionRead(entry, { deeper: true, priority: pressed || walletNftListInFront(entry) ? 'focus' : 'background' });
+    } else if (!held) entry.moreWanted = false;
+  }
+}
+async function walletNftRecheckShown(entry, named, fetchImpl) {
+  const parts = walletNftMarket.parts;
+  if (parts?.key !== entry.collection || !parts.grid?.isConnected) return;
+  const known = new Set(named);
+  const sales = walletNftViewListings(entry.collection).slice(0, parts.shown).map((listing) => listing.sale).filter((sale) => !known.has(sale))
+    .slice(0, NFT_SALES_MAX);
+  if (!sales.length) return;
+  let now = null;
+  try { now = await readSalesNow({ fetchImpl, origin: toncenterRestOrigin(), sales }); } catch { return; }
+  for (const sale of sales) {
+    const fresh = now.get(sale);
+    if (!fresh?.live) walletNftForgetListing(sale);
+    else if (fresh.price !== entry.listings.get(sale)?.price) walletNftTakeListing(fresh);
+  }
+}
+function walletNftPickerEntries() {
+  const entries = new Map();
+  const entryOf = (collection) => {
+    if (!entries.has(collection)) entries.set(collection, { collection, name: '', picture: '', stand: '', feed: 0, count: 0, more: false, floor: null });
+    return entries.get(collection);
+  };
+  for (const listing of walletNftCollection(NFT_ALL).listings.values()) {
+    if (walletNftCollectionVerified(listing.collection) !== 'yes') continue;
+    const entry = entryOf(listing.collection);
+    entry.name ||= listing.collectionName;
+    entry.picture ||= listing.collectionPicture;
+    entry.stand ||= listing.picture;
+    entry.feed += 1;
+    if (entry.floor === null || listing.price < entry.floor) entry.floor = listing.price;
+  }
+  for (const [collection, read] of walletNftMarket.collections) {
+    if (collection === NFT_ALL || walletNftCollectionVerified(collection) !== 'yes') continue;
+    const entry = entryOf(collection);
+    entry.name ||= read.name;
+    entry.picture ||= read.picture;
+    entry.stand ||= read.listings.values().next().value?.picture ?? '';
+    if (!read.at) continue;
+    entry.count = read.listings.size;
+    entry.more = read.hasMore;
+    entry.floor = null;
+    for (const listing of read.listings.values()) if (entry.floor === null || listing.price < entry.floor) entry.floor = listing.price;
+  }
+  const registry = walletNftRegistryRaw();
+  if (registry && entries.has(registry)) entries.get(registry).picture ||= NFT_REGISTRY_PICTURE;
+  const name = (entry) => entry.name || entry.collection;
+  const pinned = walletNftPinnedCollections();
+  const rank = (entry) => (pinned.includes(entry.collection) ? pinned.indexOf(entry.collection) : pinned.length);
+  return [...entries.values()].sort((a, b) => rank(a) - rank(b) || b.feed - a.feed || name(a).localeCompare(name(b)));
+}
+function walletNftQueryAddress() {
+  const query = walletNftMarket.query.trim();
+  if (query.length < 48) return null;
+  try { return rawAccount(parseTonAddress(query).raw); } catch { return null; }
+}
+async function walletNftFindByAddress() {
+  const raw = walletNftQueryAddress();
+  if (!raw || walletNftCollectionVerified(raw) !== null) { if (raw && walletNftCollectionVerified(raw) === 'yes') walletNftCollection(raw); walletNftPickerPaint(); return; }
+  try { await walletNftVerifyCollections([raw]); } catch { }
+  if (walletNftCollectionVerified(raw) === 'yes') walletNftCollection(raw);
+  walletNftPickerPaint();
+}
+function walletNftPickerPaint() {
+  const { picker, pickerNote } = walletNftMarket;
+  if (!picker?.isConnected) return;
+  const query = walletNftMarket.query.trim().toLowerCase();
+  const address = walletNftQueryAddress();
+  const entries = walletNftPickerEntries().filter((entry) => !query
+    || (address ? entry.collection === address : (entry.name || '').toLowerCase().includes(query)));
+  const all = walletNftCollection(NFT_ALL);
+  const feed = walletNftVisibleFeed().length;
+  const rows = query ? [] : [walletNftPickerRow({ collection: NFT_ALL, name: t('nft.allCollections'), picture: '', feed, count: feed, more: all.hasMore && all.at > 0, floor: null })];
+  rows.push(...entries.slice(0, NFT_PICKER_ROWS).map(walletNftPickerRow));
+  const focused = picker.contains(document.activeElement) ? document.activeElement?.dataset?.collection ?? null : null;
+  const scroller = focused === null ? null : walletNftMarket.drawnDesktop ? picker : picker.closest('.wallet-scroll-content');
+  const stood = scroller ? scroller.scrollTop : 0;
+  picker.replaceChildren(...rows);
+  walletNftWatchRows(picker);
+  if (focused !== null) picker.querySelector(`[data-collection="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
+  if (scroller && scroller.scrollTop !== stood) scroller.scrollTop = stood;
+  picker.hidden = rows.length === 0;
+  const filling = !all.at || (walletNftViewOpen(NFT_ALL) && all.hasMore && all.pages < NFT_COLLECTION_DEEP_PAGES);
+  pickerNote.textContent = rows.length ? ''
+    : address && walletNftCollectionVerified(address) === 'no' ? t('nft.collectionUnverified')
+      : filling ? t('nft.collectionsLoading') : t('wallet.swapNothingFound');
+  pickerNote.hidden = !pickerNote.textContent;
+}
+const NFT_ROW_STALE_MS = 10 * WALLET_MARKET_REFRESH_MS;
+function walletNftWatchRows(picker) {
+  if (typeof IntersectionObserver !== 'function') return;
+  if (!walletNftMarket.rowSeer || walletNftMarket.rowSeerList !== picker) {
+    walletNftMarket.rowSeer?.disconnect();
+    walletNftMarket.rowsInView.clear();
+    walletNftMarket.rowSeerList = picker;
+    walletNftMarket.rowSeer = new IntersectionObserver((entries) => {
+      for (const seen of entries) {
+        const key = seen.target.dataset.collection;
+        if (!key) continue;
+        if (seen.isIntersecting) walletNftMarket.rowsInView.add(key);
+        else walletNftMarket.rowsInView.delete(key);
+      }
+      void walletNftReadRows();
+    }, { rootMargin: '100px 0px' });
+  }
+  const drawn = new Set();
+  for (const row of picker.querySelectorAll('.wallet-nft-collection-row')) {
+    if (!row.dataset.collection) continue;
+    drawn.add(row.dataset.collection);
+    walletNftMarket.rowSeer.unobserve(row);
+    walletNftMarket.rowSeer.observe(row);
+  }
+  for (const key of walletNftMarket.rowsInView) if (!drawn.has(key)) walletNftMarket.rowsInView.delete(key);
+}
+async function walletNftReadRows() {
+  if (walletNftMarket.rowReading) return;
+  walletNftMarket.rowReading = true;
+  try {
+    for (;;) {
+      if (!walletNftMarket.picker?.isConnected || !walletNftMarketSeen() || modalOnScreen()) break;
+      const now = Date.now();
+      const key = [...walletNftMarket.rowsInView].find((one) => {
+        const entry = walletNftMarket.collections.get(one);
+        return !entry || (!entry.reading && now - (entry.listTriedAt ?? 0) > (entry.at ? NFT_ROW_STALE_MS : WALLET_MARKET_REFRESH_MS)
+          && (!entry.at || now - entry.at > NFT_ROW_STALE_MS));
+      });
+      if (!key) break;
+      const entry = walletNftCollection(key);
+      entry.listTriedAt = now;
+      await walletNftCollectionRead(entry, { forList: true });
+    }
+  } finally {
+    walletNftMarket.rowReading = false;
+  }
+}
+function walletNftPickerRow(entry) {
+  const key = entry.collection;
+  const title = entry.name || shortAddress(displayWalletAddress(key));
+  let row = walletNftMarket.pickerRows.get(key);
+  if (!row || row.dataset.title !== title) {
+    row = walletAssetRow({ letter: key ? title : '\u2726', title, subtitle: ' ', amount: '', shared: true,
+      onOpen: () => walletNftPick(key), className: 'wallet-market-row wallet-nft-collection-row' });
+    row.dataset.collection = key;
+    row.dataset.title = title;
+    row.dataset.picture = '';
+    walletNftMarket.pickerRows.set(key, row);
+  }
+  const pictures = [entry.picture, entry.stand].filter(Boolean);
+  if (pictures.length && row.dataset.picture !== pictures.join(' ')) {
+    row.dataset.picture = pictures.join(' ');
+    const icon = row.querySelector('.wallet-asset-icon');
+    if (icon) paintWalletAssetIconFirst(icon, pictures, { shared: true });
+  }
+  const stat = document.createElement('span');
+  stat.className = 'wallet-market-stat';
+  const label = document.createElement('span');
+  label.className = 'wallet-market-stat-key';
+  label.textContent = t(entry.count || entry.more ? 'nft.listedCount' : 'nft.newCount');
+  const value = document.createElement('span');
+  value.className = 'wallet-market-stat-value';
+  value.textContent = entry.count || entry.more ? `${entry.count}${entry.more ? '+' : ''}` : String(entry.feed);
+  stat.append(label, value);
+  row.querySelector('.wallet-asset-sub')?.replaceChildren(stat);
+  const amount = row.querySelector('.wallet-asset-amount');
+  if (amount) amount.textContent = entry.floor === null ? '' : t('nft.fromPrice', { price: `${formatUnits(String(entry.floor), 9)} GRAM` });
+  const picked = walletNftMarket.drawnDesktop && walletNftMarket.view === key;
+  row.classList.toggle('is-selected', picked);
+  if (picked) row.setAttribute('aria-current', 'true');
+  else row.removeAttribute('aria-current');
+  return row;
+}
+function walletNftNamed(key) {
+  const entry = walletNftCollection(key);
+  if (!entry.name || !entry.picture) {
+    const row = walletNftPickerEntries().find((one) => one.collection === key);
+    entry.name ||= row?.name ?? '';
+    entry.picture ||= row?.picture ?? '';
+  }
+  return entry;
+}
+function walletNftPick(key) {
+  if (isDesktopLayout()) walletNftShow(key);
+  else openWalletNftCollection(key);
+}
+function walletNftShow(key) {
+  const { detail } = walletNftMarket;
+  if (!detail?.isConnected) return;
+  walletNftMarket.view = key;
+  const entry = key ? walletNftNamed(key) : null;
+  const title = key ? entry.name || shortAddress(displayWalletAddress(key)) : t('nft.allCollections');
+  const head = document.createElement('div');
+  head.className = 'wallet-market-detail-head';
+  const words = document.createElement('span');
+  words.className = 'wallet-asset-text';
+  const name = document.createElement('span');
+  name.className = 'wallet-asset-name';
+  name.textContent = title;
+  words.append(name);
+  head.append(walletAssetIcon(key ? entry.picture : '', key ? title : '\u2726', 'wallet-card-picture', { shared: true }), words);
+  detail.replaceChildren(head, ...walletNftViewParts(key));
+  walletNftMarket.parts.titles = [name];
+  walletNftMarketPaint();
+  walletNftViewStart(key);
+}
+function openWalletNftCollection(key, keep = null) {
+  walletNftMarket.view = key;
+  const entry = key ? walletNftNamed(key) : null;
+  const title = key ? entry.name || shortAddress(displayWalletAddress(key)) : t('nft.allCollections');
+  fillWalletCard({ picture: key ? entry.picture : '', letter: key ? title : '\u2726', title, subtitle: '', stats: walletNftViewParts(key) });
+  walletGroupDialog?.classList.add('is-nft-view');
+  walletAssetsState.openCard = null;
+  openWalletGroup('token', { title });
+  walletNftMarket.parts.titles = [document.querySelector('#walletGroupTitle'), document.querySelector('#walletTokenCardHead .wallet-asset-name')];
+  if (keep) walletNftMarket.parts.shown = keep.shown;
+  walletNftViewPaint();
+  if (keep) {
+    const body = document.querySelector('#walletGroupDialog .wallet-group-body');
+    walletNftMarket.parts.grid.querySelector(`[data-sale="${CSS.escape(keep.sale)}"]`)?.focus({ preventScroll: true });
+    requestAnimationFrame(() => { if (body) body.scrollTop = keep.scroll; });
+  }
+  walletNftViewStart(key);
+}
+function walletNftViewStart(key) {
+  walletNftLookupAgain(key);
+  const entry = walletNftCollection(key);
+  if (!entry.at || Date.now() - entry.at > WALLET_MARKET_REFRESH_MS) void walletNftCollectionRead(entry);
+  else if (walletNftViewOpen(key) && entry.hasMore && (entry.pages < NFT_COLLECTION_DEEP_PAGES
+    || walletNftSearchReadsOn(key, entry.pages))) {
+    void walletNftCollectionRead(entry, { deeper: true, priority: walletNftListInFront(entry) ? 'focus' : 'background' });
+  }
+}
+function walletNftViewParts(key) {
+  const stats = document.createElement('div');
+  stats.className = 'wallet-nft-view-stats';
+  const sort = key ? walletNftSortSwitch() : null;
+  const filters = key ? walletNftFilterBar(key) : null;
+  const cards = document.createElement('div');
+  cards.className = 'wallet-nft-cards';
+  const moreCards = document.createElement('button');
+  moreCards.type = 'button';
+  moreCards.className = 'wallet-assets-more';
+  moreCards.textContent = t('wallet.historyMore');
+  moreCards.hidden = true;
+  moreCards.addEventListener('click', () => walletNftShowMore());
+  const cardsNote = document.createElement('p');
+  cardsNote.className = 'wallet-assets-note';
+  cardsNote.setAttribute('role', 'status');
+  walletNftMarket.parts = { key, stats, grid: cards, more: moreCards, note: cardsNote, shown: NFT_CARDS_PAGE, filters };
+  return [stats, ...(sort ? [sort] : []), ...(filters ? [filters] : []), cards, moreCards, cardsNote];
+}
+const NFT_FILTER_VALUES_MAX = 300;
+const NFT_FILTER_TRAITS_MAX = 10;
+function walletNftFilterBar(key) {
+  if (walletNftMarket.filter.key !== key) walletNftMarket.filter = { key, traits: new Map(), min: '', max: '', q: '' };
+  const bar = document.createElement('div');
+  bar.className = 'wallet-nft-filters';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.autocomplete = 'off';
+  search.spellcheck = false;
+  search.className = 'wallet-nft-filter-search';
+  search.placeholder = t('nft.filterSearch');
+  search.setAttribute('aria-label', t('nft.filterSearch'));
+  search.value = walletNftMarket.filter.q;
+  search.addEventListener('input', () => { walletNftMarket.filter.q = search.value; walletNftFilterChanged(); });
+  const traitBox = document.createElement('div');
+  traitBox.className = 'wallet-nft-filter-traits';
+  const price = (bound, label) => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.autocomplete = 'off';
+    input.className = 'wallet-nft-filter-price';
+    input.placeholder = label;
+    input.setAttribute('aria-label', label);
+    input.value = walletNftMarket.filter[bound];
+    const judge = () => input.setAttribute('aria-invalid', String(Boolean(input.value.trim()) && walletNftGramUnits(input.value) === null));
+    judge();
+    input.addEventListener('input', () => { walletNftMarket.filter[bound] = input.value.trim(); judge(); walletNftFilterChanged(); });
+    return input;
+  };
+  const filterReset = document.createElement('button');
+  filterReset.type = 'button';
+  filterReset.className = 'wallet-nft-filter-reset';
+  filterReset.textContent = t('nft.filtersReset');
+  filterReset.hidden = true;
+  filterReset.addEventListener('click', () => {
+    walletNftMarket.filter = { key, traits: new Map(), min: '', max: '', q: '' };
+    for (const input of bar.querySelectorAll('input')) { input.value = ''; input.removeAttribute('aria-invalid'); }
+    for (const select of bar.querySelectorAll('select')) select.value = '';
+    walletNftFilterChanged();
+    bar.querySelector('select, input')?.focus({ preventScroll: true });
+  });
+  bar.append(search, traitBox, price('min', t('nft.priceFrom')), price('max', t('nft.priceTo')), filterReset);
+  bar.traitBox = traitBox;
+  bar.resetButton = filterReset;
+  return bar;
+}
+function walletNftFilterChanged() {
+  if (walletNftMarket.parts) walletNftMarket.parts.shown = NFT_CARDS_PAGE;
+  walletNftViewPaint();
+  const key = walletNftMarket.filter.key;
+  if (key && walletNftNameShaped(key, walletNftMarket.filter.q)) walletNftLookupSoon(key);
+  else walletNftSearchOn(key);
+}
+function walletNftSearchOn(key) {
+  const entry = key ? walletNftMarket.collections.get(key) : null;
+  if (!entry?.at || !entry.hasMore || !(entry.moreWanted || entry.pages < NFT_COLLECTION_DEEP_PAGES
+    || walletNftSearchReadsOn(key, entry.pages))) return;
+  if (entry.reading) entry.moreWanted = true;
+  else void walletNftCollectionRead(entry, { deeper: true });
+}
+const NFT_LOOKUP_REST_MS = 400;
+function walletNftNameShaped(key, text) {
+  if (!String(text ?? '').trim()) return false;
+  if (key === walletNftRegistryRaw()) return /^[a-z0-9_-]+$/.test(walletNftAthLabel(text));
+  return nftIndexOfName(key, text) !== null;
+}
+function walletNftLookupSoon(key) {
+  clearTimeout(walletNftMarket.lookupTimer);
+  const due = { key };
+  walletNftMarket.lookupDue = due;
+  walletNftMarket.lookupTimer = setTimeout(() => {
+    void walletNftLookupName().finally(() => {
+      if (walletNftMarket.lookupDue !== due) return;
+      walletNftMarket.lookupDue = null;
+      walletNftSearchOn(key);
+      walletNftViewPaint();
+    });
+  }, NFT_LOOKUP_REST_MS);
+}
+async function walletNftIndexTyped(key) {
+  const text = String(walletNftMarket.filter.q ?? '').trim();
+  if (!key || walletNftMarket.filter.key !== key || !text) return null;
+  if (key !== walletNftRegistryRaw()) return nftIndexOfName(key, text);
+  try { return String(await computeUsernameNameHash(text)); } catch { return null; }
+}
+async function walletNftLookupName() {
+  const key = walletNftMarket.parts?.key ?? NFT_ALL;
+  const index = await walletNftIndexTyped(key);
+  if (index === null || (walletNftMarket.lookup?.key === key && walletNftMarket.lookup.index === index)) return;
+  const lookup = { key, index, label: walletNftAthLabel(walletNftMarket.filter.q), reading: true, found: 0, onSale: 0 };
+  walletNftMarket.lookup = lookup;
+  walletNftViewPaint();
+  try {
+    const fetchImpl = createToncenterRestFetch({ requestOptions: { priority: 'asked', skipIfRateLimited: false,
+      wanted: () => walletNftViewOpen(key) && walletNftMarket.lookup === lookup } });
+    const { listings, onSale } = await readListingsByIndex({ fetchImpl, origin: toncenterRestOrigin(), collection: key, indexes: [index] });
+    const entry = walletNftCollection(key);
+    for (const listing of listings) entry.listings.set(listing.sale, { ...listing, listedAt: listing.createdAt });
+    lookup.found = listings.length;
+    lookup.onSale = onSale;
+  } catch (error) {
+    if (walletNftMarket.lookup === lookup) walletNftMarket.lookup = null;
+    if (!isTonRpcRateLimitError(error) && error?.code !== 'NOT_WANTED') console.warn('[market] nft name', error);
+  } finally {
+    lookup.reading = false;
+    walletNftViewPaint();
+  }
+}
+function walletNftLookupAgain(key) {
+  if (!key || walletNftMarket.filter.key !== key || walletNftMarket.lookupDue?.key === key || walletNftLookupOf(key)) return;
+  if (walletNftNameShaped(key, walletNftMarket.filter.q)) walletNftLookupSoon(key);
+}
+function walletNftLookupOf(key) {
+  const lookup = walletNftMarket.lookup;
+  if (!lookup || lookup.key !== key || walletNftMarket.filter.key !== key) return null;
+  const text = String(walletNftMarket.filter.q ?? '').trim();
+  if (!text) return null;
+  const same = key === walletNftRegistryRaw() ? lookup.label === walletNftAthLabel(text) : nftIndexOfName(key, text) === lookup.index;
+  return same ? lookup : null;
+}
+function walletNftAthLabel(text) {
+  return String(text ?? '').trim().toLowerCase().replace(/\.ath$/, '');
+}
+function walletNftFilterActive(key) {
+  const filter = walletNftMarket.filter;
+  return Boolean(key) && filter.key === key && Boolean(filter.traits.size || walletNftGramUnits(filter.min) !== null
+    || walletNftGramUnits(filter.max) !== null || String(filter.q ?? '').trim());
+}
+function walletNftGramUnits(typed) {
+  const text = String(typed ?? '').normalize('NFKC').trim().replace(/\s*gram$/i, '').replace(/[\s']/g, '');
+  const match = /^(\d{0,12})(?:[.,](\d{0,9}))?$/.exec(text);
+  if (!match || !(match[1] || match[2])) return null;
+  return BigInt(match[1] || '0') * 1_000_000_000n + BigInt((match[2] ?? '').padEnd(9, '0'));
+}
+function walletNftFiltered(key, listings) {
+  const filter = walletNftMarket.filter;
+  if (filter.key !== key) return listings;
+  const min = walletNftGramUnits(filter.min);
+  const max = walletNftGramUnits(filter.max);
+  const query = String(filter.q ?? '').trim().toLowerCase();
+  const digits = query.replace(/\D/g, '');
+  const named = (listing) => !query || (listing.name || '').toLowerCase().includes(query)
+    || (digits.length >= 2 && digits.length === query.replace(/[\s+()-]/g, '').length && (listing.name || '').replace(/\D/g, '').includes(digits));
+  return listings.filter((listing) => named(listing) && (min === null || listing.price >= min) && (max === null || listing.price <= max)
+    && [...filter.traits].every(([trait, value]) => (listing.attributes ?? []).some((one) => one.trait === trait && one.value === value)));
+}
+function walletNftFilterPaint(bar, listings) {
+  const counts = new Map();
+  for (const listing of listings) {
+    for (const one of listing.attributes ?? []) {
+      if (!counts.has(one.trait)) counts.set(one.trait, new Map());
+      const values = counts.get(one.trait);
+      values.set(one.value, (values.get(one.value) ?? 0) + 1);
+    }
+  }
+  const order = ['Model', 'Backdrop', 'Symbol'];
+  const rank = (trait) => (order.includes(trait) ? order.indexOf(trait) : order.length);
+  const traits = [...counts.keys()].filter((trait) => counts.get(trait).size > 1 && counts.get(trait).size <= NFT_FILTER_VALUES_MAX)
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).slice(0, NFT_FILTER_TRAITS_MAX);
+  const signature = traits.map((trait) => `${trait}:${[...counts.get(trait)].map(([value, count]) => `${value}=${count}`).join(',')}`).join('|');
+  const box = bar.traitBox;
+  if (box.dataset.signature !== signature && box.contains(document.activeElement) && box.dataset.traits === traits.join('|')) {
+    box.dataset.signature = signature;
+    for (const select of box.querySelectorAll('select')) {
+      const values = counts.get(select.dataset.trait) ?? new Map();
+      const shown = new Set();
+      for (const option of [...select.options].slice(1)) {
+        shown.add(option.value);
+        option.textContent = `${option.value} (${values.get(option.value) ?? 0})`;
+      }
+      for (const [value, count] of values) {
+        if (shown.has(value)) continue;
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = `${value} (${count})`;
+        select.append(option);
+      }
+    }
+  }
+  if (box.dataset.signature !== signature && !box.contains(document.activeElement)) {
+    box.dataset.signature = signature;
+    box.dataset.traits = traits.join('|');
+    const named = { Model: 'nft.traitModel', Backdrop: 'nft.traitBackdrop', Symbol: 'nft.traitSymbol' };
+    box.replaceChildren(...traits.map((trait) => {
+      const label = named[trait] ? t(named[trait]) : trait;
+      const select = document.createElement('select');
+      select.className = 'wallet-nft-filter-trait';
+      select.dataset.trait = trait;
+      select.setAttribute('aria-label', label);
+      const any = document.createElement('option');
+      any.value = '';
+      any.textContent = label;
+      const values = [...counts.get(trait)].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      const chosen = walletNftMarket.filter.traits.get(trait) ?? '';
+      if (chosen && !counts.get(trait).has(chosen)) values.push([chosen, 0]);
+      select.append(any, ...values.map(([value, count]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = `${value} (${count})`;
+        return option;
+      }));
+      select.value = chosen;
+      select.addEventListener('change', () => {
+        if (select.value) walletNftMarket.filter.traits.set(trait, select.value);
+        else walletNftMarket.filter.traits.delete(trait);
+        walletNftFilterChanged();
+      });
+      return select;
+    }));
+  }
+  const filter = walletNftMarket.filter;
+  bar.resetButton.hidden = !(filter.traits.size || filter.min || filter.max || String(filter.q ?? '').trim());
+}
+function walletNftSortSwitch() {
+  const sorts = document.createElement('div');
+  sorts.className = 'wallet-market-modes wallet-nft-sorts';
+  for (const [sort, label] of [['cheap', t('nft.sortCheapest')], ['new', t('nft.sortNewest')]]) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'wallet-market-mode';
+    button.textContent = label;
+    button.setAttribute('aria-pressed', String(walletNftMarket.sort === sort));
+    button.addEventListener('click', () => {
+      if (walletNftMarket.sort === sort) return;
+      walletNftMarket.sort = sort;
+      for (const one of sorts.querySelectorAll('.wallet-market-mode')) one.setAttribute('aria-pressed', String(one === button));
+      if (walletNftMarket.parts) walletNftMarket.parts.shown = NFT_CARDS_PAGE;
+      walletNftViewPaint();
+    });
+    sorts.append(button);
+  }
+  return sorts;
+}
+function walletNftVisibleFeed() {
+  return [...walletNftCollection(NFT_ALL).listings.values()].filter((listing) => walletNftCollectionVerified(listing.collection) === 'yes')
+    .sort((a, b) => (b.listedAt || 0) - (a.listedAt || 0));
+}
+function walletNftViewListings(key) {
+  if (!key) return walletNftVisibleFeed();
+  const listings = walletNftFiltered(key, [...walletNftCollection(key).listings.values()]);
+  const newer = (a, b) => (b.listedAt || 0) - (a.listedAt || 0);
+  return walletNftMarket.sort === 'cheap'
+    ? listings.sort((a, b) => (a.price < b.price ? -1 : a.price > b.price ? 1 : newer(a, b)))
+    : listings.sort(newer);
+}
+function walletNftShowMore() {
+  const parts = walletNftMarket.parts;
+  if (!parts) return;
+  if (walletNftViewListings(parts.key).length > parts.shown) {
+    parts.shown += NFT_CARDS_PAGE;
+    walletNftViewPaint();
+    return;
+  }
+  void walletNftCollectionRead(walletNftCollection(parts.key), { deeper: true });
+}
+function walletNftViewPaint() {
+  const parts = walletNftMarket.parts;
+  if (!parts?.grid?.isConnected) return;
+  const { key, stats, grid: cards, more: moreCards, note: cardsNote } = parts;
+  const entry = walletNftCollection(key);
+  const listings = walletNftViewListings(key);
+  const { reading, failed } = entry;
+  if (parts.filters) walletNftFilterPaint(parts.filters, [...entry.listings.values()]);
+  const filtering = Boolean(key) && walletNftMarket.filter.key === key && entry.listings.size > 0;
+  const hasMore = entry.hasMore && entry.at > 0;
+  const shown = listings.slice(0, parts.shown);
+  const focusedAt = cards.contains(document.activeElement) ? [...cards.children].indexOf(document.activeElement) : -1;
+  const focused = focusedAt >= 0 ? document.activeElement.dataset.sale : '';
+  const scroller = focused ? cards.closest('.wallet-group-body, .wallet-nft-detail') : null;
+  const stood = scroller ? scroller.scrollTop : 0;
+  cards.replaceChildren(...shown.map((listing) => walletNftCard(listing, { withCollection: !key })));
+  if (focused) (cards.querySelector(`[data-sale="${CSS.escape(focused)}"]`) ?? cards.children[Math.min(focusedAt, cards.children.length - 1)])?.focus({ preventScroll: true });
+  if (scroller && scroller.scrollTop !== stood) scroller.scrollTop = stood;
+  cards.hidden = shown.length === 0;
+  moreCards.hidden = !(listings.length > shown.length || hasMore);
+  moreCards.setAttribute('aria-busy', String(reading && listings.length <= shown.length));
+  const lookup = walletNftLookupOf(key);
+  const searching = (filtering && entry.hasMore && walletNftSearchReadsOn(key, entry.pages))
+    || walletNftMarket.lookupDue?.key === key || Boolean(lookup?.reading);
+  cardsNote.textContent = !listings.length && lookup && !lookup.reading && !lookup.found
+    ? t(lookup.onSale ? 'nft.nameListedElsewhere' : 'nft.nameNotListed', { name: String(walletNftMarket.filter.q ?? '').trim() })
+    : searching ? t('nft.filterReading', { count: entry.listings.size })
+    : listings.length ? ''
+    : filtering && listings.length < entry.listings.size ? t('nft.filterNone')
+      : reading || !entry.at ? t('profileCard.giftsLoading')
+        : failed ? t('nft.marketUnread') : t(key ? 'nft.collectionEmpty' : 'nft.marketEmpty');
+  cardsNote.hidden = !cardsNote.textContent;
+  if (key && entry.name) for (const node of parts.titles ?? []) if (node?.isConnected && node.textContent !== entry.name) node.textContent = entry.name;
+  const floor = listings.reduce((least, listing) => (least === null || listing.price < least ? listing.price : least), null);
+  const pair = (label, value) => {
+    const one = document.createElement('span');
+    one.className = 'wallet-market-stat';
+    const name = document.createElement('span');
+    name.className = 'wallet-market-stat-key';
+    name.textContent = label;
+    const shownValue = document.createElement('span');
+    shownValue.className = 'wallet-market-stat-value';
+    shownValue.textContent = value;
+    one.append(name, shownValue);
+    return one;
+  };
+  stats.replaceChildren(pair(t('nft.listedCount'), `${listings.length}${hasMore ? '+' : ''}`),
+    ...(key && floor !== null ? [pair(t('nft.floor'), `${formatUnits(String(floor), 9)} GRAM`)] : []));
+  if (walletNftMarket.cards.size > 4 * NFT_CARDS_PAGE) {
+    const drawn = new Set(shown.map((listing) => `${key ? 'c' : 'a'}:${listing.sale}`));
+    for (const id of walletNftMarket.cards.keys()) if (!drawn.has(id)) walletNftMarket.cards.delete(id);
+  }
+}
+function walletNftCard(listing, { withCollection = false } = {}) {
+  const id = `${withCollection ? 'a' : 'c'}:${listing.sale}`;
+  const held = walletNftMarket.cards.get(id);
+  const pictures = [...walletNftAthArtOf(listing), ...walletNftPictures(walletNftGiftOf(listing.collection, listing.uri), listing.picture)];
+  if (held && held.price === listing.price) {
+    if (pictures.join(' ') !== held.pictures) { held.pictures = pictures.join(' '); paintWalletAssetIconFirst(held.icon, pictures, { shared: true }); }
+    held.listing = listing;
+    return held.card;
+  }
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'wallet-nft-card';
+  card.dataset.sale = listing.sale;
+  const name = document.createElement('span');
+  name.className = 'wallet-nft-card-name';
+  name.textContent = listing.name || shortAddress(displayWalletAddress(listing.nft));
+  const price = document.createElement('strong');
+  price.className = 'wallet-nft-card-price';
+  price.textContent = `${formatUnits(String(listing.price), 9)} GRAM`;
+  const icon = walletAssetIcon('', listing.name || '?', 'wallet-nft-card-picture');
+  walletNftDomainFace(icon, pictures, listing.domain);
+  paintWalletAssetIconFirst(icon, pictures, { shared: true });
+  card.append(icon, name);
+  if (withCollection && listing.collectionName) {
+    const collection = document.createElement('span');
+    collection.className = 'wallet-nft-card-collection';
+    collection.textContent = listing.collectionName;
+    card.append(collection);
+  }
+  card.append(price);
+  const entry = { card, icon, pictures: pictures.join(' '), price: listing.price, listing };
+  card.addEventListener('click', () => {
+    const from = walletNftMarket.parts?.key;
+    const keep = { shown: walletNftMarket.parts?.shown ?? NFT_CARDS_PAGE, scroll: document.querySelector('#walletGroupDialog .wallet-group-body')?.scrollTop ?? 0,
+      sale: entry.listing.sale };
+    openWalletNftListing(entry.listing, { back: !walletNftMarket.drawnDesktop && from !== undefined ? () => openWalletNftCollection(from, keep) : null });
+  });
+  walletNftMarket.cards.set(id, entry);
+  return card;
+}
+function walletNftForgetListing(sale) {
+  for (const entry of walletNftMarket.collections.values()) entry.listings.delete(sale);
+  walletNftMarketPaint();
+}
+function walletNftTakeListing(fresh) {
+  const take = (listing) => (listing.sale === fresh.sale ? { ...listing, ...fresh, name: fresh.name || listing.name, picture: fresh.picture || listing.picture,
+    pictureBig: fresh.pictureBig || listing.pictureBig, collectionName: fresh.collectionName || listing.collectionName, listedAt: listing.listedAt } : listing);
+  for (const entry of walletNftMarket.collections.values()) if (entry.listings.has(fresh.sale)) entry.listings.set(fresh.sale, take(entry.listings.get(fresh.sale)));
+  walletNftMarketPaint();
+}
+function walletNftExplorerButton(address) {
+  const shown = displayWalletAddress(address);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'wallet-card-send is-secondary';
+  button.textContent = t('wallet.traderExplorer');
+  button.addEventListener('click', () => activateExternalLink(`${TRADER_EXPLORER_ORIGIN}/${encodeURIComponent(shown)}`));
+  return button;
+}
+function openWalletNftListing(listing, { back = null } = {}) {
   const split = priceSplit(listing);
-  const gram = (units) => `${formatUnits(String(units), 9)} GRAM`;
+  const gram = (units) => `${formatUnits(String(units), 9, { shown: 9 })} GRAM`;
   const share = (part) => `${(part / (NFT_FEE_BASE / 100)).toLocaleString('en', { maximumFractionDigits: 3 })} %`;
   const usdRoute = walletMarketRouteOf(PRICE_USDT);
   const gramPerUsd = usdRoute ? walletMarketPrice(usdRoute) : null;
   const priceText = `${gram(listing.price)}${gramPerUsd ? ` ($${formatPrice(Number(listing.price) / 1e9 / gramPerUsd)})` : ''}`;
   const friendly = (address) => displayWalletAddress(address);
   const own = sameWalletAddress(listing.seller, plathoWallet?.address ?? '');
+  const title = listing.name || shortAddress(friendly(listing.nft));
+  const gift = walletNftGiftOf(listing.collection, listing.uri);
   fillWalletCard({
-    picture: listing.picture, letter: listing.name || '?', title: listing.name || shortAddress(friendly(listing.nft)), subtitle: listing.collectionName,
+    picture: listing.picture, letter: listing.name || '?', title, subtitle: listing.collectionName,
+    hero: walletNftHero({ pictures: [...walletNftAthArtOf(listing), ...walletNftPictures(gift, listing.pictureBig, listing.picture)], letter: listing.name || '?', gift,
+      shared: true, domain: listing.domain, nft: listing.nft }),
     stats: [
       walletCardStat(t('nft.price'), priceText),
+      own ? walletCardStat(t('nft.yourListing'), '') : walletCardSend(() => runWalletNftBuy(listing), t('wallet.marketBuy'), 'is-buy'),
+      ...walletNftTraitRows(listing.attributes),
       walletCardStat(t('nft.sellerGets'), gram(split.seller)),
       walletCardStat(t('nft.marketplaceFee'), `${share(listing.feeAddress ? listing.feePercent : 0)}, ${gram(split.fee)}`),
       walletCardStat(t('nft.royalty'), `${share(listing.royaltyAddress ? listing.royaltyPercent : 0)}, ${gram(split.royalty)}`),
-      walletCardStat(t('nft.collection'), listing.collectionName || shortAddress(friendly(listing.collection)), { copy: friendly(listing.collection), copied: 'wallet.tokenAddressCopied' }),
+      walletCardStat(t('nft.collection'), listing.collectionName || shortAddress(friendly(listing.collection)), { copy: friendly(listing.collection), copied: 'nft.collectionCopied' }),
       walletCardStat(t('nft.seller'), shortAddress(friendly(listing.seller)), { copy: friendly(listing.seller), copied: 'wallet.traderAddressCopied' }),
       walletCardStat(t('wallet.nftAddress'), shortAddress(friendly(listing.nft)), { copy: friendly(listing.nft), copied: 'wallet.nftAddressCopied' }),
-      own ? walletCardStat(t('nft.yourListing'), '') : walletCardSend(() => runWalletNftBuy(listing), t('wallet.marketBuy'), 'is-buy'),
+      walletNftExplorerButton(listing.nft),
     ],
   });
   walletAssetsState.openCard = null;
-  openWalletGroup('token', { title: listing.name || t('wallet.tabNft') });
+  openWalletGroup('token', { title, back });
 }
 async function runWalletNftBuy(listing) {
   const pressedBy = plathoWallet?.address ?? null;
@@ -46948,7 +47872,7 @@ async function openNftBuyDialog(listing, hold) {
   const wallet = requirePlathoWallet();
   const name = listing.name || shortAddress(displayWalletAddress(listing.nft));
   const value = buyValue(listing);
-  const gram = (units) => `${formatUnits(String(units), 9)} GRAM`;
+  const gram = (units) => `${formatUnits(String(units), 9, { shown: 9 })} GRAM`;
   let outcome = null;
   const values = await openActionDialog({
     title: t('nft.buyTitle', { name }),
@@ -46967,11 +47891,12 @@ async function openNftBuyDialog(listing, hold) {
       const passwordRefusal = await spendPasswordRefusal(submitted);
       if (passwordRefusal) return { ok: false, error: passwordRefusal };
       hold?.();
+      let fresh = null;
       try {
         requireNoPendingServiceWorkerAppShellReload();
         const signer = requirePlathoWallet();
         if (sameWalletAddress(listing.seller, signer.address)) throw Object.assign(new Error('this listing is this wallet\'s'), { code: 'NFT_OWN_LISTING' });
-        const fresh = await readSaleFresh({ fetchImpl: createToncenterRestFetch({ requestOptions: { priority: 'focus', skipIfRateLimited: false } }),
+        fresh = await readSaleFresh({ fetchImpl: createToncenterRestFetch({ requestOptions: { priority: 'focus', skipIfRateLimited: false } }),
           origin: toncenterRestOrigin(), sale: listing.sale });
         if (!fresh?.live) throw Object.assign(new Error('the sale is gone'), { code: 'NFT_SALE_GONE' });
         if (fresh.price !== listing.price || fresh.nft !== listing.nft || fresh.seller !== listing.seller || fresh.collection !== listing.collection
@@ -46990,6 +47915,8 @@ async function openNftBuyDialog(listing, hold) {
         outcome = t('nft.buySubmitted');
       } catch (error) {
         console.error(error);
+        if (error?.code === 'NFT_SALE_GONE') walletNftForgetListing(listing.sale);
+        else if (error?.code === 'NFT_SALE_CHANGED' && fresh?.live) walletNftTakeListing(fresh);
         return { ok: false, error: error?.code === 'NFT_SALE_GONE' ? t('nft.saleGone') : error?.code === 'NFT_SALE_CHANGED' ? t('nft.saleChanged')
           : error?.code === 'NFT_NOT_OF_COLLECTION' ? t('nft.notOfCollection') : error?.code === 'NFT_OWN_LISTING' ? t('nft.yourListing')
             : walletAssetSendRefusal(error) };
@@ -46998,11 +47925,12 @@ async function openNftBuyDialog(listing, hold) {
     },
   });
   if (!values?.sent) return null;
+  walletNftForgetListing(listing.sale);
   walletAssetsSent('nft');
   return outcome;
 }
 function walletMarketFit() {
-  const { box } = walletMarket;
+  const box = walletNftMarket.mode === 'nft' ? walletNftMarket.box : walletMarket.box;
   const page = box?.closest('.wallet-scroll-content');
   const panel = box?.parentElement;
   const side = box?.querySelector('.wallet-market-side');
@@ -47019,7 +47947,7 @@ function walletMarketFit() {
   box.style.setProperty('--market-room', `${Math.floor(room)}px`);
 }
 function walletMarketWheel(event) {
-  const { box } = walletMarket;
+  const box = walletNftMarket.mode === 'nft' ? walletNftMarket.box : walletMarket.box;
   const page = event.currentTarget;
   if (walletAssetsState.tab !== 'market' || !box?.isConnected || event.ctrlKey || !event.deltaY || !isDesktopLayout()) return;
   const column = event.target?.closest?.('.wallet-market-list, .wallet-market-detail');
@@ -47215,8 +48143,9 @@ function openWalletTrader(trader, { points = [] } = {}) {
     const usdRoute = walletMarketRouteOf(PRICE_USDT);
     const gramPerUsd = usdRoute ? walletMarketPrice(usdRoute) : null;
     const holdings = walletTraderHoldings(tokens, balance, (master) => (routes.has(master) ? walletMarketPrice(routes.get(master)) : null));
-    const worth = (grams) => `${formatUnits(String(BigInt(Math.floor(grams * 1e9))), 9)} GRAM${gramPerUsd ? ` ($${formatPrice(grams / gramPerUsd)})` : ''}`;
-    total.lastElementChild.textContent = holdings.total === null ? t('wallet.traderUnread') : worth(holdings.total);
+    const totalNano = holdings.total === null ? null : BigInt(balance) + BigInt(Math.max(0, Math.floor((holdings.total - holdings.gram) * 1e9)));
+    total.lastElementChild.textContent = totalNano === null ? t('wallet.traderUnread')
+      : `${formatUnits(String(totalNano), 9)} GRAM${gramPerUsd ? ` ($${formatPrice(holdings.total / gramPerUsd)})` : ''}`;
     gram.lastElementChild.textContent = balance === null ? t('wallet.traderUnread') : `${formatUnits(String(balance), 9)} GRAM`;
     const rows = holdings.verified.map(({ token, decimals, value }) => walletAssetRow({ picture: token.picture, letter: token.symbol || token.name,
       title: token.name || token.symbol || shortAddress(token.master), subtitle: value === null ? '' : `≈ ${formatPrice(value)} GRAM`,
@@ -48033,7 +48962,7 @@ walletShowHiddenSelect?.addEventListener('change', () => {
   else walletLocalStorage().removeItem(WALLET_SHOW_HIDDEN_KEY);
   renderWalletAssets(walletAssetsState.tab);
 });
-document.querySelector('#walletGroupBackButton')?.addEventListener('click', () => openWalletGroup('menu'));
+document.querySelector('#walletGroupBackButton')?.addEventListener('click', () => (walletGroupBack ? walletGroupBack() : openWalletGroup('menu')));
 document.querySelector('#walletGroupCloseButton')?.addEventListener('click', closeWalletGroup);
 closeOnBackdropClick(walletGroupDialog, closeWalletGroup);
 

@@ -1,8 +1,8 @@
 
-import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=104';
+import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=105';
 import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=93';
-import { applyShardSurcharge, surchargeExtraNanotons, LANE_INTRO } from './shard-debt.mjs?v=82';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=94';
+import { applyShardSurcharge, surchargeExtraNanotons, LANE_INTRO } from './shard-debt.mjs?v=83';
 import { directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX } from './fee-vault.mjs?v=39';
 
 function b64urlToBytes(value) {
