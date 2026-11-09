@@ -1,6 +1,6 @@
 
-import { beginCell, bytesToBase64, computeCellHashAndDepth, parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { STORAGE_PRICE, storageFeeNanotons } from './shard-debt.mjs?v=83';
+import { beginCell, bytesToBase64, computeCellHashAndDepth, parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { STORAGE_PRICE, storageFeeNanotons } from './shard-debt.mjs?v=87';
 
 export const ACCOUNT_ACTIVE = 'active';
 export const ACCOUNT_FROZEN = 'frozen';

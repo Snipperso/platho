@@ -1,8 +1,8 @@
 
-import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=109';
+import { readAccountStates, toWireAddress } from './shard-reader.mjs?v=113';
 import { parseIntroPublish, parseIntroEntryStack } from './intro-codec.mjs?v=4';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
-import { parseBocBase64, computeCellHashAndDepth, beginCell, bytesToBigUint } from './pwa-contract-transactions.mjs?v=59';
+import { parseBocBase64, computeCellHashAndDepth, beginCell, bytesToBigUint } from './pwa-contract-transactions.mjs?v=60';
 
 export function createShardStateReader(sendRequest) {
   if (typeof sendRequest !== 'function') throw new Error('createShardStateReader requires a request function');

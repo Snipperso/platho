@@ -257,8 +257,9 @@ describe('PUBLIC GROUPS — the client dispatch', () => {
     const fold = code(block(RAW, 'function applyPublicGroupMessagesToThread('));
     expect(fold, 'the claim goes through the same verification a comment\'s does').toContain('adoptPostSenderUsernameClaim(row.senderWallet, String(row.senderUsername));');
     const menu = code(block(RAW, 'function showProfileCardGroupsMenu('));
-    expect(menu).toContain('const known = groupRecordOf(String(room.groupId))?.name ?? null;');
-    expect(menu).toContain("hint.textContent = room.founder ? t('group.joinLabel') : t('group.askLabel');");
+    expect(menu).toContain('const held = heldGroupFor(room.groupId, roomPinClaim(room, raw));');
+    expect(menu).toContain("hint.textContent = held?.matches && !held.record.leftAt ? t('group.openCount', { count: held.people })");
+    expect(menu).toContain(": room.founder ? t('group.joinLabel') : t('group.askLabel');");
     const leave = code(block(RAW, 'async function leavePublicGroup('));
     expect(leave).not.toContain('void record;');
   });

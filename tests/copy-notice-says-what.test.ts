@@ -28,7 +28,7 @@ describe('a copy says what it copied', () => {
     expect(qr).not.toContain("t('dialog.shareCopied')");
     expect(app).toContain("{ copy: friendly, copied: 'wallet.tokenAddressCopied' }");
     expect(app).toContain("{ copy: friendly, copied: 'wallet.nftAddressCopied' }");
-    expect(code(fn('function walletCardStat(label, value, { copy = \'\', copied = \'dialog.shareCopied\', balanceRow = null } = {}) {'))).toContain('showAppNotice(t(copied))');
+    expect(code(fn('function walletCardStat(label, value, { copy = \'\', copied = \'dialog.shareCopied\', balanceRow = null, wide = false } = {}) {'))).toContain('showAppNotice(t(copied))');
     for (const line of code(app).split(NL).filter((one) => /copyTextToClipboard\((address|addressText|addressToCopy)\)/.test(one))) {
       expect(line, line).not.toContain('dialog.shareCopied');
     }

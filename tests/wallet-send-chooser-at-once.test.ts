@@ -20,7 +20,7 @@ function world() {
     loadWalletAssets: (tab: string) => { events.push(`read ${tab}`); return new Promise<void>((resolve) => { reads[tab] = () => { state.at.set(tab, 1); resolve(); }; }); },
     walletAssetsState: state, document: { createElement: node }, actionSubmitButton: null, sendWalletTonButton: { click: () => events.push('send gram') },
     walletAssetRow: ({ title }: any) => ({ tag: 'row', title }), gramPicture: () => '', walletBalanceRowText: (asset: string) => asset, assetPicture: () => '',
-    walletAthToken: () => ({ master: 'ATH', balance: '5' }), walletHiddenAssets: () => new Set(), formatUnits: (v: string) => v, shortAddress: (v: string) => v,
+    walletAthToken: () => ({ master: 'ATH', balance: '5' }), walletHiddenAssets: () => new Set(), nftCollectionTransferable: () => true, formatUnits: (v: string) => v, shortAddress: (v: string) => v,
     t: (key: string) => key, runWalletAssetSend: async () => {},
     openActionDialog: (config: any) => new Promise((resolve) => {
       events.push('dialog open');

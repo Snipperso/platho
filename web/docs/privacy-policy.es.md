@@ -1,6 +1,6 @@
 # Política de Privacidad
 
-Última actualización: 22 de octubre de 2026
+Última actualización: 31 de octubre de 2026
 
 Platho es un mensajero sin backend. Este documento es breve porque hay muy poco
 que revelar, y es concreto allí donde algo sale realmente de tu dispositivo.
@@ -23,7 +23,7 @@ nombre.
 - Tu frase de recuperación de 24 palabras, y las claves de la billetera y de mensajería derivadas de ella.
 - Tu historial de mensajes. (Un borrador sin enviar solo se guarda en memoria y desaparece al cerrar la página).
 - Los nombres que das a tus contactos, y cuáles fijaste o dejaste de marcar como no leídos.
-- Los nombres que les pones a tus billeteras: se guardan como texto normal para que la pantalla de bloqueo pueda mostrarlos antes de cualquier contraseña.
+- Los nombres que les pones a tus billeteras y las direcciones de las billeteras: se guardan como texto normal para que la pantalla de bloqueo pueda mostrarlos antes de cualquier contraseña.
 - Tus ajustes, incluida una clave de API opcional de un proveedor público de nodos TON.
 
 Nada de esto llega hasta nosotros, y no todo está protegido igual, así que se

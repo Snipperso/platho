@@ -869,9 +869,9 @@ async function migrateLegacyHistory(db, keys, keyRangeApi, { lockName = null, on
     const moveConversation = async (threadId) => {
       const legacy = await readonly(MESSAGE_STORE_NAME, (tx) => requestToPromise(legacyIndexOf(tx).getAll(legacyRange(threadId))));
       const openedLegacy = await inBatches(legacy, MOVE_PARALLEL, (record) => openLegacyMessageHistoryRecord(legacyKey, record)
-        .then((item) => ({ item, record }), () => ({ item: null, record })));
+        .then((item) => ({ item, record }), (error) => ({ item: null, record, refused: error?.name === 'OperationError' })));
       const opened = openedLegacy.filter((entry) => entry.item).map((entry) => entry.item);
-      const unreadableIds = openedLegacy.filter((entry) => !entry.item && entry.record?.id != null).map((entry) => entry.record.id);
+      const unreadableIds = openedLegacy.filter((entry) => !entry.item && entry.refused && entry.record?.id != null).map((entry) => entry.record.id);
       result.unreadable += unreadableIds.length;
       if (opened.length === 0 && unreadableIds.length === 0) return;
       const tag = await conversationTag(keys, threadId);

@@ -44,6 +44,36 @@ describe('the Market', () => {
     expect(() => bocRootCell(Buffer.from('not a boc').toString('base64'))).toThrow(/not a BoC/);
   });
 
+  it('MARKET-05: a row\'s pool depth is the one read with its price — its GRAM side now, shallow in the danger colour — not the lists\' figure from their build [2026-11-07]', () => {
+    const classes = () => { const set = new Set<string>(); return { set, add: (c: string) => set.add(c), toggle: (c: string, on: boolean) => (on ? set.add(c) : set.delete(c)), contains: (c: string) => set.has(c) }; };
+    const node = (): any => ({ textContent: '', className: '', dataset: {}, children: [] as any[], classList: classes(), replaceChildren(...kids: any[]) { this.children = kids; } });
+    const amount = node();
+    const pool = node();
+    pool.textContent = '20.6K GRAM';
+    const row: any = { dataset: {}, querySelector: (selector: string) => (selector === '.wallet-asset-amount' ? amount : selector === '.wallet-market-stat-value' ? pool : null) };
+    const route = { dex: 'stonfi_v2', pair: { pool: 'P', stable: false, offerSide: 1, offer: { id: 'GRAM', decimals: 9 }, ask: { id: 'TKN', decimals: 9 } } };
+    const market: any = { reserves: new Map(), seen: new Set(['TKN']), rows: new Map([['TKN', row]]), head: null };
+    // eslint-disable-next-line no-new-func
+    const paint = new Function('walletMarket', 'walletMarketRouteOf', 'PRICE_USDT', 'GRAM', 'formatPrice', 'walletCompact', 'setTextIfChanged', 'POOL_SHALLOW_DEPTH_GRAM',
+      'walletNftMarket', 'document', `${sourceBlock(app, 'function walletMarketPrice(route) {')}\n${sourceBlock(app, 'function walletMarketDepth(route) {')}\n`
+      + `${sourceBlock(app, 'function walletMarketPaint() {')}\nreturn walletMarketPaint;`)(market, (id: string) => (id === 'TKN' ? route : null), 'USDT', 'GRAM',
+      (value: number) => String(value), (value: number) => String(Math.round(value)), (one: any, text: string) => { one.textContent = text; }, 1_000,
+      { box: null }, { createElement: node });
+    paint();
+    expect(pool.textContent, 'not read yet: the lists\' figure stays').toBe('20.6K GRAM');
+    market.reserves.set('P', { reserves: [12_000_000_000_000_000n, 18_885_000_000_000n], at: 0 });
+    paint();
+    expect([pool.textContent, pool.classList.contains('is-thin')], 'its GRAM side, read now').toEqual(['18885 GRAM', false]);
+    market.reserves.set('P', { reserves: [600_000_000_000_000n, 900_000_000_000n], at: 0 });
+    paint();
+    expect([pool.textContent, pool.classList.contains('is-thin')], 'shallow: the danger colour').toEqual(['900 GRAM', true]);
+    // eslint-disable-next-line no-new-func
+    const depthOf = new Function('walletMarket', 'GRAM', `${sourceBlock(app, 'function walletMarketDepth(route) {')}
+return walletMarketDepth;`)(market, 'GRAM');
+    expect(depthOf({ pair: { ...route.pair, offerSide: 0, offer: { id: 'TKN', decimals: 9 }, ask: { id: 'GRAM', decimals: 9 } } })).toBe(900);
+    expect(depthOf({ pair: { ...route.pair, stable: true } }), 'a stable pool: none').toBeNull();
+  });
+
   it('MARKET-02: many pools in one call, a hundred at most; an account not active or not readable is left out', async () => {
     const asked: string[] = [];
     const pools = [...fixtures.map((one) => ({ address: one.address, dex: one.dex })), ...Array.from({ length: 120 }, (_, i) => ({ address: `0:${String(i).padStart(64, '0')}`, dex: 'stonfi' }))];

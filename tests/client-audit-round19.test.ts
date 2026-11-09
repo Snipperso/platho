@@ -409,7 +409,7 @@ describe('R19 — signed bytes live by their signed deadline on the chain\'s clo
     expect(api.activation({ boc: 'te6-1300', at: 1_000_000 }, 1_060_000 + 600_000), 'MEASURED before: offered again at once, 281 s early, after a correction').toBe(true);
     expect(api.activation({ at: 1_000_000 }, 1_000_000 - 1), 'a clock set back is not a lock for ever').toBe(false);
     expect(env.PLATHO_ACTIVATION_IN_FLIGHT_TTL_MS).toBe(WALLET_EXTERNAL_VALIDITY_S * 1000 + WALLET_EXTERNAL_DEATH_GRACE_MS);
-    expect(code(fn('function plathoActivationInFlightForCurrentWallet() {'))).toContain('if (!activationExternalAlive(record)) { forgetPlathoActivationInFlight(); return false; }');
+    expect(code(fn('function plathoActivationInFlightForCurrentWallet() {'))).toContain('if (!activationExternalAlive(record)) { forgetPlathoActivationInFlight(raw); return false; }');
     expect(code(fn('function plathoActivationPendingExternal() {'))).toContain('return activationExternalAlive(record) ?');
   });
 });
@@ -559,7 +559,7 @@ const windowOf = async () => {
     line('const CONV_TAIL_UNDELIVERABLE_META = '), fn('function markConvTailUndeliverable(thread, message, captured) {'),
     fn('async function settleEarlierConvTails(thread, message, address, transport, signer) {'), fn('function convEarlierRestPendingError() {'),
     fn('function isRecoverablePrivateSendError(error) {'),
-    fn('function currentPrivateSenderMode() {'), fn('function currentPrivateSenderOptions(thread = activeThread()) {'),
+    fn('function currentPrivateSenderOptions() {'),
     fn('function privateSenderOptionsAsPressed(thread, message) {'), fn('function privateSenderUsernameMetadataLabel(options = {}) {'),
     fn('function serializeMessageForHistory(message) {'), fn('function safeJsonClone(value) {'), fn('function privateSendRetryContextForMessage(thread, message) {'),
   ], `{ lane: enqueueOutgoingPublish, send: (context) => enqueueOutgoingPublish(() => attemptPrivateComposerMessagePublish(context)),
@@ -959,7 +959,7 @@ describe('R19 — a message is sent as the person pressed it: anonymous stays an
     expect(token).toContain('senderAnonymous: senderOptions.includeSenderWalletMetadata === false,');
     expect(token).toContain('thread: peerThread, message, text: token, senderOptions,');
     expect(code(fn('async function attemptConvMessagePublishDirect(context, owner = undefined) {'))).toContain('const senderOptions = context.senderOptions ?? privateSenderOptionsAsPressed(thread, message);');
-    expect(code(fn('function currentPrivateSenderOptions(thread = activeThread()) {'))).toContain('const savedThread = isSavedMessagesThread(thread);');
+    expect(code(fn('function currentPrivateSenderOptions() {')), 'a press names its sender — the peer holds the wallet either way [2026-10-31]').toContain('return { includeSenderWalletMetadata: true,');
   });
 });
 
@@ -2262,5 +2262,38 @@ describe('R19 — a public room\'s rows are signed by the room\'s own wallet [F5
     env.plathoWallet = { address: 'A' };
     expect([await send(), built]).toEqual(['group.sendFailed', 1]);
     expect(code(fn('async function buildPublicGroupRuntime() {'))).toContain('publish: (document) => publishPublicGroupDocument({ ...document, owner: wallet.address }),');
+  });
+});
+
+describe('the activation marker is each wallet\'s own [pentest 2026-10-31 — D2]', () => {
+  it('R19-ACT-WALLETS: a second wallet\'s activation keeps the first\'s owed re-send; forgetting one leaves the other; a marker written as one object reads as its own wallet\'s; the release is its own wallet\'s', () => {
+    const store = new Map<string, string>();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+    const source = [
+      "const PLATHO_ACTIVATION_IN_FLIGHT_KEY = 'k';",
+      'let plathoWallet = null;',
+      code(fn('function activationInFlightMarkers() {')),
+      code(fn('function writeActivationInFlightMarkers(markers) {')),
+      code(fn('function rememberPlathoActivationInFlight(walletAddress, pendingBoc = null, pendingSeqno = null) {')),
+      code(fn('function plathoActivationPendingExternal() {')),
+      code(fn('function forgetPlathoActivationInFlight(walletAddress = plathoWallet?.address) {')),
+      'return { remember: rememberPlathoActivationInFlight, pending: plathoActivationPendingExternal, forget: forgetPlathoActivationInFlight, use: (w) => { plathoWallet = w ? { address: w } : null; } };',
+    ].join('\n');
+    const api = new Function('localStorageOrNull', 'rawWalletAddress', 'activationExternalAlive', source)(() => storage, (a: string) => a || '', () => true);
+    api.use('A'); api.remember('A', 'BOC_A', 41);
+    api.use('B'); api.remember('B', 'BOC_B', 7);
+    api.use('A');
+    expect(api.pending(), 'MEASURED before: null — the second wallet took the one slot').toEqual({ boc: 'BOC_A', seqno: 41 });
+    api.forget('B');
+    expect(api.pending(), 'forgetting B leaves A').toEqual({ boc: 'BOC_A', seqno: 41 });
+    api.use('B');
+    expect(api.pending()).toBeNull();
+    store.set('k', JSON.stringify({ wallet: 'C', at: 1, boc: 'BOC_C', seqno: 3 }));
+    api.use('C');
+    expect(api.pending(), 'a marker of one object, as written before').toEqual({ boc: 'BOC_C', seqno: 3 });
+    const refresh = code(fn('function queueVaultPostTransactionRefresh('));
+    expect(refresh).toContain('const owner = rawWalletAddress(plathoWallet?.address);');
+    expect(refresh).toContain('if (rawWalletAddress(plathoWallet?.address) !== owner) return;');
+    expect(refresh).toContain('forgetPlathoActivationInFlight(owner);');
   });
 });

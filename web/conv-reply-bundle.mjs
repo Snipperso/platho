@@ -1,6 +1,6 @@
 
-import { publicKeyBundleFromVaultKeyRecord, CRYPTO_SUITES } from './crypto/platho-crypto.mjs?v=31';
-import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=59';
+import { publicKeyBundleFromVaultKeyRecord, CRYPTO_SUITES } from './crypto/platho-crypto.mjs?v=32';
+import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=60';
 
 const MLKEM768_PUBLIC_KEY_BYTES = 1184;
 

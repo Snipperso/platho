@@ -1,5 +1,6 @@
-import { isVerifiedJettonMaster, isVerifiedNftCollection } from './verified-assets.mjs?v=6';
-import { parseTelegramGiftItemUri } from './telegram-gift-nfts.mjs?v=27';
+import { isVerifiedJettonMaster, isVerifiedNftCollection } from './verified-assets.mjs?v=9';
+import { isApprovedNftCollection } from './nft-collections.mjs?v=5';
+import { parseTelegramGiftItemUri } from './telegram-gift-nfts.mjs?v=28';
 
 export const WALLET_TOKEN_PAGE = 1000;
 export const WALLET_NFT_PAGE = 1000;
@@ -68,7 +69,18 @@ const FIRST_PARTY_NFT_COLLECTIONS = new Set([
   '0:0e41dc1dc3c9067ed24248580e12b3359818d83dee0304fabcf80845eafafdb2',
 ]);
 export function listedNftCollection(collection) {
-  return isVerifiedNftCollection(collection) || FIRST_PARTY_NFT_COLLECTIONS.has(rawAccount(collection));
+  return isVerifiedNftCollection(collection) || isApprovedNftCollection(rawAccount(collection)) || FIRST_PARTY_NFT_COLLECTIONS.has(rawAccount(collection));
+}
+const NONTRANSFERABLE_NFT_COLLECTIONS = new Set([
+  '0:c089c5b80494c179cec2fc4d6a6890ef7a6e0188ac260b31fd78896f422e8349',
+  '0:3971e42d84298ca7a1ca9cf206b3ad919e83570081e5b7641ecd54fd736c8250',
+  '0:0775136083d039a97a3dc90535f538363761a638358ae87f54f6d22925539a54',
+  '0:dfdb68e5d54fe1d1d4417912266a4777de16752e3f99c669e567272a8732633d',
+  '0:921518859bfaa3bfb5ba4bdc6323b658d9725e71485de15ca62e096c384f3c94',
+  '0:7958c516fb3c518f5cb1c9bfc7140db917655e19bd4b90f32ba576620f847851',
+]);
+export function nftCollectionTransferable(collection) {
+  return !NONTRANSFERABLE_NFT_COLLECTIONS.has(rawAccount(collection));
 }
 function pictureOf(info, size = '_image_small') {
   return toncenterPicture(info?.extra?.[size]) || toncenterPicture(info?.extra?._image_medium) || toncenterPicture(info?.image);
@@ -92,10 +104,13 @@ function text(value, max = 80) {
     ? Array.from(value.replace(/[\u0000-\u001f\u007f-\u009f\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g, '').trim()).slice(0, max).join('') : '';
 }
 
-async function indexRead(path, params, { fetchImpl, origin = 'https://toncenter.com', apiKey = null } = {}) {
+async function indexRead(path, params, { fetchImpl, origin = 'https://toncenter.com', apiKey = null, bodyMs = 0 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('wallet assets: no fetch available');
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) for (const one of value) query.append(key, String(one));
+    else if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
   const headers = { Accept: 'application/json' };
   if (apiKey) headers['X-API-Key'] = String(apiKey);
   const response = await fetchImpl(`${origin}/api/v3/${path}?${query}`, { headers, cache: 'no-store' });
@@ -104,7 +119,16 @@ async function indexRead(path, params, { fetchImpl, origin = 'https://toncenter.
     error.status = Number(response?.status) || 0;
     throw error;
   }
-  return response.json();
+  if (!bodyMs) return response.json();
+  let timer = 0;
+  const stalled = new Promise((_, refuse) => {
+    timer = setTimeout(() => refuse(Object.assign(new Error('wallet assets: the answer stalled'), { code: 'BODY_STALLED' })), bodyMs);
+  });
+  try {
+    return await Promise.race([response.json(), stalled]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 async function indexPages(path, params, key, access) {
   let payload = null;
@@ -207,6 +231,7 @@ export function parseNftItems(payload, { verifiedItems = [], verifiedCollections
       uri: contentUriOf(row?.content),
       scam,
       verified,
+      onSale: row?.on_sale === true,
       lastLt: String(row?.last_transaction_lt ?? ''),
     });
   }
@@ -258,6 +283,80 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
   const ownTraces = ownTracesOf(payload, self);
   const services = serviceCallsOf(payload, self);
   const traded = marketTradesOf(payload);
+  const boughtByBid = bidPurchasesOf(payload, self);
+  const swaps = (Array.isArray(payload?.actions) ? payload.actions : []).filter((one) => one?.type === 'jetton_swap');
+  const swapOfSelf = (one) => rawAccount(one.details?.sender) === self || rawAccount(one.details?.dex_incoming_transfer?.source) === self;
+  const routed = new Set(swaps.filter((one) => {
+    const paidTo = rawAccount(one.details?.dex_outgoing_transfer?.destination);
+    return swapOfSelf(one) && one.trace_id && paidTo && paidTo !== self;
+  }).map((one) => String(one.trace_id)));
+  const ends = [];
+  const routeEnds = new Map();
+  for (const one of swaps) {
+    const hop = one.details ?? {};
+    const paid = hop.dex_outgoing_transfer ?? {};
+    if (swapOfSelf(one) || rawAccount(paid.destination) !== self) continue;
+    const amount = /^\d+$/.test(String(paid.amount ?? '')) ? String(paid.amount) : '0';
+    if (!(BigInt(amount) > 0n)) continue;
+    const end = { one, amount, asset: paid.asset !== undefined ? paid.asset : one.success === false ? hop.asset_in : hop.asset_out,
+      from: rawAccount(hop.sender) || rawAccount(hop.dex_incoming_transfer?.source), taken: false };
+    ends.push(end);
+    if (!one.trace_id) continue;
+    for (const via of new Set([end.from, rawAccount(hop.dex_incoming_transfer?.destination_jetton_wallet)].filter(Boolean))) {
+      const key = `${String(one.trace_id)} ${via}`;
+      routeEnds.set(key, [...(routeEnds.get(key) ?? []), end]);
+    }
+  }
+  const ownJettonWallets = new Map();
+  for (const [address, entry] of Object.entries(payload?.metadata && typeof payload.metadata === 'object' ? payload.metadata : {})) {
+    const info = (Array.isArray(entry?.token_info) ? entry.token_info : []).find((one) => one?.type === 'jetton_wallets');
+    const master = rawAccount(info?.extra?.jetton);
+    if (master && rawAccount(address) && rawAccount(info?.extra?.owner) === self) ownJettonWallets.set(master, rawAccount(address));
+  }
+  const takeOf = (master, actions, named = '') => {
+    const wallet = ownJettonWallets.get(master) || rawAccount(named);
+    const transactions = actions.flatMap((one) => (Array.isArray(one?.transactions) ? one.transactions.map(String) : []));
+    const lts = actions.flatMap((one) => [one?.start_lt, one?.end_lt]).filter((lt) => /^\d+$/.test(String(lt ?? ''))).map((lt) => BigInt(lt));
+    if (!wallet || !transactions.length || !lts.length) return null;
+    return { wallet, transactions, fromLt: String(lts.reduce((low, lt) => (lt < low ? lt : low))), toLt: String(lts.reduce((high, lt) => (lt > high ? lt : high))) };
+  };
+  const startOf = (one) => (/^\d+$/.test(String(one?.start_lt ?? '')) ? BigInt(one.start_lt) : 0n);
+  const gramTakeOf = (action) => {
+    const before = new Set(swaps.filter((other) => other !== action && other.trace_id === action.trace_id && swapOfSelf(other) && startOf(other) < startOf(action))
+      .flatMap((other) => (Array.isArray(other.transactions) ? other.transactions.map(String) : [])));
+    const take = takeOf('', [{ ...action, transactions: (Array.isArray(action.transactions) ? action.transactions.map(String) : []).filter((hash) => !before.has(hash)) }], self);
+    return take ? { ...take, gram: true } : null;
+  };
+  const jettonsHanded = new Map();
+  for (const one of Array.isArray(payload?.actions) ? payload.actions : []) {
+    if (one?.type !== 'jetton_transfer' || !one.trace_id || one.success === false) continue;
+    const from = rawAccount(one.details?.sender);
+    if (!from || from === self || rawAccount(one.details?.receiver) !== self || infoOf(payload?.metadata, one.details?.asset)?.is_scam === true) continue;
+    const key = `${String(one.trace_id)} ${from}`;
+    jettonsHanded.set(key, [...(jettonsHanded.get(key) ?? []), one]);
+  }
+  const routeOf = new Map();
+  const handedOver = new Set();
+  for (const one of swaps) {
+    const paidTo = rawAccount(one.details?.dex_outgoing_transfer?.destination);
+    if (!swapOfSelf(one) || !one.trace_id || !paidTo || paidTo === self) continue;
+    const key = `${String(one.trace_id)} ${paidTo}`;
+    const end = (routeEnds.get(key) ?? []).find((candidate) => !candidate.taken) ?? null;
+    if (end) {
+      end.taken = true;
+      routeOf.set(one, { end });
+      continue;
+    }
+    const handed = (jettonsHanded.get(key) ?? []).find((candidate) => !handedOver.has(candidate)) ?? null;
+    if (handed) {
+      handedOver.add(handed);
+      routeOf.set(one, { handed });
+    }
+  }
+  const boughtFrom = new Set((Array.isArray(payload?.actions) ? payload.actions : []).filter((one) => one?.type === 'nft_purchase' && one.trace_id
+    && rawAccount(one.details?.new_owner) === self && rawAccount(one.details?.old_owner)).map((one) => `${String(one.trace_id)} ${rawAccount(one.details.old_owner)}`));
+  const handedIn = new Set((Array.isArray(payload?.actions) ? payload.actions : []).filter((one) => one?.type === 'nft_transfer' && rawAccount(one.details?.new_owner) === self)
+    .map((one) => `${String(one.trace_id ?? '')} ${rawAccount(one.details?.nft_item)}`));
   for (const action of Array.isArray(payload?.actions) ? payload.actions : []) {
     const details = action?.details ?? {};
     const at = Number(action?.end_utime ?? action?.start_utime) || 0;
@@ -272,9 +371,11 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
     if (action?.type === 'ton_transfer') {
       const way = directed(details.source, details.destination);
       if (!way) continue;
-      out.push({ ...base, ...way, kind: 'gram', amount: String(details.value ?? '0'), decimals: 9, symbol: 'GRAM',
-        comment: details.encrypted ? '' : text(details.comment, 120) });
+      const comment = details.encrypted ? '' : text(details.comment, 120);
+      out.push({ ...base, ...way, kind: 'gram', amount: String(details.value ?? '0'), decimals: 9, symbol: 'GRAM', comment,
+        ...(way.direction === 'in' && (comment === ROYALTY_COMMENT || boughtFrom.has(`${base.trace} ${way.counterparty}`)) ? { payment: 'royalty' } : {}) });
     } else if (action?.type === 'jetton_transfer') {
+      if (handedOver.has(action)) continue;
       const way = directed(details.sender, details.receiver);
       if (!way) continue;
       const info = infoOf(payload?.metadata, details.asset);
@@ -293,8 +394,27 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
         const info = infoOf(payload?.metadata, asset);
         return { master, symbol: text(info?.symbol, 16), decimals: decimalsOf(info) ?? 9 };
       };
-      out.push({ ...base, kind: 'swap', direction: 'out', counterparty: rawAccount(given.destination), amount: String(given.amount ?? '0'), ...side(given.asset ?? details.asset_in),
-        got: { amount: rawAccount(got.destination) === self ? String(got.amount ?? '0') : '0', ...side(got.asset ?? details.asset_out) }, nftName: '', comment: '' });
+      const paidTo = rawAccount(got.destination);
+      const route = routeOf.get(action) ?? {};
+      const end = route.end ?? null;
+      const handed = route.handed ?? null;
+      const givenAsset = given.asset !== undefined ? given.asset : details.asset_in;
+      const refundFolded = !end && !handed && action.success === false && !(/^\d+$/.test(String(got.amount ?? '')) && BigInt(got.amount) > 0n);
+      const came = end ? { amount: end.amount, ...side(end.asset) }
+        : handed ? { amount: /^\d+$/.test(String(handed.details?.amount ?? '')) ? String(handed.details.amount) : '0', ...side(handed.details?.asset) }
+        : refundFolded ? { amount: '0', ...side(givenAsset) }
+        : { amount: paidTo === self ? String(got.amount ?? '0') : '0',
+          ...side(got.asset !== undefined ? got.asset : action.success === false ? details.asset_in : details.asset_out) };
+      const take = handed ? null
+        : refundFolded ? (came.master ? takeOf(came.master, [action], given.source_jetton_wallet) : gramTakeOf(action))
+        : came.master && (came.amount !== '0' || action.success !== false)
+          ? takeOf(came.master, end ? [action, end.one] : [action],
+            end ? end.one.details?.dex_outgoing_transfer?.destination_jetton_wallet : paidTo === self ? got.destination_jetton_wallet : '') : null;
+      const handedAsset = handed?.details?.asset;
+      out.push({ ...base, kind: 'swap', direction: 'out', counterparty: rawAccount(given.destination), amount: String(given.amount ?? '0'),
+        ...side(givenAsset), got: came,
+        wanted: side(end ? end.asset : handed && rawAccount(handedAsset) !== rawAccount(givenAsset) ? handedAsset
+          : details.asset_out !== undefined ? details.asset_out : got.asset), nftName: '', comment: '', ...(take ? { take } : {}) });
     } else if (MARKET_NFT_ACTIONS.has(action?.type)) {
       const item = rawAccount(details.nft_item);
       const collection = rawAccount(details.nft_collection);
@@ -304,16 +424,20 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
       let trade = null;
       let way = null;
       let amount = '0';
+      let rest = null;
       if (action.type === 'nft_purchase') {
         const seller = rawAccount(details.real_old_owner) || rawAccount(details.old_owner);
         if (rawAccount(details.new_owner) === self && seller !== self) {
           trade = 'bought';
-          way = { direction: 'in', counterparty: seller };
+          way = { direction: 'in', counterparty: seller, sale: rawAccount(details.old_owner) };
           amount = grams(details.price);
         } else if (seller === self && rawAccount(details.new_owner) !== self) {
           trade = 'sold';
           way = { direction: 'out', counterparty: rawAccount(details.new_owner) };
           amount = rawAccount(details.payout_address) === self ? grams(details.payout_amount) : '0';
+          if (amount !== '0' && rawAccount(details.response_destination) === self && Array.isArray(action?.transactions) && action.transactions.length) {
+            rest = { transactions: action.transactions.map(String), sale: rawAccount(details.old_owner) };
+          }
         }
       } else if (rawAccount(details.owner) === self) {
         trade = action.type === 'nft_put_on_sale' ? 'listed' : 'unlisted';
@@ -321,26 +445,86 @@ export function parseWalletHistory(payload, account, { alsoVerified = [], verifi
         amount = trade === 'listed' ? grams(details.full_price) : '0';
       }
       if (!trade) continue;
-      out.push({ ...base, ...way, kind: 'nft', trade, nftName: text(info?.name), master: item, amount, decimals: 9, symbol: 'GRAM', comment: '',
+      out.push({ ...base, ...way, kind: 'nft', trade, nftName: text(info?.name), master: item, collection, amount, decimals: 9, symbol: 'GRAM', comment: '',
+        verified: listedNftCollection(collection) || ownCollections.has(collection) || provenItems.has(item) ? true : (nftVerdictsKnown ? false : null),
+        ...(rest ? { rest } : {}) });
+    } else if (action?.type === 'auction_bid' || action?.type === 'auction_outbid') {
+      if (rawAccount(details.bidder) !== self) continue;
+      const bid = action.type === 'auction_bid';
+      const item = rawAccount(details.nft_item);
+      const collection = rawAccount(details.nft_collection);
+      const info = infoOf(payload?.metadata, details.nft_item);
+      const auction = rawAccount(bid ? details.auction : details.auction_address);
+      if (bid && boughtByBid.has(`${base.trace} ${item}`) && !traded.get(base.trace)?.has(item)) {
+        out.push({ ...base, direction: 'in', counterparty: auction, sale: auction, byBid: true, kind: 'nft', trade: 'bought', nftName: info?.is_scam === true ? '' : text(info?.name),
+          master: item, collection, amount: /^\d+$/.test(String(details.amount ?? '')) ? String(details.amount) : '0', decimals: 9, symbol: 'GRAM', comment: '',
+          verified: listedNftCollection(collection) || ownCollections.has(collection) || provenItems.has(item) ? true : (nftVerdictsKnown ? false : null) });
+        continue;
+      }
+      out.push({ ...base, direction: bid ? 'out' : 'in', counterparty: auction, kind: 'nft', trade: bid ? 'bid' : 'outbid',
+        nftName: info?.is_scam === true ? '' : text(info?.name), master: item, collection, amount: /^\d+$/.test(String(details.amount ?? '')) ? String(details.amount) : '0',
+        decimals: 9, symbol: 'GRAM', comment: '',
         verified: listedNftCollection(collection) || ownCollections.has(collection) || provenItems.has(item) ? true : (nftVerdictsKnown ? false : null) });
+    } else if (action?.type === 'call_contract' && String(details.opcode ?? '').toLowerCase() === TELEMINT_FILL_UP_OP) {
+      const way = directed(details.source, details.destination);
+      if (way?.direction !== 'in') continue;
+      out.push({ ...base, ...way, kind: 'gram', amount: /^\d+$/.test(String(details.value ?? '')) ? String(details.value) : '0', decimals: 9, symbol: 'GRAM',
+        comment: '', payment: 'sale' });
+    } else if (action?.type === 'call_contract' && String(details.opcode ?? '').toLowerCase() === OWNERSHIP_ASSIGNED_OP) {
+      const item = rawAccount(details.source);
+      if (rawAccount(details.destination) !== self || !item || action.success === false) continue;
+      if (boughtByBid.has(`${base.trace} ${item}`) || handedIn.has(`${base.trace} ${item}`)) continue;
+      const info = infoOf(payload?.metadata, details.source);
+      out.push({ ...base, direction: 'in', counterparty: '', kind: 'nft', nftName: info?.is_scam === true ? '' : text(info?.name), master: item, collection: '',
+        amount: '0', decimals: 0, symbol: '', comment: '', verified: nftVerdictsKnown ? false : null, endOnly: true });
+    } else if (action?.type === 'call_contract' && routed.has(base.trace) && !NOT_A_SWAP_PAYMENT_OPS.has(opcodeKey(details.opcode))) {
+      const way = directed(details.source, details.destination);
+      const value = /^\d+$/.test(String(details.value ?? '')) ? String(details.value) : '0';
+      if (way?.direction !== 'in' || action.success === false || !(BigInt(value) > 0n)) continue;
+      out.push({ ...base, ...way, kind: 'gram', amount: value, decimals: 9, symbol: 'GRAM', comment: '', payment: 'swap' });
     } else if (action?.type === 'nft_transfer') {
       const way = directed(details.old_owner, details.new_owner);
       if (!way) continue;
       if (traded.get(String(action?.trace_id ?? ''))?.has(rawAccount(details.nft_item))) continue;
+      if (way.direction === 'in' && boughtByBid.has(`${String(action?.trace_id ?? '')} ${rawAccount(details.nft_item)}`)) continue;
       const info = infoOf(payload?.metadata, details.nft_item);
       const collection = rawAccount(details.nft_collection);
       if (info?.is_scam === true || (collection && infoOf(payload?.metadata, details.nft_collection)?.is_scam === true)) continue;
       const item = rawAccount(details.nft_item);
-      out.push({ ...base, ...way, kind: 'nft', nftName: text(info?.name), master: item, amount: '0', decimals: 0, symbol: '', comment: '',
+      out.push({ ...base, ...way, kind: 'nft', nftName: text(info?.name), master: item, collection, amount: '0', decimals: 0, symbol: '', comment: '',
         verified: listedNftCollection(collection) || ownCollections.has(collection) || provenItems.has(item) ? true : (nftVerdictsKnown ? false : null) });
     }
   }
+  for (const end of ends) {
+    if (end.taken) continue;
+    const at = Number(end.one.end_utime ?? end.one.start_utime) || 0;
+    const base = { id: String(end.one.action_id ?? `${String(end.one.trace_id ?? '')}:${at}`), at, success: true, trace: String(end.one.trace_id ?? ''),
+      direction: 'in', counterparty: end.from, comment: '' };
+    const master = rawAccount(end.asset);
+    if (!master) {
+      out.push({ ...base, kind: 'gram', amount: end.amount, decimals: 9, symbol: 'GRAM', payment: 'swap' });
+      continue;
+    }
+    const info = infoOf(payload?.metadata, end.asset);
+    if (info?.is_scam === true) continue;
+    const take = takeOf(master, [end.one], end.one.details?.dex_outgoing_transfer?.destination_jetton_wallet);
+    if (!take) continue;
+    out.push({ ...base, kind: 'jetton', amount: end.amount, master, decimals: decimalsOf(info) ?? 9, symbol: text(info?.symbol, 16),
+      verified: isVerifiedJettonMaster(master) || extra.has(master), held: true, take });
+  }
   const paid = paymentsInOwnTraces(payload, self);
   for (const row of out) {
-    const payment = paid(row);
+    const payment = row.payment ?? paid(row);
     if (payment) row.payment = payment;
   }
-  return withoutServiceStorage(withoutOwnChange(out, ownTraces), services.keys()).sort((a, b) => b.at - a.at);
+  const swapsAt = new Map();
+  for (const row of out) if (row.kind === 'swap' && row.trace) swapsAt.set(row.trace, Math.min(swapsAt.get(row.trace) ?? Infinity, row.at));
+  const placeOf = (row) => (row.payment === 'swap' && swapsAt.has(row.trace) ? [swapsAt.get(row.trace), 1] : [row.at, 0]);
+  return withoutServiceStorage(withoutOwnChange(out, ownTraces), services.keys()).sort((a, b) => {
+    const [atA, rankA] = placeOf(a);
+    const [atB, rankB] = placeOf(b);
+    return (atB - atA) || (rankA - rankB);
+  });
 }
 function paymentsInOwnTraces(payload, self) {
   const nftTo = new Set();
@@ -375,6 +559,26 @@ function paymentsInOwnTraces(payload, self) {
     return sentTo.has(at) && amount > sentTo.get(at) ? 'refund' : null;
   };
 }
+const OWNERSHIP_ASSIGNED_OP = '0x05138d91';
+const NOT_A_SWAP_PAYMENT_OPS = new Set(['0xd53276db', '0x7362d09c', '0xffffffff', '0x73696e74']);
+const ROYALTY_COMMENT = 'Royalty';
+const OUTBID_RETURN_COMMENT = 'Your bid has been outbid by another user.';
+function bidPurchasesOf(payload, self) {
+  const came = new Set();
+  const bids = new Set();
+  for (const action of Array.isArray(payload?.actions) ? payload.actions : []) {
+    const details = action?.details ?? {};
+    const trace = String(action?.trace_id ?? '');
+    if (!trace || action?.success === false) continue;
+    if (action.type === 'auction_bid' && rawAccount(details.bidder) === self) bids.add(`${trace} ${rawAccount(details.nft_item)}`);
+    else if (action.type === 'call_contract' && String(details.opcode ?? '').toLowerCase() === OWNERSHIP_ASSIGNED_OP && rawAccount(details.destination) === self) {
+      came.add(`${trace} ${rawAccount(details.source)}`);
+    } else if (action.type === 'nft_transfer' && rawAccount(details.new_owner) === self && rawAccount(details.old_owner) !== self) {
+      came.add(`${trace} ${rawAccount(details.nft_item)}`);
+    }
+  }
+  return new Set([...bids].filter((key) => came.has(key)));
+}
 const MARKET_NFT_ACTIONS = new Set(['nft_purchase', 'nft_put_on_sale', 'nft_cancel_sale']);
 function marketTradesOf(payload) {
   const traces = new Map();
@@ -397,6 +601,56 @@ export function ownTracesOf(payload, account) {
   }
   return traces;
 }
+export function wonBidsOf(rows, pairs = null) {
+  const rank = { bought: 0, outbid: 1, bid: 2 };
+  const ordered = rows.map((row, at) => ({ row, at })).filter(({ row }) => row?.success !== false && row?.master && row.trade in rank)
+    .sort((a, b) => (b.row.at - a.row.at) || (rank[a.row.trade] - rank[b.row.trade]) || (a.at - b.at));
+  const out = new Map();
+  const bought = new Map();
+  const returned = new Map();
+  for (const { row } of ordered) {
+    const item = row.master;
+    if (row.trade === 'bought') {
+      if (row.byBid) bought.delete(item);
+      else bought.set(item, row);
+    } else if (row.trade === 'outbid') returned.set(item, [...(returned.get(item) ?? []), row.trace ?? '']);
+    else {
+      const pending = returned.get(item) ?? [];
+      let at = pending.length - 1;
+      while (at >= 0 && row.trace && pending[at] === row.trace) at -= 1;
+      if (at >= 0) { pending.splice(at, 1); continue; }
+      const purchase = bought.get(item);
+      if (!purchase || (purchase.sale && row.counterparty && purchase.sale !== row.counterparty)) continue;
+      out.set(row.id, row.trace && purchase.trace === row.trace ? 'folded' : 'paid');
+      pairs?.set(purchase.id, row);
+      bought.delete(item);
+    }
+  }
+  return out;
+}
+export function historyRowsOf(held) {
+  const bids = new Map();
+  for (const row of held) if (row?.trade === 'bid' && row.counterparty && row.success !== false && !bids.has(row.counterparty)) bids.set(row.counterparty, row);
+  const won = new Set();
+  const shown = held.map((row) => {
+    if (row?.kind === 'gram' && row.direction === 'in' && row.success !== false && row.comment === OUTBID_RETURN_COMMENT && bids.has(row.counterparty)) {
+      const bid = bids.get(row.counterparty);
+      return { ...row, kind: 'nft', trade: 'outbid', master: bid.master, collection: bid.collection, nftName: bid.nftName, verified: bid.verified, comment: '' };
+    }
+    const bid = row?.kind === 'nft' && !row.trade && row.direction === 'in' && row.success !== false && row.master && !row.counterparty ? bids.get(row.master) : null;
+    if (bid && bid.master === row.master) {
+      won.add(row.id);
+      return { ...row, trade: 'bought', sale: row.master, amount: '0', decimals: 9, symbol: 'GRAM', collection: row.collection || bid.collection,
+        nftName: row.nftName || bid.nftName, verified: row.collection ? row.verified : bid.verified };
+    }
+    return row;
+  });
+  const pairs = new Map();
+  const settled = wonBidsOf(shown, pairs);
+  const rows = shown.map((row, at) => (won.has(row.id) ? (pairs.has(row.id) ? { ...row, amount: pairs.get(row.id).amount } : held[at]) : row))
+    .filter((row) => !row.held && (!row.endOnly || row.trade === 'bought'));
+  return { rows, won: settled };
+}
 export function withoutOwnChange(rows, ownTraces) {
   const own = ownTraces instanceof Set ? ownTraces : new Set(ownTraces ?? []);
   return rows.filter((row) => !(row.kind === 'gram' && row.direction === 'in' && row.trace && own.has(row.trace) && !row.payment));
@@ -405,7 +659,156 @@ export function withoutServiceStorage(rows, serviceTraces) {
   const services = new Set(serviceTraces ?? []);
   return rows.filter((row) => !(row.kind === 'gram' && row.direction === 'out' && !row.comment && row.trace && services.has(row.trace)));
 }
-export async function readWalletHistory({ account, offset = 0, alsoVerified = [], verifiedItems = [], verifiedCollections = [], nftVerdictsKnown = true, ...access } = {}) {
+const TELEMINT_FILL_UP_OP = '0x370fec51';
+const saleRests = new Map();
+const saleRestsReading = new Map();
+const SALE_REST_BODY_MS = 30_000;
+function withSaleRests(rows, self, access, onSaleRests) {
+  const asked = [];
+  for (const row of rows) {
+    const rest = row.rest;
+    if (!rest) continue;
+    delete row.rest;
+    if (saleRests.has(row.id)) row.amount = saleRests.get(row.id);
+    else if (saleRestsReading.has(row.id)) saleRestsReading.get(row.id).push(row);
+    else if (row.trace && rest.transactions?.length) {
+      saleRestsReading.set(row.id, [row]);
+      asked.push({ row, own: new Set(rest.transactions), sale: rest.sale });
+    }
+  }
+  if (!asked.length) return rows;
+  void (async () => {
+    const traces = new Map();
+    for (const { row, own, sale } of asked) {
+      try {
+        if (!traces.has(row.trace)) {
+          traces.set(row.trace, indexRead('traces', { trace_id: row.trace, include_actions: false }, { ...access, bodyMs: SALE_REST_BODY_MS }));
+        }
+        const body = await traces.get(row.trace);
+        const transactions = body?.traces?.[0]?.transactions;
+        let came = 0n;
+        let sent = 0n;
+        let found = false;
+        for (const tx of Object.values(transactions && typeof transactions === 'object' ? transactions : {})) {
+          if (rawAccount(tx?.account) !== self) continue;
+          for (const message of Array.isArray(tx?.out_msgs) ? tx.out_msgs : []) {
+            if (sale && rawAccount(message?.destination) === sale) sent += BigInt(String(message?.value ?? '0'));
+          }
+          const message = tx?.in_msg;
+          if (!own.has(String(tx?.hash ?? '')) || !rawAccount(message?.source) || rawAccount(message?.destination) !== self) continue;
+          came += BigInt(String(message?.value ?? '0'));
+          found = true;
+        }
+        if (!found) continue;
+        const drawn = rows.filter((one) => one.kind === 'gram' && one.direction === 'out' && one.trace === row.trace && one.counterparty === sale && one.success !== false)
+          .reduce((sum, one) => sum + BigInt(one.amount || '0'), 0n);
+        const brought = came - (sent > drawn ? sent - drawn : 0n);
+        if (brought <= 0n) continue;
+        for (const one of saleRestsReading.get(row.id) ?? [row]) one.amount = String(brought);
+        saleRests.set(row.id, String(brought));
+        try { onSaleRests?.(); } catch { }
+      } catch { } finally {
+        saleRestsReading.delete(row.id);
+      }
+    }
+  })();
+  return rows;
+}
+const JETTON_INTERNAL_TRANSFER_OP = '0x178d4519';
+const tokenTakes = new Map();
+const tokenTakesReading = new Map();
+const TOKEN_TAKE_BODY_MS = 30_000;
+const TOKEN_TAKE_LIMIT = 100;
+const TOKEN_TAKE_PAGES = 3;
+function applyTake(row, took, final = false) {
+  let amount = 0n;
+  try { amount = BigInt(took); } catch { amount = 0n; }
+  if (!(amount > 0n)) {
+    if (final && row.held === true) row.held = 'nothing';
+    return;
+  }
+  if (row.held) {
+    row.amount = String(amount);
+    delete row.held;
+    return;
+  }
+  if (row.kind !== 'swap' || !row.got) return;
+  let named = 0n;
+  try { named = BigInt(row.got.amount || '0'); } catch { named = 0n; }
+  if (named === 0n || amount < named) row.got = { ...row.got, amount: String(amount) };
+}
+function withTokenTakes(rows, access, onTokenTakes) {
+  const asked = [];
+  for (const row of rows) {
+    const take = row.take;
+    if (!take) continue;
+    delete row.take;
+    const key = `${row.id} ${take.wallet}`;
+    if (tokenTakes.has(key)) applyTake(row, tokenTakes.get(key), true);
+    else if (tokenTakesReading.has(key)) tokenTakesReading.get(key).push(row);
+    else {
+      tokenTakesReading.set(key, [row]);
+      asked.push({ row, take, key });
+    }
+  }
+  if (!asked.length) return { rows, landed: null };
+  const landed = (async () => {
+    const took = new Map();
+    const gramTook = new Map();
+    const gramWallets = new Set(asked.filter(({ take }) => take.gram).map(({ take }) => take.wallet));
+    let whole = false;
+    try {
+      const fromLt = asked.reduce((low, { take }) => (BigInt(take.fromLt) < low ? BigInt(take.fromLt) : low), BigInt(asked[0].take.fromLt));
+      const toLt = asked.reduce((high, { take }) => (BigInt(take.toLt) > high ? BigInt(take.toLt) : high), BigInt(asked[0].take.toLt));
+      const wallets = [...new Set(asked.map(({ take }) => take.wallet))];
+      for (let page = 0; page < TOKEN_TAKE_PAGES; page += 1) {
+        const body = await indexRead('transactions', { account: wallets, start_lt: String(fromLt), end_lt: String(toLt), limit: TOKEN_TAKE_LIMIT,
+          offset: page * TOKEN_TAKE_LIMIT, sort: 'asc' }, { ...access, bodyMs: TOKEN_TAKE_BODY_MS });
+        const list = Array.isArray(body?.transactions) ? body.transactions : [];
+        for (const tx of list) {
+          const message = tx?.in_msg;
+          const account = rawAccount(tx?.account);
+          if (gramWallets.has(account)) {
+            const value = String(message?.value ?? '');
+            const brought = rawAccount(message?.source) && rawAccount(message?.source) !== account && message?.bounced !== true && tx?.description?.aborted !== true
+              && !NOT_A_SWAP_PAYMENT_OPS.has(opcodeKey(message?.opcode)) && /^\d+$/.test(value);
+            if (brought) gramTook.set(String(tx?.hash ?? ''), { account, amount: BigInt(value) });
+            continue;
+          }
+          if (opcodeKey(message?.opcode) !== JETTON_INTERNAL_TRANSFER_OP || message?.bounced === true || tx?.description?.aborted === true) continue;
+          const value = String(message?.message_content?.decoded?.amount?.value ?? '');
+          if (/^\d+$/.test(value)) took.set(String(tx?.hash ?? ''), { account: rawAccount(tx?.account), amount: BigInt(value) });
+        }
+        if (list.length < TOKEN_TAKE_LIMIT) {
+          whole = true;
+          break;
+        }
+      }
+    } catch { }
+    let changed = false;
+    for (const { row, take, key } of asked) {
+      let sum = 0n;
+      for (const hash of take.transactions) {
+        const one = (take.gram ? gramTook : took).get(hash);
+        if (one && one.account === take.wallet) sum += one.amount;
+      }
+      const final = sum > 0n || whole;
+      if (final) tokenTakes.set(key, String(sum));
+      for (const one of tokenTakesReading.get(key) ?? [row]) {
+        const before = `${String(one.held ?? '')} ${one.amount} ${one.got?.amount ?? ''}`;
+        applyTake(one, String(sum), final);
+        if (`${String(one.held ?? '')} ${one.amount} ${one.got?.amount ?? ''}` !== before) changed = true;
+      }
+      tokenTakesReading.delete(key);
+    }
+    if (changed) {
+      try { onTokenTakes?.(); } catch { }
+    }
+  })();
+  return { rows, landed };
+}
+export async function readWalletHistory({ account, offset = 0, alsoVerified = [], verifiedItems = [], verifiedCollections = [], nftVerdictsKnown = true, onSaleRests = null,
+  onTokenTakes = null, ...access } = {}) {
   const self = rawAccount(account);
   if (!self) throw new Error('wallet assets: an account is required');
   const payload = await indexRead('actions', { account: self, limit: WALLET_HISTORY_PAGE, offset, sort: 'desc' }, access);
@@ -419,7 +822,9 @@ export async function readWalletHistory({ account, offset = 0, alsoVerified = []
     if (cut > 0) kept = list.slice(0, cut);
   }
   const page = { ...payload, actions: kept };
-  return { rows: parseWalletHistory(page, self, { alsoVerified, verifiedItems, verifiedCollections, nftVerdictsKnown }), ownTraces: [...ownTracesOf(page, self)],
+  const { rows } = withTokenTakes(withSaleRests(parseWalletHistory(page, self, { alsoVerified, verifiedItems, verifiedCollections, nftVerdictsKnown }), self, access, onSaleRests),
+    access, onTokenTakes);
+  return { rows, ownTraces: [...ownTracesOf(page, self)],
     serviceTraces: [...serviceCallsOf(page, self).keys()], nextOffset: offset + kept.length, more };
 }
 export async function readWalletHistoryPages({ pages = WALLET_HISTORY_READ_ON, wanted = () => true, offset = 0, ...options } = {}) {

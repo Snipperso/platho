@@ -1,5 +1,5 @@
-import { tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
+import { tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
 
 export const TELEGRAM_GIFT_COLLECTION_CODE_HASH = 'iEEMIg+CIYFmgmnOg+ucwNOznCGZnItV3gM2CiDnwoI=';
 export const TELEGRAM_GIFT_MINTER_KEY = 0xbe3a1bc943496314139a36e2ab85f53fefb5e32c098fe6cef85094d6cdebc898n;

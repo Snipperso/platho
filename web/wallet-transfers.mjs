@@ -1,11 +1,11 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=112';
-import { beginCell, parseBocBase64 } from './pwa-contract-transactions.mjs?v=59';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=116';
+import { beginCell, parseBocBase64 } from './pwa-contract-transactions.mjs?v=60';
 
 export const JETTON_TRANSFER_OPCODE = 0x0F8A7EA5n;
 export const NFT_TRANSFER_OPCODE = 0x5FCC3D14n;
 export const JETTON_TRANSFER_VALUE_NANOTONS = 50_000_000n;
-export const NFT_TRANSFER_VALUE_NANOTONS = 50_000_000n;
+export const NFT_TRANSFER_VALUE_NANOTONS = 150_000_000n;
 export const TRANSFER_NOTIFY_NANOTONS = 1n;
 export const TRANSFER_COMMENT_MAX_BYTES = 120;
 export const BURN_ADDRESS = '0:0000000000000000000000000000000000000000000000000000000000000000';
@@ -139,4 +139,55 @@ export async function readNftOwner({ transport, item, callOptions = {} }) {
   const stack = getMethodStack(result);
   if (stack.length < 5) throw new Error('get_nft_data did not return five values');
   return stackAddress(stack[3], 'the owner');
+}
+
+export async function readCollectionRoyalty({ fetchImpl, origin, collection }) {
+  return runRestGetMethod({ fetchImpl, origin, address: collection, method: 'royalty_params', parse: (stack) => {
+    if (stack.length < 3) throw new Error('royalty_params did not return three values');
+    return {
+      numerator: stackInteger(stack[0], 'the royalty numerator'),
+      denominator: stackInteger(stack[1], 'the royalty denominator'),
+      address: addrNoneSlice(stack[2]) ? null : stackAddress(stack[2], 'the royalty address'),
+    };
+  } });
+}
+export async function readNftOwnSaleOn({ fetchImpl, origin, item }) {
+  return runRestGetMethod({ fetchImpl, origin, address: item, method: 'get_telemint_auction_state', parse: () => true }).then((on) => on === true);
+}
+function nullStackItem(item) {
+  const type = Array.isArray(item) ? item[0] : item?.type;
+  const value = Array.isArray(item) ? item[1] : item?.value;
+  return item === null || type === 'null' || ((type === 'list' || type === 'tuple') && Array.isArray(value) && value.length === 0);
+}
+export async function readTelemintAuction({ fetchImpl, origin, item }) {
+  const now = await runRestGetMethod({ fetchImpl, origin, address: item, method: 'get_telemint_auction_state', parse: (stack) => {
+    if (stack.length < 5) throw new Error('get_telemint_auction_state did not return five values');
+    return {
+      bidder: nullStackItem(stack[0]) || addrNoneSlice(stack[0]) ? null : stackAddress(stack[0], 'the bidder'),
+      lastBid: stackInteger(stack[1], 'the bid'), lastBidAt: Number(stackInteger(stack[2], 'the bid time')),
+      minBid: stackInteger(stack[3], 'the least bid'), endTime: Number(stackInteger(stack[4], 'the end time')),
+    };
+  } });
+  if (!now) return null;
+  const terms = await runRestGetMethod({ fetchImpl, origin, address: item, method: 'get_telemint_auction_config', parse: (stack) => {
+    if (stack.length < 6) throw new Error('get_telemint_auction_config did not return six values');
+    if (nullStackItem(stack[0]) || addrNoneSlice(stack[0])) return null;
+    return {
+      beneficiary: stackAddress(stack[0], 'the beneficiary'), initialMinBid: stackInteger(stack[1], 'the first least bid'),
+      maxBid: stackInteger(stack[2], 'the buy-now price'), minStep: Number(stackInteger(stack[3], 'the step')),
+      extendTime: Number(stackInteger(stack[4], 'the extension')), duration: Number(stackInteger(stack[5], 'the duration')),
+    };
+  } });
+  return terms ? { ...now, ...terms } : null;
+}
+async function runRestGetMethod({ fetchImpl, origin, address, method, parse }) {
+  const response = await fetchImpl(`${origin}/api/v3/runGetMethod`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ address: parseTonAddress(address).raw, method, stack: [] }),
+  });
+  if (!response?.ok) throw Object.assign(new Error(`${method}: HTTP ${response?.status}`), { status: response?.status });
+  const answer = await response.json();
+  const exit = Number(answer?.exit_code ?? NaN);
+  if (!Number.isInteger(exit)) throw new Error(`${method} answered no exit code`);
+  if (exit !== 0) return null;
+  return parse(getMethodStack(answer));
 }

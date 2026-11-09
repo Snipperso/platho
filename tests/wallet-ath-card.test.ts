@@ -26,6 +26,7 @@ describe('ATH: the token card from Tokens, the program from Settings', () => {
       walletHiddenAssets: () => new Set(), walletAssetsFresh: () => true, walletCardSendRow: (...parts: any[]) => ({ row: parts.filter(Boolean).length }),
       walletCardSend: (_press: any, label = 'send') => ({ button: label }), walletCardBurn: () => ({ bin: true }), walletCardHide: () => ({ hide: true }), walletCardUnhide: () => ({ unhide: true }),
       runWalletAssetSend: () => {}, runWalletAssetBurn: () => {}, runWalletSwap: () => {}, swapRoutesFrom: () => [1],
+      walletCardCommunities: () => ({ communities: true }), ASSET_KIND: { JETTON: 1, COLLECTION: 2, ITEM: 3 },
       walletSwapOffers: () => offered.map((id) => ({ id })),
       walletAssetsState: {}, openWalletGroup: (group: string, options: any) => { opened = [group, options.title]; },
       GRAM: 'gram', walletPriceChart: (base: string, quote: string, options: any) => ({ chart: [base, quote, options.intro] }),
@@ -61,7 +62,7 @@ describe('ATH: the token card from Tokens, the program from Settings', () => {
 
   it('ATH-CARD-03: the row opens the card; the program rides under it — no head of its own, no Send, no Swap; the row reads "ATH" alone [2026-10-23]', () => {
     const tokens = code(fn('function renderWalletTokens(panel) {'));
-    expect(tokens).toContain("balanceRow: 'ATH', onOpen: () => openWalletAthCard() }));");
+    expect(tokens).toContain("balanceRow: 'ATH', onOpen: () => openWalletAthCard(), key: 'ATH' }));");
     expect(tokens, 'the program hint belongs to the program, not the token row').not.toContain('wallet.groupAthHint');
     expect(app).not.toContain('function openWalletAthGroup(');
     expect(app).not.toContain('#walletGroupAthButton');

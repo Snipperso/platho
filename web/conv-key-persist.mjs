@@ -1,6 +1,6 @@
 
 import { createConvKeyStore, OUTGOING_SEQ_KEEP_EPOCHS, walletList } from './conv-key-store.mjs?v=27';
-import { tonCell } from './pwa-contract-transactions.mjs?v=59';
+import { tonCell } from './pwa-contract-transactions.mjs?v=60';
 import { LEGACY_KEY_GRACE_ID, legacyGraceInClear, legacyKeyRetirement, openAtRest, openLegacyGrace, sealAtRest, sealLegacyGrace, withAtRestLock } from './at-rest-seal.mjs?v=5';
 
 const KEY_STORE_NAME = 'convKeys';

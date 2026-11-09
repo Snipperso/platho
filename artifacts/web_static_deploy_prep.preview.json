@@ -1,6 +1,6 @@
 {
   "document": "PLATHO.WEB_STATIC_DEPLOY_PREP.V1",
-  "generatedAt": "2026-10-31T12:20:54.746Z",
+  "generatedAt": "2026-11-09T09:20:40.885Z",
   "mode": "preview",
   "domain": "platho.app",
   "outputDir": "C:\\platho\\artifacts\\platho-web-static-preview",
@@ -8,19 +8,24 @@
   "productionReady": false,
   "noBackendRuntime": true,
   "runtime": {
-    "fileCount": 307,
-    "totalBytes": 8792876,
-    "bundleSha256": "5b6137944c87caf46409a8c2bfbe4ae6c73caac7774ae18134d0b6ae9f543e26",
+    "fileCount": 309,
+    "totalBytes": 9043785,
+    "bundleSha256": "0f0e694bca96d3fac9dc221a685f0f228ea1e8625d57a7fd10a1897d3a7cf45a",
     "files": [
       {
         "path": "app.js",
-        "bytes": 2190967,
-        "sha256": "fe30acafe2b413cf24d752d34a182bd1c8327b0ecb57b9e41563a4e25f62a9c3"
+        "bytes": 2269649,
+        "sha256": "7cf3f8d5ac452837b5bb279523b24a541e9da85b1104ba6250f50a5bb94223c5"
+      },
+      {
+        "path": "asset-communities.mjs",
+        "bytes": 7671,
+        "sha256": "47d4eede66d4f0e4c0a34cfc16ea6c62dad0f5597b30f64243deb22c8942691f"
       },
       {
         "path": "asset-pictures.mjs",
-        "bytes": 118336,
-        "sha256": "4b3ef6019bd70a8fdfc4d493101e2da0f08b9870fbac8b4679ddfbdf3b338765"
+        "bytes": 108941,
+        "sha256": "e6dc9faf77e2cd3fbea0a7049e6dbb7c90f2d25409dee952c5f0367f35f1c1cf"
       },
       {
         "path": "assets/icons/about.svg",
@@ -295,12 +300,12 @@
       {
         "path": "ath-request-reserve.mjs",
         "bytes": 7485,
-        "sha256": "36a80dc63743d3e2d4d013a444f99213d72c2fefb23fafdc9194757901333c1a"
+        "sha256": "cb9492ce14b83074beb989734d59adf64dc7d24700adc3387c9145e9b8b50162"
       },
       {
         "path": "ath-ton-rpc-provider.mjs",
-        "bytes": 7805,
-        "sha256": "b00153cdc6603e9e921d56546b9cabfcc324227b84a630bd6a1c9691b15a2c80"
+        "bytes": 7823,
+        "sha256": "7c6528cd597027bf996c522f5a71f3cfa2d4f1ab9a7f8aacadb1f92e8ad75e79"
       },
       {
         "path": "ath-wallet-code.mjs",
@@ -320,7 +325,7 @@
       {
         "path": "bench-scan.js",
         "bytes": 7722,
-        "sha256": "771dd554e7c008102e5539d2d009ffdc51cfdb8f502a35e63df2a506cb01178f"
+        "sha256": "5921cf76918001df2e03e0989e1ba45daa8331a8c414c329f2e1f07bc6994ecc"
       },
       {
         "path": "boot-guard.js",
@@ -339,8 +344,8 @@
       },
       {
         "path": "capsule-part-policy.mjs",
-        "bytes": 29426,
-        "sha256": "f3c0d9b74847ee8e7f5788768557dfbfdf849aa66cb1d971faffe2ed7eb50231"
+        "bytes": 31941,
+        "sha256": "032cf8873125a9f8ffa9bed54cd158becb4e1a5e921780a356aa5905d515db1b"
       },
       {
         "path": "channels/platho.app/feed.json",
@@ -350,12 +355,12 @@
       {
         "path": "conv-discovery.mjs",
         "bytes": 8771,
-        "sha256": "40aee31fca9a69a879d963696d86754aa05090e30333b68e9e3fa1544bcc9e0d"
+        "sha256": "4474dd966015808e40f498bf5963f76d84d0c0c3bf9e1a10a540b791595daa5a"
       },
       {
         "path": "conv-key-persist.mjs",
         "bytes": 13899,
-        "sha256": "9d2255421467f02c34c38f3ac15d57c99e71ce2f885cac65dd8009f4df119dd8"
+        "sha256": "916628fb957812d43a0fb671b5342cc2d83078fa2b69df8c9e6f892d96abb47d"
       },
       {
         "path": "conv-key-store.mjs",
@@ -365,27 +370,27 @@
       {
         "path": "conv-lane-read.mjs",
         "bytes": 14709,
-        "sha256": "8ddce12fa71b2087fd406f8b4ed9a9b2f766725aa0d967e3ec34663e6f7b664c"
+        "sha256": "be56da20b16d7bd77b5c3ba0ad9fa3829bdec853ef55fbcc7f6b1cc3f56df098"
       },
       {
         "path": "conv-lane-send.mjs",
         "bytes": 8717,
-        "sha256": "448bf995fd28ca24d685d1c167598edb72fd26a8a7c269d07999775b6501d6f4"
+        "sha256": "cb40172737bfe7df88d315123998035985069feba0a588b20fc623d30b03d1e1"
       },
       {
         "path": "conv-lane.mjs",
         "bytes": 12483,
-        "sha256": "a6ec4a491b510493ea3240a3426d5a1c701b4aabeac4cf532582f9ea26525196"
+        "sha256": "9b56bcdf8ba7859329a69d01100575c0649bdfbc4e9588f5a7cdd7129ea0005c"
       },
       {
         "path": "conv-publish-browser.mjs",
         "bytes": 3226,
-        "sha256": "c1c3203cfd400c1610037ea3140cce656e0fc7e0d95457db62549f4ac001d2d5"
+        "sha256": "61e640a7aa5556c418f144f27179494bc44ebebfa31af6d23399ab0caa30da4a"
       },
       {
         "path": "conv-reply-bundle.mjs",
         "bytes": 4021,
-        "sha256": "2d935753f2e4c9b88dee3b475c4ed7a34f19a016d4f659df13f000284b048f65"
+        "sha256": "02020a6416f4ce50fdf31108f23ef24f2f47c3134d6ae523c0721326284e11fb"
       },
       {
         "path": "crypto/conv-routing.mjs",
@@ -404,8 +409,8 @@
       },
       {
         "path": "crypto/platho-crypto.mjs",
-        "bytes": 156600,
-        "sha256": "bf3e54853f4c43e650088ce9861c5dd54d4f69403e0bf3a8354001102528a52c"
+        "bytes": 156606,
+        "sha256": "eddaa68a9d37d3904d24bf721a7feefb150bf393e9080a36d6aa13217987b0fd"
       },
       {
         "path": "cutover-epoch.mjs",
@@ -414,13 +419,13 @@
       },
       {
         "path": "dedust-pools.mjs",
-        "bytes": 55985,
-        "sha256": "4a80462a6ca87e4190e44bc27baeccdadfab9e18f455d0d12349c679dc0a633d"
+        "bytes": 49692,
+        "sha256": "e2587b3a916dff753b6ed4260228762645dce5ad11c870e3e9ba975c4f1cf5ae"
       },
       {
         "path": "device-secret-store.mjs",
-        "bytes": 10377,
-        "sha256": "a26e1cdc9631acfdd22422d667cbf1fa6a7e8d9e7867ddd4b37845846fd0af03"
+        "bytes": 10620,
+        "sha256": "7ad1a05f872e1c8e4f791da4e54703fe7c7f7b514f53c6a15e8cc98000e15342"
       },
       {
         "path": "doc-page.css",
@@ -579,53 +584,53 @@
       },
       {
         "path": "docs/privacy-policy.de.md",
-        "bytes": 11276,
-        "sha256": "e0ae2e8d77f71ff58af4a0590daf23549d13e7bf46cfa3384c28a641bf47ed57"
+        "bytes": 11306,
+        "sha256": "0748b5f51ad28561cd80a89101ff504e75983ccd67bac652ae3e31089552078d"
       },
       {
         "path": "docs/privacy-policy.es.md",
-        "bytes": 10438,
-        "sha256": "09ded3086eb6571aa209dc54116fcc55cad9750121f7b5c4cdafe409dd42c56d"
+        "bytes": 10474,
+        "sha256": "a5e1502b6560b2be5b3b80abd1bb9eee8bf3cc46973efa8916c86766cf9255f1"
       },
       {
         "path": "docs/privacy-policy.fr.md",
-        "bytes": 11491,
-        "sha256": "49b32b93ade1f8eb7c4317ba0ccd81618c59b3b2f387e6457bad5960ce58fa25"
+        "bytes": 11526,
+        "sha256": "a4f4c463e81c506c14b30a26b01b347583c658341266a0198e98992b8cdbda8e"
       },
       {
         "path": "docs/privacy-policy.hi.md",
-        "bytes": 23687,
-        "sha256": "aab18033365b83b2859d01c2785da7acbae0b74d6d36b560108bdd961297e1a7"
+        "bytes": 23728,
+        "sha256": "54f6d80de09d7ee8037e3dc02e4ea0dcf728e496b6524e31c967500229214f78"
       },
       {
         "path": "docs/privacy-policy.id.md",
-        "bytes": 10556,
-        "sha256": "d461cef054d2d4fa03c880a81cc00f0c82b0c70605f99668d6dc1f898177ad6b"
+        "bytes": 10575,
+        "sha256": "9db1998e9fa2b6019d864a3e1cb6d25905c289f586cc12aec6faa8091228cff1"
       },
       {
         "path": "docs/privacy-policy.ja.md",
-        "bytes": 13726,
-        "sha256": "09389109276800be613a49536c0495e922c28330966013ad8666fe31df8b8766"
+        "bytes": 13759,
+        "sha256": "729057b22ea77d467743dbe89dcf668dc109b947bf6b24ffd2f59c7b1878990b"
       },
       {
         "path": "docs/privacy-policy.md",
-        "bytes": 9223,
-        "sha256": "36124e5d54f8547f0809c5cbb2dc92f81f47957d5b024c8cb5dd49871bec49b6"
+        "bytes": 9251,
+        "sha256": "a67fad28f18cacd3ac2fea5dfd512c4f73387ff24f254c8a868caa7bf1fa857a"
       },
       {
         "path": "docs/privacy-policy.pt.md",
-        "bytes": 10497,
-        "sha256": "031f0f5326e82731c16196f87d9c5de5866e8f91b4623fa0b86ad48641b4abdc"
+        "bytes": 10528,
+        "sha256": "a58dac263117a513cc08635dd687090c2d40b7b657963a4dc777312fbb982c6b"
       },
       {
         "path": "docs/privacy-policy.ru.md",
-        "bytes": 17022,
-        "sha256": "737824c9cf92ee74c40e5e6c1c132cd4ab29570ec3033ad1fcc7c379879a6e63"
+        "bytes": 17057,
+        "sha256": "e366cdf536d2ec35ac3581dc9ca5da9cc346b98490b6a10336d2c6f942518fbd"
       },
       {
         "path": "docs/privacy-policy.zh.md",
-        "bytes": 9323,
-        "sha256": "d739e06ce0975e2edc58bbf4249d4811588246de7757a6988233233079fa78d4"
+        "bytes": 9338,
+        "sha256": "70d0b2ada25dd9bcd2b676278a60c04ca4c4b8b911773f81279206a8fed8cd5b"
       },
       {
         "path": "docs/terms-of-use.de.md",
@@ -679,78 +684,78 @@
       },
       {
         "path": "encrypted-message-store.mjs",
-        "bytes": 48321,
-        "sha256": "78a6ed7fd015ed167fc1a04021101487278372035ff82f039c640943985fa296"
+        "bytes": 48386,
+        "sha256": "24f5bb1b600eeaed2e6df110b4f7c5a4b158717b83df3ff9e760da6c3fe17734"
       },
       {
         "path": "fee-vault-read.mjs",
         "bytes": 1809,
-        "sha256": "3245b47f07142628bbf82b941b16bc2bc07e0ac188cf88c1cd8e0e26f756db70"
+        "sha256": "cb338345f947378d5869e01751a395af30fd4880c14e6de46d3241f2e1b38731"
       },
       {
         "path": "fee-vault.mjs",
         "bytes": 17672,
-        "sha256": "582d67fac609aee7fd6cab57bb80267536409e8cc92b9d3bdd776b656429486b"
+        "sha256": "8ce64ffa49b9697099f85ea805f8d78012370a917c84f51fb504e0ced070db1a"
       },
       {
         "path": "frozen-account.mjs",
         "bytes": 8922,
-        "sha256": "8b119f66c87fa277f9e1334e27404bf3916d013384c31494eee68e685cbcb1df"
+        "sha256": "81c806ad5c04440e6c1fcd9c352b4b0d594435590fba8a3c0091a096b7e3c852"
       },
       {
         "path": "group-entry-fee.mjs",
         "bytes": 6244,
-        "sha256": "8830ce11b9cb683fe2b07a7bef7913967582068fc557f1d105f3b89a078b95f0"
+        "sha256": "86494d2e5ab6559bc3c77657c8aa2aeb702b0f10e67ecf4e4f9fd3296e3c2b3b"
       },
       {
         "path": "group-lane-read.mjs",
         "bytes": 13273,
-        "sha256": "f9eecc5e550bf4e2f4f3cc6966fc0c860eb3ff95ce05b05cf651f5dfd69b032e"
+        "sha256": "7abf4a12f9acdc9de26208cd608e1374b5ce6ac65a273d000f0ddf69060cd6e2"
       },
       {
         "path": "group-lane-send.mjs",
         "bytes": 4985,
-        "sha256": "0c6eeb6c3228ea861715c2aebaa399bbfcbc0c583d28363d756a38e14456d4e0"
+        "sha256": "69cfec8e8f0e46fd14fbe64705a2210d7a079f97cfcfede91ff92e0ec9cbed0a"
       },
       {
         "path": "group-protocol.mjs",
         "bytes": 41373,
-        "sha256": "c6e455c9f8c46460d6dc941904ce1fc4463131709adaf13b2ce6f012c53fd289"
+        "sha256": "65c181748e773d0744a2e21cd31445e2efbfff4ecc4e0921be67673d042f84ef"
       },
       {
         "path": "group-record-store.mjs",
-        "bytes": 13274,
-        "sha256": "ce90bb6b9d1d7cea95524786b835d26c7376f44e0b97c0cc41c096fa3a9afa51"
+        "bytes": 13226,
+        "sha256": "9dadddc315656e75045ecf627bec49b1d74a43333de1c293de58b03213c0bd5c"
       },
       {
         "path": "group-runtime.mjs",
-        "bytes": 84484,
-        "sha256": "318fd8bbef1b9a4ee3ac65b7619c42dbac071c8354908ebfc5cae12f68a649fe"
+        "bytes": 84485,
+        "sha256": "896ca2ff59ba7f83bdaaf4482bcf5d2a853a6ba56788caa31d964dfa6fab4031"
       },
       {
         "path": "group-store.mjs",
         "bytes": 63064,
-        "sha256": "5e5b417527f76296389fbd9cc5c9592d0d0f576a7a9ea473ec36327b8bab37ad"
+        "sha256": "08caf51702e5521f82aa04349ef67d11ef6085f0922feb78b4c9b44b5cbce03c"
       },
       {
         "path": "i18n-strings.mjs",
-        "bytes": 1436793,
-        "sha256": "df78588fb5a4bb7c487bdd8d44911b6ed2c88328f22a4671feee1e641d2de95e"
+        "bytes": 1495788,
+        "sha256": "61e51c263c52e8bf72b602c83f804284b52cc2d3b82308f8b027adb1855c3526"
       },
       {
         "path": "i18n.mjs",
         "bytes": 3281,
-        "sha256": "b60e3a8666c3051f5bafdc66b679b22a3483567871dd6881eab14928c9ef4d4e"
+        "sha256": "69dbaea5990d3f13bb92abce70bebda2d49a24480e6e0ef0c6b5786ae44c0833"
       },
       {
         "path": "index.html",
-        "bytes": 84050,
-        "sha256": "92a43588f83c880639fe85d7f0ac665c90af021291f3fd40b1951fc81b0bf958"
+        "bytes": 83888,
+        "sha256": "70f713e7bbd0041bc503417dd4e81a5933ae72d816c9181682438db7cc13822e"
       },
       {
         "path": "intro-bucket.mjs",
         "bytes": 1337,
-        "sha256": "2e4e3965daed9cf697d60aa44babceba9b679c6aef290dfac03cabcb3fde2854"
+        "sha256": "13beccebe4be984e8eee6b73fb54cf0b62f1d193c5d30a9a7b97a1a1186cdd10"
       },
       {
         "path": "intro-codec.mjs",
@@ -765,27 +770,27 @@
       {
         "path": "intro-lane-send.mjs",
         "bytes": 3462,
-        "sha256": "723ce7410ef895fa8a7e8df50f5e39ae30cf185e3d0495a64493874848e41434"
+        "sha256": "75f06380fa746d83f05af4b17149ab81408d93f0efa30dc334dce4d513c6b43e"
       },
       {
         "path": "intro-lane.mjs",
         "bytes": 2296,
-        "sha256": "699b6cda58c47cbbaa2ff6ddadc8af197a746daaa2d3d08f911dc00fe7eb5486"
+        "sha256": "f4924408a557f5daf50c360263586f98537bd0a00d7ed5a67abac73a730040d7"
       },
       {
         "path": "intro-publish-browser.mjs",
         "bytes": 1036,
-        "sha256": "dc4584f18f13e62d10f5afc441d7ebabd96ecac3280a7010bf4b4ebfcafbe610"
+        "sha256": "bde15838940597e2cf0d8ed64dd6bca7d1100da1bd2ae4a1547fc0c21eaf5439"
       },
       {
         "path": "intro-receive-handler.mjs",
         "bytes": 4851,
-        "sha256": "48343186667696a189b86d8698ec4668ed1425f993cc5cf9b01bd96bc3d70c99"
+        "sha256": "35606cc92eed1605389717a3fb5dd0ad18730efdb4c8d3a550a276a7ad081065"
       },
       {
         "path": "intro-receive.mjs",
         "bytes": 6078,
-        "sha256": "fb2f86a6c77d99b51ed4e90c387f6dfd41b408557dfee3354097ca6846007155"
+        "sha256": "65d67704a9e4d7e7f28f576b1f002ce0e3f073574f02566d87de1fefea774688"
       },
       {
         "path": "intro-scan-policy.mjs",
@@ -795,17 +800,17 @@
       {
         "path": "intro-scan-runner.mjs",
         "bytes": 10068,
-        "sha256": "a17ee10054819d37f6281dc2273e3f783635f5789229d2fb61e4ad5af09b7914"
+        "sha256": "97fdc0c1faf5e88ef2cac45ce98c950c29982f31c842ae45edf3ce22dcbcfb1f"
       },
       {
         "path": "intro-scan.mjs",
         "bytes": 767,
-        "sha256": "630aafcaaeefd6dc4d98480a8459f073d36baeec9fb166175d74b4452989a28b"
+        "sha256": "688e3bf12f69d84fa2f7d9f58ace372d99524ef12416b45d39133200cac5e935"
       },
       {
         "path": "intro-send-coords.mjs",
         "bytes": 2841,
-        "sha256": "ebaf6c96db67b8563ee8775ac7e5b143c4a4196f09cc644f360244a8d642bad7"
+        "sha256": "6a09ed5c3bb5dd13f5d74243b2f62f07808db813a8b88ec081199895eef6d0eb"
       },
       {
         "path": "intro-send-state.mjs",
@@ -815,22 +820,22 @@
       {
         "path": "intro-transport.mjs",
         "bytes": 6104,
-        "sha256": "d37738fadea69298f9003c239f13ed94f445692b4a6be7d9bcda5ebdb1d6a6c1"
+        "sha256": "1fc91915362c0ba84c31269a52f6c0665025c2b96bdcb07f7e9db0e1792baa0d"
       },
       {
         "path": "key-shard-register-browser.mjs",
         "bytes": 5516,
-        "sha256": "4e8c70665caf1b9de7966f97973e2b2a25ab3f8c2c01de934d8e7a9530a0b8b4"
+        "sha256": "3674f37858b396a66f37b833e083315d55363f80eeb4772edc68167f2d7fbf8f"
       },
       {
         "path": "key-shard-register-send.mjs",
         "bytes": 2672,
-        "sha256": "87d37655b3db0de03cdd51cfb86805af981504c241de5f1c62fc547cac7f224a"
+        "sha256": "4107609e687eda0f5929b0db8a3f271fe4db20c445693f7dab0de521c8600ced"
       },
       {
         "path": "key-shard-ton-rpc-provider.mjs",
         "bytes": 9524,
-        "sha256": "36c3b8615dd2e06d15d5478ef9477468c665ee4966c6c967289e3a2100791da8"
+        "sha256": "51ea9436a8197f881c3b15014414af4e605f229e8cc2b5306a20ecc8f14cc58b"
       },
       {
         "path": "keyed-rows.mjs",
@@ -850,7 +855,7 @@
       {
         "path": "market-stability-buy-send.mjs",
         "bytes": 2091,
-        "sha256": "5c8f195552526ca86fa4372328679e686de27e6d99b000e7e32e9beefc9b4db1"
+        "sha256": "082ed28d3a9d0e7189c520fdd33fc1d0f17d814aaec44bc5651c9bc17da235de"
       },
       {
         "path": "market-stability-read.mjs",
@@ -870,32 +875,37 @@
       {
         "path": "moderation.mjs",
         "bytes": 29776,
-        "sha256": "8505073c531b547eea9305179902bfb35b99c5d07e60d1196ce4d0bd19e064f8"
+        "sha256": "6089d9c1a89f4c0ac3e885ed52f39f0cc6330d3638cb05a52e4bbab9b39bee4b"
+      },
+      {
+        "path": "nft-collections.mjs",
+        "bytes": 62702,
+        "sha256": "17c931fd449374627b3dad6bc81d29fb4ddef45e157161d41eacc860fa4e322b"
       },
       {
         "path": "nft-market.mjs",
-        "bytes": 9686,
-        "sha256": "8be452c160edcecbd98fa4f93d72839080779fddb9350959668c442145ed3a8b"
+        "bytes": 41898,
+        "sha256": "6ad299035de41cbe3a541faf67f4c6026c769f5f8ed9a7d31c051c874260d89f"
       },
       {
         "path": "notes-lane.mjs",
         "bytes": 5895,
-        "sha256": "0dbb3ad7de8b158da3aef32d9b166e32ca7d2fea94371978fd8f14f2f43e3603"
+        "sha256": "5292d189cb0917d8b253fdddb1c0fd7f20612029b3c47a18fe9a25cf05f92983"
       },
       {
         "path": "platho-config.mjs",
-        "bytes": 15698,
-        "sha256": "41bf99e3a2ba5f47b8308073ed94e7b73a2bc237205b20ef4886d206fa27502d"
+        "bytes": 15699,
+        "sha256": "5c8f6b216f8e277ad8ad0f68d3a548d59774704c64fc4cece7d3c148f62b8e4b"
       },
       {
         "path": "platho-wallet.mjs",
         "bytes": 61436,
-        "sha256": "f3c4221a5f1ed3a8eeec1b3b94caa4b9584f12d00c127c0f71d9129d360a45e0"
+        "sha256": "ea85ec7dd045cff5f24fc738afee272681bd471f15dce129b0cb398008e3d470"
       },
       {
         "path": "pool-activity.mjs",
-        "bytes": 39982,
-        "sha256": "759de32d9c032957f29bce365fa58b72b474846f719baf546cbfd866108a921d"
+        "bytes": 36119,
+        "sha256": "2e80cee13c7c1382da7ee5c7e5e7e2b2f78812f0b2b4e79bf5dc28de38c5e9bb"
       },
       {
         "path": "pool-state.mjs",
@@ -904,13 +914,13 @@
       },
       {
         "path": "price-history.mjs",
-        "bytes": 9124,
-        "sha256": "b0027ea27d496fd88e1eaac1b68ae8bd0cb0ed4a95ac49cdc6754f080f9621a7"
+        "bytes": 9383,
+        "sha256": "9a859fa5f62ab0dbdca7e74cc228057b05c68c6c4150a2b3c572d163bc55280a"
       },
       {
         "path": "privacy.html",
-        "bytes": 11059,
-        "sha256": "9d7006c9cb580735d006e26739d02f4da22fb8e0575f0cceafd9b6d36e388f15"
+        "bytes": 11087,
+        "sha256": "c9bd10f2123646a6d4563254d8c269a6f1410b6bd2ad20a86ed16f20bef6be0f"
       },
       {
         "path": "profile-avatar-media-store.mjs",
@@ -920,12 +930,12 @@
       {
         "path": "profile-registry-ton-rpc-provider.mjs",
         "bytes": 8154,
-        "sha256": "682a5246dd531bdc1482db44186622b3b46ddc853af39098914640e874e4b903"
+        "sha256": "36e6ebcc19e0d4b6788aa923318f9c33a8e4329db141e7bdbd93cd5712236b07"
       },
       {
         "path": "public-channel-subscriptions.mjs",
-        "bytes": 34012,
-        "sha256": "0bca131a27d6d22360c0873f6056924a4bc34a0c6bfebc6cd5780dda4abfb981"
+        "bytes": 34185,
+        "sha256": "e02cd3979c9c8907d72942ca9a602584b43cf988811757769edb06df10ff2640"
       },
       {
         "path": "public-group-protocol.mjs",
@@ -935,37 +945,37 @@
       {
         "path": "public-group-runtime.mjs",
         "bytes": 46617,
-        "sha256": "91a545002603d903845328ae6de12772d967c159ed2ba1f558fc3a7ee5a2dc51"
+        "sha256": "d8663e18e696850cf56e5d1aa913cf07bc14eaade3c2025bfe562857c39552ec"
       },
       {
         "path": "public-lane-send.mjs",
         "bytes": 7129,
-        "sha256": "ad6ae0f8a00a1833dd80e198fcec117a9b9af99cd480bca0f9ec5268f378c31d"
+        "sha256": "bbd6e747879d3e43a40cc0f501065b297c8efdc94272a129d9fb345b4c9044ca"
       },
       {
         "path": "public-lane.mjs",
         "bytes": 39296,
-        "sha256": "af343f2512f605f8eef8c5fe6020f6f87b4ef865031322414e362cf5d2b16e48"
+        "sha256": "4e0d37772ab4ae1356f90051f1a8d0894aeedd1b70e495c6b202c558352e77c1"
       },
       {
         "path": "public-publish-browser.mjs",
         "bytes": 2476,
-        "sha256": "76f35bd4437f413873eb14679e4b32b830931b0944b73fed1d262586808acd9e"
+        "sha256": "a6d85c90d854b63d51cbebfaaf62b5bb69e8f32a368861f836869522bcc1a896"
       },
       {
         "path": "public-reactions.mjs",
         "bytes": 9986,
-        "sha256": "e4b5172dceef4ea491f6451ba71611f28af55eee4daeeed2a11076a8d7218d99"
+        "sha256": "a2af96260f2d36eb727cd75d59fea89bba2d14751ed028fb9d16bb91596e9bf6"
       },
       {
         "path": "public-shard-ton-rpc-provider.mjs",
         "bytes": 17930,
-        "sha256": "1546358610c122926c7669c376cf12ac3f165d44be2dd198f576c4ab4a606e05"
+        "sha256": "6eed0b2a85dff0b73d1c70b93877e7ddeb9fcd19e90fb7d8c28e941c7adda5c0"
       },
       {
         "path": "publish-final-cost.mjs",
         "bytes": 17405,
-        "sha256": "b85e2d4873816730c557e7b5526e0b590e26db4dc072d13dc0cb297162912300"
+        "sha256": "66d42b05dd78a075a85fbc5307aa6d778f1b45cca5d7d294a29a43f202d6313f"
       },
       {
         "path": "publish-price.mjs",
@@ -975,7 +985,7 @@
       {
         "path": "pwa-contract-transactions.mjs",
         "bytes": 61230,
-        "sha256": "be61194ace8b9877da5155b1ee0565e3089bd2ce1de4eedd911af8d1b5f8c7a2"
+        "sha256": "efba8477fe74f555d9309874baee5e148080469db9ebd124d7d887167b3fdff0"
       },
       {
         "path": "qr-code.mjs",
@@ -985,27 +995,27 @@
       {
         "path": "recipient-identities.mjs",
         "bytes": 9655,
-        "sha256": "ff81de85ef503488ac3db18c939a4ec075a954c27f12177b2d244f11d2355055"
+        "sha256": "0ec69062c21098b831b370abd036abbdcd14d3a2ac0d22b216a723d5e03ddf9a"
       },
       {
         "path": "recovery-blob.mjs",
         "bytes": 13442,
-        "sha256": "2c82d7b2ab742b6bd3ece3025212f3d26375c79892314d54d11cd4856540d5a9"
+        "sha256": "a42ead561fd39fe9b2bbccb4deca7f2a9a5026542b20b76df17f761a391e6c2d"
       },
       {
         "path": "recovery-lane.mjs",
         "bytes": 12629,
-        "sha256": "31c62b039c30a43beeaac87db8180d8d3420810f405566e9b8ffc59fd770d627"
+        "sha256": "41711f3a11a5921e3383f52ac020d5a442fe96b072c2b738ad6c2d03b0f2d550"
       },
       {
         "path": "recovery-publish-browser.mjs",
         "bytes": 2329,
-        "sha256": "2c2b5aae8a52374cbc04ec59994873c6fe4aa0db5724869d93b9257afbc5fa66"
+        "sha256": "09e552162b45eb00f9d477f90fa3accb4394a265c53ece5dcef54d38d49d7628"
       },
       {
         "path": "recovery-transport.mjs",
         "bytes": 2349,
-        "sha256": "3c8d4321ac25cf3b0b8616a8770a10e7d5e1d2be02c52305384cbb7a62204ae5"
+        "sha256": "aac2445c3399b31ceed2c75b3460632a30eb11a3b772cf8742501081a049a9ae"
       },
       {
         "path": "replay-store.mjs",
@@ -1020,7 +1030,7 @@
       {
         "path": "shard-address.mjs",
         "bytes": 9961,
-        "sha256": "58ec0a87bdd41d50c58ac7c35f10e03e1d24748d5466548ddf22ffa5c5e383d2"
+        "sha256": "d4dd727781822b197cc11bc43d26d0a7f702dc01a97a2e277dd6c160e111a8f6"
       },
       {
         "path": "shard-code-18.mjs",
@@ -1035,22 +1045,22 @@
       {
         "path": "shard-debt.mjs",
         "bytes": 7182,
-        "sha256": "e57780c82e343ed9bf5952a017da32688e366cb6941e9d0280122819088630de"
+        "sha256": "792fdc2528a4bd62bb2a56e38ac3164c3e65f9c20ad0d61c77a5cfe4dd91cb29"
       },
       {
         "path": "shard-discovery.mjs",
         "bytes": 10816,
-        "sha256": "bdb5cd95fb833742a6e9c43898c00dd10a18ecccc7f9de17f5dff4f80e6d7016"
+        "sha256": "002099096e52028f13d2f04b0740c5715fb1e4172ff5670e8fa1bb4439ea0cbb"
       },
       {
         "path": "shard-reader.mjs",
         "bytes": 11333,
-        "sha256": "0c77846d3c786f0b9cc0aecf57b032cb8cf2b944a12afdf2a05c91460b64767e"
+        "sha256": "8d58a4ebaa6f1f08f3a3b4b286d2f79ab27e55b325d08c55ca082ec23e55dadb"
       },
       {
         "path": "shard-rpc.mjs",
         "bytes": 15981,
-        "sha256": "d4c12f5388ec577df87117493a4c2838c37ef79daadb9492dc8b241c4222a54b"
+        "sha256": "1de14073ff8594ff6cd743328ddebceb16863792e43da70e71ec4270e8cc2f41"
       },
       {
         "path": "storage-resecure.mjs",
@@ -1059,28 +1069,28 @@
       },
       {
         "path": "styles.css",
-        "bytes": 221964,
-        "sha256": "d129c71591b80a81aba77447a1205421c8e22c5fb4a1610a4106b0477e644542"
+        "bytes": 225605,
+        "sha256": "02148a68ff794523b9e4e9c7d72e1c6ef6770ce5ff9b300e26b1652daf9502f0"
       },
       {
         "path": "sw.js",
-        "bytes": 13859,
-        "sha256": "2386a120f6b8536a15812694efedcc33e44dd834291875fcaab0dd924333ed9c"
+        "bytes": 13928,
+        "sha256": "99ed54f575a327abb3bf8af198abc7029c118bbe778acf4131143d191f13789c"
       },
       {
         "path": "swap-pools.mjs",
-        "bytes": 75100,
-        "sha256": "9ff80a7f003396dc786cf14cc329a0818f781e81cd81732293d03c506e16af28"
+        "bytes": 68720,
+        "sha256": "b8feb29ff18c91e1fc8cad5cabf44d4558f68ed1e42eb8ec82364a6ec0953c74"
       },
       {
         "path": "swap-routes.mjs",
         "bytes": 7034,
-        "sha256": "0cd14148b984a13e1cf80afce41e594962202cc817702e8a80c2b1b8b07d143e"
+        "sha256": "a468bda04aca836b60882092925af21ec2e551fcd92f1e07a249bf6a79423571"
       },
       {
         "path": "telegram-gift-nfts.mjs",
         "bytes": 17422,
-        "sha256": "7e61a64fb1445facaefbbf78f74b9f5a7058216095b86e4d3162137c0d05e93c"
+        "sha256": "ea44bcf5db8ea3fac8977942fb6120f0a8d5a3cafa135f09717f67565b4314ef"
       },
       {
         "path": "telegram-launch.mjs",
@@ -1100,7 +1110,7 @@
       {
         "path": "ton-dns-provider.mjs",
         "bytes": 11494,
-        "sha256": "1a1206abbf1384491152c907be4dc96e3b6192dcac54cae3164fc1043170fe17"
+        "sha256": "2c16f95d756266b03f9213b97108a266f33436a0eaad94ba755200c3d188879e"
       },
       {
         "path": "ton-mnemonic-wordlist.mjs",
@@ -1109,8 +1119,8 @@
       },
       {
         "path": "ton-rpc-transport.mjs",
-        "bytes": 85249,
-        "sha256": "eb4eeb7aa7a698cc236295145215c11a90c95e144d491485783e1ada2fb1829d"
+        "bytes": 86108,
+        "sha256": "7a01314d95c3fdc5927dc687c4ce9882b778f759dedbac80ebd85aa2da02b64a"
       },
       {
         "path": "ton-stack-num.mjs",
@@ -1119,23 +1129,23 @@
       },
       {
         "path": "username-nft-owned.mjs",
-        "bytes": 7604,
-        "sha256": "96224c26829fb04aac91cbe51df69cedc1766929c7155189505c70efc49bc570"
+        "bytes": 7605,
+        "sha256": "89b0bd951ad6faa16aaefef10c8739c2719e392d4936f3f1c277f690ebe61e6e"
       },
       {
         "path": "username-nft-transfer.mjs",
         "bytes": 1489,
-        "sha256": "ea3a296b6b832cf9754313f7ff98c2f7272bf46edbb0e9637c73f47013391c58"
+        "sha256": "311c587ed2549f6bf5370a75939a1d382e57f5e965ca6bc32240f6b5c6df831c"
       },
       {
         "path": "username-ton-rpc-provider.mjs",
-        "bytes": 16081,
-        "sha256": "0aa9e8fadf7ed44806e94b8c1b80ab3943d6b24bf9ca4a987ed585cd7595ca37"
+        "bytes": 16099,
+        "sha256": "ac889599aee9a65d69183df7bca0bb2de681478b1ffd79dabcbe90d47ca44724"
       },
       {
         "path": "vault-account.mjs",
         "bytes": 13618,
-        "sha256": "7a4ba3ede0bd8972ed2b0c0ca9cf1dc3eea34aa528dc7b2e8465bc4b58f8065b"
+        "sha256": "948e85824595668bcf38a5614aff2c2716acc87351f9ca4ee7490c3d06cd404d"
       },
       {
         "path": "vendor/@jsquash/webp/LICENSE",
@@ -1509,13 +1519,13 @@
       },
       {
         "path": "verified-assets.mjs",
-        "bytes": 110463,
-        "sha256": "6e1d1f8398ead4c72fc670bf89636b52e8cb3a8cf6adcbc114b77f3d0dc14389"
+        "bytes": 112063,
+        "sha256": "7b923fe3be96ef0251f1aac88d94591dba49f8bb5d14598425d02ced2a5f20de"
       },
       {
         "path": "wallet-assets.mjs",
-        "bytes": 24207,
-        "sha256": "3e3f3e7d27e97f3a779674c8b80b63fa5b265abec1aac1f0484251a500d5a19f"
+        "bytes": 48031,
+        "sha256": "26252dfc269d16706cbfbd4a2f0a99107be9cb38ef2955b4a7a0b7fca74b60aa"
       },
       {
         "path": "wallet-keyring.mjs",
@@ -1525,22 +1535,22 @@
       {
         "path": "wallet-send-fee.mjs",
         "bytes": 2659,
-        "sha256": "e72f662117182abddafa2cafb0ba29481eff6adb559b9b47791a3e00b0138761"
+        "sha256": "2e691c35dd85b00cfa3fa8a91e51777c8e90f739aaf9c6754bf5ce416ab6ae5d"
       },
       {
         "path": "wallet-swap-dedust.mjs",
-        "bytes": 9464,
-        "sha256": "2baebf602151395c3f3b0495cceaf80efcaa3ae71bfff7aef0184f517281f64d"
+        "bytes": 9465,
+        "sha256": "cf99c322c78b65278ce1cac69618f3e5166ee3f91cda1a0a5e3a422a74a4a682"
       },
       {
         "path": "wallet-swap.mjs",
         "bytes": 9149,
-        "sha256": "5063f841399d76c63981303f03a978be5bec6aa0fe1d57025bd30886e0275509"
+        "sha256": "9286863fd1bacaf09c177ac801e6589f9ad5681f4a1c0becb0c518990d7cfe9a"
       },
       {
         "path": "wallet-transfers.mjs",
-        "bytes": 7660,
-        "sha256": "7212f25ffcd84bb4c667ac4a0ac9813d9b2b75ff28088e348d27566f3020c45c"
+        "bytes": 10823,
+        "sha256": "8d059e1aab265b0a4255cd89bd18c72d1d4308ba1b2aae444d4b4c04e0f6c593"
       },
       {
         "path": "webp-encoder.mjs",

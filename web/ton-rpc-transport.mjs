@@ -1,4 +1,4 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
 
 
 export class TonRpcTransportError extends Error {
@@ -190,6 +190,10 @@ function finiteNonNegativeMs(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) return fallback;
   return Math.floor(number);
+}
+
+function callRateLimitRetries(asked, fallback) {
+  return asked === undefined || asked === null ? fallback : finiteNonNegativeMs(asked, fallback);
 }
 
 function finitePositiveInteger(value, fallback) {
@@ -1116,8 +1120,10 @@ export function createTonCenterV3Transport(options = {}) {
     queuesRequests: true,
     supportsMessageHistory: Boolean(messagesEndpoint),
     supportsSendBoc: Boolean(sendBocEndpoint),
+    supportsAccountState: Boolean(accountEndpoint),
     async runGetMethod({ address, method, stack, cacheTtlMs, ttlMs, priority, verify, allowUnverifiedCriticalRead,
-      requestTimeoutMs, timeoutMs, queueTimeoutMs, skipIfRateLimited, rateLimitBackoffMs: callRateLimitBackoffMs, wanted = null }) {
+      requestTimeoutMs, timeoutMs, queueTimeoutMs, skipIfRateLimited, rateLimitBackoffMs: callRateLimitBackoffMs, rateLimitRetries: askedRetries,
+      wanted = null }) {
       const call = {
         address: assertString(address, 'TON RPC address'),
         method: assertString(method, 'TON RPC method'),
@@ -1165,7 +1171,7 @@ export function createTonCenterV3Transport(options = {}) {
               rateLimitKey: options.rateLimitKey,
               requestSpacingMs,
               rateLimitBackoffMs: callRateLimitBackoffMs,
-              rateLimitRetries,
+              rateLimitRetries: callRateLimitRetries(askedRetries, rateLimitRetries),
               skipIfRateLimited: skipIfRateLimited ?? options.skipRateLimitedGetMethods ?? true,
               priority: resolvedPriority,
               queueTimeoutMs,
@@ -1299,7 +1305,7 @@ export function createTonCenterV3Transport(options = {}) {
           rateLimitKey: options.rateLimitKey,
           requestSpacingMs,
           rateLimitBackoffMs: requestOptions.rateLimitBackoffMs,
-          rateLimitRetries,
+          rateLimitRetries: callRateLimitRetries(requestOptions.rateLimitRetries, rateLimitRetries),
           skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
           priority: requestOptions.priority ?? 'wallet',
           queueTimeoutMs: requestOptions.queueTimeoutMs,
@@ -1322,7 +1328,7 @@ export function createTonCenterV3Transport(options = {}) {
           rateLimitKey: options.rateLimitKey,
           requestSpacingMs,
           rateLimitBackoffMs: requestOptions.rateLimitBackoffMs,
-          rateLimitRetries,
+          rateLimitRetries: callRateLimitRetries(requestOptions.rateLimitRetries, rateLimitRetries),
           skipIfRateLimited: requestOptions.skipIfRateLimited ?? false,
           priority: requestOptions.priority ?? 'critical',
           queueTimeoutMs: requestOptions.queueTimeoutMs,
@@ -1345,7 +1351,7 @@ export function createTonCenterV3Transport(options = {}) {
           rateLimitKey: options.rateLimitKey,
           requestSpacingMs,
           rateLimitBackoffMs: requestOptions.rateLimitBackoffMs,
-          rateLimitRetries,
+          rateLimitRetries: callRateLimitRetries(requestOptions.rateLimitRetries, rateLimitRetries),
           skipIfRateLimited: requestOptions.skipIfRateLimited ?? false,
           priority: requestOptions.priority ?? 'critical',
           queueTimeoutMs: requestOptions.queueTimeoutMs,
@@ -1373,7 +1379,7 @@ export function createTonCenterV3Transport(options = {}) {
           rateLimitKey: options.rateLimitKey,
           requestSpacingMs,
           rateLimitBackoffMs: requestOptions.rateLimitBackoffMs,
-          rateLimitRetries,
+          rateLimitRetries: callRateLimitRetries(requestOptions.rateLimitRetries, rateLimitRetries),
           skipIfRateLimited: requestOptions.skipIfRateLimited ?? false,
           priority: requestOptions.priority ?? 'critical',
           queueTimeoutMs: requestOptions.queueTimeoutMs,
@@ -1409,7 +1415,7 @@ export function createTonCenterV3Transport(options = {}) {
           rateLimitKey: options.rateLimitKey,
           requestSpacingMs,
           rateLimitBackoffMs: requestOptions.rateLimitBackoffMs,
-          rateLimitRetries,
+          rateLimitRetries: callRateLimitRetries(requestOptions.rateLimitRetries, rateLimitRetries),
           skipIfRateLimited: requestOptions.skipIfRateLimited ?? false,
           priority: requestOptions.priority ?? 'critical',
           queueTimeoutMs: requestOptions.queueTimeoutMs,
@@ -1448,7 +1454,7 @@ export function createTonCenterV3Transport(options = {}) {
               rateLimitKey: options.rateLimitKey,
               requestSpacingMs,
               rateLimitBackoffMs: requestOptions.rateLimitBackoffMs,
-              rateLimitRetries,
+              rateLimitRetries: callRateLimitRetries(requestOptions.rateLimitRetries, rateLimitRetries),
               skipIfRateLimited: requestOptions.skipIfRateLimited ?? true,
               priority: requestOptions.priority ?? 'messages',
               queueTimeoutMs: requestOptions.queueTimeoutMs,
@@ -1809,6 +1815,7 @@ function withRunGetMethodCapabilities(transport, provider = {}, defaults = {}) {
 
 function transportSupportsReadMethod(transport, methodName, call = {}) {
   if (typeof transport?.[methodName] !== 'function') return false;
+  if (methodName === 'getAccountState' || methodName === 'getAccountBalance') return transport.supportsAccountState !== false;
   if (methodName !== 'runGetMethod') return true;
   if (typeof transport.supportsRunGetMethod !== 'function') return true;
   return transport.supportsRunGetMethod(call?.method) !== false;

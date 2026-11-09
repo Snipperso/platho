@@ -296,7 +296,7 @@ describe('Username TON RPC providers', () => {
       },
     };
     const registryProvider = createUsernameRegistryTonRpcProvider({ usernameRegistryAddress: REGISTRY, transport: registryTransport });
-    const critical = { verify: false, allowUnverifiedCriticalRead: true, priority: 'critical', cacheTtlMs: 0 };
+    const critical = { verify: false, allowUnverifiedCriticalRead: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: 8_000 };
 
     await expect(registryProvider.getUsernamePrice(6n, critical)).resolves.toMatchObject({ valid_length: true });
     await expect(registryProvider.getUsernameItemAddress(hash, critical)).resolves.toBe(ITEM);

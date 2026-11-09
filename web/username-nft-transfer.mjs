@@ -1,5 +1,5 @@
-import { beginCell } from './pwa-contract-transactions.mjs?v=59';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
+import { beginCell } from './pwa-contract-transactions.mjs?v=60';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
 
 export const USERNAME_NFT_TRANSFER_OPCODE = 0x5FCC3D14n;
 

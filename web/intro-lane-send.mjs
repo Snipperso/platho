@@ -1,9 +1,9 @@
 
-import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=105';
-import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=94';
-import { applyShardSurcharge, surchargeExtraNanotons, LANE_INTRO } from './shard-debt.mjs?v=83';
-import { directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX } from './fee-vault.mjs?v=39';
+import { buildIntroPublishBrowser } from './intro-publish-browser.mjs?v=109';
+import { parseBocBase64, serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=98';
+import { applyShardSurcharge, surchargeExtraNanotons, LANE_INTRO } from './shard-debt.mjs?v=87';
+import { directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX } from './fee-vault.mjs?v=40';
 
 function b64urlToBytes(value) {
   const b64 = String(value).replace(/-/g, '+').replace(/_/g, '/');

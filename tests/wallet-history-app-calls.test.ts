@@ -81,7 +81,7 @@ describe('the app\'s own calls stay out of History', () => {
     const app = readFileSync('web/app.js', 'utf8');
     const render = code(sourceBlock(app, 'function renderWalletHistory('));
     expect(render, 'MEASURED before: the button needed a drawn row').toContain('if (walletAssetsState.historyMore) {');
-    expect(render).toContain("walletAssetsNote(panel, 'history', 'wallet.historyEmpty', rows.length > 0 || (walletAssetsState.historyMore && !walletAssetsReading('history')));");
+    expect(render).toContain("walletAssetsNote(panel, 'history', heldOnly ? 'wallet.assetsLoading' : 'wallet.historyEmpty', rows.length > 0 || (walletAssetsState.historyMore && !walletAssetsReading('history')));");
     expect(render).toContain("more.disabled = walletAssetsReading('history');");
     expect(code(sourceBlock(app, 'function walletAssetsReading('))).toContain('return Boolean(running) && !running.keep;');
     expect(render.split('new Intl.DateTimeFormat(').length - 1).toBe(1);
@@ -131,7 +131,7 @@ describe('the app\'s own calls stay out of History', () => {
     expect(asked.slice(3), 'the person asks: as many pages as it takes').toEqual([{ offset: 0, pages: undefined }, { offset: 28, pages: undefined }]);
   });
 
-  it('HISTCALL-08: the incoming check is never the person\'s read — an open meeting it in flight waits and reads; a failed check is retried as a check', async () => {
+  it('HISTCALL-08: the incoming check is never the person\'s read — an open meeting it in flight reads for itself beside it [round 122 — C1-1]; a failed check is retried as a check', async () => {
     const app = readFileSync('web/app.js', 'utf8');
     const settle = async () => { for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
     const world = (state: any) => {
@@ -164,12 +164,15 @@ describe('the app\'s own calls stay out of History', () => {
     const check = w.load('history', { force: true, keep: true });
     const open = w.load('history');
     await settle();
-    expect(w.asked, 'the open waits for the check in flight').toEqual([{ offset: 0, pages: 1 }]);
+    expect(w.asked, 'the open reads for itself beside the check in flight, at once [client audit round 122 — C1-1: it waited for the check\'s background read]')
+      .toEqual([{ offset: 0, pages: 1 }, { offset: 0, pages: undefined }]);
+    await open;
+    expect(state.history.map((row: any) => row.id), 'drawn before the check lands').toEqual(['pay']);
     w.land();
     await check;
-    await open;
-    expect(w.asked, 'then reads for itself').toEqual([{ offset: 0, pages: 1 }, { offset: 0, pages: undefined }]);
-    expect(state.history.map((row: any) => row.id)).toEqual(['pay']);
+    expect(w.asked, 'nothing read again').toEqual([{ offset: 0, pages: 1 }, { offset: 0, pages: undefined }]);
+    expect(state.history.map((row: any) => row.id), 'the check, bringing nothing, leaves the open\'s page').toEqual(['pay']);
+    expect(state.loading.has('history'), 'neither read left behind').toBe(false);
     const loaded: any = { owner: SELF, tab: 'history', history: Array.from({ length: 116 }, (_, i) => ({ id: `r${i}`, kind: 'gram', direction: 'in', trace: `r${i}` })),
       historyOffset: 116, historyMore: true, historyOwnTraces: new Set(), historyServiceTraces: new Set(), stored: {}, loading: new Map(), failures: new Map(), retries: new Map(), at: new Map() };
     const v = world(loaded);

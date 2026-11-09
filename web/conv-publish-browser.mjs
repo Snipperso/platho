@@ -1,6 +1,6 @@
 
-import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=59';
-import { recordShardAddressBytesFor, recordShardStateInitFor, rawAddress } from './shard-address.mjs?v=47';
+import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
+import { recordShardAddressBytesFor, recordShardStateInitFor, rawAddress } from './shard-address.mjs?v=48';
 import { generationForEpochAt, CUTOVER_EPOCH } from './cutover-epoch.mjs?v=7';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 

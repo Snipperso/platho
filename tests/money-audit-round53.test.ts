@@ -69,8 +69,15 @@ describe('money audit round 53', () => {
     expect(chart).toContain('if (!reserves || route.pair.stable) return null;');
     expect(chart).toContain('const now = spot ?? summary.last;');
     expect(chart).toContain('const moved = summary.first > 0 ? now / summary.first - 1 : summary.change;');
-    expect(chart).toContain('void walletPriceRoute([route], ask, null, refreshMs - 5_000, () => box.isConnected).then(({ reserves }) => {');
+    expect(chart).toContain('void walletPriceRoute([route], ask, null, refreshMs - 5_000, () => box.isConnected).then(({ reserves, depth }) => {');
     expect(chart).toContain('spot = spotOf(reserves) ?? spot;');
+    const tick = chart.slice(chart.indexOf('const tick = (era) => {'), chart.indexOf('const again = () => {'));
+    expect(tick).toContain('if (depth !== null && depth !== undefined) showDepth(depth);');
+    const adopt = chart.slice(chart.indexOf('const adopt = ({ route: deepest, depth, reserves }) => {'), chart.indexOf('const choosePool = (one'));
+    expect(adopt).toContain('showDepth(depth);');
+    const show = chart.slice(chart.indexOf('const showDepth = (depth) => {'), chart.indexOf('const poolButton = '));
+    expect(show).toContain("depthShown = depth === null ? '' : depthText(depth);");
+    expect(show).toContain('depthLine.hidden = !thin;');
     expect(code(sourceBlock(app, 'async function walletPriceRoute('))).toContain('return { route: candidates[best], depth: depths[best], reserves: reads[best].reserves };');
   });
 });

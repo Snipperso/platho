@@ -4,7 +4,7 @@ import {
   encodeGroupLeave, encodeGroupProfile, encodeGroupMute, encodeGroupHide, isGroupRowKey, groupExcerptIn, encodeGroupRemove, encodeGroupRoster, encodeGroupText, groupAvatarHash,
   groupCapsulePlan, groupRekeyEnvelopeBytes, openGroupRekeyEnvelope, sealGroupRekeyEnvelope, isValidMemberKeys,
   groupEntryFeeIn,
-} from './group-protocol.mjs?v=31';
+} from './group-protocol.mjs?v=32';
 import {
   advanceGroupWindow, adoptGroupGeneration, applyGroupRows, clearPendingGroupInvite, createGroupRecord,
   currentGroupEpoch, groupMemberPublicKeys, groupOwnerKey, groupRemovalPlan, groupRosterKeyFor, isGroupAdmin, isGroupOwner, isGroupMuted, groupHiddenForRoster, matchPendingGroupInvite,
@@ -14,7 +14,7 @@ import {
   groupMember, memberForLog, notePendingControl, noteRosterSeen, settlePendingControl, snapshotForRevert, noteSeenSeqs, createPerKeyLock,
   groupOwnerWallet, groupRemovedAt, groupRemovalsForRoster, noteGroupCandidatePaid, noteGroupRemoval, declineGroupCandidate,
   holdsGroupGeneration, noteGroupAccessOwed, clearGroupAccessOwed, catchUpGroupGeneration, groupAdminByWallet, pendingInviteBehind,
-} from './group-store.mjs?v=42';
+} from './group-store.mjs?v=43';
 import {
   createGroupFounding, groupEpochFromSeconds, groupMemberPublicKey, groupMemberSeed, groupRosterKey, rekeyGroup,
   isValidGroupKey, GROUP_EPOCH_SECONDS, GROUP_KEY_BYTES, GROUP_MAX_RATCHET_STEPS,
@@ -32,8 +32,8 @@ function rosterReadsOfPreviousGeneration(record, today) {
   for (let e = adoptionEpoch; e <= Number(today.epoch); e += 1) epochs.push(e);
   return [{ rosterKey, generation: previousGeneration, epochs }];
 }
-import { buildGroupAvatarPublishMessages, buildGroupPublishMessages } from './group-lane-send.mjs?v=98';
-import { createGroupReadLane, groupLaneBuckets, groupRosterBuckets } from './group-lane-read.mjs?v=75';
+import { buildGroupAvatarPublishMessages, buildGroupPublishMessages } from './group-lane-send.mjs?v=102';
+import { createGroupReadLane, groupLaneBuckets, groupRosterBuckets } from './group-lane-read.mjs?v=79';
 import { CUTOVER_EPOCH, generationForEpochAt } from './cutover-epoch.mjs?v=7';
 
 const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');

@@ -7,6 +7,7 @@ export const SWAP_LISTS = Object.freeze([
   { file: 'dedust-pools.mjs', constant: 'DEDUST_POOLS_TAKEN', what: "DeDust's pools" },
   { file: 'asset-pictures.mjs', constant: 'ASSET_PICTURES_TAKEN', what: "the tokens' pictures" },
   { file: 'pool-activity.mjs', constant: 'POOL_ACTIVITY_TAKEN', what: "the pools' depth and swaps" },
+  { file: 'nft-collections.mjs', constant: 'NFT_COLLECTIONS_TAKEN', what: 'the NFT collections Getgems verifies' },
 ]);
 export const SWAP_LISTS_MAX_AGE_DAYS = 7;
 

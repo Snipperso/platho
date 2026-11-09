@@ -140,6 +140,8 @@
     --amber: #9a7420;
     --rose: #b03a3a;
     --danger: #d64545;
+    --sell-fill: #c73c3c;
+    --sell-ink: #ffffff;
     --danger-ink: #a33434;
     --surface: rgba(10, 60, 50, 0.04);
     --accent-rgb: 15, 157, 129;
@@ -208,6 +210,8 @@
     --amber: #9a7420;
     --rose: #b03a3a;
     --danger: #d64545;
+    --sell-fill: #c73c3c;
+    --sell-ink: #ffffff;
     --danger-ink: #a33434;
     --surface: rgba(10, 60, 50, 0.04);
     --accent-rgb: 15, 157, 129;
@@ -2094,24 +2098,6 @@ a .avatar.has-image,
   box-shadow: 0 6px 18px var(--a40);
 }
 
-.composer .private-anonymous-button {
-  width: 44px;
-  height: 44px;
-  background: var(--a06);
-  border-color: transparent;
-  color: var(--accent);
-}
-
-.composer .private-anonymous-button[hidden] {
-  display: none;
-}
-
-.composer .private-anonymous-button:disabled {
-  background: var(--panel-3);
-  border-color: transparent;
-  color: var(--muted);
-}
-
 .composer-toolbar {
   display: flex;
   align-items: center;
@@ -2311,11 +2297,6 @@ a .avatar.has-image,
   background: var(--panel-3);
   border-color: transparent;
   color: var(--muted);
-}
-
-.private-anonymous-button[aria-pressed="true"] {
-  background: var(--a16);
-  color: var(--accent);
 }
 
 .emoji-picker {
@@ -4695,6 +4676,8 @@ button.feed-item:hover {
 .appearance-group[hidden],
 .aurora-canvas[hidden],
 .profile-card-section[hidden],
+.asset-communities-section[hidden],
+.asset-community-row[hidden],
 .profile-card-wallet[hidden],
 .discovery-cta-actions[hidden],
 .nft-card-art[hidden] {
@@ -4832,14 +4815,20 @@ button.feed-item:hover {
   line-height: 1.25;
 }
 
-.settings-list strong.profile-action-status[data-state="error"],
-.discovery-cta-action-note[data-state="error"] {
+.settings-list strong.profile-action-status[data-state="error"] {
   color: var(--danger);
 }
 
-.settings-list strong.profile-action-status[data-state="busy"],
-.discovery-cta-action-note[data-state="busy"] {
+.settings-list strong.profile-action-status[data-state="busy"] {
   color: var(--green);
+}
+
+.discovery-cta-action-note[data-state] {
+  opacity: 1;
+}
+
+.discovery-cta-action-note[data-state="error"] {
+  font-weight: 700;
 }
 
 .wallet-ton-group {
@@ -6551,7 +6540,6 @@ form.action-dialog,
     gap: 8px;
   }
 
-  .composer .private-anonymous-button,
   .public-composer .composer-post-option {
     width: 40px;
     height: 44px;
@@ -7830,27 +7818,7 @@ form.action-dialog,
   transition: opacity 0.25s ease;
 }
 
-@keyframes iconSwapOn {
-  from { opacity: 0; transform: scale(0.6) rotate(-40deg); }
-}
-
-@keyframes iconSwapOff {
-  from { opacity: 0; transform: scale(0.6) rotate(40deg); }
-}
-
-.private-anonymous-button[aria-pressed="true"] .icon {
-  animation: iconSwapOn 0.28s ease;
-}
-
-.private-anonymous-button[aria-pressed="false"] .icon {
-  animation: iconSwapOff 0.28s ease;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .private-anonymous-button[aria-pressed="true"] .icon,
-  .private-anonymous-button[aria-pressed="false"] .icon {
-    animation: none;
-  }
   .composer-post-option::after {
     transition: none;
   }
@@ -7862,15 +7830,7 @@ form.action-dialog,
   font-size: 30px;
 }
 
-.private-anonymous-button:focus,
-.private-anonymous-button:focus-visible {
-  outline: none;
-}
-
 @media (hover: hover) {
-  .composer .private-anonymous-button:hover {
-    background: var(--a16);
-  }
   .composer-post-option:hover {
     background: var(--a16);
   }
@@ -7953,7 +7913,6 @@ form.action-dialog,
 .send-button,
 .composer .send-button,
 .composer-post-option,
-.composer .private-anonymous-button,
 .global-sync-indicator,
 .public-jump-down-button {
   border-radius: var(--r-m);
@@ -8652,6 +8611,16 @@ form.action-dialog,
   overflow-wrap: normal;
 }
 
+.wallet-group-dialog .profile-stat-row.wallet-card-stat-wide {
+  grid-template-columns: minmax(0, auto) minmax(40%, 1fr);
+}
+
+.wallet-group-dialog .wallet-card-stat-wide .wallet-card-copy {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
 .wallet-group-dialog .pane-header h1 {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -8982,6 +8951,62 @@ form.action-dialog,
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.profile-card-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profile-card-fold {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin: -9px -6px -8px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .profile-card-fold:hover {
+    color: var(--accent);
+  }
+}
+
+.profile-card-fold:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.profile-card-fold .icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 160ms ease;
+}
+
+.profile-card-fold[aria-expanded="true"] .icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-card-fold .icon {
+    transition: none;
+  }
+}
+
+.profile-card-section[data-folded="true"] > .profile-card-note,
+.profile-card-section[data-folded="true"] > .profile-card-rows,
+.profile-card-section[data-folded="true"] > .profile-card-gifts {
+  display: none;
 }
 
 .profile-card-note {
@@ -9470,8 +9495,17 @@ button.wallet-asset-row:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.wallet-history-row.is-failed {
+.wallet-history-row > .wallet-asset-text {
+  min-width: 9em;
+}
+
+.wallet-history-row.is-failed > .wallet-asset-icon {
   opacity: var(--disabled-opacity);
+}
+
+.wallet-history-row.is-failed .wallet-asset-name,
+.wallet-history-row.is-failed .wallet-asset-amount {
+  color: var(--muted);
 }
 
 .wallet-assets-apart summary {
@@ -10000,8 +10034,10 @@ button.wallet-asset-row:focus-visible {
 .wallet-market-trades { display: grid; gap: 2px; }
 .wallet-market-trade-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wallet-market-trade-buttons[hidden] { display: none; }
+.wallet-market-trade-buttons { margin-top: 12px; }
+.wallet-market-trade-buttons > .wallet-card-send { margin-top: 0; }
 .wallet-card-send.is-buy { background: var(--price-up-theme, #2ebd85); color: #04150e; }
-.wallet-card-send.is-sell { background: var(--danger); color: #fff; }
+.wallet-card-send.is-sell { background: var(--sell-fill, var(--danger)); color: var(--sell-ink, #1a0505); }
 .wallet-card-send.is-sell:disabled { background: rgba(127, 127, 127, 0.24); color: var(--text-muted); cursor: not-allowed; }
 .wallet-market-trades-head { margin: 6px 2px 4px; color: var(--text-muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 .wallet-market-trade {
@@ -10121,7 +10157,7 @@ button.wallet-market-trade:focus-visible { outline-offset: -2px; }
 .wallet-nft-hero-picture.is-domain,
 .wallet-nft-picture.is-domain {
   padding: 10%;
-  background: linear-gradient(140deg, #0098ea, #0b4f9c);
+  background-image: linear-gradient(140deg, #0098ea, #0b4f9c);
   color: #fff;
   font-size: 17px;
   font-weight: 800;
@@ -10136,6 +10172,11 @@ button.wallet-market-trade:focus-visible { outline-offset: -2px; }
 .wallet-nft-hero-picture.is-domain,
 .wallet-nft-picture.is-domain { align-content: center; gap: 0.15em; }
 .wallet-nft-domain-name { display: block; }
+.wallet-nft-card-picture.is-stand-in,
+.wallet-nft-hero-picture.is-stand-in { opacity: 0.35; }
+.wallet-nft-card-picture.is-domain.has-picture,
+.wallet-nft-hero-picture.is-domain.has-picture,
+.wallet-nft-picture.is-domain.has-picture { color: transparent; }
 .wallet-nft-domain-zone { display: block; font-size: 0.72em; opacity: 0.8; }
 .wallet-nft-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wallet-nft-filter-traits { display: contents; }
@@ -10269,4 +10310,148 @@ button.wallet-market-trade:focus-visible { outline-offset: -2px; }
 @media (prefers-reduced-motion: reduce) {
   .wallet-price-chart.is-intro *,
   .wallet-price-chart.is-intro .wallet-price-dots circle { animation: none !important; }
+}
+
+.asset-communities {
+  display: grid;
+  gap: 14px;
+}
+
+.asset-communities-section {
+  display: grid;
+  gap: 6px;
+}
+
+.asset-communities-section h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.asset-communities-heading {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.asset-communities-note {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 12px;
+}
+
+.asset-community-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.asset-community-row.is-hidden .asset-community-open {
+  border-style: dashed;
+}
+
+.asset-community-row.is-hidden .asset-community-open strong {
+  color: var(--muted);
+}
+
+.asset-community-open {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.asset-community-open strong {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.asset-community-open span {
+  overflow-wrap: anywhere;
+}
+
+.asset-community-open[aria-disabled="true"],
+.identity-variant[aria-disabled="true"] {
+  cursor: default;
+}
+
+.asset-community-open[aria-disabled="true"] strong,
+.identity-variant[aria-disabled="true"] strong {
+  color: var(--muted);
+}
+
+.identity-variant[aria-disabled="true"]:hover,
+.asset-community-open[aria-disabled="true"]:hover {
+  background: transparent;
+}
+
+.identity-variant[aria-disabled="true"] span {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.asset-community-open strong {
+  font-size: 13px;
+}
+
+.asset-community-open span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.asset-community-side {
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.asset-communities-attach {
+  min-height: 40px;
+  margin-top: 4px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .asset-community-open:hover,
+  .asset-communities-attach:hover {
+    background: var(--a10);
+  }
+
+  .asset-community-side:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+}
+
+.asset-community-open:focus-visible,
+.asset-community-side:focus-visible,
+.asset-communities-attach:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }

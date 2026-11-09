@@ -32,34 +32,34 @@ const world = (entry: any, { overlay = null }: { overlay?: any } = {}) => {
   const verify = lift(env, [fn('function channelProfileDeclaresOtherName(key, value) {'), fn('function verifyChannelUsernameClaim(authorWallet, claimedName) {')], 'verifyChannelUsernameClaim');
   return { verify, applied, reads, cache, holdNext: () => { hold = true; }, release: () => release() };
 };
-const PROFILE = { ownerUsername: 'cash', entryId: '11', createdAtSec: 1_792_668_748, verifiedUsername: '', verifiedUsernameAt: 0 };
+const PROFILE = { ownerUsername: 'mossgrove', entryId: '11', createdAtSec: 1_792_668_748, verifiedUsername: '', verifiedUsernameAt: 0 };
 
 describe('the name a channel\'s profile declares is its name', () => {
   it('NAMEPROFILE-01: an old post\'s name, proven too, is not written over the profile\'s — nor even asked', async () => {
     const w = world({ ...PROFILE });
-    w.verify('W', 'cash');
+    w.verify('W', 'mossgrove');
     await settle();
-    expect(w.applied, 'the profile\'s own name is proven and written').toEqual(['cash']);
+    expect(w.applied, 'the profile\'s own name is proven and written').toEqual(['mossgrove']);
     w.verify('W', 'platho');
     await settle();
-    expect(w.applied, 'MEASURED before: "platho" written five seconds later').toEqual(['cash']);
-    expect(w.reads, 'and no read is spent proving it').toEqual(['cash']);
+    expect(w.applied, 'MEASURED before: "platho" written five seconds later').toEqual(['mossgrove']);
+    expect(w.reads, 'and no read is spent proving it').toEqual(['mossgrove']);
     w.verify('W', '');
     await settle();
-    expect(w.applied).toEqual(['cash']);
+    expect(w.applied).toEqual(['mossgrove']);
   });
 
   it('NAMEPROFILE-02: a profile that changes while its name is proven drops the proof; one that takes its name off strips it', async () => {
     const w = world({ ...PROFILE });
     w.holdNext();
-    w.verify('W', 'cash');
+    w.verify('W', 'mossgrove');
     await settle();
     w.cache.W = { ...PROFILE, ownerUsername: 'other', createdAtSec: PROFILE.createdAtSec + 60 };
     w.release();
     await settle();
     await settle();
     expect(w.applied, 'not written over the newer profile').toEqual([]);
-    const bare = world({ ...PROFILE, ownerUsername: '', verifiedUsername: 'cash' });
+    const bare = world({ ...PROFILE, ownerUsername: '', verifiedUsername: 'mossgrove' });
     bare.verify('W', '');
     expect(bare.applied, 'the profile took its name off: the proof goes').toEqual(['']);
   });
@@ -70,9 +70,9 @@ describe('the name a channel\'s profile declares is its name', () => {
     await settle();
     expect(seed.applied, 'only posts to go by: the claim is proven and written').toEqual(['second']);
     const mine = world({ ...PROFILE, ownerUsername: 'platho', verifiedUsername: 'platho' }, { overlay: { ...PROFILE, entryId: '', createdAtSec: PROFILE.createdAtSec + 5 } });
-    mine.verify('W', 'cash');
+    mine.verify('W', 'mossgrove');
     await settle();
-    expect(mine.applied, 'the overlay the owner just published declares "cash"').toEqual(['cash']);
+    expect(mine.applied, 'the overlay the owner just published declares "mossgrove"').toEqual(['mossgrove']);
   });
 
   it('NAMEPROFILE-04: a card open on the wallet takes the newly proven name — its title too, for a contact', () => {

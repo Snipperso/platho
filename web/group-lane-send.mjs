@@ -1,9 +1,9 @@
 
 import { groupAvatarKey, groupAvatarLaneSigner, groupContentKey, groupLaneSigner } from './crypto/group-lane.mjs?v=8';
-import { sealGroupCapsules, GROUP_AVATAR_SENDER, GROUP_KIND } from './group-protocol.mjs?v=31';
-import { buildConvPublishViaVaultMessage, buildConvPublishWalletMessage } from './conv-lane-send.mjs?v=137';
-import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { PLATHO_ONCHAIN_CELL_DATA_BYTES } from './crypto/platho-crypto.mjs?v=31';
+import { sealGroupCapsules, GROUP_AVATAR_SENDER, GROUP_KIND } from './group-protocol.mjs?v=32';
+import { buildConvPublishViaVaultMessage, buildConvPublishWalletMessage } from './conv-lane-send.mjs?v=141';
+import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { PLATHO_ONCHAIN_CELL_DATA_BYTES } from './crypto/platho-crypto.mjs?v=32';
 
 export function privateShapedSnakeCell(bytes, name = 'group cell') {
   const chunks = [];

@@ -1,7 +1,7 @@
 
-import { beginCell, snakeCellFromBytes, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=59';
+import { beginCell, snakeCellFromBytes, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
 import { keyShardAddressBytes, keyShardAddressBytesFor, keyShardStateInit, keyShardStateInitFor, rawAddress }
-  from './shard-address.mjs?v=47';
+  from './shard-address.mjs?v=48';
 
 const KEYSHARD_REGISTER_OPCODE = 0x4B534731n;
 

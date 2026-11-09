@@ -30,7 +30,7 @@ describe('the NFT tab: order and tiles', () => {
       append(...more: any[]) { this.children.push(...more); }, addEventListener(_kind: string, handler: any) { this.listeners.push(handler); } });
     const tile = lift({
       walletNftTiles: tiles, document: { createElement: (tag: string) => { if (tag === 'button') made += 1; return node(tag); } },
-      walletAssetIcon: () => node('span'), paintWalletAssetIcon: (_icon: any, picture: string) => painted.push(picture), walletNftDomainFace: () => {},
+      walletAssetIcon: () => node('span'), paintWalletAssetIcon: (_icon: any, picture: string) => painted.push(picture), walletNftDomainFace: () => {}, walletNftFaceName: () => '',
       shortAddress: (a: string) => a, openWalletNftCard: (item: any) => opened.push(item),
     }, [fn('function walletNftTile(item) {')], 'walletNftTile');
     const first = tile({ address: addr(1), name: 'sample.ath', picture: '', verified: true });
@@ -54,7 +54,7 @@ describe('the NFT tab: order and tiles', () => {
     const tiles = new Map([[addr(1), {}], [addr(2), {}]]);
     const state: any = { owner: addr(7), loading: new Map(), failures: new Map(), retries: new Map(), openFolds: new Set(), at: new Map() };
     lift({ walletAssetsState: state, forgetWalletGroup: () => {}, walletAssetPanels: () => ({}), walletNftTiles: tiles, refreshWalletIncomingBadges: () => {},
-      walletMarketForget: () => {} }, [fn('function resetWalletAssets(owner) {')], 'resetWalletAssets')('');
+      walletMarketForget: () => {}, WALLET_FOLDS_OPEN_FIRST: ['nft-on-sale'] }, [fn('function resetWalletAssets(owner) {')], 'resetWalletAssets')('');
     expect(tiles.size).toBe(0);
   });
 });

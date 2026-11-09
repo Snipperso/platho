@@ -1,6 +1,6 @@
-import { beginCell } from './pwa-contract-transactions.mjs?v=59';
-import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=94';
+import { beginCell } from './pwa-contract-transactions.mjs?v=60';
+import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=98';
 import { buyValueNanotons } from './market-stability-read.mjs?v=3';
 
 const MARKET_STABILITY_BUY_OPCODE = 0x4D534558n;

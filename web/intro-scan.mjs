@@ -1,5 +1,5 @@
 
-import { privateScanViewTagOrNull } from './crypto/platho-crypto.mjs?v=31';
+import { privateScanViewTagOrNull } from './crypto/platho-crypto.mjs?v=32';
 
 export async function scanIntros(scanSecretKey, entries) {
   const candidates = [];

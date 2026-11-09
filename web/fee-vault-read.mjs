@@ -1,5 +1,5 @@
 
-import { toWireAddress } from './shard-reader.mjs?v=109';
+import { toWireAddress } from './shard-reader.mjs?v=113';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
 
 export const FEE_VAULT_VIEW_ARITY = 12;

@@ -317,6 +317,23 @@ export const PROFILE_GROUP_NAME_MAX_BYTES = 96;
 export const PROFILE_FLAGS_MARKER = 0xf1;
 export const PROFILE_FLAG_BALANCE_CARD = 0x01;
 
+export const PROFILE_ABOUT_MARKER = 0xf2;
+export const PROFILE_GROUP_ABOUT_MAX = 4;
+const PROFILE_ABOUT_KINDS = new Set([1, 2, 3]);
+
+export function normalizeProfileGroupAbout(value) {
+  const out = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    const kind = Number(entry?.kind);
+    const address = String(entry?.address ?? '').trim().toLowerCase();
+    if (!PROFILE_ABOUT_KINDS.has(kind) || !/^0:[0-9a-f]{64}$/.test(address) || /^0:0{64}$/.test(address)) continue;
+    if (out.some((held) => held.address === address)) continue;
+    out.push({ kind, address });
+    if (out.length >= PROFILE_GROUP_ABOUT_MAX) break;
+  }
+  return out;
+}
+
 function profileGroupKeyHex(value) {
   const hex = String(value ?? '').trim().toLowerCase();
   return /^[0-9a-f]{64}$/.test(hex) && !/^0{64}$/.test(hex) ? hex : null;
@@ -331,7 +348,8 @@ export function normalizeProfileGroups(value) {
     const name = truncateUtf8ToBytes(String(entry?.name ?? '').trim(), PROFILE_GROUP_NAME_MAX_BYTES);
     const founder = profileGroupKeyHex(entry?.founder);
     const owner = profileGroupKeyHex(entry?.owner);
-    out.push({ groupId, name, ...(founder ? { founder } : {}), ...(owner ? { owner } : {}) });
+    const about = normalizeProfileGroupAbout(entry?.about);
+    out.push({ groupId, name, ...(founder ? { founder } : {}), ...(owner ? { owner } : {}), ...(about.length ? { about } : {}) });
     if (out.length >= PROFILE_GROUPS_MAX) break;
   }
   return out;
@@ -352,6 +370,8 @@ export function encodeProfileBlockContent(profile) {
   const foundersBytes = groupsBytes > 0 && anyFounder ? 1 + groups.length * 64 : 0;
   const flags = profile?.balanceCard === true ? PROFILE_FLAG_BALANCE_CARD : 0;
   const flagsBytes = flags ? 3 : 0;
+  const anyAbout = groups.some((group) => (group.about ?? []).length > 0);
+  const aboutBytes = groupsBytes > 0 && anyAbout ? 2 + groups.reduce((sum, group) => sum + 1 + (group.about ?? []).length * 33, 0) : 0;
   let total = 1 + 2 + description.length + 1;
   for (const tag of tags) total += 1 + tag.length;
   total += 1 + ownerUsername.length;
@@ -361,7 +381,7 @@ export function encodeProfileBlockContent(profile) {
   else if (groupsBytes > 0 || flagsBytes > 0) total += 1;
   total += groupsBytes + foundersBytes;
   if (flagsBytes > 0 && groupsBytes === 0) total += 1;
-  total += flagsBytes;
+  total += flagsBytes + aboutBytes;
   const out = new Uint8Array(total);
   out[0] = PROFILE_BLOCK_CONTENT_VERSION;
   out[1] = (description.length >> 8) & 0xff;
@@ -430,6 +450,23 @@ export function encodeProfileBlockContent(profile) {
     out[offset + 1] = 1;
     out[offset + 2] = flags;
     offset += 3;
+  }
+  if (aboutBytes > 0) {
+    out[offset] = PROFILE_ABOUT_MARKER;
+    out[offset + 1] = groups.length;
+    offset += 2;
+    for (const group of groups) {
+      const about = group.about ?? [];
+      out[offset] = about.length;
+      offset += 1;
+      for (const entry of about) {
+        out[offset] = entry.kind;
+        offset += 1;
+        const hash = entry.address.slice(2);
+        for (let byte = 0; byte < 32; byte += 1) out[offset + byte] = parseInt(hash.slice(byte * 2, byte * 2 + 2), 16);
+        offset += 32;
+      }
+    }
   }
   return out;
 }
@@ -619,7 +656,34 @@ export function decodeProfileBlockContent(content) {
   let balanceCard = false;
   if (offset + 3 <= bytes.length && bytes[offset] === PROFILE_FLAGS_MARKER) {
     const length = bytes[offset + 1];
-    if (length >= 1 && offset + 2 + length <= bytes.length) balanceCard = (bytes[offset + 2] & PROFILE_FLAG_BALANCE_CARD) !== 0;
+    if (length >= 1 && offset + 2 + length <= bytes.length) {
+      balanceCard = (bytes[offset + 2] & PROFILE_FLAG_BALANCE_CARD) !== 0;
+      offset += 2 + length;
+    }
+  }
+  if (offset + 2 <= bytes.length && bytes[offset] === PROFILE_ABOUT_MARKER && bytes[offset + 1] === groups.length && groups.length > 0) {
+    let at = offset + 2;
+    const lists = [];
+    for (let index = 0; index < groups.length; index += 1) {
+      if (at >= bytes.length) break;
+      const count = bytes[at];
+      at += 1;
+      if (count > PROFILE_GROUP_ABOUT_MAX || at + count * 33 > bytes.length) break;
+      const list = [];
+      for (let entry = 0; entry < count; entry += 1) {
+        let hash = '';
+        for (let byte = 0; byte < 32; byte += 1) hash += bytes[at + 1 + byte].toString(16).padStart(2, '0');
+        list.push({ kind: bytes[at], address: `0:${hash}` });
+        at += 33;
+      }
+      lists.push(list);
+    }
+    if (lists.length === groups.length) {
+      groups.forEach((group, index) => {
+        const about = normalizeProfileGroupAbout(lists[index]);
+        if (about.length) group.about = about;
+      });
+    }
   }
   return { description, tags, ownerUsername, appearance, wornGift, groups, balanceCard };
 }

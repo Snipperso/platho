@@ -6,7 +6,7 @@ import { code, sourceBlock } from './helpers/source';
 
 const app = readFileSync('web/app.js', 'utf8');
 
-function world({ modal = false, dialog = null as any, sending = false, seen = true, wallet = { address: 'EQme' } as any } = {}) {
+function world({ modal = false, dialog = null as any, sending = false, seen = true, wallet = { address: 'EQme' } as any, source = app } = {}) {
   const timers: Array<() => void> = [];
   const cleared: number[] = [];
   const dialogs: any[] = [];
@@ -14,21 +14,24 @@ function world({ modal = false, dialog = null as any, sending = false, seen = tr
   let reloads = 0;
   const state = { sending, typing: false };
   const notices: string[] = [];
+  const submit = { disabled: false };
   const env: Record<string, any> = {
     modalOnScreen: () => modal, shouldDeferLockForActiveSend: () => false, sendWorkInHand: () => state.sending, pageOnScreen: () => seen, t: (key: string) => key,
     showAppNotice: (text: string) => { notices.push(text); }, composerHoldsContent: () => state.typing, pageHoldsTyping: () => false,
     setTimeout: (run: () => void) => { timers.push(run); return timers.length; }, clearTimeout: (id: number) => { cleared.push(id); },
-    openActionDialog: (config: any) => { dialogs.push(config); return new Promise((resolve) => { answers.push(resolve); }); },
-    reloadForPendingServiceWorkerAppShellUpdate: () => { reloads += 1; return true; },
+    openActionDialog: (config: any) => { dialogs.push(config); submit.disabled = false; return new Promise((resolve) => { answers.push(resolve); }); },
+    reloadForAppUpdatePress: () => { reloads += 1; },
+    actionSubmitButton: submit,
   };
   const names = Object.keys(env);
   // eslint-disable-next-line no-new-func
   const api = new Function(...names, `let pendingServiceWorkerAppShellReload = false; let appUpdateOffered = false; let appUpdateOfferTimer = null;
     let activeActionDialog = __dialog; let plathoWallet = __wallet;
-    ${sourceBlock(app, 'function offerAppUpdate(')}
+    ${sourceBlock(source, 'function offerAppUpdate(')}
+    ${sourceBlock(source, 'function awaitSendThenReload() {')}
     return { offer: offerAppUpdate, pending(on) { pendingServiceWorkerAppShellReload = on; }, closeDialog() { activeActionDialog = null; } };`
     .replace('__dialog', JSON.stringify(dialog)).replace('__wallet', JSON.stringify(wallet)))(...names.map((n) => env[n]));
-  return { api, timers, dialogs, answers, reloads: () => reloads, state, notices, cleared };
+  return { api, timers, dialogs, answers, reloads: () => reloads, state, notices, cleared, submit };
 }
 
 describe('a new build is offered where the person is [2026-10-27]', () => {
@@ -81,49 +84,45 @@ describe('a new build is offered where the person is [2026-10-27]', () => {
     expect(code(app)).toContain("indicator.addEventListener('click', () => (pendingServiceWorkerAppShellReload ? offerAppUpdate({ asked: true }) : syncNowForCurrentScreen()));");
     expect(readFileSync('web/styles.css', 'utf8')).toMatch(/\.global-sync-indicator\[data-syncing="false"\]\[data-delayed="false"\]\[data-update="true"\]::before \{[\s\S]{0,200}?background: var\(--cta-ink\);/);
     expect(code(sourceBlock(app, 'function noteHistoryStoreSuperseded('))).toContain('offerAppUpdate();');
-    expect(code(sourceBlock(app, 'function requireNoPendingServiceWorkerAppShellReload('))).toContain('offerAppUpdate({ asked: true, said: true });');
-    expect((code(app).match(/offerAppUpdate\(/g) ?? []).length, 'declaration and its own wait + the deferred reload, the store, the send, the return, the mark, "Update now" over a send, a money door').toBe(9);
+    expect(code(sourceBlock(app, 'function requireNoPendingServiceWorkerAppShellReload('))).toContain('offerAppUpdate({ asked: true });');
+    expect((code(app).match(/offerAppUpdate\(/g) ?? []).length, 'declaration and its own wait + the deferred reload, the store, the send, the return, the mark, a money door').toBe(8);
     const door = app.slice(app.indexOf("\ndocument.addEventListener('visibilitychange', () => {"));
     const hidden = code(door.slice(0, door.indexOf('} else {')));
     expect(hidden).toContain('if (lockedAppMayTakeBuild()) reloadForPendingServiceWorkerAppShellUpdate();');
     for (const { code: locale } of I18N_LOCALES as any[]) {
-      for (const key of ['app.updateTitle', 'app.updateHint', 'app.updateHintUnlocked', 'app.updateNow', 'app.updateLater', 'app.updateTap', 'app.updateWaitsForSend']) {
+      for (const key of ['app.updateTitle', 'app.updateHint', 'app.updateHintUnlocked', 'app.updateNow', 'app.updateLater', 'app.updateTap', 'app.updateWaiting']) {
         expect(I18N_STRINGS[locale][key], `${locale} ${key}`).toBeTruthy();
       }
     }
   });
 
-  it('UPDATE-OFFER-04: a send under way is waited out — offered after it, asked for it says why, and "Update now" over a send begun meanwhile reloads nothing [round 76 — C1-1]', async () => {
+  it('UPDATE-OFFER-04: unasked, a send is waited out; asked, the window opens over it; "Update now" over a send waits ON SCREEN and reloads once it is done [round 76 — C1-1; 2026-11-08]', async () => {
     const w = world({ sending: true });
     w.api.pending(true);
     w.api.offer();
     expect([w.dialogs.length, w.timers.length], 'MEASURED before: offered 15 ms after a GRAM transfer was signed').toEqual([0, 1]);
     w.api.offer({ asked: true });
-    expect(w.notices).toEqual(['app.updateWaitsForSend']);
-    w.timers.pop()!();
-    expect(w.notices, 'said once an ask [round 77 — C2-2: MEASURED before, written again every 5 s]').toEqual(['app.updateWaitsForSend']);
-    w.state.sending = false;
-    w.timers.pop()!();
-    expect(w.dialogs).toHaveLength(1);
-    w.state.sending = true;
+    expect(w.dialogs.map((d) => d.title), '2026-11-08, MEASURED before: a 6-s line and no window').toEqual(['app.updateTitle']);
+    expect(w.notices).toEqual([]);
     w.answers[0]({});
     await new Promise((resolve) => setImmediate(resolve));
-    expect(w.reloads(), 'MEASURED before: "Update now" reloaded 100 ms later, the transfer\'s watch gone').toBe(0);
-    expect(w.notices.at(-1), 'the press is kept, and said so').toBe('app.updateAfterSend');
+    expect(w.reloads(), 'MEASURED before [round 76]: "Update now" reloaded 100 ms later, the transfer\'s watch gone').toBe(0);
+    expect([w.dialogs.length, w.dialogs[1].hint, w.dialogs[1].cancelLabel, w.submit.disabled]).toEqual([2, 'app.updateWaiting', 'app.updateLater', true]);
+    w.timers.pop()!();
+    expect(w.reloads()).toBe(0);
     w.state.sending = false;
     w.timers.pop()!();
-    expect([w.dialogs.length, w.reloads()], 'once the send is done it reloads, no second window').toEqual([1, 1]);
-    const typed = world({ sending: true });
-    typed.api.pending(true);
-    typed.state.sending = false;
-    typed.api.offer();
-    typed.state.sending = true;
-    typed.answers[0]({});
+    expect([w.dialogs.length, w.reloads()], 'the send done: reloaded, no third window').toEqual([2, 1]);
+    const later = world({ sending: true });
+    later.api.pending(true);
+    later.api.offer({ asked: true });
+    later.answers[0]({});
     await new Promise((resolve) => setImmediate(resolve));
-    typed.state.sending = false;
-    typed.state.typing = true;
-    typed.timers.pop()!();
-    expect([typed.dialogs.length, typed.reloads()], 'a sentence being written: asked again, not reloaded').toEqual([2, 0]);
+    later.answers[1](null);
+    await new Promise((resolve) => setImmediate(resolve));
+    later.state.sending = false;
+    later.timers.pop()!();
+    expect(later.reloads(), 'nothing reloads after "Later"').toBe(0);
   });
 
   it('UPDATE-OFFER-05: one door opening at a time — presses while it reads are not taken; its window lets go; a money door meets a waiting build first [2026-10-27; round 76 — C1-3]', async () => {
@@ -182,19 +181,20 @@ describe('a new build is offered where the person is [2026-10-27]', () => {
     expect(card.dialogs, 'unasked: never over a window').toHaveLength(0);
     card.api.offer({ asked: true });
     expect(card.dialogs, 'MEASURED before: three presses of Buy ATH in the ATH card, nothing for 30 s').toHaveLength(1);
-    const refused = world({ sending: true });
+    const refused = world({ sending: true, dialog: { title: 'Send GRAM' } });
     refused.api.pending(true);
-    refused.api.offer({ asked: true, said: true });
-    expect(refused.notices, 'MEASURED before: "A send is under way" over the window\'s own "Update ready"').toEqual([]);
+    refused.api.offer({ asked: true });
+    expect([refused.notices, refused.dialogs.length], 'MEASURED before: "A send is under way" over the window\'s own "Update ready"').toEqual([[], 0]);
+    refused.api.closeDialog();
     refused.state.sending = false;
     refused.timers.pop()!();
-    expect(refused.dialogs, 'offered once the hold is let go').toHaveLength(1);
+    expect(refused.dialogs, 'offered once its window is closed').toHaveLength(1);
     expect(app).toMatch(/profileCardMintNameButton\?\.addEventListener\('click', async \(\) => \{[^\n]*\n\s+if \(offeredWaitingBuild\(\)\) return;/);
     expect(app).toMatch(/if \(offeredWaitingBuild\(\)\) return;[^\n]*\n\s+openUsernameNftTransferDialog\(nft\)/);
     expect(app).toMatch(/if \(offeredWaitingBuild\(\)\) return;[^\n]*\n\s+openTelegramGiftTransferDialog\(gift\)/);
   });
 
-  it('UPDATE-OFFER-08: the way back to the page leaves an asked offer\'s wait in place; the name window\'s "Buy ATH" is the Buy ATH door [round 78 — C1-1, C1-3]', async () => {
+  it('UPDATE-OFFER-08: the way back to the page leaves a pressed update\'s wait in place; the name window\'s "Buy ATH" is the Buy ATH door [round 78 — C1-1, C1-3]', async () => {
     const w = world();
     w.api.pending(true);
     w.api.offer();
@@ -202,12 +202,72 @@ describe('a new build is offered where the person is [2026-10-27]', () => {
     w.state.sending = true;
     w.answers[0]({});
     await new Promise((resolve) => setImmediate(resolve));
-    const askedWait = w.timers.length;
     w.api.offer();
-    expect(w.cleared, 'MEASURED before: the asked wait cleared, never offered again').not.toContain(askedWait);
+    expect([w.dialogs.length, w.cleared], 'MEASURED before [round 78]: the wait cleared, never offered again').toEqual([2, []]);
     w.state.sending = false;
     w.timers.pop()!();
-    expect([w.dialogs.length, w.reloads()], 'the press kept: reloaded once the send is done').toEqual([1, 1]);
+    expect([w.dialogs.length, w.reloads()], 'the press kept: reloaded once the send is done').toEqual([2, 1]);
     expect(app).toContain("hintAction = error?.code === 'PLATHO_ATH_REQUIRED' && buyAthButton ? { label: t('profile.buyAth'), run: doorPress(openBuyAthDialog, { money: true }) } : null;");
   });
 });
+
+describe('"Update now" always does what it says [2026-11-08]', () => {
+  it('UPDATE-OFFER-09: the press reloads although the flag dropped while the window stood — a probe that did not answer is not the person\'s "no"', async () => {
+    const w = world();
+    w.api.pending(true);
+    w.api.offer();
+    w.api.pending(false);
+    w.answers[0]({});
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(w.reloads(), 'MEASURED before: the window closed and nothing happened').toBe(1);
+    const gated = app.replace('if (shouldDeferLockForActiveSend() || sendWorkInHand()) { awaitSendThenReload(); return; }',
+      'if (!pendingServiceWorkerAppShellReload) return;\n    if (shouldDeferLockForActiveSend() || sendWorkInHand()) { awaitSendThenReload(); return; }');
+    expect(gated).not.toBe(app);
+    const before = world({ source: gated });
+    before.api.pending(true);
+    before.api.offer();
+    before.api.pending(false);
+    before.answers[0]({});
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(before.reloads(), 'the gated press does nothing — the defect').toBe(0);
+  });
+
+  it('UPDATE-OFFER-10: the press over a send waits on screen — MUTATION: the old way, offered again behind a line, is the defect', async () => {
+    const old = app.replace('if (shouldDeferLockForActiveSend() || sendWorkInHand()) { awaitSendThenReload(); return; }',
+      'if (shouldDeferLockForActiveSend() || sendWorkInHand()) { offerAppUpdate({ asked: true }); return; }');
+    expect(old).not.toBe(app);
+    const before = world({ sending: true, source: old });
+    before.api.pending(true);
+    before.api.offer({ asked: true });
+    before.answers[0]({});
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(before.dialogs[1]?.hint, 'without the wait: a second plain window, nothing said of the send').not.toBe('app.updateWaiting');
+  });
+});
+
+describe('a new build is looked for as one moves about the app [2026-11-08]', () => {
+  it('UPDATE-OFFER-11: a tab switch asks for the worker, at most every two minutes, never at boot before the check\'s state exists', () => {
+    const view = code(sourceBlock(app, 'function setView(view, { restoreRoom = true } = {}) {'));
+    expect(view).toContain('if (installPromptUiReady && plathoWallet) checkForServiceWorkerUpdate(SERVICE_WORKER_UPDATE_ON_VIEW_MS);');
+    expect(app).toContain('const SERVICE_WORKER_UPDATE_ON_VIEW_MS = 120_000;');
+    expect(app.indexOf('let installPromptUiReady = false;')).toBeLessThan(app.indexOf('function setView('));
+    expect(app.indexOf('const SERVICE_WORKER_UPDATE_ON_VIEW_MS')).toBeLessThan(app.lastIndexOf('installPromptUiReady = true;'));
+    const check = code(sourceBlock(app, 'function checkForServiceWorkerUpdate(minIntervalMs = 60_000) {'));
+    expect(check).toContain('if (now - serviceWorkerUpdateAskedAt < minIntervalMs) return;');
+  });
+});
+
+describe('an asked offer stays asked [round 144 — C12-3]', () => {
+  it('UPDATE-OFFER-12: an unasked call while an asked offer waits leaves its wait as it is — the window opens as asked, over a card, taking the first press', () => {
+    const w = world({ dialog: { title: 'Send GRAM' } });
+    w.api.pending(true);
+    w.api.offer({ asked: true });
+    expect(w.timers).toHaveLength(1);
+    w.api.offer();
+    expect([w.timers.length, w.cleared], 'MEASURED before: the asked wait cleared and set again as unasked').toEqual([1, []]);
+    w.api.closeDialog();
+    w.timers.pop()!();
+    expect(w.dialogs.map((d) => d.unprompted), 'opened as asked: no first-moments guard against the press that asked').toEqual([false]);
+  });
+});
+

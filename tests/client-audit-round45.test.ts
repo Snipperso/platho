@@ -180,7 +180,7 @@ describe('client audit round 45', () => {
       const render = lift({
         walletAssetsState: state, walletHiddenAssets: () => new Set(), walletShowsHidden: () => false, walletNftTile: () => node('div'), t: (key: string) => key, walletNftTiles: new Map(),
         appendWalletFold: (target: any, _id: string, _title: string, _cls: string, tiles: any[]) => { if (tiles.length) target.append(node('details')); },
-        document: { createElement: node },
+        document: { createElement: node }, NFT_CARDS_PAGE: 40,
       }, [fn('function walletAssetsReading(tab) {'), fn('function walletAssetsNote(panel, tab, emptyKey, hasRows) {'), fn('function walletAssetsCutNote(panel, count) {'), fn('function renderWalletNfts(panel) {')], 'renderWalletNfts');
       render(panel);
       return panel.children.filter((one: any) => one.className === 'wallet-assets-note').map((one: any) => one.textContent);

@@ -1,9 +1,9 @@
 
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
-import { buildKeyShardRegisterBrowser18, keyShardRegisterPossessionDigest } from './key-shard-register-browser.mjs?v=46';
-import { keyShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=47';
-import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=94';
+import { buildKeyShardRegisterBrowser18, keyShardRegisterPossessionDigest } from './key-shard-register-browser.mjs?v=47';
+import { keyShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=48';
+import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=98';
 
 function bytesToBigInt(bytes) {
   let value = 0n;

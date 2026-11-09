@@ -182,12 +182,13 @@ export async function createIndexedDbDeviceSecretStore({ dbName, id, atRestKey =
     const recordId = walletRecordId(id);
     return {
       async read() {
-        try {
-          const tx = db.transaction(BLOB_STORE_NAME, 'readonly');
-          const record = await reqToPromise(tx.objectStore(BLOB_STORE_NAME).get(recordId));
-          await txDone(tx);
-          return await openWalletSecret(atRestKey, id, record ?? null);
-        } catch { return null; }
+        const tx = db.transaction(BLOB_STORE_NAME, 'readonly');
+        const record = await reqToPromise(tx.objectStore(BLOB_STORE_NAME).get(recordId));
+        await txDone(tx);
+        if (!record) return null;
+        const unreadable = (cause) => Object.assign(new Error('the sealed record would not open'), { code: 'SECRET_UNREADABLE', cause });
+        if (record.v !== WALLET_SEAL_VERSION || !record.x) throw unreadable(null);
+        try { return await openWalletSecret(atRestKey, id, record); } catch (error) { throw unreadable(error); }
       },
       async write(value) {
         const next = String(value ?? '').trim();

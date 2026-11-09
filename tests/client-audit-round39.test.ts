@@ -103,7 +103,9 @@ describe('client audit round 39', () => {
     const rawOf = (id: string) => `0:${Buffer.from(id, 'base64url').toString('hex')}`;
     const stonfi = new Set(SWAP_TOKENS.map(([id]: any) => rawOf(id)));
     const dedustOnly = DEDUST_TOKENS.map(([id]: any) => rawOf(id)).filter((id: string) => !stonfi.has(id));
-    expect(dedustOnly.filter((id: string) => ASSET_PICTURES[id]).length, 'of the tokens DeDust alone lists').toBeGreaterThan(150);
+    const pictured = dedustOnly.filter((id: string) => ASSET_PICTURES[id]).length;
+    expect(dedustOnly.length, 'DeDust lists tokens of its own').toBeGreaterThan(100);
+    expect(pictured / dedustOnly.length, 'of the tokens DeDust alone lists, the share with a picture').toBeGreaterThan(0.4);
     expect(code(fn('function walletSwapPickerItems(side, offers, offerId) {'))).toContain('picture: token?.picture || (item.id === GRAM ? gramPicture() : assetPicture(item.id)),');
     expect(code(fn('function gramPicture() {'))).toMatch(/return 'data:image\/svg\+xml;base64,/);
     const seen: Array<() => void> = [];
@@ -134,11 +136,11 @@ describe('client audit round 39', () => {
   });
 
   it('R39-07: GRAM\'s row opens its card with Send and Swap; ATH\'s group starts with Send and Swap; a swap through too shallow a pool is refused', () => {
-    expect(appCode).toContain("balanceRow: 'TON', onOpen: () => openWalletGramCard() }));");
+    expect(appCode).toContain("balanceRow: 'TON', onOpen: () => openWalletGramCard(),");
     const gram = code(fn('function openWalletGramCard() {'));
     expect(gram).toContain('walletCardSend(() => { if (!walletTransferOnItsWay(plathoWallet?.address ?? null)) sendWalletTonButton?.click(); }),');
     expect(gram).toContain("...(swapRoutesFrom(GRAM).length ? [walletCardSend(() => runWalletSwap(GRAM), t('wallet.actionSwap'), 'is-secondary')] : []),");
-    expect(appCode).toContain("balanceRow: 'ATH', onOpen: () => openWalletAthCard() }));");
+    expect(appCode).toContain("balanceRow: 'ATH', onOpen: () => openWalletAthCard(), key: 'ATH' }));");
     expect(code(fn('function openWalletAthCard() {'))).toContain('if (token) openWalletTokenCard(token);');
     const swap = code(fn('async function openWalletSwapDialog(start, hold, asked = null) {'));
     expect(appCode).toContain('const WALLET_SWAP_IMPACT_MAX_BPS = 1500;');

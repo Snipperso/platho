@@ -1,7 +1,7 @@
 
-import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=59';
+import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=60';
 import { parseVaultPublishEnvelope } from './m21c-envelope.mjs?v=5';
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
 
 export class PublicShardTonRpcProviderError extends Error {
   constructor(message) {

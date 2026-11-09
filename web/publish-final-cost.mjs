@@ -1,5 +1,5 @@
 
-import { FV_PROTOCOL_FEE, vaultTakeFor } from './fee-vault.mjs?v=39';
+import { FV_PROTOCOL_FEE, vaultTakeFor } from './fee-vault.mjs?v=40';
 
 export const FINAL_COST_MEASURED_AT = '2026-09-30';
 

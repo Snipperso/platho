@@ -104,11 +104,11 @@ describe('a wallet\'s lists read past the first page', () => {
     });
     const draw = (state: any) => {
       const target = node('section');
-      new Function('walletAssetsState', 'walletHiddenAssets', 'walletShowsHidden', 'walletNftTile', 't', 'walletNftTiles', 'appendWalletFold', 'document',
+      new Function('walletAssetsState', 'walletHiddenAssets', 'walletShowsHidden', 'walletNftTile', 't', 'walletNftTiles', 'appendWalletFold', 'document', 'NFT_CARDS_PAGE',
         [fn('function walletAssetsReading(tab) {'), fn('function walletAssetsNote(panel, tab, emptyKey, hasRows) {'), fn('function walletAssetsCutNote(panel, count) {'), fn('function renderWalletNfts(panel) {'), 'return renderWalletNfts;'].join(String.fromCharCode(10)))(
         { stored: {}, loading: new Map(), failures: new Map(), retries: new Map(), at: new Map([['nft', 1]]), ...state }, () => new Set(), () => false, () => node('div'),
         (key: string, params: any) => (params ? `${key}:${params.count}` : key), new Map(), (into: any, _id: string, _title: string, _cls: string, tiles: any[]) => { if (tiles.length) into.append(node('details')); },
-        { createElement: node })(target);
+        { createElement: node }, 40)(target);
       return target.children.filter((one: any) => one.className === 'wallet-assets-note').map((one: any) => one.textContent);
     };
     expect(draw({ nfts: [{ address: 'a', verified: true }, { address: 'b', verified: null }], cutNfts: 5000 })).toEqual(['wallet.nftChecking', 'wallet.assetsCut:5000']);

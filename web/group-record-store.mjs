@@ -189,8 +189,8 @@ async function moveLegacyRows(db, storeName, keys, lockName, { mergeRows = null,
         if (typeof mergeRows !== 'function') { deletes.push(row.id); continue; }
         // eslint-disable-next-line no-await-in-loop
         const current = await openGroupRecord(keys, tag, await requestToPromise(db.transaction(storeName, 'readonly').objectStore(storeName).get(tag)));
-        if (current === null) { deletes.push(row.id); continue; }
-        try { next = mergeRows(current, record); } catch { deletes.push(row.id); continue; }
+        if (current === null) continue;
+        try { next = mergeRows(current, record); } catch { continue; }
       }
       // eslint-disable-next-line no-await-in-loop
       const blob = await sealGroupRecord(keys, tag, next);

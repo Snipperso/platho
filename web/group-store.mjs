@@ -1,5 +1,5 @@
 
-import { GROUP_KIND, groupEntryFeeIn, groupHiddenIn, groupNameIn, groupRemovalsIn, isGroupRowKey, isValidMemberKeys } from './group-protocol.mjs?v=31';
+import { GROUP_KIND, groupEntryFeeIn, groupHiddenIn, groupNameIn, groupRemovalsIn, isGroupRowKey, isValidMemberKeys } from './group-protocol.mjs?v=32';
 import { advanceGroupEpoch, groupEpochFromSeconds, isValidGroupKey, GROUP_MAX_RATCHET_STEPS } from './crypto/group-lane.mjs?v=8';
 import { CUTOVER_EPOCH } from './cutover-epoch.mjs?v=7';
 

@@ -1,6 +1,6 @@
 # Datenschutzerklärung
 
-Zuletzt aktualisiert: 22. Oktober 2026
+Zuletzt aktualisiert: 31. Oktober 2026
 
 Platho ist ein Messenger ohne Backend. Dieses Dokument ist kurz, weil es sehr
 wenig offenzulegen gibt — und genau dort konkret, wo tatsächlich etwas Ihr Gerät
@@ -24,7 +24,7 @@ einem Namen.
 - Ihre 24-Wort-Wiederherstellungsphrase sowie die daraus abgeleiteten Wallet- und Nachrichtenschlüssel.
 - Ihr Nachrichtenverlauf. (Ein nicht gesendeter Entwurf wird nur im Arbeitsspeicher gehalten und verschwindet mit der Seite.)
 - Die Namen, die Sie Ihren Kontakten geben, und welche davon Sie angeheftet haben oder nicht mehr als ungelesen markieren.
-- Die Namen, die Sie Ihren Wallets geben – als gewöhnlicher Text gespeichert, damit der Sperrbildschirm sie vor jedem Passwort zeigen kann.
+- Die Namen, die Sie Ihren Wallets geben, und die Adressen der Wallets – als gewöhnlicher Text gespeichert, damit der Sperrbildschirm sie vor jedem Passwort zeigen kann.
 - Ihre Einstellungen, einschließlich eines optionalen API-Schlüssels für einen öffentlichen TON-Node-Anbieter.
 
 Nichts davon erreicht uns, und geschützt ist es auf unterschiedliche Weise —

@@ -1,4 +1,4 @@
-import { I18N_STRINGS, I18N_LOCALES } from './i18n-strings.mjs?v=298';
+import { I18N_STRINGS, I18N_LOCALES } from './i18n-strings.mjs?v=325';
 
 const I18N_STORAGE_KEY = 'platho.locale.v1';
 const DEFAULT_LOCALE = 'en';

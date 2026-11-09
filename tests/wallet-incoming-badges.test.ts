@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { code, sourceBlock } from './helpers/source';
+import { I18N_STRINGS } from '../web/i18n-strings.mjs';
 
 
 const app = readFileSync('web/app.js', 'utf8');
 const css = readFileSync('web/styles.css', 'utf8');
 const fn = (start: string) => sourceBlock(app, start);
 const NL = String.fromCharCode(10);
-const SOURCES = ['function walletHistorySeen() {', 'function markWalletHistorySeen(rows) {', 'function walletIncomingCount(rows, seen) {', 'function walletIncomingGram(amount) {',
+const SOURCES = ['function walletHistorySeen() {', 'function markWalletHistorySeen(rows, held = []) {', 'function walletIncomingCount(rows, seen, unjudged = null) {', 'function walletIncomingGram(amount) {',
   'function refreshWalletIncomingBadges() {', 'function checkWalletIncoming({ now = false } = {}) {'].map(fn);
 
 function world({ locked = false } = {}) {
   const store = new Map<string, string>();
   const painted: Array<[string, number]> = [];
+  const judged: string[][] = [];
   const historyTab = { dataset: {} as Record<string, string> };
   const reads: any[] = [];
   const env: Record<string, any> = {
@@ -25,11 +27,13 @@ function world({ locked = false } = {}) {
     walletTabs: { querySelector: (selector: string) => (selector === '[data-wallet-tab="history"]' ? historyTab : null) },
     loadWalletAssets: (tab: string, options: any) => { reads.push([tab, options]); return Promise.resolve(); },
     Date: { now: () => 1_000_000_000 }, chainNowSec: () => 1_000_000,
+    walletNftCollectionVerified: (collection: string) => (collection === 'BAD' ? 'no' : collection === 'GIFT' ? null : collection ? 'yes' : 'no'),
+    walletHistoryJudge: (collections: string[]) => judged.push(collections),
   };
   const names = Object.keys(env);
   // eslint-disable-next-line no-new-func
   const api = new Function(...names, [...SOURCES, 'return { walletIncomingCount, refreshWalletIncomingBadges, checkWalletIncoming, markWalletHistorySeen };'].join(NL))(...names.map((n) => env[n]));
-  return { api, env, store, painted, historyTab, reads, last: () => painted.at(-1) };
+  return { api, env, store, painted, historyTab, reads, judged, last: () => painted.at(-1) };
 }
 const row = (id: string, at: number, extra: any = {}) => ({ id, at, kind: 'gram', direction: 'in', success: true, amount: '1000000000', ...extra });
 
@@ -47,8 +51,18 @@ describe('new incoming transfers, counted', () => {
     expect(api.walletIncomingCount(rows, { at: 300, ids: [] })).toBe(0);
     const dust = [row('d1', 400, { amount: '1' }), row('d2', 390, { amount: '9999999' }), row('ok', 380, { amount: '10000000' }), row('bad', 370, { amount: 'x' })];
     expect(api.walletIncomingCount(dust, { at: 0, ids: [] })).toBe(1);
+    const sales = [row('own', 500, { kind: 'nft', trade: 'sold', collection: 'G', amount: '28800000000' }),
+      row('planted', 490, { kind: 'nft', trade: 'sold', collection: 'BAD', amount: '28800000000' }),
+      row('crumb', 480, { kind: 'nft', trade: 'sold', collection: 'G', amount: '929000' })];
+    expect(api.walletIncomingCount(sales, { at: 0, ids: [] })).toBe(1);
+    const unjudged = new Set<string>();
+    const gifts = [row('gift sold', 600, { kind: 'nft', trade: 'sold', collection: 'GIFT', amount: '28800000000' }),
+      row('gift in', 590, { kind: 'nft', verified: null, collection: 'GIFT' }),
+      row('gift dust', 580, { kind: 'nft', trade: 'sold', collection: 'GIFT2', amount: '929000' })];
+    expect(api.walletIncomingCount(gifts, { at: 0, ids: [] }, unjudged)).toBe(0);
+    expect([...unjudged]).toEqual(['GIFT']);
     expect(app).toContain('const WALLET_INCOMING_GRAM_FLOOR_NANOTONS = WALLET_GRAM_DUST_NANOTONS;');
-    expect(code(sourceBlock(app, 'function walletIncomingCount(rows, seen) {')), 'a cancel\'s refund is this wallet\'s own doing [round 86 — C1-3]').toContain("if (row.payment === 'refund') continue;");
+    expect(code(sourceBlock(app, 'function walletIncomingCount(rows, seen, unjudged = null) {')), 'a cancel\'s refund is this wallet\'s own doing [round 86 — C1-3]').toContain("if (row.payment === 'refund') continue;");
     expect(readFileSync('web/wallet-assets.mjs', 'utf8')).toContain('export const WALLET_GRAM_DUST_NANOTONS = 10_000_000n;');
   });
 
@@ -142,13 +156,86 @@ describe('new incoming transfers, counted', () => {
     expect(css).toMatch(/\.rail-item-wallet-face > \.rail-badge \{\s*top: -4px;\s*\}/);
   });
 
+  it('INCOMING-08: a token end held at a look — not shown then — is news when it lands, however old; once looked at, landed, it is seen [client audit round 141 — C7-1]', () => {
+    const { api, env, last } = world();
+    env.walletAssetsState.history = [row('old', 100)];
+    api.refreshWalletIncomingBadges();
+    env.walletAssetsState.tab = 'history';
+    env.walletAssetsState.history = [row('new', 200), { ...row('end', 150, { kind: 'jetton', verified: true }), held: true }, row('old', 100)];
+    api.refreshWalletIncomingBadges();
+    expect(last()).toEqual(['wallet', 0]);
+    env.walletAssetsState.tab = 'tokens';
+    delete env.walletAssetsState.history[1].held;
+    api.refreshWalletIncomingBadges();
+    expect(last(), 'landed after the look: news').toEqual(['wallet', 1]);
+    env.walletAssetsState.tab = 'history';
+    api.refreshWalletIncomingBadges();
+    env.walletAssetsState.tab = 'tokens';
+    api.refreshWalletIncomingBadges();
+    expect(last(), 'looked at since: seen').toEqual(['wallet', 0]);
+    for (const at of [150, 250]) {
+      const first = world();
+      first.env.walletAssetsState.history = [row('new', 200), { ...row('end', at, { kind: 'jetton', verified: true }), held: true }];
+      first.api.refreshWalletIncomingBadges();
+      delete first.env.walletAssetsState.history[1].held;
+      first.api.refreshWalletIncomingBadges();
+      expect(first.last(), `first read, the end at ${at}`).toEqual(['wallet', 0]);
+    }
+    env.walletAssetsState.history = [row('later', 300)];
+    expect(api.walletIncomingCount([row('end', 150, { kind: 'jetton', verified: true })], { at: 200, ids: [], held: undefined } as any)).toBe(0);
+  });
+
+  it('INCOMING-09: History\'s unit, its keyboard and its place; the swap picker holds the keyboard; a long card value wraps in its own place; a failed row legible; Sell readable; the Japanese hint whole [the LOW batch of 2026-11-07]', () => {
+    // eslint-disable-next-line no-new-func
+    const unit = new Function('shortAddress', 'formatTonUserFriendlyAddress', `${fn('function walletHistoryUnit(symbol, master) {')}\nreturn walletHistoryUnit;`)(
+      (address: string) => `short(${address})`, (raw: string) => `F${raw}`);
+    expect([unit('USD₮', '0:aa'), unit('', '0:aa'), unit('', ''), unit(undefined, undefined)]).toEqual(['USD₮', 'short(F0:aa)', '', '']);
+    const history = code(fn('function renderWalletHistory(panel) {'));
+    expect(history).toContain('const given = walletHistoryUnit(row.symbol, row.master);');
+    expect(history).toContain("to: walletHistoryUnit(asked?.symbol ?? '', asked?.master ?? '')");
+    expect(history).toContain('${walletHistoryUnit(row.got.symbol, row.got.master)}');
+    expect(history).toContain("row.kind === 'jetton' ? walletHistoryUnit(row.symbol, row.master) : row.symbol");
+    expect(history.match(/historyId: String\(row\.id\)/g)?.length, 'every History row carries its id').toBe(3);
+    const render = code(fn('function renderWalletAssets(tab) {'));
+    expect(render).toContain("const onMore = focusedAt >= 0 && document.activeElement?.classList?.contains('wallet-assets-more');");
+    expect(render).toContain("const more = onMore ? panel.querySelector('.wallet-assets-more') : null;");
+    expect(render).toContain('(more ?? rows[Math.min(focusedAt, rows.length - 1)])?.focus({ preventScroll: true });');
+    expect(render).toContain("if (tab === 'history' && scroller && at > 0 && scroller.getClientRects().length) {");
+    expect(render).toContain('if (Math.abs(moved) >= 1) scroller.scrollTop += moved;');
+    expect(code(fn('function restoreDialogFocus(target) {'))).toContain('`.wallet-asset-list [data-wallet-token="${CSS.escape(target.dataset.walletToken)}"]`');
+    expect(code(fn('function renderWalletTokens(panel) {'))).toContain('onOpen: () => openWalletTokenCard(token), key: token.master });');
+    const picker = code(fn('function openWalletSwapPicker({ title, items, amountOf, onPick, returnTo }) {'));
+    expect(picker).toContain("const stops = [...panel.querySelectorAll('button, input')].filter((one) => !one.disabled && elementRendered(one));");
+    expect(picker).toContain('stops.at(-1).focus({ preventScroll: true });');
+    expect(picker).toContain('stops[0].focus({ preventScroll: true });');
+    expect(code(fn("function walletCardStat(label, value, { copy = '', copied = 'dialog.shareCopied', balanceRow = null, wide = false } = {}) {"))).toContain("if (wide) row.classList.add('wallet-card-stat-wide');");
+    expect(app).toContain("walletCardStat(t('nft.royalty'), `${share(listing.royaltyAddress ? listing.royaltyPercent : 0)}, ${gram(split.royalty)}`, { wide: true }),");
+    expect(css).toMatch(/\.wallet-group-dialog \.profile-stat-row\.wallet-card-stat-wide \{\s*grid-template-columns: minmax\(0, auto\) minmax\(40%, 1fr\);/);
+    expect(css).toMatch(/\.wallet-group-dialog \.wallet-card-stat-wide \.wallet-card-copy \{\s*white-space: normal;/);
+    expect(css).toMatch(/\.wallet-history-row > \.wallet-asset-text \{\s*min-width: 9em;/);
+    expect(css).not.toMatch(/\.wallet-history-row\.is-failed \{\s*opacity/);
+    expect(css).toMatch(/\.wallet-history-row\.is-failed > \.wallet-asset-icon \{\s*opacity: var\(--disabled-opacity\);/);
+    expect(css).toMatch(/\.wallet-history-row\.is-failed \.wallet-asset-name,\s*\.wallet-history-row\.is-failed \.wallet-asset-amount \{\s*color: var\(--muted\);/);
+    expect(css).toContain('.wallet-card-send.is-sell { background: var(--sell-fill, var(--danger)); color: var(--sell-ink, #1a0505); }');
+    expect(css.match(/--sell-fill: #c73c3c;/g)?.length, 'both light themes').toBe(2);
+    expect(I18N_STRINGS.ja['wallet.sendNftHint']).toContain('永久に');
+  });
+
   it('INCOMING-05: wired where it lives — every balance read, every History read, the section and the view opened, a wallet gone', () => {
     const balance = code(fn('async function refreshVaultNavBalanceInBackground(options = {}) {'));
     expect(balance).toContain('const before = vaultPocketState.wallet;');
     expect(balance).toContain("|| (ath !== null && typeof before?.ath_balance === 'bigint' && ath !== before.ath_balance);");
     expect(balance).toContain('checkWalletIncoming({ now: moved });');
     const load = code(fn('async function loadWalletAssets(tab, { force = false, more = false, keep = false } = {}) {'));
-    expect(load.indexOf('refreshWalletIncomingBadges();')).toBeGreaterThan(load.indexOf('state.historyMore = page.more;'));
+    expect(load.lastIndexOf('refreshWalletIncomingBadges();')).toBeGreaterThan(load.indexOf('state.historyMore = page.more;'));
+    const takes = load.slice(load.indexOf('onTokenTakes: () => {'), load.indexOf('nftVerdictsKnown: Boolean(gifts),'));
+    expect(takes).toContain('if (owner !== state.owner) return;');
+    expect(takes).toContain('refreshWalletIncomingBadges();');
+    expect(takes).toContain("if (state.tab === 'history' && isVaultViewActive()) renderWalletAssets('history');");
+    expect(code(fn('function refreshWalletIncomingBadges() {'))).toContain('walletAssetsState.history.filter((row) => !row?.held)');
+    const history = code(fn('function renderWalletHistory(panel) {'));
+    expect(history).toContain("const heldOnly = !rows.length && (walletAssetsState.history ?? []).some((row) => row?.held === true);");
+    expect(history).toContain("walletAssetsNote(panel, 'history', heldOnly ? 'wallet.assetsLoading' : 'wallet.historyEmpty',");
     expect(code(fn('function showWalletAssetsTab(tab, { load = true, render = true } = {}) {'))).toContain('refreshWalletIncomingBadges();');
     expect(code(fn('function resetWalletAssets(owner) {'))).toContain('refreshWalletIncomingBadges();');
     const view = code(app).slice(code(app).indexOf("syncWalletCardLife(view === 'wallet');"));

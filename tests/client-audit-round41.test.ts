@@ -125,11 +125,13 @@ describe('client audit round 41', () => {
     const art = `data:image/svg+xml;base64,${whole}`;
     const drawn: string[] = [];
     let ownReads = 0;
+    const queued: string[] = [];
     const state: any = { owner: OWNER, nfts: null, tab: 'nft' };
     const env = {
       walletAssetsState: state, rawAccount: (a: string) => String(a).toLowerCase(), safeInlineImage: (image: string) => image, inlinePictureOf,
       readStoredUsernameNftList: async () => ({ owned: [{ label: 'tiles', itemAddress: NAME, image: art }] }),
       loadOwnedUsernameNfts: async () => { ownReads += 1; return null; }, writeStoredUsernameNftList: async () => {},
+      walletNftTiles: new Map(), walletNftAthArtOf: ({ nft }: any) => { queued.push(nft); return []; },
       sameWalletAddress: (a: string, b: string) => a === b, plathoWallet: { address: OWNER }, isVaultViewActive: () => true,
       renderWalletAssets: (tab: string) => drawn.push(tab),
     };
@@ -142,8 +144,7 @@ describe('client audit round 41', () => {
     const missing = [{ address: addr(0x5353), collection: REGISTRY, picture: '' }];
     state.nfts = missing;
     await dress(OWNER, REGISTRY, missing);
-    await dress(OWNER, REGISTRY, missing);
-    expect(ownReads, 'a name the list lacks: the profile\'s own read, once a session').toBe(1);
+    expect([ownReads, queued], 'no own-names read; the name asked of the art queue').toEqual([0, [missing[0].address]]);
     expect(code(fn('async function loadWalletAssets(tab, { force = false, more = false, keep = false } = {}) {'))).toContain('void dressWalletNamesFromProfileList(owner, registry, nfts);');
   });
 
@@ -193,5 +194,24 @@ describe('client audit round 41', () => {
     expect(code(fn('async function openWalletSendChooser() {'))).toContain('const hiddenNow = walletHiddenAssets();');
     expect(code(fn('function openWalletTokenCard(token, { refill = false } = {}) {'))).toContain('token.verified ? null : walletCardHide(token.master,');
     expect(code(fn('function walletCardNftActions(item) {'))).toContain('item.verified === false ? walletCardHide(item.address,');
+  });
+});
+
+describe('the wallet\'s own .ath tiles draw their art [2026-11-08]', () => {
+  it('R41-08: a batch that lands paints the list the tab draws NOW — a list read again while the art was on its way takes it too', async () => {
+    const whole = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><rect width="4" height="4"/></svg>').toString('base64');
+    const art = `data:image/svg+xml;base64,${whole}`;
+    const NAME = addr(0x5151);
+    const drawn: string[] = [];
+    const replaced = [{ address: NAME, collection: addr(0x4444), picture: '' }];
+    const state: any = { nfts: replaced, nftListings: [], stored: {}, tab: 'nft', onSaleArtLanded: false };
+    const market: any = { athQueue: new Set([NAME]), athArt: new Map(), cards: new Map(), athTimer: null };
+    const read = lift({
+      walletNftMarket: market, walletAssetsState: state, readUsernameNftArt: async () => new Map([[NAME, art]]), inlinePictureOf,
+      NFT_ATH_ART_KEPT: 200, WALLET_MARKET_REFRESH_MS: 30_000, walletNftMarketPaint: () => {}, document: { querySelectorAll: () => [] },
+      paintWalletAssetIconFirst: () => {}, isVaultViewActive: () => true, renderWalletAssets: (tab: string) => drawn.push(tab), setTimeout: () => 0,
+    }, [fn('function walletNftKeepAthArt(nft, art) {'), fn('async function walletNftReadAthArt() {')], 'walletNftReadAthArt');
+    await read();
+    expect([replaced[0].picture, drawn], 'MEASURED before: the tile stayed a letter for the session').toEqual([art, ['nft']]);
   });
 });

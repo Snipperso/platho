@@ -1,5 +1,5 @@
 
-import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=59';
+import { beginCell, parseBocBase64, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
 import {
   RECORDSHARD_CODE_BOC, INTROSHARD_CODE_BOC, RECOVERYSHARD_CODE_BOC, KEYSHARD_CODE_BOC, PUBLICSHARD_CODE_BOC,
 } from './shard-code.mjs?v=6';

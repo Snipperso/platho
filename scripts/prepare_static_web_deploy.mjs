@@ -85,6 +85,8 @@ const ROOT_RUNTIME_FILES = new Set([
   'dedust-pools.mjs',
   'price-history.mjs',
   'nft-market.mjs',
+  'nft-collections.mjs',
+  'asset-communities.mjs',
   'pool-activity.mjs',
   'pool-state.mjs',
   'webp-encoder.mjs',

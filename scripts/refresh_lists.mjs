@@ -65,7 +65,7 @@ async function snapshot(label) {
   const dir = join(LISTS, 'compare', label);
   mkdirSync(dir, { recursive: true });
   const out = {};
-  for (const file of ['verified-assets.mjs', 'swap-pools.mjs', 'dedust-pools.mjs', 'asset-pictures.mjs', 'pool-activity.mjs']) {
+  for (const file of ['verified-assets.mjs', 'swap-pools.mjs', 'dedust-pools.mjs', 'asset-pictures.mjs', 'pool-activity.mjs', 'nft-collections.mjs']) {
     const copy = join(dir, file);
     copyFileSync(join(ROOT, 'web', file), copy);
     out[file] = await import(`${pathToFileURL(copy).href}?${label}-${Date.now()}`);
@@ -93,7 +93,7 @@ for (const entry of SOURCES) paths[entry.name] = await source(entry);
 const access = toncenterAccess();
 console.log(`toncenter: ${access.keyed ? 'with the key' : 'keyless — the pools take about half an hour'}`);
 const before = await snapshot('before');
-const LIST_FILES = ['verified-assets.mjs', 'swap-pools.mjs', 'dedust-pools.mjs', 'asset-pictures.mjs', 'pool-activity.mjs'];
+const LIST_FILES = ['verified-assets.mjs', 'swap-pools.mjs', 'dedust-pools.mjs', 'asset-pictures.mjs', 'pool-activity.mjs', 'nft-collections.mjs'];
 const kept = new Map(LIST_FILES.map((file) => [file, readFileSync(join(ROOT, 'web', file))]));
 const restore = () => { for (const [file, bytes] of kept) writeFileSync(join(ROOT, 'web', file), bytes); };
 const cacheDir = join(LISTS, 'cache');
@@ -106,6 +106,7 @@ try {
     '--cache', join(cacheDir, `dedust-${DAY}.json`), '--taken', STAMP]);
   build('build_asset_pictures.mjs', []);
   build('build_pool_activity.mjs', ['--cache', join(cacheDir, `activity-${DAY}.json`), '--taken', STAMP]);
+  build('build_nft_collections.mjs', ['--cache', join(cacheDir, 'nft-deployer.json'), '--taken', STAMP]);
 } catch (error) {
   restore();
   console.error(`\n${error.message}\nthe four lists stand as they were before this run`);
@@ -133,6 +134,8 @@ console.log(change("STON.fi's pools", poolsOf(before['swap-pools.mjs'].SWAP_POOL
 console.log(change("DeDust's pools", poolsOf(before['dedust-pools.mjs'].DEDUST_POOLS, dedustSymbol(before)), poolsOf(after['dedust-pools.mjs'].DEDUST_POOLS, dedustSymbol(after))));
 console.log(change('tokens offered', offeredBefore, tokensOf(after)));
 console.log(`  pictures: ${Object.keys(before['asset-pictures.mjs'].ASSET_PICTURES).length} -> ${Object.keys(after['asset-pictures.mjs'].ASSET_PICTURES).length}`);
+const collectionsOf = (lists) => new Map(lists['nft-collections.mjs'].approvedNftCollections().map((one) => [one.collection, one.name || one.collection]));
+console.log(change('NFT collections Getgems verifies', collectionsOf(before), collectionsOf(after)));
 console.log('\nnext, as every release: node scripts/bump_module_versions.mjs --run (twice), npm run web:deploy:prepare, the tests');
 
 for (const day of existsSync(join(LISTS, 'sources')) ? readdirSync(join(LISTS, 'sources')).sort().slice(0, -KEEP_SOURCE_DAYS) : []) {

@@ -110,7 +110,7 @@ describe('client audit round 32 — what a wallet shows', () => {
     expect(parseWalletHistory({ actions: [{ type: 'jetton_transfer', end_utime: 1, action_id: 'a', details: { asset: OTHER, sender: OTHER, receiver: SELF, amount: '1' } }],
       metadata: { [OTHER.toUpperCase()]: master('ATH') } }, SELF, { alsoVerified: [OTHER] })[0].verified, 'the app\'s own ATH').toBe(true);
     expect(code(fn('function renderWalletHistory(panel) {')))
-      .toContain("const unverified = (row.kind === 'jetton' || (row.kind === 'nft' && incoming)) && row.verified === false && !stranger ? t('wallet.tokenUnverified') : '';");
+      .toContain("const unverified = (row.kind === 'jetton' && row.verified === false && !stranger) || (row.kind === 'nft' && incoming && nftJudged === 'no')");
   });
 
   it('R32-08 (F3-3): the index is read 1000 rows at a time — its maximum (1001 is refused)', () => {

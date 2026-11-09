@@ -1,6 +1,6 @@
 # Política de Privacidade
 
-Última atualização: 22 de outubro de 2026
+Última atualização: 31 de outubro de 2026
 
 O Platho é um mensageiro sem backend. Este documento é curto porque há muito
 pouco a divulgar — e é específico onde algo realmente sai do seu dispositivo.
@@ -22,7 +22,7 @@ Não pedimos endereço de e-mail, número de telefone nem nome.
 - A sua frase de recuperação de 24 palavras e as chaves de carteira e de mensagens dela derivadas.
 - O seu histórico de mensagens. (Um rascunho que você não enviou fica só na memória e some quando a página fecha.)
 - Os nomes que você dá aos seus contatos, e quais deles você fixou ou deixou de marcar como não lidos.
-- Os nomes que você dá às suas carteiras — guardados como texto comum, para que a tela de bloqueio possa mostrá-los antes de qualquer senha.
+- Os nomes que você dá às suas carteiras, e os endereços das carteiras — guardados como texto comum, para que a tela de bloqueio possa mostrá-los antes de qualquer senha.
 - As suas definições, incluindo uma chave de API opcional de um fornecedor público de nós TON.
 
 Nada disso chega até nós, e a proteção não é a mesma para cada item — por isso

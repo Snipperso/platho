@@ -1,11 +1,11 @@
 
-import { createConvReadLane } from './conv-lane.mjs?v=134';
+import { createConvReadLane } from './conv-lane.mjs?v=138';
 import { groupAvatarKey, groupAvatarLanePublicKey, groupContentKey, groupLanePublicKey } from './crypto/group-lane.mjs?v=8';
 import {
   assembleGroupParts, decodeGroupPayload, groupAvatarHash, groupAvatarSecretIn, openGroupCapsule, GROUP_AVATAR_SENDER, GROUP_KIND,
-} from './group-protocol.mjs?v=31';
-import { parseBocBase64, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=59';
-import { recordShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=47';
+} from './group-protocol.mjs?v=32';
+import { parseBocBase64, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=60';
+import { recordShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=48';
 import { generationForEpochAt } from './cutover-epoch.mjs?v=7';
 
 const bytesToBig = (bytes) => [...bytes].reduce((acc, byte) => (acc << 8n) | BigInt(byte), 0n);

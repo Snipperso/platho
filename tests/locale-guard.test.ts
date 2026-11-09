@@ -10,6 +10,8 @@ const BASELINE_PATH = 'tests/fixtures/locale-debt-baseline.json';
 const INTENTIONAL = [
   /^web\/i18n-strings\.mjs$/,
   /^web\/docs\/.*\.ru\.md$/,
+  /^scripts\/server\/maintenance\/index\.html$/,
+  /^web\/nft-collections\.mjs$/,
 ];
 
 const SCANNED = /\.(tact|ts|mjs|js|md|json|txt|html|css)$/;

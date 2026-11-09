@@ -1,4 +1,4 @@
-import { randomBytes, parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=31';
+import { randomBytes, parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=32';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const ATH_WALLET_OPS = Object.freeze({

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 22 October 2026
+Last updated: 31 October 2026
 
 Platho is a messenger with no backend. This document is short because there is
 very little to disclose — and specific where something genuinely leaves your
@@ -22,7 +22,7 @@ We do not ask for an email address, a phone number or a name.
 - Your 24-word recovery phrase, and the wallet and messaging keys derived from it.
 - Your message history. (A draft you have not sent is kept in memory only, and goes when the page closes.)
 - The names you give your contacts, and which of them you pinned or stopped marking as unread.
-- The names you give your wallets — kept as ordinary text, so that the lock screen can show them before any password.
+- The names you give your wallets, and the wallets' addresses — kept as ordinary text, so that the lock screen can show them before any password.
 - Your settings, including an optional API key for a public GRAM node provider.
 
 None of it reaches us, and what protects each of them is not the same — so this

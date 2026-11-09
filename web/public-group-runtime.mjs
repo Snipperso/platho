@@ -1,7 +1,7 @@
 
-import { parseTonAddress, randomBytes, sha256Sync } from './crypto/platho-crypto.mjs?v=31';
-import { readPublicPostPayloadV2 } from './pwa-contract-transactions.mjs?v=59';
-import { createPerKeyLock } from './group-store.mjs?v=42';
+import { parseTonAddress, randomBytes, sha256Sync } from './crypto/platho-crypto.mjs?v=32';
+import { readPublicPostPayloadV2 } from './pwa-contract-transactions.mjs?v=60';
+import { createPerKeyLock } from './group-store.mjs?v=43';
 import {
   isPublicGroupBanned,
   PUBLIC_GROUP_ID_BYTES, PUBLIC_GROUP_KIND, applyPublicGroupRows, createPublicGroupRecord, decodePublicGroupControl,

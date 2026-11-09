@@ -47,7 +47,7 @@ describe('client audit round 34', () => {
     try {
       const memberships = new Map();
       const ask = lift({ telegramGiftMemberships: memberships, giftChainReadOptions: () => ({ priority: 'profile' }), decodeNftAddressByIndexStack,
-        decodeTonAddressSliceBoc: () => { throw new Error('not reached'); } }, [fn('async function verifyTelegramGiftMembershipOnChain(collectionAddress, index) {')],
+        decodeTonAddressSliceBoc: () => { throw new Error('not reached'); } }, [fn('async function verifyTelegramGiftMembershipOnChain(collectionAddress, index, { callOptions = giftChainReadOptions() } = {}) {')],
         'verifyTelegramGiftMembershipOnChain');
       expect(await ask(COLLECTION, 37n)).toBe(ITEM);
       expect(await ask(COLLECTION, 37n), 'remembered').toBe(ITEM);
@@ -64,7 +64,7 @@ describe('client audit round 34', () => {
   it('R34-03 (F6-2): a channel with a shard nobody answered about is reported as not read whole — never taken for "no profile"', () => {
     const many = code(sourceBlock(lane, 'async function readChannelPostsManyImpl('));
     expect(many).toMatch(/out\.set\(wallet, await readChannelPostsFromStates\([^\n]*\n\s*if \(\(coordsByWallet\.get\(wallet\) \?\? \[\]\)\.some\(\(coord\) => isUnknownAccountState\(live\.get\(addrKey\(coord\.address\)\)\)\)\s*&& typeof onChannelError === 'function'\) \{\s*try \{ onChannelError\(wallet, Object\.assign\(new Error\([^)]*\), \{ code: 'PUBLIC_CHANNEL_STATE_UNKNOWN' \}\)\); \} catch \{/);
-    expect(code(fn('async function resolveChannelProfile(authorWallet, options = {}) {'))).toContain('if (failed) return cachedChannelProfile(key);');
+    expect(code(fn('async function resolveChannelProfile(authorWallet, options = {}) {'))).toContain('if (failed) return readFailed();');
   });
 
   it('R34-04 (F2-1, F1-2, F5-4; F2 LOW): the swap window says what it could not read; the press answers for the screen up to the signature', () => {

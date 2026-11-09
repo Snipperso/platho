@@ -11,7 +11,7 @@
     <link rel="manifest" href="/manifest.webmanifest?v=3">
     <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="/assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="/styles.css?v=618">
+    <link rel="stylesheet" href="/styles.css?v=632">
     <script src="/boot-guard.js?v=17"></script>
   </head>
   <body>
@@ -27,7 +27,7 @@
             <div class="network-pill" id="brandNetworkPill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">1.5.24</span>
+              <span class="app-version-label" id="appVersionLabel">1.5.27</span>
             </div>
           </div>
         </div>
@@ -321,9 +321,6 @@
             <input id="privateImageInput" type="file" accept="image/*" hidden>
             <input id="privateFileInput" type="file" hidden>
             <div class="composer-input-row">
-              <button class="icon-button private-anonymous-button" id="privateAnonymousButton" type="button" aria-label="Send pseudonymously without wallet address" title="Pseudonymous: wallet address hidden, sender key may still link messages" aria-pressed="false" data-i18n-aria-label="composer.sendPseudonymously" data-i18n-title="composer.pseudonymousHint">
-                <span class="icon icon-eye-off"></span>
-              </button>
               <label class="sr-only" for="messageInput" data-i18n="composer.message">Message</label>
               <div id="messageInput" class="composer-input is-empty" contenteditable="true" role="textbox" aria-multiline="true" tabindex="0" autocapitalize="sentences" placeholder="Wallet required" data-i18n-placeholder="composer.walletRequired"></div>
               <button class="send-button" type="submit" aria-label="Send" title="Send" data-i18n-aria-label="composer.send" data-i18n-title="composer.send">
@@ -498,7 +495,7 @@
             <div class="pane-title-block">
               <h1 id="profileSettingsTitle" data-i18n="profile.settingsTitle">Settings</h1>
               <p id="profileHandle" data-i18n="profile.settingsLead">This device and this account</p>
-              <span class="app-version-label" id="profileVersionLabel" hidden>1.5.24</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.5.27</span>
             </div>
             <button class="icon-button" id="profileSettingsCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
               <span class="icon icon-close" aria-hidden="true"></span>
@@ -526,13 +523,6 @@
             <section class="profile-section" aria-label="Messages" data-i18n-aria-label="chat.messages">
               <h2 data-i18n="chat.messages">Messages</h2>
               <div class="settings-list">
-                <label class="settings-select-row compact-select-row" for="privateSenderModeSelect">
-                  <span data-i18n="chat.privateSender">Send private messages</span>
-                  <select id="privateSenderModeSelect" aria-label="Send private messages by default" data-i18n-aria-label="chat.defaultPrivateSenderMode">
-                    <option value="share" data-i18n="chat.senderModeWithWallet">With wallet address</option>
-                    <option value="anonymous" data-i18n="chat.anonymous">Anonymous</option>
-                  </select>
-                </label>
                 <button id="replaceVaultKeysButton" type="button"><span data-i18n="sync.replaceMessageKeys">Replace message keys</span><strong id="vaultRotateStatus" data-i18n="sync.statusActivateAccountFirst">activate account first</strong></button>
               </div>
             </section>
@@ -847,7 +837,10 @@
             <button class="discovery-cta-action" id="profileCardSettingsButton" type="button" aria-haspopup="dialog" data-i18n="profile.settingsTitle">Settings</button>
           </div>
           <div class="profile-card-section">
-            <h3 data-i18n="profileCard.names">.ath names</h3>
+            <div class="profile-card-section-head">
+              <h3 id="profileCardNamesTitle" data-i18n="profileCard.names">.ath names</h3>
+              <button class="profile-card-fold" id="profileCardNamesFold" type="button" data-fold-key="names" aria-labelledby="profileCardNamesFold profileCardNamesTitle" aria-controls="profileCardNames" aria-expanded="true" aria-label="Collapse" title="Collapse"><span class="icon icon-chevron-down" aria-hidden="true"></span></button>
+            </div>
             <p class="profile-card-note" id="profileCardNamesNote"></p>
             <div class="profile-card-rows" id="profileCardNames"></div>
             <div class="discovery-cta-actions" id="profileCardMintNameRow" hidden>
@@ -860,7 +853,10 @@
             </div>
           </div>
           <div class="profile-card-section">
-            <h3 data-i18n="profileCard.gifts">Telegram gifts</h3>
+            <div class="profile-card-section-head">
+              <h3 id="profileCardGiftsTitle" data-i18n="profileCard.gifts">Telegram gifts</h3>
+              <button class="profile-card-fold" id="profileCardGiftsFold" type="button" data-fold-key="gifts" aria-labelledby="profileCardGiftsFold profileCardGiftsTitle" aria-controls="profileCardGifts" aria-expanded="true" aria-label="Collapse" title="Collapse"><span class="icon icon-chevron-down" aria-hidden="true"></span></button>
+            </div>
             <p class="profile-card-note" id="profileCardGiftsNote"></p>
             <div class="profile-card-gifts" id="profileCardGifts"></div>
           </div>
@@ -1019,6 +1015,6 @@
       </div>
     </div>
     <script src="/vendor/telegram-web-app.js?v=3"></script>
-    <script src="/app.js?v=bfe30acaf" type="module"></script>
+    <script src="/app.js?v=b7cf3f8d5" type="module"></script>
   </body>
 </html>

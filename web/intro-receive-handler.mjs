@@ -1,5 +1,5 @@
 
-import { openIntroCapsuleFromChainCells } from './crypto/platho-crypto.mjs?v=31';
+import { openIntroCapsuleFromChainCells } from './crypto/platho-crypto.mjs?v=32';
 import { INTRO_UNSIGNED_REFUSED_FROM } from './crypto/intro-handshake.mjs?v=8';
 
 function introReplayError(message) {
@@ -16,7 +16,7 @@ export function introEpochVerdict(signedEpoch, readEpoch) {
   }
   return Number(signedEpoch) === read ? null : `signed for epoch ${Number(signedEpoch)}, read in ${read}`;
 }
-import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=59';
+import { readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=60';
 
 const asBytes = (value, name) => (value instanceof Uint8Array ? value : readSnakeCellBytes(value, { name }));
 

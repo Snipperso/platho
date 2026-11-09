@@ -1,4 +1,5 @@
-import { t, tPlural } from './i18n.mjs?v=298';
+import { normalizeProfileGroupAbout } from './capsule-part-policy.mjs?v=24';
+import { t, tPlural } from './i18n.mjs?v=325';
 import { messagePreviewText } from './message-plain-text.mjs?v=5';
 
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;
@@ -561,7 +562,8 @@ function normalizeProfileGroupRecords(value) {
     const keyHex = (value) => { const hex = String(value ?? '').trim().toLowerCase(); return /^[0-9a-f]{64}$/.test(hex) && !/^0{64}$/.test(hex) ? hex : null; };
     const founder = keyHex(entry?.founder);
     const owner = keyHex(entry?.owner);
-    out.push({ groupId, name: nonEmptyString(entry?.name) ?? '', ...(founder ? { founder } : {}), ...(owner ? { owner } : {}) });
+    const about = normalizeProfileGroupAbout(entry?.about);
+    out.push({ groupId, name: nonEmptyString(entry?.name) ?? '', ...(founder ? { founder } : {}), ...(owner ? { owner } : {}), ...(about.length ? { about } : {}) });
     if (out.length >= 8) break;
   }
   return out;

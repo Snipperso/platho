@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-Dernière mise à jour : 22 octobre 2026
+Dernière mise à jour : 31 octobre 2026
 
 Platho est une messagerie sans serveur dorsal. Ce document est court parce qu'il
 y a très peu de choses à divulguer — et précis là où quelque chose quitte
@@ -24,7 +24,7 @@ Nous ne demandons ni adresse e-mail, ni numéro de téléphone, ni nom.
 - Votre phrase de récupération de 24 mots, ainsi que les clés de portefeuille et de messagerie qui en sont dérivées.
 - Votre historique de messages. (Un brouillon non envoyé n'est gardé qu'en mémoire et disparaît à la fermeture de la page.)
 - Les noms que vous donnez à vos contacts, et ceux que vous avez épinglés ou que vous ne marquez plus comme non lus.
-- Les noms que vous donnez à vos portefeuilles — conservés en texte ordinaire, pour que l’écran de verrouillage puisse les afficher avant tout mot de passe.
+- Les noms que vous donnez à vos portefeuilles, et les adresses des portefeuilles — conservés en texte ordinaire, pour que l’écran de verrouillage puisse les afficher avant tout mot de passe.
 - Vos réglages, y compris une clé d'API facultative pour un fournisseur public de nœuds TON.
 
 Rien de tout cela ne nous parvient, et la protection n'est pas la même pour

@@ -45,7 +45,7 @@ describe('PROFILE CARD — the profile lane', () => {
     const same = code(block(RAW, 'function sameChannelProfileContent('));
     expect(same).toMatch(/&& groups\(a\) === groups\(b\)\s/);
     expect(same).toContain("const groups = (profile) => (Array.isArray(profile?.groups) ? profile.groups : [])");
-    expect(same, 'id, name, founder and owner — the fields the card carries').toContain("`${room?.groupId ?? ''}:${room?.name ?? ''}:${room?.founder ?? ''}:${room?.owner ?? ''}`");
+    expect(same, 'id, name, founder, owner and assets — the fields the card carries').toContain("`${room?.groupId ?? ''}:${room?.name ?? ''}:${room?.founder ?? ''}:${room?.owner ?? ''}:${JSON.stringify(room?.about ?? [])}`");
     expect(APP, 'the description dialog').toContain('channelProfilePriceLine(values.description, values.tags, appearanceOf(values), normalizeProfileWornGift(current?.wornGift ?? null), current?.groups ?? [])');
     expect(APP, 'the wear dialog').toContain('channelProfilePriceLine(description, tags, appearance, wornGift, current?.groups ?? [], card)');
     const priceLine = code(block(RAW, 'function channelProfilePriceLine('));

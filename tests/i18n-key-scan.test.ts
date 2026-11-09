@@ -106,7 +106,7 @@ describe('I18N-SCAN — every key a call can resolve to', () => {
     expect([...before].filter((key) => !now.has(key)), 'nothing the regex checked goes unchecked').toEqual([]);
     expect([...beforePlural].filter((key) => !nowPlural.has(key))).toEqual([]);
     expect(unread, 'every call in the client is read to its end').toEqual([]);
-    for (const key of ['group.privateLabel', 'chat.activateBeforeSending']) {
+    for (const key of ['chat.activateBeforeSending']) {
       expect(before.has(key), `${key}: invisible to the regex`).toBe(false);
       expect(now.has(key), `${key}: read now`).toBe(true);
     }

@@ -1,7 +1,7 @@
 
-import { toWireAddress } from './shard-reader.mjs?v=109';
+import { toWireAddress } from './shard-reader.mjs?v=113';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
-import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=59';
+import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=60';
 
 export const RECOVERY_SHARD_VIEW_ARITY = 12;
 

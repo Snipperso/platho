@@ -160,21 +160,9 @@ describe('GROUP LANES — a room says which kind it is', () => {
     expect(send).toContain("sendButton.title = reason ?? (nothingToSend ? t('composer.nothingToSend') : sendWords);");
   });
 
-  it('LANE-06: no room offers "send pseudonymously" — nothing it sends can hide its writer', () => {
-    const button: any = { hidden: false, attrs: {} as Record<string, string>, setAttribute(k: string, v: string) { this.attrs[k] = v; }, querySelector: () => null, title: '' };
-    let thread: any = { id: 'group:aa' };
-    const update = inAppScope([fn('function updatePrivateSenderModeUi(')], 'updatePrivateSenderModeUi', {
-      t, privateAnonymousButton: button, privateSenderModeSelect: null, plathoWallet: { address: '0:aa' },
-      currentPrivateSenderMode: () => 'share', PRIVATE_SENDER_MODES: { ANONYMOUS: 'anonymous', SHARE: 'share' },
-      privateSenderModeToggleBlockReason: () => null, privateSendBlockReason: () => null,
-      activeThread: () => thread, isGroupThread: (x: any) => String(x?.id ?? '').startsWith('group:'),
-    });
-    update(null);
-    expect(button.hidden).toBe(true);
-    thread = { id: 'dm:1' };
-    update(null);
-    expect(button.hidden, 'a dialog keeps it').toBe(false);
-    expect(css).toMatch(/\.composer \.private-anonymous-button\[hidden\] \{\s*display: none;\s*\}/);
+  it('LANE-06: no composer offers "send pseudonymously" — a room\'s rows name their writer, and a dialog\'s peer holds the wallet from the first contact [2026-10-31]', () => {
+    expect(readFileSync('web/index.html', 'utf8')).not.toMatch(/id="privateAnonymousButton"/);
+    expect(css).not.toMatch(/private-anonymous-button/);
   });
 
   it('LANE-07: a public room wears the Public tab\'s mark in the corner, a private group the people mark', () => {
@@ -209,7 +197,7 @@ describe('GROUP LANES — a room says which kind it is', () => {
     expect(hint('priv', true)).toBe('<group.profileUnpinHint>');
     expect(RAW.split('hint: groupProfilePinHint(groupId, groupIsPinnedToProfile(groupId)),').length - 1).toBe(2);
     expect(RAW).toContain("groupActions.profilePin.hint ?? (groupActions.profilePin.pinned ? t('group.profileUnpinHint') : t('group.profilePinHint')),");
-    expect(fn('async function togglePinnedProfileGroup(')).toContain('hint: () => joinHintSentences(groupProfilePinHint(groupId, pinned), channelProfilePriceLine(description, tags, appearance, worn, next)),');
+    expect(fn('async function togglePinnedProfileGroup(')).toContain("hint: () => joinHintSentences(groupProfilePinHint(groupId, pinned), endsOfficial ? t('community.unpinEndsOfficial') : '', channelProfilePriceLine(description, tags, appearance, worn, next)),");
   });
 });
 

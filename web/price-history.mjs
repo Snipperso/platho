@@ -160,6 +160,11 @@ export function priceLinePaths(xy, height) {
 }
 
 const SUBSCRIPT_DIGITS = '\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089';
+export function formatUsdAmount(usd) {
+  if (!(usd >= 0.01) || usd >= 1e13) return formatPrice(usd);
+  const [whole, cents] = (Math.round(usd * 100) / 100).toFixed(2).split('.');
+  return `${Number(whole).toLocaleString('en').replace(/,/g, ' ')}.${cents}`;
+}
 export function formatPrice(price) {
   if (!(price > 0)) return '0';
   if (price >= 1000) return Math.round(price).toLocaleString('en').replace(/,/g, ' ');

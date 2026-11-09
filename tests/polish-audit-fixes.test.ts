@@ -59,7 +59,7 @@ describe('the final polish audit\'s fixes', () => {
   it('PAF-04 (P2-02): the copy row is marked, its label wraps, its short address stays one piece', () => {
     const doc = { createElement: (tag: string) => ({ tag, className: '', textContent: '', dataset: {}, append() {}, addEventListener() {} }) };
     const stat = lift({ document: doc, copyTextToClipboard: async () => {}, showAppNotice: () => {}, t: (k: string) => k },
-      [fn("function walletCardStat(label, value, { copy = '', copied = 'dialog.shareCopied', balanceRow = null } = {}) {")], 'walletCardStat');
+      [fn("function walletCardStat(label, value, { copy = '', copied = 'dialog.shareCopied', balanceRow = null, wide = false } = {}) {")], 'walletCardStat');
     expect(stat('Token address', 'UQAR...bvW', { copy: 'UQAR-full' }).className).toBe('profile-stat-row wallet-card-stat-copy');
     expect(stat('Balance', '5 MAJOR').className).toBe('profile-stat-row');
     expect(ruleOf('.wallet-group-dialog .profile-stat-row.wallet-card-stat-copy')).toContain('grid-template-columns: minmax(0, 1fr) auto;');

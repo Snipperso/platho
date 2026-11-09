@@ -1,6 +1,6 @@
 
-import { sha256Sync } from './crypto/platho-crypto.mjs?v=31';
-import { tonCell, createAthWalletMessage, estimateAthWalletAttachedValueNanotons } from './pwa-contract-transactions.mjs?v=59';
+import { sha256Sync } from './crypto/platho-crypto.mjs?v=32';
+import { tonCell, createAthWalletMessage, estimateAthWalletAttachedValueNanotons } from './pwa-contract-transactions.mjs?v=60';
 
 export const GROUP_ENTRY_BURN_BPS = 5000n;
 export const GROUP_ENTRY_QUERY_DOMAIN = 'PLATHO.GROUP.ENTRY.V1';

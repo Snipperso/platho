@@ -60,7 +60,7 @@ describe('client audit round 35', () => {
     expect(parseWalletHistory(payload, SELF)[0].verified, 'known: unlisted').toBe(false);
     expect(parseWalletHistory(payload, SELF, { nftVerdictsKnown: false })[0].verified, 'not known yet: no verdict').toBeNull();
     expect(parseWalletHistory(payload, SELF, { nftVerdictsKnown: false, verifiedCollections: [COLLECTION] })[0].verified, 'listed stays verified').toBe(true);
-    expect(code(fn('function renderWalletHistory(panel) {')), 'the warning only on a known "no"').toContain("row.verified === false && !stranger ? t('wallet.tokenUnverified') : ''");
+    expect(code(fn('function renderWalletHistory(panel) {')), 'the warning only on a known "no"').toContain("(row.kind === 'jetton' && row.verified === false && !stranger) || (row.kind === 'nft' && incoming && nftJudged === 'no')");
     const load = code(fn('async function loadWalletAssets(tab, { force = false, more = false, keep = false } = {}) {'));
     expect(load).toContain('nftVerdictsKnown: Boolean(gifts),');
     expect(load).toMatch(/void proof\.then\(async \(late\) => \{\s*if \(!\(raced \? late\?\.advanced : \(\(late\?\.complete && late !== gifts\) \|\| late\?\.advanced\)\) \|\| owner !== state\.owner\) return;\s*if \(late\?\.advanced\) \{\s*if \(\(state\.proofRuns \?\? 0\) >= WALLET_PROOF_CONTINUATIONS_MAX\) return;\s*state\.proofRuns = \(state\.proofRuns \?\? 0\) \+ 1;\s*\}\s*await state\.loading\.get\('nft'\);\s*if \(owner !== state\.owner\) return;\s*state\.at\.delete\('nft'\);\s*if \(state\.tab === 'nft' && isVaultViewActive\(\)\) void loadWalletAssets\('nft', \{ force: true \}\);/);

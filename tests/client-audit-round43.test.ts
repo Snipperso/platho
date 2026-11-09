@@ -93,7 +93,8 @@ describe('client audit round 43', () => {
     expect(code(fn('function openWalletTokenCard(token, { refill = false } = {}) {'))).toContain('walletHiddenAssets().has(token.master) ? walletCardUnhide(token.master)');
     const chooser = code(fn('async function openWalletSendChooser() {'));
     expect(chooser).toContain('const hiddenNow = walletHiddenAssets();');
-    expect(chooser).toContain('...nfts.filter((one) => one.verified === true && !hiddenNow.has(one.address)), ...nfts.filter((one) => one.verified === false && !hiddenNow.has(one.address))');
+    expect(chooser).toContain('const offered = (one) => !hiddenNow.has(one.address) && !one.onSale && nftCollectionTransferable(one.collection);');
+    expect(chooser).toContain('...nfts.filter((one) => one.verified === true && offered(one)), ...nfts.filter((one) => one.verified === false && offered(one))');
     const tokens = code(fn('function renderWalletTokens(panel) {'));
     expect(tokens).toContain('for (const token of tokens.filter((one) => one.verified && !hidden.has(one.master))) list.append(row(token));');
   });

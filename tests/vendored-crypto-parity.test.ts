@@ -106,3 +106,15 @@ describe('vendored @noble crypto parity', () => {
     expect(unrewritten, `vendored files still importing bare @noble specifiers:\n${unrewritten.join('\n')}`).toEqual([]);
   });
 });
+
+describe('the signed and sealed key order is the same on every device [pentest 2026-10-31 — C5]', () => {
+  it('CRYPTO-ORDER-01: stableStringify sorts by one named collation — the order the device locales gave but four, which moved it', () => {
+    const source = readFileSync('web/crypto/platho-crypto.mjs', 'utf8');
+    expect(source).toContain(".sort(([a], [b]) => a.localeCompare(b, 'en'));");
+    expect(source).not.toMatch(/a\.localeCompare\(b\)\)/);
+    const order = (locale: string) => ['expiresAt', 'ephemeralR'].sort((a, b) => a.localeCompare(b, locale)).join(',');
+    expect(order('az'), 'a device locale that moved it').toBe('expiresAt,ephemeralR');
+    expect(order('en'), 'the named order: what every other locale gives').toBe('ephemeralR,expiresAt');
+    expect(order('und')).toBe(order('en'));
+  });
+});

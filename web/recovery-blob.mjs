@@ -1,5 +1,5 @@
 
-import { tonCell } from './pwa-contract-transactions.mjs?v=59';
+import { tonCell } from './pwa-contract-transactions.mjs?v=60';
 
 const RECOVERY_BLOB_SALT = 'PLATHO.RECOVERY.BLOB.SALT.V1';
 const RECOVERY_BLOB_INFO = 'PLATHO.RECOVERY.BLOB.KEY.V1';

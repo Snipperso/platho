@@ -1,7 +1,7 @@
-import { parseTonAddress } from './crypto/platho-crypto.mjs?v=31';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=112';
-import { shardStateInitCell } from './shard-address.mjs?v=47';
-import { computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=59';
+import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=116';
+import { shardStateInitCell } from './shard-address.mjs?v=48';
+import { computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
 import { ATHWALLET_CODE_BOC } from './ath-wallet-code.mjs?v=2';
 
 export class AthTonRpcProviderError extends Error {
@@ -80,7 +80,7 @@ function stackNumber(value) {
 
 function criticalCallOptions(callOptions = {}) {
   const out = {};
-  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead']) {
+  for (const key of ['cacheTtlMs', 'ttlMs', 'priority', 'verify', 'allowUnverifiedCriticalRead', 'queueTimeoutMs']) {
     if (callOptions[key] !== undefined) out[key] = callOptions[key];
   }
   return out;

@@ -250,6 +250,7 @@ describe('AUDIT ROUND 7 — money: what the app says about a send', () => {
       const build = (failure: any) => appFunctions({
         requireNoPendingServiceWorkerAppShellReload: () => {}, requirePlathoWallet: () => ({ address: `0:${'44'.repeat(32)}` }), requireSameWallet: (signer: any) => signer,
         assertWalletGramAtLeast: async () => {}, walletSendFeeReserveNanotons: () => 1n,
+        refuseNftOnOwnSale: async () => {},
         USERNAME_NFT_TRANSFER_VALUE_NANOTONS: 20_000_000n, TELEGRAM_GIFT_TRANSFER_VALUE_NANOTONS: 50_000_000n,
         buildUsernameNftTransferBody: () => ({}), buildTelegramGiftTransferBody: () => ({}), buildNftTransferBody: () => ({}),
         nextUsernameNftTransferQueryId: () => 1n, nextQueryId: () => 1n,
@@ -261,10 +262,10 @@ describe('AUDIT ROUND 7 — money: what the app says about a send', () => {
         canonicalUsernameDisplay: (v: any) => String(v ?? ''), readLinkedPlathoUsername: () => null, clearLinkedPlathoUsername: () => {},
         removeKnownPlathoUsername: (label: string) => { left.push(`name ${label}`); }, deleteStoredUsernameNftList: async () => {},
         telegramGiftListCache: { delete: () => { left.push('gift cache'); } }, deleteStoredTelegramGiftList: async () => {},
-        wornGiftTheme: null, unwearTelegramGift: () => {},
+        wornGiftTheme: null, unwearTelegramGift: () => {}, walletNftWornNow: () => false,
         parseTonAddress, ownedUsernameNftsVerified: true, renderWalletIdentity: () => {}, console: { warn: () => {}, error: () => {} },
         t: tKey,
-      }, [fn(declaration)], exported);
+      }, [fn(declaration), fn('function usernameNftLeftWallet(label, walletAddress) {'), fn('function telegramGiftLeftWallet(itemAddress, walletAddress) {')], exported);
       const item = { itemAddress: `0:${'55'.repeat(32)}`, label: 'bob.ath', address: `0:${'55'.repeat(32)}` };
       await expect(build(Object.assign(new Error('timeout'), { builtBoc: 'te6' }))(item, `0:${'66'.repeat(32)}`), `${exported}: may have landed`).resolves.not.toThrow();
       expect(left.length, `${exported}: the item left this device's lists`).toBeGreaterThan(0);

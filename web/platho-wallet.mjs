@@ -13,9 +13,9 @@ import {
   computeHybridKeyId,
   createMessagingIdentity,
   parseTonAddress,
-} from './crypto/platho-crypto.mjs?v=31';
-import { tonCell } from './pwa-contract-transactions.mjs?v=59';
-import { TON_RPC_MAX_QUEUE_WAIT_MS, beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=112';
+} from './crypto/platho-crypto.mjs?v=32';
+import { tonCell } from './pwa-contract-transactions.mjs?v=60';
+import { TON_RPC_MAX_QUEUE_WAIT_MS, beginTonRpcPhaseProfile, broadcastThroughNextDoor, toncenterBroadcastExitCode } from './ton-rpc-transport.mjs?v=116';
 
 const {
   beginCell,

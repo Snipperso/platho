@@ -259,7 +259,7 @@ describe('the regression check\'s lows', () => {
     focusArgs.length = 0;
     render('tokens');
     expect([doc.activeElement, focusArgs.length]).toEqual([kept, 0]);
-    expect(code(fn('function renderWalletAssets(tab) {'))).toContain("const rowsSelector = '.wallet-asset-row, .wallet-nft-tile';");
+    expect(code(fn('function renderWalletAssets(tab) {'))).toContain("const rowsSelector = '.wallet-asset-row, .wallet-nft-tile, .wallet-nft-card, .wallet-assets-more';");
   });
 
   it('RLOW-08: "Show full" puts the nearest scroller back where it stood — the browser\'s scroll anchoring carried a reader at the end of a chat to the end of the message', () => {

@@ -1,5 +1,5 @@
 
-import { privateScanViewTagOrNull, __x25519FastPathActiveForTests } from './crypto/platho-crypto.mjs?v=31';
+import { privateScanViewTagOrNull, __x25519FastPathActiveForTests } from './crypto/platho-crypto.mjs?v=32';
 import { x25519 } from './vendor/@noble/curves/ed25519.js';
 import { hkdf } from './vendor/@noble/hashes/hkdf.js';
 import { sha256 } from './vendor/@noble/hashes/sha2.js';

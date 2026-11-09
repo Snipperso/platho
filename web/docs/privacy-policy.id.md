@@ -1,6 +1,6 @@
 # Kebijakan Privasi
 
-Terakhir diperbarui: 22 Oktober 2026
+Terakhir diperbarui: 31 Oktober 2026
 
 Platho adalah messenger tanpa backend. Dokumen ini singkat karena memang sangat
 sedikit yang perlu diungkapkan — dan menjadi rinci di tempat sesuatu benar-benar
@@ -23,7 +23,7 @@ Kami tidak meminta alamat email, nomor telepon, atau nama.
 - Frasa pemulihan 24 kata Anda, serta kunci dompet dan kunci pesan yang diturunkan darinya.
 - Riwayat pesan Anda. (Draf yang belum dikirim hanya disimpan di memori dan hilang saat halaman ditutup.)
 - Nama yang Anda berikan kepada kontak Anda, dan kontak mana yang Anda sematkan atau berhenti Anda tandai belum dibaca.
-- Nama yang Anda berikan pada dompet Anda — disimpan sebagai teks biasa, agar layar kunci bisa menampilkannya sebelum kata sandi apa pun.
+- Nama yang Anda berikan pada dompet Anda, dan alamat dompet — disimpan sebagai teks biasa, agar layar kunci bisa menampilkannya sebelum kata sandi apa pun.
 - Pengaturan Anda, termasuk API key opsional untuk penyedia node TON publik.
 
 Tidak ada satu pun yang sampai kepada kami, dan pelindungnya tidak sama — jadi

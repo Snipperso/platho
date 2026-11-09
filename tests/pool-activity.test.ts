@@ -5,7 +5,7 @@ import { ACTIVITY_MONTH_SAMPLE, ACTIVITY_SAMPLE, ACTIVITY_WINDOW_S, NEW_TOKEN_MA
 import { POOL_ACTIVITY, POOL_ACTIVITY_NEW } from '../web/pool-activity.mjs';
 import { SWAP_POOLS } from '../web/swap-pools.mjs';
 import { DEDUST_POOLS } from '../web/dedust-pools.mjs';
-import { POOL_BUSY_TRADES, POOL_LIVELY_DEPTH_GRAM, POOL_LIVELY_TRADES, SWAP_NEW_ID, routeLively, routeScore, swapAskLively, swapAsksFrom, swapRoutes, swapTokenIsNew } from '../web/swap-routes.mjs';
+import { POOL_BUSY_TRADES, POOL_LIVELY_DEPTH_GRAM, POOL_LIVELY_TRADES, SWAP_NEW_ID, routeLively, routeScore, swapAskEntries, swapAskLively, swapAsksFrom, swapRoutes, swapTokenIsNew } from '../web/swap-routes.mjs';
 import { SWAP_LISTS } from '../scripts/lib/swap-lists-age.mjs';
 
 
@@ -64,7 +64,7 @@ describe('pool activity', () => {
     expect(SWAP_LISTS.map((list) => list.file)).toContain('pool-activity.mjs');
     const refresh = readFileSync('scripts/refresh_lists.mjs', 'utf8');
     expect(refresh).toContain("build('build_pool_activity.mjs', ['--cache', join(cacheDir, `activity-${DAY}.json`), '--taken', STAMP]);");
-    expect(refresh).toContain("const LIST_FILES = ['verified-assets.mjs', 'swap-pools.mjs', 'dedust-pools.mjs', 'asset-pictures.mjs', 'pool-activity.mjs'];");
+    expect(refresh).toContain("const LIST_FILES = ['verified-assets.mjs', 'swap-pools.mjs', 'dedust-pools.mjs', 'asset-pictures.mjs', 'pool-activity.mjs', 'nft-collections.mjs'];");
   });
 
   it('POOLACT-05: a shallow pool that trades all day is lively; a deep one that hardly trades is not; depth times swaps puts the busy shallow one above', () => {
@@ -76,9 +76,11 @@ describe('pool activity', () => {
     const score = (depth: number, trades: number) => Math.log10(1 + depth) + Math.log10(1 + trades);
     expect(score(4_177, 47_533)).toBeGreaterThan(score(71_067, 28));
     void route; void routeLively;
-    const asks = swapAsksFrom('gram');
-    const at = (symbol: string) => asks.findIndex((ask) => ask.symbol === symbol);
-    if (at('MRG') >= 0 && at('OPEN') >= 0) expect(at('MRG')).toBeLessThan(at('OPEN'));
+    const entries = swapAskEntries('gram');
+    expect(entries.length).toBeGreaterThan(100);
+    const broken = entries.findIndex((entry, at) => at > 0 && (entries[at - 1].lively === entry.lively ? entries[at - 1].score < entry.score : !entries[at - 1].lively && entry.lively));
+    expect(broken, 'the first entry out of order').toBe(-1);
+    expect(entries.every((entry) => entry.lively === routeLively(entry.best) && entry.score === routeScore(entry.best))).toBe(true);
   });
 
   it('POOLACT-08: a burst is not a month — the month itself is read, up to 1000 swaps [client audit 61 — C5-2]', () => {

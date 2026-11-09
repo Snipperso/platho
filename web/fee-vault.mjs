@@ -2,9 +2,9 @@
 import {
   beginCell, bytesToBase64, computeCellHashAndDepth, serializeBoc,
   estimateAthWalletAttachedValueNanotons,
-} from './pwa-contract-transactions.mjs?v=59';
-import { shardStateInitCell, rawAddress } from './shard-address.mjs?v=47';
-import { gasFeeNanotons } from './ath-request-reserve.mjs?v=10';
+} from './pwa-contract-transactions.mjs?v=60';
+import { shardStateInitCell, rawAddress } from './shard-address.mjs?v=48';
+import { gasFeeNanotons } from './ath-request-reserve.mjs?v=11';
 
 const toBig = (value, name) => {
   let out;

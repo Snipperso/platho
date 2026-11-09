@@ -1,5 +1,5 @@
 
-import { addrKey } from './shard-discovery.mjs?v=104';
+import { addrKey } from './shard-discovery.mjs?v=108';
 
 export const ACCOUNT_STATES_MAX_PER_CALL = 1024;
 

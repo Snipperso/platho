@@ -816,9 +816,10 @@ describe('R21 A13 — a contact\'s names: shown as proven, the first screenful f
   });
 
   it('R21-NAMES-02: the card draws the names as they come, unless the chain\'s whole answer or a longer list from last time is already shown', () => {
-    const open = sourceBlock(app, 'async function openProfileCardDialog(subject) {');
-    expect(open).toContain('load: () => loadUsernameNftsForWallet(raw, own, {');
-    expect(open).toMatch(/onProgress: \(partial\) => \{\s*if \(profileCardSubject !== raw \|\| profileCardNamesConfirmedFor === raw\) return;\s*if \(nameLane\.stored && \(nameLane\.stored\.owned\?\.length \?\? 0\) > partial\.owned\.length\) return;[^\n]*\s*renderProfileCardNames\(partial, own, \{ unconfirmed: true \}\);/);
+    expect(sourceBlock(app, 'async function openProfileCardDialog(subject) {')).toContain('startProfileCardNamesLane(raw, own);');
+    const lane = sourceBlock(app, 'function startProfileCardNamesLane(raw, own, { shown = null } = {}) {');
+    expect(lane).toContain('load: () => loadUsernameNftsForWallet(raw, own, {');
+    expect(lane).toMatch(/onProgress: \(partial\) => \{\s*if \(!current\(\) \|\| profileCardNamesConfirmedFor === raw\) return;\s*if \(nameLane\.stored && \(nameLane\.stored\.owned\?\.length \?\? 0\) > partial\.owned\.length\) return;[^\n]*\s*renderProfileCardNames\(partial, own, \{ unconfirmed: true \}\);/);
   });
 });
 
@@ -913,8 +914,9 @@ describe('R21 wave D — what the person sees around the card, the names and the
   it('R21-TRANSFER-01: "no longer in this wallet" reaches the dialog as itself, for a name and for a gift (B6)', () => {
     for (const [thrower, key] of [['async function submitUsernameNftTransfer(nft, recipient) {', 'username'], ['async function submitTelegramGiftTransfer(gift, recipient) {', 'gift']] as const) {
       expect(sourceBlock(app, thrower)).toContain(`throw Object.assign(new Error(t('${key}.noLongerYours')), { code: 'ITEM_NOT_OWNED' });`);
-      expect(app, `MEASURED before: "${key} transfer did not go through", Transfer still offered`)
-        .toContain(`error: error?.code === 'ITEM_NOT_OWNED' ? error.message : (gramShortfallText(error) ?? t('${key}.transferFailed'))`);
+      const refusal = key === 'gift' ? "error: error?.code === 'ITEM_NOT_OWNED' ? error.message : error?.code === 'NFT_ON_OWN_SALE' ? t('nft.onOwnSale')"
+        : `error: error?.code === 'ITEM_NOT_OWNED' ? error.message : (gramShortfallText(error) ?? t('${key}.transferFailed'))`;
+      expect(app, `MEASURED before: "${key} transfer did not go through", Transfer still offered`).toContain(refusal);
     }
   });
 

@@ -57,11 +57,12 @@ describe('ATH TON RPC providers', () => {
       verify: true,
       priority: 'critical',
       cacheTtlMs: 0,
+      queueTimeoutMs: 8_000,
     })).resolves.toBe(WALLET);
 
     expect(calls.map((call) => call.method)).toEqual(['get_jetton_data', 'get_wallet_address']);
     expect(calls.every((call) => call.address === MASTER)).toBe(true);
-    expect(calls[1]).toMatchObject({ verify: true, priority: 'critical', cacheTtlMs: 0 });
+    expect(calls[1]).toMatchObject({ verify: true, priority: 'critical', cacheTtlMs: 0, queueTimeoutMs: 8_000 });
   });
 
   it('ATH-RPC-02: reads ATHWallet balance and pending notification', async () => {

@@ -956,7 +956,7 @@ describe('R14 the wallet\'s small records', () => {
     const closing = new Promise<void>((resolve) => { land = resolve; });
     const reloadFor = (held: Promise<void> | null) => lift({
       pendingServiceWorkerAppShellReload: true, deviceCachesClosing: held, delay: () => new Promise(() => {}), window: { location: { reload: () => { reloads += 1; } } },
-    }, [fn('function reloadForPendingServiceWorkerAppShellUpdate() {')], 'reloadForPendingServiceWorkerAppShellUpdate');
+    }, [fn('function reloadForAppUpdatePress() {'), fn('function reloadForPendingServiceWorkerAppShellUpdate() {')], 'reloadForPendingServiceWorkerAppShellUpdate');
     expect(reloadFor(closing)()).toBe(true);
     await delay(1);
     expect(reloads, 'MEASURED before: the reload cut the lock\'s write of the sealed map off').toBe(0);
@@ -965,7 +965,8 @@ describe('R14 the wallet\'s small records', () => {
     expect(reloads, 'once it has landed').toBe(1);
     reloadFor(null)();
     expect(reloads, 'nothing closing: at once').toBe(2);
-    expect(code(fn('function reloadForPendingServiceWorkerAppShellUpdate() {'))).toContain('delay(2_000)');
+    expect(code(fn('function reloadForPendingServiceWorkerAppShellUpdate() {'))).toContain('reloadForAppUpdatePress();');
+    expect(code(fn('function reloadForAppUpdatePress() {'))).toContain('delay(2_000)');
     expect(code(fn('function forgetDeviceCaches() {'))).toContain('deviceCachesClosing = closing;');
     const loadLocal = code(fn('async function loadWalletLocal(wallet) {'));
     const sealedWrite = loadLocal.indexOf('void writeWalletLocalRecords(store, wallet, [WALLET_LOCAL_RECORD, WALLET_LOCAL_CONTENT_RECORD])');

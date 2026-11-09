@@ -1,9 +1,9 @@
 
-import { beginCell } from './pwa-contract-transactions.mjs?v=59';
-import { publicShardAddressBytesFor, publicShardStateInitFor, rawAddress } from './shard-address.mjs?v=47';
+import { beginCell } from './pwa-contract-transactions.mjs?v=60';
+import { publicShardAddressBytesFor, publicShardStateInitFor, rawAddress } from './shard-address.mjs?v=48';
 import { generationForEpochAt, CUTOVER_EPOCH } from './cutover-epoch.mjs?v=7';
-import { publicBeaconPartitionKeyFor } from './shard-discovery.mjs?v=104';
-import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=44';
+import { publicBeaconPartitionKeyFor } from './shard-discovery.mjs?v=108';
+import { publicBodyCommit } from './public-shard-ton-rpc-provider.mjs?v=45';
 
 export const PUBLIC_PUBLISH_OPCODE = 0x50535031;
 

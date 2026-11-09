@@ -51,7 +51,7 @@ describe('client audit round 42', () => {
       return node;
     };
     const state = { openFolds: new Set<string>() };
-    const fold = lift({ document: { createElement: element }, walletAssetsState: state }, [fn('function appendWalletFold(panel, key, title, listClass, nodes) {')], 'appendWalletFold');
+    const fold = lift({ document: { createElement: element }, walletAssetsState: state }, [fn('function appendWalletFold(panel, key, title, listClass, nodes, after = null) {')], 'appendWalletFold');
     const panel: any = { children: [], append(item: any) { this.children.push(item); } };
     fold(panel, 'nft-unverified', 'Unverified (2)', 'wallet-nft-grid', [{}, {}]);
     const first = panel.children[0];
@@ -136,7 +136,7 @@ describe('client audit round 42', () => {
       readStoredUsernameNftList: async () => ({ owned: [{ itemAddress: NAME, image: art }] }),
       loadOwnedUsernameNfts: () => new Promise(() => {}),
       writeStoredUsernameNftList: async () => {}, sameWalletAddress: (a: string, b: string) => a === b, plathoWallet: { address: OWNER },
-      isVaultViewActive: () => true, renderWalletAssets: (tab: string) => drawn.push(tab),
+      isVaultViewActive: () => true, renderWalletAssets: (tab: string) => drawn.push(tab), walletNftAthArtOf: () => [], walletNftTiles: new Map(),
     }, [fn('async function dressWalletNamesFromProfileList(owner, registry, nfts) {')], 'dressWalletNamesFromProfileList');
     void dress(OWNER, REGISTRY, nfts);
     await new Promise((resolve) => setTimeout(resolve, 0));
