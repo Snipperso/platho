@@ -1,7 +1,7 @@
 
 import { groupAvatarKey, groupAvatarLaneSigner, groupContentKey, groupLaneSigner } from './crypto/group-lane.mjs?v=8';
 import { sealGroupCapsules, GROUP_AVATAR_SENDER, GROUP_KIND } from './group-protocol.mjs?v=32';
-import { buildConvPublishViaVaultMessage, buildConvPublishWalletMessage } from './conv-lane-send.mjs?v=141';
+import { buildConvPublishViaVaultMessage, buildConvPublishWalletMessage } from './conv-lane-send.mjs?v=143';
 import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
 import { PLATHO_ONCHAIN_CELL_DATA_BYTES } from './crypto/platho-crypto.mjs?v=32';
 

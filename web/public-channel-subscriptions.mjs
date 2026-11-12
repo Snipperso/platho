@@ -1,5 +1,5 @@
 import { normalizeProfileGroupAbout } from './capsule-part-policy.mjs?v=24';
-import { t, tPlural } from './i18n.mjs?v=325';
+import { t, tPlural } from './i18n.mjs?v=331';
 import { messagePreviewText } from './message-plain-text.mjs?v=5';
 
 export const PUBLIC_CHANNEL_SUBSCRIPTIONS_VERSION = 1;

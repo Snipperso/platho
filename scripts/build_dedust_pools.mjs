@@ -3,6 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { Address, Cell, beginCell } from '@ton/core';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 import { toncenterAccess } from './lib/toncenter-access.mjs';
+import { jettonVerdictKey, proveJettonsWhole, toncenterJettonReads } from './lib/jetton-pays-whole.mjs';
+import { JETTON_PROOF } from './lib/swap-lists-age.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) => (value.startsWith('--') ? [...pairs, [value.slice(2), all[index + 1]]] : pairs), []));
 for (const name of ['pools', 'verified', 'stonfi', 'cache']) {
@@ -259,6 +261,37 @@ async function judge(one) {
 let cursor = 0;
 await Promise.all(Array.from({ length: 3 }, async () => { while (cursor < candidates.length) await judge(candidates[cursor++]); }));
 writeFileSync(args.cache, JSON.stringify(cache));
+
+{
+  const symbolOf = (id) => OWN.get(id) ?? tonkeeper.get(id)?.symbol ?? id.slice(0, 10);
+  const holders = [];
+  const short = new Map();
+  for (const id of [...new Set(kept.flatMap((one) => one.ids))].filter((one) => one !== 'gram')) {
+    const vault = vaultVerdict.get(id).vault;
+    const named = await get(id, 'get_wallet_address', [sliceArg(beginCell().storeAddress(Address.parse(vault)).endCell())]);
+    const wallet = named.exit_code === 0 ? addressAt(named.stack[0]) : '';
+    if (!wallet) { short.set(id, 'its master names no jetton wallet for the vault'); continue; }
+    const held = cache[jettonVerdictKey(id, wallet)];
+    if (held) { if (!held.whole) short.set(id, held.why); continue; }
+    const pools = kept.filter((one) => one.ids.includes(id));
+    const listed = pools.reduce((sum, one) => sum + one.reserves[one.ids.indexOf(id)], 0n);
+    holders.push({ master: id, owner: vault, wallet, symbol: symbolOf(id), sale: { dex: 'dedust', pool: pools[0].pool }, atLeast: listed / 2n });
+  }
+  const verdicts = await proveJettonsWhole({ holders, ...toncenterJettonReads(call), log: (line) => console.log(line) });
+  for (const holder of holders) {
+    const verdict = verdicts.get(`${holder.master}|${holder.wallet}`) ?? { whole: false, why: 'not run' };
+    if (!verdict.unproven) cache[jettonVerdictKey(holder.master, holder.wallet)] = { whole: verdict.whole, why: verdict.why };
+    if (!verdict.whole) short.set(holder.master, verdict.why);
+  }
+  writeFileSync(args.cache, JSON.stringify(cache));
+  for (let at = kept.length - 1; at >= 0; at -= 1) {
+    const id = kept[at].ids.find((one) => short.has(one));
+    if (!id) continue;
+    console.log(`left out ${kept[at].ids.map((one) => (one === 'gram' ? 'GRAM' : symbolOf(one))).join('/')} ${kept[at].stable ? 'stable' : 'volatile'} ${kept[at].pool}: ${symbolOf(id)} does not reach a wallet whole — ${short.get(id)}`);
+    kept.splice(at, 1);
+  }
+  console.log(`${holders.length} jettons run in the sandbox, ${short.size} not whole`);
+}
 kept.sort((a, b) => b.usd - a.usd);
 
 const hashOf = (rawAddress) => Buffer.from(rawAddress.slice(2), 'hex').toString('base64url');
@@ -275,10 +308,15 @@ const tokens = tokenList.slice(1).map((token, index) => `  [${JSON.stringify(has
 const poolLines = kept.map((one) => `  [${JSON.stringify(hashOf(one.pool))}, ${one.stable ? 1 : 0}, ${tokenIndex.get(one.ids[0])}, ${tokenIndex.get(one.ids[1])}],`).join('\n');
 const out = `/**
  * The DeDust v2 pools the wallet swaps through (volatile and stable, direct pairs), as of ${TAKEN}: ${kept.length} pools among ${tokenList.length} tokens,
- * each pair's deepest pool of its type holding at least $${FLOOR_USD} as it stands on chain, every pool, vault and decimals read back from the chain.
+ * each pair's deepest pool of its type holding at least $${FLOOR_USD} as it stands on chain, every pool, vault and decimals read back from the chain,
+ * every jetton paid out of its vault's own wallet in a sandbox and sold back by the app's own message, arriving whole both ways.
  * Built by scripts/build_dedust_pools.mjs — not edited by hand. Account ids are the 32 bytes of a basechain address, base64url.
  */
 export const DEDUST_POOLS_TAKEN = '${TAKEN}';
+/** The day every jetton below was proven to reach a wallet whole (scripts/lib/jetton-pays-whole.mjs) — the day the list was taken, or it does not ship. */
+export const DEDUST_TOKENS_WHOLE = '${TAKEN}';
+/** The number of the proof that did it (scripts/lib/swap-lists-age.mjs): a list proven by an older one does not ship. */
+export const DEDUST_TOKENS_PROOF = ${JETTON_PROOF};
 /** The factory's account id, and its vault for GRAM. */
 export const DEDUST_FACTORY = ${JSON.stringify(hashOf(DEDUST_FACTORY))};
 export const DEDUST_GRAM_VAULT = ${JSON.stringify(hashOf(vaults[0]))};

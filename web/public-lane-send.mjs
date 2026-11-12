@@ -1,14 +1,14 @@
 
-import { buildPublicPublishBrowser } from './public-publish-browser.mjs?v=88';
+import { buildPublicPublishBrowser } from './public-publish-browser.mjs?v=90';
 import {
   buildVaultInternalPublishMessage, vaultInternalPublishValue, publicPublishRoute, FV_PUBLIC_SHARD_PUBLISH_GAS_MAX,
   directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX,
-} from './fee-vault.mjs?v=40';
-import { publicShardCodeCellFor, publicShardDataCellFor } from './shard-address.mjs?v=48';
+} from './fee-vault.mjs?v=41';
+import { publicShardCodeCellFor, publicShardDataCellFor } from './shard-address.mjs?v=49';
 import { CUTOVER_EPOCH } from './cutover-epoch.mjs?v=7';
 import { serializeBoc, tonCell } from './pwa-contract-transactions.mjs?v=60';
-import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=98';
-import { applyShardSurcharge, surchargeExtraNanotons, LANE_PUBLIC } from './shard-debt.mjs?v=87';
+import { sendPlathoWalletTransaction } from './platho-wallet.mjs?v=100';
+import { applyShardSurcharge, surchargeExtraNanotons, LANE_PUBLIC } from './shard-debt.mjs?v=89';
 
 export async function buildPublicPublishWalletMessage({ kind, keyArg = 0n, shardSeq = 0, header, body, value, partitionKey, epochTag, nowUnix, boundary = CUTOVER_EPOCH, attachStateInit = true, prices = null }) {
   const live = BigInt(value) + directWriteLiveSurchargeNanotons({ prices, receiverGas: DIRECT_WRITE_GAS_MAX.public });

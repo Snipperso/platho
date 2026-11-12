@@ -32,8 +32,8 @@ function rosterReadsOfPreviousGeneration(record, today) {
   for (let e = adoptionEpoch; e <= Number(today.epoch); e += 1) epochs.push(e);
   return [{ rosterKey, generation: previousGeneration, epochs }];
 }
-import { buildGroupAvatarPublishMessages, buildGroupPublishMessages } from './group-lane-send.mjs?v=102';
-import { createGroupReadLane, groupLaneBuckets, groupRosterBuckets } from './group-lane-read.mjs?v=79';
+import { buildGroupAvatarPublishMessages, buildGroupPublishMessages } from './group-lane-send.mjs?v=104';
+import { createGroupReadLane, groupLaneBuckets, groupRosterBuckets } from './group-lane-read.mjs?v=86';
 import { CUTOVER_EPOCH, generationForEpochAt } from './cutover-epoch.mjs?v=7';
 
 const hex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -409,17 +409,15 @@ export function createGroupRuntime({
       default: return String(record[field] ?? '');
     }
   };
-  const keepWritesMadeDuringReads = (start, folded, since) => {
+  const keepPendingOwnWrites = (start, folded) => {
     const stillPending = new Set(folded.pendingControl ?? []);
     const seatedIn = (record, keyHex) => record.members.some((m) => hex(m.groupKey) === keyHex);
-    const heldBefore = new Set(start.controlLog ?? []);
-    const foldedNow = (folded.controlLog ?? []).filter((e) => !heldBefore.has(e));
-    const outranked = (entry, about) => foldedNow.some((e) => Number(e.stamp?.[0] ?? 0) > Number(entry.at ?? 0) && about(e));
+    const outranked = (entry, about) => (folded.controlLog ?? []).some((e) => Number(e.stamp?.[0] ?? 0) > Number(entry.at ?? 0) && about(e));
     const names = (e, keyHex) => (e.keys ?? []).some((k) => String(k).toLowerCase() === keyHex)
       || (e.members ?? []).some((m) => String(m?.groupKey ?? '').toLowerCase() === keyHex);
     let next = folded;
     for (const entry of start.pendingControl ?? []) {
-      if (Number(entry.at ?? 0) < Number(since) || !stillPending.has(entry)) continue;
+      if (!stillPending.has(entry)) continue;
       const revert = entry.revert ?? {};
       for (const field of WHOLE_FIELDS) {
         if (!(field in revert) || wholeText(next, field) === wholeText(start, field)) continue;
@@ -898,7 +896,7 @@ export function createGroupRuntime({
       let walked = null;
       try {
         if (start) walked = await walkRoom(start, replay.io, at);
-        if (walked) walked = { ...walked, current: keepWritesMadeDuringReads(start, walked.current, at) };
+        if (walked) walked = { ...walked, current: keepPendingOwnWrites(start, walked.current) };
       } catch (error) { note(`group ${id}`, error); }
       forget([...reads.markedRead].filter((address) => !(walked && replay.used.has(address))));
       if (!walked) return [];

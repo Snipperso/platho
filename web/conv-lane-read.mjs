@@ -1,10 +1,10 @@
 
 import { parseBocBase64, serializeBoc, tonCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
-import { toWireAddress } from './shard-reader.mjs?v=113';
+import { toWireAddress } from './shard-reader.mjs?v=115';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
 import { parseVaultPublishEnvelope, M21C_VAULT_PUBLISH_OPCODE } from './m21c-envelope.mjs?v=5';
 import { WRITES_GENERATION } from './cutover-epoch.mjs?v=7';
-import { convWriteDigestCell } from './conv-publish-browser.mjs?v=49';
+import { convWriteDigestCell } from './conv-publish-browser.mjs?v=50';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 
 export const CAPSULE_PUBLISH_OPCODE = 0x52535031n;
@@ -127,6 +127,10 @@ export function convChainEntryFromParsed(parsed, { createdAtSec = null } = {}) {
 async function cellHashBig(cell) {
   const { hash } = await computeCellHashAndDepth(cell);
   return bytesToBig(hash);
+}
+
+export async function convFrameCommitOfParsed(parsed) {
+  return convFrameCommit(parsed.header0, parsed.header1, parsed.body);
 }
 
 async function convFrameCommit(header0, header1, body) {

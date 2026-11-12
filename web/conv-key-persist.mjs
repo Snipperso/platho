@@ -1,5 +1,5 @@
 
-import { createConvKeyStore, OUTGOING_SEQ_KEEP_EPOCHS, walletList } from './conv-key-store.mjs?v=27';
+import { createConvKeyStore, OUTGOING_SEQ_KEEP_EPOCHS, signKeyHex, walletList } from './conv-key-store.mjs?v=35';
 import { tonCell } from './pwa-contract-transactions.mjs?v=60';
 import { LEGACY_KEY_GRACE_ID, legacyGraceInClear, legacyKeyRetirement, openAtRest, openLegacyGrace, sealAtRest, sealLegacyGrace, withAtRestLock } from './at-rest-seal.mjs?v=5';
 
@@ -42,6 +42,7 @@ export function serializeConvKeyMap(map) {
       lastScannedGeneration: r.lastScannedGeneration == null ? null : Number(r.lastScannedGeneration),
       gapFloors: gapFloorsOf(r.gapFloors),
       retiredIntroNonces: (r.retiredIntroNonces ?? []).map((n) => b64(n)),
+      ...(signKeyHex(r.peerSignPublicKey) ? { peerSignPublicKey: signKeyHex(r.peerSignPublicKey) } : {}),
     };
   }
   return out;
@@ -73,6 +74,7 @@ export function deserializeConvKeyMap(obj) {
       lastScannedGeneration: r.lastScannedGeneration == null ? null : Number(r.lastScannedGeneration),
       gapFloors: gapFloorsOf(r.gapFloors),
       retiredIntroNonces: Array.isArray(r.retiredIntroNonces) ? r.retiredIntroNonces.map((n) => unb64(n)) : [],
+      ...(signKeyHex(r.peerSignPublicKey) ? { peerSignPublicKey: signKeyHex(r.peerSignPublicKey) } : {}),
     });
   }
   return map;
@@ -129,7 +131,13 @@ export function mergeConvKeyMaps(theirs, mine) {
     const base = theirsIsNewer ? theirRecord : myRecord;
     const myEpoch = num(myRecord?.lastScannedEpoch);
     const theirEpoch = num(theirRecord?.lastScannedEpoch);
-    const epoch = maxOf(myEpoch, theirEpoch);
+    const rootHexes = (record) => new Set([record?.kRootCurrent, ...(record?.kRootsForRead ?? []).map((entry) => entry?.kRoot)]
+      .filter((value) => value != null)
+      .map((value) => Array.from(value, (b) => (b & 0xff).toString(16).padStart(2, '0')).join('')));
+    const bringsRoot = (from, to) => { const held = rootHexes(to); return [...rootHexes(from)].some((hex) => !held.has(hex)); };
+    const restart = (myEpoch == null) !== (theirEpoch == null)
+      && ((myEpoch == null && bringsRoot(myRecord, theirRecord)) || (theirEpoch == null && bringsRoot(theirRecord, myRecord)));
+    const epoch = restart ? null : maxOf(myEpoch, theirEpoch);
     const generationSource = epoch == null ? base
       : (theirEpoch != null && epoch === theirEpoch ? theirRecord : myRecord);
     const outgoingSeq = { ...(myRecord?.outgoingSeq ?? {}) };
@@ -155,8 +163,10 @@ export function mergeConvKeyMaps(theirs, mine) {
     }
     const settled = myRecord?.peerWalletVerified === true ? myRecord : (theirRecord?.peerWalletVerified === true ? theirRecord : null);
     const peerWallet = settled ? settled.peerWallet : (base.peerWallet ?? myRecord?.peerWallet ?? theirRecord?.peerWallet ?? null);
+    const peerSign = signKeyHex(myRecord?.peerSignPublicKey) ?? signKeyHex(theirRecord?.peerSignPublicKey);
     merged.set(id, {
       ...base,
+      ...(peerSign ? { peerSignPublicKey: peerSign } : {}),
       peerWallet,
       peerWalletVerified: Boolean(settled),
       peerWalletCandidates: walletList([peerWallet], myRecord?.peerWalletCandidates ?? [], [myRecord?.peerWallet], theirRecord?.peerWalletCandidates ?? [], [theirRecord?.peerWallet]),

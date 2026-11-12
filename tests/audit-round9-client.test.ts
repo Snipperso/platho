@@ -436,7 +436,7 @@ describe('R9 PS-1 / D9-3 — a replayed INTRO moves nothing, and a copy is never
     const handler = code(readFileSync('web/intro-receive-handler.mjs', 'utf8'));
     expect(handler).toMatch(/if \(typeof onFirstContact === 'function' && adoption !== 'replayed'\) await onFirstContact\(result, capsule\);/);
     const store = code(readFileSync('web/conv-key-store.mjs', 'utf8'));
-    expect(store, 'and nothing is persisted for it').toMatch(/if \(\(outcome !== 'duplicate' && outcome !== 'replayed'\) \|\| record !== held \|\| dirty\) \{ byConv\.set\(id, record\); await persistAndAdopt\(\); \}/);
+    expect(store, 'and nothing is persisted for it').toMatch(/if \(\(outcome !== 'duplicate' && outcome !== 'replayed'\) \|\| record !== held \|\| dirty\) \{ byConv\.set\(id, record\); edits \+= 1; await persistAndAdopt\(\); \}/);
   });
 
   it('R9-D93-01: a copy stamped after the entry, in the newest window, is never the source — the entry\'s own window is read', async () => {
@@ -501,16 +501,23 @@ describe('R9 U-2 — a key backup refused for money says so, with the figure, un
       .map((head) => sourceBlock(APP, head)).join('\n');
     const h = new Function(`let chatKeysBackupShortfall = { conv: null, groups: null };
       const chatKeysBackupWarning = { hidden: true }; const chatKeysBackupStatus = { textContent: '' };
+      const vaultPocketState = { wallet: { ton_balance: null } };
       const t = (key, p) => key === 'errors.walletNeedsGram' ? 'Wallet needs ~' + p.amount + ' GRAM' : key;
       const formatTonNanotonsUp = (n) => (Number(n) / 1e9).toFixed(4);
       ${src}
-      return { note: noteChatKeysBackupShortfall, clear: clearChatKeysBackupShortfall, row: chatKeysBackupWarning, status: chatKeysBackupStatus };`)();
+      return { note: noteChatKeysBackupShortfall, clear: clearChatKeysBackupShortfall, render: renderChatKeysBackupWarning, row: chatKeysBackupWarning, status: chatKeysBackupStatus, pocket: vaultPocketState };`)();
     expect(h.row.hidden).toBe(true);
     h.note('conv', { code: 'PLATHO_WALLET_GRAM_REQUIRED', requiredNanotons: 48_400_000n });
     expect(h.row.hidden, 'MEASURED before: a console warning and nothing else').toBe(false);
     expect(h.status.textContent).toBe('Wallet needs ~0.0484 GRAM');
     h.note('groups', { code: 'PLATHO_WALLET_GRAM_REQUIRED', requiredNanotons: 51_620_000n });
     expect(h.status.textContent, 'the larger of the two asks').toBe('Wallet needs ~0.0516 GRAM');
+    h.pocket.wallet.ton_balance = 51_620_000n;
+    h.render();
+    expect([h.row.hidden, h.status.textContent], 'a balance that covers the ask').toEqual([false, '']);
+    h.pocket.wallet.ton_balance = 51_619_999n;
+    h.render();
+    expect(h.status.textContent, 'one nanoton short').toBe('Wallet needs ~0.0516 GRAM');
     h.note('conv', { code: 'SOMETHING_ELSE' });
     expect(h.row.hidden, 'only a refusal for money shows here').toBe(false);
     h.clear('conv');
@@ -525,7 +532,7 @@ describe('R9 U-2 — a key backup refused for money says so, with the figure, un
     expect(conv).toMatch(/\} catch \(error\) \{\s*noteChatKeysBackupShortfall\('conv', error\);/);
     expect(conv).toContain("if (convRecoveryDirtySlots.size === 0) clearChatKeysBackupShortfall('conv');");
     const groups = sourceBlock(app, 'async function backupGroupsIfNeeded(');
-    expect(groups).toMatch(/\} catch \(error\) \{\s*noteChatKeysBackupShortfall\('groups', error\);\s*throw error;/);
+    expect(groups).toMatch(/\} catch \(error\) \{\s*noteChatKeysBackupShortfall\('groups', error\);[^\n]*\n\s*short = true;[\s\S]{0,260}?throw error;/);
     expect(groups).toMatch(/groupsRecoveryStored = chunks\.flat\(\);\s*clearChatKeysBackupShortfall\('groups'\);/);
     expect(app).toMatch(/chatKeysBackupShortfall = \{ conv: null, groups: null \};\s*renderChatKeysBackupWarning\(\);/);
     const html = readFileSync('web/index.html', 'utf8');

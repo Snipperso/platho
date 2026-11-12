@@ -1,5 +1,5 @@
 import { parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=32';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=116';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=118';
 
 export class UsernameTonRpcProviderError extends Error {
   constructor(message) {
@@ -245,6 +245,7 @@ export async function resolveAuthoritativeUsernameItemOwnership({
   registryAddress = null,
   registryCallOptions = {},
   itemCallOptions = {},
+  derived = null,
 } = {}) {
   if (!registryProvider?.getUsernameItemAddress) throw new UsernameTonRpcProviderError('UsernameRegistry provider cannot derive item addresses');
   if (!itemProvider?.getState) throw new UsernameTonRpcProviderError('UsernameNFTItem provider cannot read item state');
@@ -271,7 +272,11 @@ export async function resolveAuthoritativeUsernameItemOwnership({
     };
   }
 
-  const derivedItemAddress = await registryProvider.getUsernameItemAddress(itemState.name_hash, registryCallOptions);
+  const sameDerivation = derived !== null && derived.itemAddress
+    && (() => { try { return BigInt(derived.nameHash) === BigInt(itemState.name_hash) && parseTonAddress(derived.itemAddress).raw === parsedItemAddress; } catch { return false; } })();
+  const derivedItemAddress = sameDerivation
+    ? derived.itemAddress
+    : await registryProvider.getUsernameItemAddress(itemState.name_hash, registryCallOptions);
   const itemOwnerWallet = parseTonAddress(itemState.owner_wallet).raw;
   const authoritative = parseTonAddress(derivedItemAddress).raw === parsedItemAddress;
   return {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createPublicKey, verify } from 'node:crypto';
-import { Address, Cell } from '@ton/core';
+import { Address, Cell, beginCell as tonBeginCell } from '@ton/core';
 import {
-  GETGEMS_FEE_ADDRESS, GETGEMS_MARKETPLACE, GETGEMS_SALE_DEPLOYER, GETGEMS_SALE_V4_CODE_HASH, NFT_FEE_MAX, NFT_LIST_FORWARD, NFT_LIST_TO_SALE, NFT_ROYALTY_MAX,
+  GETGEMS_AUCTION_V3R3_CODE_HASH, GETGEMS_FEE_ADDRESS, GETGEMS_MARKETPLACE, GETGEMS_SALE_DEPLOYER, GETGEMS_SALE_V4_CODE_HASH, NFT_FEE_MAX, NFT_LIST_FORWARD, NFT_LIST_TO_SALE, NFT_ROYALTY_MAX,
   NFT_ITEM_RESERVE, NFT_PINNED_COLLECTIONS, NFT_SALES_MAX, buildListing, listingTermsFrom, nftCancelBody, nftChangePriceBody,
   nftItemTopUp, readListingsOf, saleV4Code,
 } from '../web/nft-market.mjs';
@@ -20,6 +20,22 @@ const ROYALTY = '0:3333333333333333333333333333333333333333333333333333333333333
 const COLLECTION = '0:4444444444444444444444444444444444444444444444444444444444444444';
 const OTHER = '0:5555555555555555555555555555555555555555555555555555555555555555';
 const GRAM = 1_000_000_000n;
+const v4Data = (d: Partial<{ complete: boolean, seller: string, price: bigint, nft: string }> = {}) => {
+  const v = { complete: false, seller: SELLER, price: GRAM, nft: NFT, ...d };
+  const fees = tonBeginCell().storeAddress(Address.parse(OTHER)).storeAddress(null).storeUint(1000, 17).storeUint(0, 17).storeAddress(Address.parse(v.nft))
+    .storeUint(1_800_000_000, 32).endCell();
+  return tonBeginCell().storeBit(v.complete).storeAddress(Address.parse(OTHER)).storeAddress(Address.parse(v.seller)).storeCoins(v.price)
+    .storeUint(0, 32).storeUint(0, 64).storeRef(fees).storeBit(false).storeBit(true).storeUint(7n, 256).endCell().toBoc().toString('base64');
+};
+const auctionData = (d: Partial<{ ended: boolean, seller: string, nft: string, endTime: number }> = {}) => {
+  const v = { ended: false, seller: SELLER, nft: NFT, endTime: Math.floor(Date.now() / 1000) + 86_400, ...d };
+  const fees = tonBeginCell().storeAddress(Address.parse(OTHER)).storeAddress(Address.parse(ROYALTY)).endCell();
+  const constants = tonBeginCell().storeAddress(Address.parse(OTHER)).storeCoins(20n * GRAM).storeCoins(100n * GRAM).storeUint(5, 7).storeUint(300, 17)
+    .storeAddress(Address.parse(v.nft)).storeUint(1_800_000_000, 32).endCell();
+  return tonBeginCell().storeInt(v.ended ? -1 : 0, 1).storeInt(0, 1).storeAddress(null).storeCoins(0n).storeUint(0, 32).storeUint(v.endTime, 32)
+    .storeAddress(Address.parse(v.seller)).storeUint(0, 64).storeUint(5, 32).storeUint(100, 32).storeUint(75, 32).storeUint(1000, 32)
+    .storeRef(fees).storeRef(constants).endCell().toBoc().toString('base64');
+};
 const ed25519Spki = (raw32: Buffer) => createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), raw32]), format: 'der', type: 'spki' });
 
 describe('selling — the listing', () => {
@@ -193,12 +209,11 @@ describe('selling — the terms a listing takes', () => {
     const filler = (n: number) => Array.from({ length: n }, (_, i) => ({ address: `0:${String(i).padStart(64, 'f')}`, owner_address: SELLER, on_sale: false }));
     const pageOf = (offset: number) => (offset === (WALLET_LIST_PAGES - 1) * WALLET_NFT_PAGE
       ? [...filler(WALLET_NFT_PAGE - 1), { address: NFT, owner_address: saleA, real_owner: SELLER, on_sale: true }] : filler(WALLET_NFT_PAGE));
-    const sale = { type: 'getgems_sale', address: saleA, nft_address: NFT, nft_owner_address: SELLER, code_hash: GETGEMS_SALE_V4_CODE_HASH,
-      details: { is_complete: false, full_price: '1000000000', marketplace_fee: '1000', royalty_amount: '0' }, nft_item: { owner_address: saleA, collection_address: COLLECTION } };
+    const sale = { address: saleA, status: 'active', code_hash: GETGEMS_SALE_V4_CODE_HASH, data_hash: 'h-a', data_boc: v4Data() };
     const fetchImpl = async (url: string) => {
       asked.push(url);
       const offset = Number(new URL(url).searchParams.get('offset') ?? 0);
-      return { ok: true, json: async () => (url.includes('/nft/items') ? { nft_items: pageOf(offset) } : { nft_sales: [sale] }) };
+      return { ok: true, json: async () => (url.includes('/nft/items') ? { nft_items: pageOf(offset) } : { accounts: [sale] }) };
     };
     const own: any = await readListingsOf({ fetchImpl, origin: 'https://o', owner: SELLER });
     expect(own.map((l: any) => l.sale), 'a listing behind 4 999 other rows').toEqual([saleA]);
@@ -237,32 +252,37 @@ describe('selling — the terms a listing takes', () => {
 });
 
 describe('selling — the wallet\'s own listings', () => {
-  it('NFTSELL-07: its items on a sale (include_on_sale, real_owner this wallet), each sale read as the market reads them — live and this wallet\'s only', async () => {
+  it('NFTSELL-07: its items on a sale (include_on_sale, real_owner this wallet), each sale read by its own state as the market reads its lots — a v4 sale or a v3r3 auction, live and this wallet\'s only [client audit round 153 — C5-2]', async () => {
     const asked: string[] = [];
     const saleA = '0:a'.padEnd(66, 'a');
     const saleB = '0:b'.padEnd(66, 'b');
+    const auctionC = '0:c'.padEnd(66, 'c');
+    const nftC = '0:6'.padEnd(66, '6');
     const items = { nft_items: [
-      { address: NFT, owner_address: saleA, real_owner: SELLER, on_sale: true },
+      { address: NFT, owner_address: saleA, real_owner: SELLER, on_sale: true, collection_address: COLLECTION },
       { address: OTHER, owner_address: saleB, real_owner: ROYALTY, on_sale: true },
+      { address: nftC, owner_address: auctionC, real_owner: SELLER, on_sale: true, collection_address: COLLECTION },
       { address: COLLECTION, owner_address: SELLER, on_sale: false },
     ] };
-    const sale = (address: string, owner: string) => ({ type: 'getgems_sale', address, nft_address: NFT, nft_owner_address: owner, code_hash: GETGEMS_SALE_V4_CODE_HASH,
-      details: { is_complete: false, full_price: '1000000000', marketplace_fee: '1000', royalty_amount: '0' }, nft_item: { owner_address: address, collection_address: COLLECTION } });
-    const done = { ...sale(saleA, SELLER), details: { ...sale(saleA, SELLER).details, is_complete: true } };
-    const fetchImpl = async (url: string) => {
+    const v4 = (over: any = {}) => ({ address: saleA, status: 'active', code_hash: GETGEMS_SALE_V4_CODE_HASH, data_hash: 'h-a', data_boc: v4Data(over) });
+    const auction = (over: any = {}) => ({ address: auctionC, status: 'active', code_hash: GETGEMS_AUCTION_V3R3_CODE_HASH, data_hash: 'h-c', balance: '1000000000',
+      data_boc: auctionData({ nft: nftC, ...over }) });
+    const serve = (accounts: any[]) => async (url: string) => {
       asked.push(url);
-      const body = url.includes('/nft/items') ? items : { nft_sales: [sale(saleA, SELLER)] };
-      return { ok: true, json: async () => body };
+      return { ok: true, json: async () => (url.includes('/nft/items') ? items : { accounts }) };
     };
-    for (const sales of [[done], [sale(saleA, ROYALTY)]]) {
-      const odd = async (url: string) => ({ ok: true, json: async () => (url.includes('/nft/items') ? items : { nft_sales: sales }) });
-      expect(await readListingsOf({ fetchImpl: odd, origin: 'https://o', owner: SELLER })).toEqual([]);
+    for (const accounts of [[v4({ complete: true })], [v4({ seller: ROYALTY })], [auction({ ended: true })], [auction({ seller: ROYALTY })]]) {
+      expect(await readListingsOf({ fetchImpl: serve(accounts), origin: 'https://o', owner: SELLER })).toEqual([]);
     }
-    const own = await readListingsOf({ fetchImpl, origin: 'https://o', owner: SELLER });
-    expect(own.map((l: any) => l.sale)).toEqual([saleA]);
+    asked.length = 0;
+    const own = await readListingsOf({ fetchImpl: serve([v4(), auction()]), origin: 'https://o', owner: SELLER });
+    expect(own.map((l: any) => [l.sale, l.kind]), 'MEASURED before: the auction in neither «On sale» nor the NFT list').toEqual([[saleA, 'sale'], [auctionC, 'auction']]);
+    expect(own.map((l: any) => l.collection), 'the item as the index has it').toEqual([COLLECTION, COLLECTION]);
     expect(asked[0]).toContain(`owner_address=${encodeURIComponent(SELLER)}&include_on_sale=true&limit=${WALLET_NFT_PAGE}&offset=0`);
+    expect(asked[1]).toContain('/api/v3/accountStates?');
     expect(asked[1]).toContain(`address=${encodeURIComponent(saleA)}`);
+    expect(asked[1]).toContain(`address=${encodeURIComponent(auctionC)}`);
     expect(asked[1]).not.toContain(encodeURIComponent(saleB));
-    expect(await readListingsOf({ fetchImpl, origin: 'https://o', owner: '' })).toEqual([]);
+    expect(await readListingsOf({ fetchImpl: serve([]), origin: 'https://o', owner: '' })).toEqual([]);
   });
 });

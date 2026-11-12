@@ -56,7 +56,7 @@ type Loaded = {
   caches: () => Map<string, Map<string, Response>>;
 };
 
-function loadWorker(network: (request: any) => Promise<Response>): Loaded {
+function loadWorker(network: (request: any) => Promise<Response>, { registration = {} }: { registration?: Record<string, any> } = {}): Loaded {
   const handlers: Record<string, (event: any) => void> = {};
   const caches = makeCaches(network);
   const self = {
@@ -64,7 +64,7 @@ function loadWorker(network: (request: any) => Promise<Response>): Loaded {
     addEventListener: (type: string, handler: any) => { handlers[type] = handler; },
     skipWaiting: () => {},
     clients: { claim: () => {} },
-    registration: { scope: BASE },
+    registration: { scope: BASE, ...registration },
   };
   class ScopedRequest extends Request {
     constructor(input: any, init?: any) { super(typeof input === 'string' ? new URL(input, BASE).href : input, init); }
@@ -239,6 +239,57 @@ describe('SERVICE WORKER — what the page actually receives', () => {
     await lifecycle(worker, 'activate');
     expect(worker.cacheOf(cacheName()).has(keyOf(versioned)), 'the missing entry was fetched on activate').toBe(true);
     expect(worker.caches().has('platho-previous'), 'and only then does the old cache go').toBe(false);
+  });
+
+  it('SWRUN-18 [client audit round 159 — P3-2]: a navigation while the next release installs leaves that release\'s cache alone', async () => {
+    const network = async () => new Response('ok');
+    const navigate = async (registration: Record<string, any>) => {
+      const worker = loadWorker(network, { registration });
+      worker.seed('platho-next-release', './', new Response('the next release, installing'));
+      const kept: Promise<any>[] = [];
+      let answer: Promise<Response> | null = null;
+      worker.handlers.fetch({ request: { url: new URL('/', BASE).href, mode: 'navigate', method: 'GET' }, respondWith: (promise: Promise<Response>) => { answer = promise; },
+        waitUntil: (promise: Promise<any>) => { kept.push(promise); } });
+      await answer;
+      await Promise.all(kept);
+      return worker;
+    };
+    for (const state of [{ installing: {} }, { waiting: {} }]) {
+      const worker = await navigate(state);
+      expect(worker.caches().has('platho-next-release'), JSON.stringify(state)).toBe(true);
+    }
+    const alone = await navigate({});
+    expect(alone.caches().has('platho-next-release')).toBe(false);
+  });
+
+  it('SWRUN-15 [client audit round 153 — C2-2]: only the app\'s own page is kept as the shell — a page the server serves as itself is not', async () => {
+    const SHELL = '<!doctype html><title>Platho</title><div class="boot-screen" id="bootScreen" data-phase="idle"></div>';
+    const POLICY = '<!doctype html><title>Platho — Privacy Policy</title><main>the policy</main>';
+    let down = false;
+    const worker = loadWorker(async (request: any) => {
+      if (down) return new Response('down', { status: 503 });
+      return new Response(new URL(keyOf(request)).pathname === '/privacy.html' ? POLICY : SHELL);
+    });
+    expect(await (await serve(worker, '/privacy.html', 'navigate'))!.text()).toContain('Privacy Policy');
+    expect(worker.cacheOf(cacheName()).has(keyOf('./index.html')), 'the policy is not kept as the shell').toBe(false);
+    expect(await (await serve(worker, '/', 'navigate'))!.text()).toContain('bootScreen');
+    expect(worker.cacheOf(cacheName()).has(keyOf('./index.html')), 'the app\'s own page is').toBe(true);
+    down = true;
+    expect(await (await serve(worker, '/', 'navigate'))!.text(), 'the server down: the app').toContain('bootScreen');
+  });
+
+  it('SWRUN-16 [client audit round 153 — C8-6]: with no older cache a `?v=` file is asked for as any request is; an unversioned one past the HTTP cache', async () => {
+    const list = assetsOf();
+    const isVersioned = (asset: string) => /\.(?:mjs|js|css)\?v=[A-Za-z0-9]+$/.test(asset);
+    const asked = new Map<string, string>();
+    const worker = loadWorker(async (request: any) => {
+      asked.set(keyOf(request), typeof request === 'string' ? 'default' : String(request.cache ?? 'default'));
+      return new Response('ok');
+    });
+    await lifecycle(worker, 'install');
+    expect(worker.cacheOf(cacheName()).size, 'the whole list is present').toBe(list.length);
+    for (const asset of list) expect(asked.get(keyOf(asset)), asset).toBe(isVersioned(asset) ? 'default' : 'reload');
+    expect(list.filter(isVersioned).length, 'most of the list is versioned').toBeGreaterThan(100);
   });
 
   it('SWRUN-14: the update probe is answered from the network and never written into a cache', async () => {

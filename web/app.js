@@ -51,7 +51,7 @@ import {
   walletMessageToRecord,
   WALLET_EXTERNAL_DEATH_GRACE_MS,
   WALLET_EXTERNAL_VALIDITY_S,
-} from './platho-wallet.mjs?v=98';
+} from './platho-wallet.mjs?v=100';
 import { createMemoryReplayStore, createSealedReplayGuard } from './replay-store.mjs?v=8';
 import { createMemoryIntroCursorStore } from './intro-cursor-store.mjs?v=16';
 import {
@@ -64,7 +64,7 @@ import {
   createIndexedDbEncryptedMessageHistoryStore,
   createMemoryEncryptedMessageHistoryStore,
 } from './encrypted-message-store.mjs?v=23';
-import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=180';
+import { PLATHO_APP_CONFIG } from './platho-config.mjs?v=183';
 import {
   createTonRpcTransport,
   isTonRpcTransportDead,
@@ -74,7 +74,7 @@ import {
   beginTonRpcPhaseProfile,
   broadcastThroughNextDoor,
   BROADCAST_VERDICT,
-} from './ton-rpc-transport.mjs?v=116';
+} from './ton-rpc-transport.mjs?v=118';
 import {
   PUBLIC_CHANNEL_PROFILE_CACHE_KEY,
   DEFAULT_PUBLIC_CHANNELS,
@@ -99,7 +99,7 @@ import {
   lightPublicFeedJson,
   encodePrefsSnapshotChunks,
   mergePrefsSnapshotChunks,
-} from './public-channel-subscriptions.mjs?v=311';
+} from './public-channel-subscriptions.mjs?v=317';
 import {
   createInboundPeerThread,
   createRecipientThread,
@@ -117,7 +117,7 @@ import {
   RECIPIENT_IDENTITY_TYPES,
   threadIdentitySearchText,
   threadIdentityVariants,
-} from './recipient-identities.mjs?v=141';
+} from './recipient-identities.mjs?v=148';
 import {
   MAX_CAPSULE_USEFUL_BYTES,
   SINGLE_CAPSULE_USEFUL_BYTES,
@@ -179,66 +179,66 @@ import {
   VAULT_CRYPTO_SUITE,
   VAULT_PUBLISH_KIND,
 } from './pwa-contract-transactions.mjs?v=60';
-import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=98';
-import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=99';
-import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=46';
-import { createPublicLane } from './public-lane.mjs?v=169';
-import { createPublicShardTonRpcProvider, extractStack, readInt } from './public-shard-ton-rpc-provider.mjs?v=45';
-import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage, chooseBeaconBucket } from './public-lane-send.mjs?v=149';
-import { squatCushionNanotons, applyShardSurcharge, surchargeExtraNanotons, defaultShardDebtResolver, LANE_PUBLIC, LANE_CONV, LANE_INTRO, LANE_REPORT, LANE_SANCTION, LANE_KEY, LANE_RECOVERY } from './shard-debt.mjs?v=87';
-import { GROUPS_NAMED_SLOT_COUNT, NOTES_NAMED_SLOT_COUNT, PREFS_CHUNK_COUNT, RECOVERY_MAX_SLOTS } from './shard-discovery.mjs?v=108';
-import { moderationSupported, moderationGateAddress, moderationLedgerTrusted, verdictMinimumCeiling, createModerationLedgerReader, createSanctionCache, createReportQueueReader, buildReportMessage, buildVerdictMessage, readPublicEntry, reportShardPrices, reportAttachValue, walletHashOf, sanctionShardAddressFor, reportEraOf, callGetter, REPORT_REASONS, VERDICT_ACTION, WARNINGS_TO_RESTRICT, SANCTION_RETENTION_SECONDS, MODERATION_GENERATION, sanctionStandingForVerdict, verdictLiveSurchargeNanotons, REPORT_DEPLOY_VALUE } from './moderation.mjs?v=84';
-import { publicShardAddressBytesFor, keyShardAddressBytesFor, rawAddress as rawShardAddress, feeVaultCodeBoc, publicShardCodeCellFor, publicShardDataCellFor } from './shard-address.mjs?v=48';
-import { FV_DEPLOY_FUNDING, FV_PROTOCOL_FEE, FV_FLOAT_TOPUP_BELOW, FV_MSG_FORWARD_PRICES, FV_PUBLIC_SHARD_PUBLISH_GAS_MAX, FV_REFERENCE_GAS_PRICES, FV_STAKE_FORWARD_NANOTONS, buildVaultDeployMessage, vaultInternalPublishValue, vaultTakeFor, publicPublishRoute, scaleByNetworkPrices, networkPricesWithin, directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX, feeVaultInitializedDataCell } from './fee-vault.mjs?v=40';
+import { createAthMasterTonRpcProvider, createAthWalletTonRpcProvider } from './ath-ton-rpc-provider.mjs?v=100';
+import { createProfileRegistryTonRpcProvider } from './profile-registry-ton-rpc-provider.mjs?v=101';
+import { createKeyShardTonRpcProvider } from './key-shard-ton-rpc-provider.mjs?v=47';
+import { createPublicLane } from './public-lane.mjs?v=171';
+import { createPublicShardTonRpcProvider, extractStack, readInt } from './public-shard-ton-rpc-provider.mjs?v=46';
+import { publishPublicLane, publishPublicLaneParts, buildPublicPublishWalletMessage, chooseBeaconBucket } from './public-lane-send.mjs?v=151';
+import { squatCushionNanotons, applyShardSurcharge, surchargeExtraNanotons, defaultShardDebtResolver, LANE_PUBLIC, LANE_CONV, LANE_INTRO, LANE_REPORT, LANE_SANCTION, LANE_KEY, LANE_RECOVERY } from './shard-debt.mjs?v=89';
+import { GROUPS_NAMED_SLOT_COUNT, NOTES_NAMED_SLOT_COUNT, PREFS_CHUNK_COUNT, RECOVERY_MAX_SLOTS } from './shard-discovery.mjs?v=110';
+import { moderationSupported, moderationGateAddress, moderationLedgerTrusted, verdictMinimumCeiling, createModerationLedgerReader, createSanctionCache, createReportQueueReader, buildReportMessage, buildVerdictMessage, readPublicEntry, reportShardPrices, reportAttachValue, walletHashOf, sanctionShardAddressFor, reportEraOf, callGetter, REPORT_REASONS, VERDICT_ACTION, WARNINGS_TO_RESTRICT, SANCTION_RETENTION_SECONDS, MODERATION_GENERATION, sanctionStandingForVerdict, verdictLiveSurchargeNanotons, REPORT_DEPLOY_VALUE } from './moderation.mjs?v=87';
+import { publicShardAddressBytesFor, keyShardAddressBytesFor, rawAddress as rawShardAddress, feeVaultCodeBoc, publicShardCodeCellFor, publicShardDataCellFor } from './shard-address.mjs?v=49';
+import { FV_DEPLOY_FUNDING, FV_PROTOCOL_FEE, FV_FLOAT_TOPUP_BELOW, FV_MSG_FORWARD_PRICES, FV_PUBLIC_SHARD_PUBLISH_GAS_MAX, FV_REFERENCE_GAS_PRICES, FV_STAKE_FORWARD_NANOTONS, buildVaultDeployMessage, vaultInternalPublishValue, vaultTakeFor, publicPublishRoute, scaleByNetworkPrices, networkPricesWithin, directWriteLiveSurchargeNanotons, DIRECT_WRITE_GAS_MAX, feeVaultInitializedDataCell } from './fee-vault.mjs?v=41';
 import { publicPublishValueForKind, CONV_PUBLISH_VALUE, INTRO_PUBLISH_VALUE, RECOVERY_PUBLISH_VALUE, KEYSHARD_REGISTER_VALUE } from './publish-price.mjs?v=17';
 import {
   createFeeVaultReader, planRecovery, planStake, planUnstake, planUnstakeUnjam, planWithdrawFloat, priceVaultExit, priceVaultStake,
   stakeBandVerdict, strandedAtoms, planVaultRestore,
   vaultAddressFor, vaultSnapshot, vaultSupported, FV_ATOMIC_PER_ATH, FV_CUSTODY_TOPUP, FV_STAKE_MAX_ATH,
   FV_STAKE_MIN_ATH, VAULT_LIVE, VAULT_UNKNOWN, VAULT_ABSENT, VAULT_FROZEN,
-} from './vault-account.mjs?v=78';
+} from './vault-account.mjs?v=80';
 import {
   ACCOUNT_FROZEN, ACCOUNT_NONEXIST, ACCOUNT_UNINIT, accountStateRow, cellToBoc, frozenAccountDebtNanotons,
   matchFrozenState, preFreezeStateFromArchive,
-} from './frozen-account.mjs?v=29';
-import { walletSendFeeNanotons, walletSendPayloadBytesFor, walletSendSizeClassForPayloadBytes, WALLET_SEND_FEE_PER_PART_NANOTONS, WALLET_SEND_FIRST_EXTERNAL_EXTRA_NANOTONS } from './wallet-send-fee.mjs?v=70';
-import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=95';
-import { createIntroLane } from './intro-lane.mjs?v=140';
+} from './frozen-account.mjs?v=31';
+import { walletSendFeeNanotons, walletSendPayloadBytesFor, walletSendSizeClassForPayloadBytes, WALLET_SEND_FEE_PER_PART_NANOTONS, WALLET_SEND_FIRST_EXTERNAL_EXTRA_NANOTONS } from './wallet-send-fee.mjs?v=72';
+import { publishKeyShardRegister } from './key-shard-register-send.mjs?v=97';
+import { createIntroLane } from './intro-lane.mjs?v=142';
 import { createIndexedDbDeviceSecretStore } from './device-secret-store.mjs?v=12';
 import { deriveAtRestKeys, openAtRest, sealAtRest, withAtRestLock } from './at-rest-seal.mjs?v=5';
-import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=33';
-import { createMemoryConvKeyStore, conversationId, conversationSafetyCode } from './conv-key-store.mjs?v=27';
+import { createIntroReceiveHandler } from './intro-receive-handler.mjs?v=34';
+import { createMemoryConvKeyStore, conversationId, conversationSafetyCode, signKeyHex } from './conv-key-store.mjs?v=35';
 import { telegramLaunchSignedFor } from './telegram-launch.mjs?v=2';
-import { WALLET_GRAM_DUST_NANOTONS, WALLET_NFT_PAGE, assetAttributesOf, formatUnits, inlinePictureOf, listedNftCollection, nftCollectionTransferable, rawAccount, readCardBalances, readJettonBalances, readNftItems, readWalletHistoryPages, withoutOwnChange, historyRowsOf, withoutServiceStorage } from './wallet-assets.mjs?v=58';
+import { WALLET_GRAM_DUST_NANOTONS, WALLET_NFT_PAGE, assetAttributesOf, formatUnits, inlinePictureOf, listedNftCollection, nftCollectionTransferable, rawAccount, readCardBalances, readJettonBalances, readNftItems, readWalletHistoryPages, withoutOwnChange, historyRowsOf, withoutServiceStorage } from './wallet-assets.mjs?v=61';
 import { BURN_ADDRESS, BURN_VALUE_NANOTONS, JETTON_TRANSFER_VALUE_NANOTONS, NFT_TRANSFER_VALUE_NANOTONS, TRANSFER_COMMENT_MAX_BYTES, 
   buildJettonTransferBody, buildNftTransferBody, buildTextCommentBody, getMethodStack, nextTransferQueryId, parseUnits, readCollectionRoyalty, readJettonWalletAddress, readNftHolder,
-  readNftOwnSaleOn, readNftOwner, readTelemintAuction, stackInteger } from './wallet-transfers.mjs?v=23';
-import { GRAM, SWAP_DEFAULT_SLIPPAGE_BPS, SWAP_SLIPPAGE_CHOICES_BPS, amountInFor, minimumOut, readSwapPool, swapDeadline, swapPair } from './wallet-swap.mjs?v=32';
+  readNftOwnSaleOn, readNftOwner, readTelemintAuction, stackInteger } from './wallet-transfers.mjs?v=25';
+import { GRAM, SWAP_DEFAULT_SLIPPAGE_BPS, SWAP_SLIPPAGE_CHOICES_BPS, amountInFor, minimumOut, readSwapPool, swapDeadline, swapPair } from './wallet-swap.mjs?v=35';
 import { DEDUST, STONFI, SWAP_EXCHANGE_NAMES, buildRouteMessage, estimateRoute, quoteRoute, readRoutePool, routeAmountInFor, routeAttachedNanotons, routeLocked,
   routePoolFeeBps, routeRate, swapAsksFrom, swapListedToken, swapRoutes, swapRoutesFrom, routeActivity, routeScore, swapAskEntries, POOL_BUSY_TRADES, POOL_SHALLOW_DEPTH_GRAM, POOL_LIVELY_DEPTH_GRAM, POOL_LIVELY_TRADES, SWAP_NEW_ID,
-  swapTokenIsNew } from './swap-routes.mjs?v=33';
-import { ASSET_PICTURES } from './asset-pictures.mjs?v=11';
+  swapTokenIsNew } from './swap-routes.mjs?v=36';
+import { ASSET_PICTURES } from './asset-pictures.mjs?v=14';
 import { readBalanceAndReserves, readPoolReserves } from './pool-state.mjs?v=5';
 import { GETGEMS_FEE_ADDRESS, NFT_AUCTION_BID_KEEP, NFT_AUCTION_BUYOUT_GAS, NFT_BUY_GAS, NFT_CANCEL_VALUE, NFT_CHANGE_PRICE_VALUE, NFT_COLLECTION_DEEP_PAGES, NFT_COLLECTION_PAGE, NFT_FEE_BASE, NFT_LIST_VALUE, NFT_PINNED_COLLECTIONS, NFT_SALES_MAX, buildListing, buyValue, listingTermsFrom, nftBuyBody, nftCancelBody, nftChangePriceBody, nftIndexOfName, nftItemKeepsReserve, nftItemTopUp, priceSplit, readAuctionFresh, readCollectionNames, readLatestListings, readListingsByIndex, readListingsChanged, readListingsOf, readSaleFresh,
-  readTelemintListings, TELEMINT_NO_END, auctionNextBid, telemintListingOf, telemintNextBid } from './nft-market.mjs?v=50';
-import { approvedNftCollections } from './nft-collections.mjs?v=5';
+  readTelemintListings, TELEMINT_NO_END, auctionNextBid, telemintListingOf, telemintNextBid } from './nft-market.mjs?v=54';
+import { approvedNftCollections } from './nft-collections.mjs?v=8';
 import { PRICE_USDT, formatPrice, formatUsdAmount, priceChart, priceLinePaths, priceSummary, readPriceHistory, swapsPerMonth } from './price-history.mjs?v=16';
 import {
   DEVICE_OTHER_WALLETS_KEY, DEVICE_WALLETS_MAX, cloudFormOf, cloudKeyFor, cloudValueFor, counted, isCloudWalletKey, isSigned, isUntaggedCloudKey, keyringFind,
   keyringForget, keyringPut, keyringRecords, keyringWithout, newerSeal, nextSeq, normalizeKeyring, parseCloudValue, planWalletSync, recordOwner, recordSeq,
   sameSeal, sameWallet as sameWalletRecords, sealedFieldsText, supersedes,
 } from './wallet-keyring.mjs?v=7';
-import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=45';
-import { outgoingRecordShard, createRecordShardPlanner, selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=109';
-import { publishConvLaneParts, quoteConvVaultMessageNanotons } from './conv-lane-send.mjs?v=141';
-import { RECIPIENT_NOT_ACTIVATED, resolvePeerReplyBundle, resolveRecipientBundleByWallet } from './conv-reply-bundle.mjs?v=30';
-import { createConvReadLane } from './conv-lane.mjs?v=138';
-import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, createRecordShardPageReader, confirmConvRecordsLanded, CONV_READ_OPCODES } from './conv-lane-read.mjs?v=126';
-import { createShardMessagesWithSourceReader, createShardStatesRequest, createShardLastTransactionReader, createToncenterRestFetch, toncenterRestOrigin, createAccountHistoryReader, createAccountStateAtReader } from './shard-rpc.mjs?v=74';
-import { athRequestTopUpNanotons, athTransferTopUpPossible, athWalletRentOwedNanotons, buildAthWalletTopUpMessage, groupEntryLegValues, groupEntryLegsSettledNanotons, groupEntryTopUpNanotons, groupEntryTopUpPossible, parseForwardPrices, parseGasPrices } from './ath-request-reserve.mjs?v=11';
-import { avatarRequestFinalCost, convMessageFinalCost, introFinalCost, publicPostFinalCost, reactionFinalCost, recoveryWriteFinalCost, walletOnceFinalCost, reportFinalCost, walletTransferFeeFinalCost, activationFinalCost } from './publish-final-cost.mjs?v=19';
-import { createGroupRuntime } from './group-runtime.mjs?v=122';
-import { forgetGroupLaneKeys, createGroupReadLane } from './group-lane-read.mjs?v=79';
+import { createIndexedDbConvKeyStore } from './conv-key-persist.mjs?v=53';
+import { outgoingRecordShard, createRecordShardPlanner, selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=111';
+import { publishConvLaneParts, quoteConvVaultMessageNanotons } from './conv-lane-send.mjs?v=143';
+import { RECIPIENT_NOT_ACTIVATED, heldPeerShardSignKey, peerKeysCopiedError, resolvePeerReplyBundle, resolveRecipientBundleByWallet, resolveRecipientByWallet } from './conv-reply-bundle.mjs?v=38';
+import { createConvReadLane } from './conv-lane.mjs?v=145';
+import { createRecordShardLastSeqReader, createRecordShardViewReader, createRecordShardRecordReader, createRecordShardPageReader, confirmConvRecordsLanded, CONV_READ_OPCODES } from './conv-lane-read.mjs?v=129';
+import { createShardMessagesWithSourceReader, createShardStatesRequest, createShardLastTransactionReader, createToncenterRestFetch, toncenterRestOrigin, createAccountHistoryReader, createAccountStateAtReader } from './shard-rpc.mjs?v=76';
+import { athRequestTopUpNanotons, athTransferTopUpPossible, athWalletRentOwedNanotons, buildAthWalletTopUpMessage, groupEntryLegValues, groupEntryLegsSettledNanotons, groupEntryTopUpNanotons, groupEntryTopUpPossible, parseForwardPrices, parseGasPrices } from './ath-request-reserve.mjs?v=12';
+import { avatarRequestFinalCost, convMessageFinalCost, introFinalCost, publicPostFinalCost, reactionFinalCost, recoveryWriteFinalCost, walletOnceFinalCost, reportFinalCost, walletTransferFeeFinalCost, activationFinalCost } from './publish-final-cost.mjs?v=20';
+import { createGroupRuntime } from './group-runtime.mjs?v=130';
+import { forgetGroupLaneKeys, createGroupReadLane } from './group-lane-read.mjs?v=86';
 import { createGroupRecordStore, createGroupRequestQueue, GROUP_RECORD_DB_NAME, GROUP_REQUEST_DB_NAME, GROUP_REQUEST_STORE_NAME, PUBLIC_GROUP_RECORD_DB_NAME } from './group-record-store.mjs?v=16';
 import { assemblePublicGroupDocuments, createPublicGroupRuntime, publicGroupKeyOfWallet, publicGroupChatUid } from './public-group-runtime.mjs?v=29';
 import {
@@ -255,30 +255,30 @@ import { encodeGroupAskToken, encodeGroupInviteToken, groupAskLink, parseGroupAs
 import {
   buildReactMessage, decodePublicReactions, reactionsGetterCall, reactionsShown, createOwnReactionStore,
   PUBLIC_REACTION_GLYPHS, PUBLIC_REACTION_COUNT, PUBLIC_REACTION_PAGE_CAP,
-} from './public-reactions.mjs?v=32';
-import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, currentStatesBatchCeiling, changeMarkerOf, isActiveAccountState, isUnknownAccountState } from './shard-reader.mjs?v=113';
+} from './public-reactions.mjs?v=33';
+import { readAccountStates, seedStatesBatchCeiling, subscribeStatesBatchCeiling, currentStatesBatchCeiling, changeMarkerOf, isActiveAccountState, isUnknownAccountState } from './shard-reader.mjs?v=115';
 import { DEFAULT_POLICY as INTRO_SCAN_POLICY } from './intro-scan-policy.mjs?v=6';
 import { sha256 as nobleSha256 } from './vendor/@noble/hashes/sha2.js';
 import { orderThreadsForList } from './thread-list-order.mjs?v=5';
 import { reconcileKeyedRows } from './keyed-rows.mjs?v=3';
 import { epochFromCreatedAtSeconds, CONV_RECV_WINDOW_W, convForwardEpochs, CONV_EPOCH_SECONDS } from './crypto/conv-routing.mjs?v=9';
 import { INTRO_EPOCH_SIGNED_FROM } from './crypto/intro-handshake.mjs?v=8';
-import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=140';
+import { publishIntroLane, introCapsuleStealthFields } from './intro-lane-send.mjs?v=142';
 import {
   serializeIntroDirectSend, reviveIntroDirectSend, directSendReachedWallet,
-} from './intro-send-state.mjs?v=5';
-import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=110';
-import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=116';
+} from './intro-send-state.mjs?v=6';
+import { pickIntroSendSlot, confirmIntroCreatedAt } from './intro-send-coords.mjs?v=112';
+import { createScanPageReader, createEntryReader } from './intro-transport.mjs?v=118';
 import {
   ATH_ATOMIC_PER_UNIT, MARKET_STABILITY_BUY_OVERHEAD,
   athForNanotons, buyValueNanotons, createMarketStabilityReader,
   marketStabilityCanSell, maxBuyableAtomic, quoteNanotonsForAth,
 } from './market-stability-read.mjs?v=3';
-import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=69';
+import { publishMarketStabilityBuy } from './market-stability-buy-send.mjs?v=71';
 import { TON_MNEMONIC_WORDLIST } from './ton-mnemonic-wordlist.mjs?v=2';
-import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsChunks, prefsChunkSlot, PREFS_CHUNK_PLAINTEXT_MAX, confirmRecoverySlotWrite, confirmRecoverySlotWrites, packGroupsForRecovery, prepareGroupsBackup, restoreGroupsEntries, groupsChunkSlot } from './recovery-lane.mjs?v=138';
-import { prepareNotesBackup, restoreNotes, notesChunkSlot, NOTES_SLOT_MAX_BLOB_BYTES } from './notes-lane.mjs?v=117';
-import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=115';
+import { restoreConvKeysFromRecovery, prepareRecoveryBackup, staleRecoverySlots, recoverySlotForConversation, partitionRecoveryMap, preparePrefsBackup, restorePrefsChunks, prefsChunkSlot, PREFS_CHUNK_PLAINTEXT_MAX, confirmRecoverySlotWrite, confirmRecoverySlotWrites, packGroupsForRecovery, prepareGroupsBackup, restoreGroupsEntries, groupsChunkSlot } from './recovery-lane.mjs?v=141';
+import { prepareNotesBackup, restoreNotes, notesChunkSlot, NOTES_SLOT_MAX_BLOB_BYTES } from './notes-lane.mjs?v=119';
+import { createRecoveryViewReader, createRecoveryBodyReader } from './recovery-transport.mjs?v=117';
 import {
   publicChannelPartitionKey,
   publicThreadPartitionKey,
@@ -290,21 +290,21 @@ import {
   PUBLIC_BEACON_READ_SPACE,
   epochIsDerivable,
   addrKey as publicAddrKey,
-} from './shard-discovery.mjs?v=108';
-import { createTonDnsProvider } from './ton-dns-provider.mjs?v=100';
+} from './shard-discovery.mjs?v=110';
+import { createTonDnsProvider, TON_DNS_NOT_REGISTERED, TON_DNS_NO_WALLET } from './ton-dns-provider.mjs?v=103';
 import {
   computeUsernameNameHash,
   createUsernameNftItemTonRpcProvider,
   createUsernameRegistryTonRpcProvider,
   resolveAuthoritativeUsernameItemOwnership,
-} from './username-ton-rpc-provider.mjs?v=101';
+} from './username-ton-rpc-provider.mjs?v=103';
 import {
   collectOwnedUsernameNfts,
   discoverUsernameNftAddresses,
   readUsernameNftArt,
   safeInlineImage,
   usernameNftCandidateFromLabel,
-} from './username-nft-owned.mjs?v=45';
+} from './username-nft-owned.mjs?v=47';
 import {
   TELEGRAM_GIFT_ASSET_ORIGIN,
   TELEGRAM_GIFT_COLLECTION_CODE_HASH,
@@ -338,7 +338,7 @@ import {
   currentLocale,
   applyStaticTranslations,
   I18N_LOCALES,
-} from './i18n.mjs?v=325';
+} from './i18n.mjs?v=331';
 import { createBootSignalField } from './boot-signal-field.mjs?v=16';
 import { cutoverUpdateRequired, generationForEpoch, generationForUnixSeconds, currentEpochUtc, CUTOVER_EPOCH, WRITES_GENERATION } from './cutover-epoch.mjs?v=7';
 import {
@@ -364,7 +364,7 @@ const RESECURE_WINDOW_WAIT_SHOW_MS = 300;
 await refuseWithoutDeviceStorage();
 await holdActiveWindow();
 await resecureStorageIfDue();
-const PLATHO_APP_RUNTIME_VERSION = '1.5.27';
+const PLATHO_APP_RUNTIME_VERSION = '1.5.28';
 
 const PLATHO_APP_BUILD_ID = plathoRunningBuildId();
 
@@ -647,7 +647,7 @@ function showOpenElsewhere({ locks, onUseHere, takeIfFree }) {
   const phase = screen?.dataset?.phase ?? 'idle';
   if (screen) screen.dataset.phase = 'elsewhere';
   if (panel) panel.hidden = false;
-  if (globalThis.Telegram?.WebApp?.initData) {
+  if (telegramBridgePresent() && globalThis.Telegram?.WebApp?.initData) {
     const title = panel?.querySelector?.('.boot-elsewhere-title') ?? null;
     const hint = panel?.querySelector?.('.boot-elsewhere-hint') ?? null;
     if (title) { title.dataset.i18n = 'window.elsewhereTitleTelegram'; title.textContent = t('window.elsewhereTitleTelegram'); }
@@ -1087,7 +1087,7 @@ function reflectThemeColorMeta() {
 
 function syncTelegramChromeColor() {
   const tg = window.Telegram?.WebApp;
-  if (!tg || !((typeof tg.initData === 'string' && tg.initData.length > 0) || (typeof tg.platform === 'string' && tg.platform && tg.platform !== 'unknown'))) return;
+  if (!tg || !telegramBridgePresent() || !((typeof tg.initData === 'string' && tg.initData.length > 0) || (typeof tg.platform === 'string' && tg.platform && tg.platform !== 'unknown'))) return;
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   if (!/^#[0-9a-f]{6}$/i.test(bg)) return;
   const at = (version) => { try { return Boolean(tg.isVersionAtLeast?.(version)); } catch { return false; } };
@@ -1311,7 +1311,8 @@ const walletPricePoolChoices = new Map();
 const walletPriceCharts = new Set();
 const walletNftMarket = { mode: 'tokens', box: null, picker: null, pickerNote: null, detail: null, parts: null, turnLine: null, pickerRows: new Map(), cards: new Map(),
   query: '', view: null, sort: 'cheap', collections: new Map(), giftVerdicts: new Map(), pictureCopies: new Map(), namesAsked: new Set(), namesRetryAt: 0, namesReading: false, fitObserver: null, drawnDesktop: null, rowSeer: null, rowSeerList: null,
-  rowsInView: new Set(), rowReading: false, pinnedNamed: false, athArt: new Map(), athQueue: new Set(), athTimer: null, filter: { key: null, traits: new Map(), min: '', max: '', q: '' }, lookup: null, lookupDue: null, lookupTimer: 0 };
+  rowsInView: new Set(), rowReading: false, pinnedNamed: false, athArt: new Map(), athQueue: new Set(), athTimer: null, filter: { key: null, traits: new Map(), min: '', max: '', q: '' }, lookup: null, lookupDue: null, lookupTimer: 0,
+  pickerShown: 0, pickerEnd: null, pickerEndSeer: null, pickerEndRoot: null, places: new Map(), placeKeep: null, placePage: null, pickerStop: null };
 const WALLET_MARKET_ROOM_MIN = 400;
 const WALLET_MARKET_BATCH = 32;
 const WALLET_MARKET_PAGE = 40;
@@ -1878,6 +1879,7 @@ const verifiedPlathoUsernameOwnerCache = new Map();
 const PLATHO_USERNAME_OWNER_CACHE_TTL_MS = 5 * 60_000;
 let plathoWallet = null;
 let isResolvingNewChat = false;
+let newChatAttempt = 0;
 
 function setNewChatResolving(resolving) {
   isResolvingNewChat = resolving;
@@ -2107,6 +2109,7 @@ let lastWalletUnlockAt = 0;
 let vaultAutoRefreshTimer = null;
 let vaultRefreshPromise = null;
 let vaultRefreshInFlightFlags = null;
+let vaultRefreshStartedAt = 0;
 let navVaultBalanceRetryTimer = null;
 let navVaultBalanceRefreshPromise = null;
 let vaultReadMutexTail = Promise.resolve();
@@ -2174,12 +2177,12 @@ const WALLET_TRANSIENT_LOCK_GRACE_MS = 8_000;
 const SEND_LOCK_MAX_GRACE_MS = 600 * 1000;
 const VAULT_AUTO_REFRESH_MS = 60 * 1000;
 const VAULT_NAV_BACKGROUND_REFRESH_MS = 180 * 1000;
+const VAULT_FOCUS_REFRESH_FLOOR_MS = 20 * 1000;
 const VAULT_POST_TRANSACTION_REFRESH_DELAYS_MS = [5_000, 15_000, 45_000];
 const ATH_POST_TRANSACTION_REFRESH_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 45_000, 90_000, 180_000];
 const VAULT_NAV_BALANCE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
 const MESSAGE_AUTO_SYNC_MS = 60 * 1000;
 const MESSAGE_AUTO_SYNC_IDLE_MS = 12 * 1000;
-const MESSAGE_AUTO_SYNC_DEGRADED_MS = 180 * 1000;
 const TON_WALLET_BALANCE_CACHE_MS = 20 * 1000;
 const TON_WALLET_BALANCE_FETCH_TIMEOUT_MS = 10 * 1000;
 let TON_RPC_CONNECTING_STATUS = t('common.rpcBusyRetrying');
@@ -3809,17 +3812,28 @@ function telegramWebApp() {
   return tg && typeof tg === 'object' ? tg : null;
 }
 
+function telegramBridgePresent() {
+  try {
+    const page = globalThis;
+    return typeof page.TelegramWebviewProxy !== 'undefined' || Boolean(page.external && 'notify' in page.external) || page.parent !== page;
+  } catch {
+    return false;
+  }
+}
+
 let telegramEnvCache;
 function isTelegramEnv() {
   if (telegramEnvCache !== undefined) return telegramEnvCache;
   const tg = telegramWebApp();
-  telegramEnvCache = Boolean(
+  const launched = Boolean(
     tg && (
       (typeof tg.initData === 'string' && tg.initData.length > 0)
       || (typeof tg.platform === 'string' && tg.platform && tg.platform !== 'unknown')
     ),
   );
-  return telegramEnvCache;
+  const inside = launched && telegramBridgePresent();
+  if (inside || !launched) telegramEnvCache = inside;
+  return inside;
 }
 
 function telegramSupports(version) {
@@ -3987,12 +4001,25 @@ function installNavBackHandling() {
   }
   if (typeof window !== 'undefined' && !isTelegramEnv()) {
     window.addEventListener('popstate', () => {
-      if (navHistorySilentPops > 0) { navHistorySilentPops -= 1; navHistorySentinel = false; syncNavBackAffordance(); return; }
+      if (navHistorySilentPops > 0) { navHistorySilentPops -= 1; navHistorySentinel = false; syncNavBackAffordance(); dropActedLinkFromAddressBar(); return; }
       navHistorySentinel = false;
       closeNavOverlay();
+      dropActedLinkFromAddressBar();
     });
   }
   syncNavBackAffordance();
+}
+
+function dropActedLinkFromAddressBar() {
+  try {
+    const path = location.pathname;
+    const shown = (parsePublicPostPermalink(path) && publicPane?.dataset?.postOpen === 'true')
+      || (parsePublicChannelPermalink(path) && publicPane?.dataset?.channelOpen === 'true');
+    if (shown) return;
+    if (parsePublicPostPermalink(path) || parsePublicChannelPermalink(path) || parseGroupAskLink(path) || parsePublicGroupJoinLink(path)) {
+      history.replaceState(history.state, '', '/');
+    }
+  } catch { }
 }
 
 function openExternalLinkInTelegram(href) {
@@ -4007,6 +4034,7 @@ function openExternalLinkInTelegram(href) {
 }
 
 function openTelegramDeepLink(href) {
+  if (!isTelegramEnv()) return false;
   const tg = telegramWebApp();
   if (tg && typeof tg.openTelegramLink === 'function') {
     try {
@@ -4040,6 +4068,7 @@ function pathFromTelegramStartParam(param) {
 function applyTelegramStartParamToLocation() {
   try {
     if (location.pathname !== '/' && location.pathname !== '') return false;
+    if (!telegramBridgePresent()) return false;
     const path = pathFromTelegramStartParam(telegramWebApp()?.initDataUnsafe?.start_param);
     if (!path) return false;
     history.replaceState(null, '', path);
@@ -6434,8 +6463,12 @@ function clearWalletScopedRuntimeState(reason = 'wallet changed') {
   convRecoveryBackupAllowed = false;
   prefsBackupAllowed = false;
   groupsBackupAllowed = false;
+  groupsBackupShortBalance = null;
+  groupsBackupLatchAskedAt = 0;
   groupsRecoveryStored = null;
   groupsRecoveryOverflowIds = new Set();
+  groupsBackupFailures = 0;
+  groupsBackupNotBefore = 0;
   selfSlotLedger = null;
   selfSlotSpaceCache = null;
   walletLocalStoresReady = false;
@@ -6873,7 +6906,10 @@ async function siteServerClockOffsetMs({ timeoutMs = 8_000 } = {}) {
 async function refreshWalletChainClock({ force = false } = {}) {
   const now = Date.now();
   if (!force && Math.abs(now - walletChainClockReadAt) < WALLET_CHAIN_CLOCK_REFRESH_MS) return;
-  if (force && Math.abs(now - walletChainClockReadAt) < 10_000) return;
+  if (force && Math.abs(now - walletChainClockReadAt) < 10_000) {
+    if (walletClockInDoubt()) scheduleWalletChainClockRetry();
+    return;
+  }
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (typeof transport?.getMasterchainInfo !== 'function') return;
   walletChainClockReadAt = now;
@@ -7163,8 +7199,12 @@ function lockPlathoWallet(status = t('wallet.locked'), options = {}) {
   convRecoveryBackupAllowed = false;
   prefsBackupAllowed = false;
   groupsBackupAllowed = false;
+  groupsBackupShortBalance = null;
+  groupsBackupLatchAskedAt = 0;
   groupsRecoveryStored = null;
   groupsRecoveryOverflowIds = new Set();
+  groupsBackupFailures = 0;
+  groupsBackupNotBefore = 0;
   selfSlotLedger = null;
   selfSlotSpaceCache = null;
   walletLocalStoresReady = false;
@@ -7246,7 +7286,9 @@ function resumeWalletUnlockPrompt() {
 }
 
 function noteActionDialogUserDismissed() {
-  if (walletUnlockPromise) walletUnlockPromptDeclined = true;
+  if (!walletUnlockPromise) return;
+  walletUnlockPromptDeclined = true;
+  walletUnlockPromptPending = false;
 }
 
 function shouldOpenWalletUnlockPrompt() {
@@ -7595,6 +7637,13 @@ function selectedIdentityDisplayOptionKey(thread) {
   return thread?.localLabel ? 'local-label' : null;
 }
 
+function focusOpenedPopover(popover, anchor) {
+  let keyboard = false;
+  try { keyboard = anchor.matches(':focus-visible'); } catch { keyboard = false; }
+  if (!keyboard) return;
+  try { popover.querySelector('button:not([disabled])')?.focus({ preventScroll: true }); } catch { }
+}
+
 function ensureIdentityPopover() {
   if (identityPopover) return identityPopover;
   identityPopover = document.createElement('div');
@@ -7629,6 +7678,7 @@ function showPopoverAt(popover, anchor) {
   if (identityPopoverAnchor && identityPopoverAnchor !== anchor) identityPopoverAnchor.setAttribute('aria-expanded', 'false');
   identityPopoverAnchor = anchor;
   anchor.setAttribute('aria-expanded', 'true');
+  focusOpenedPopover(popover, anchor);
 }
 
 function forgetIdentityPopover() {
@@ -7844,6 +7894,7 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
   if (identityPopoverAnchor && identityPopoverAnchor !== anchor) identityPopoverAnchor.setAttribute('aria-expanded', 'false');
   identityPopoverAnchor = anchor;
   anchor.setAttribute('aria-expanded', 'true');
+  focusOpenedPopover(popover, anchor);
   if (!cached || !cached.fetchedAt) {
     let resolved = null;
     try {
@@ -7854,6 +7905,7 @@ async function showChannelDescriptionPopover(authorWallet, anchor, options = {})
     if (!popover.hidden && identityPopoverAnchor === anchor) {
       renderBody(resolved);
       positionIdentityPopover(popover, anchor);
+      if (document.activeElement === anchor) focusOpenedPopover(popover, anchor);
     }
   }
 }
@@ -8266,11 +8318,16 @@ function renderDisplayAsPopover({
   }
   identityPopoverAnchor = anchor;
   anchor.setAttribute('aria-expanded', 'true');
+  focusOpenedPopover(popover, anchor);
 }
 
 async function copyGroupAskLink(groupId, record) {
   const wallet = walletAddressForCopy(plathoWallet);
   if (!wallet) return;
+  if (ownKeyShardKnownAbsent() && !plathoActivationInFlightForCurrentWallet()) {
+    flashWalletIdentityStatus(t('group.askLinkNeedsActivation'), 6_000);
+    return;
+  }
   let link = null;
   const entryFee = record?.entryFee ?? null;
   const ownerWallet = entryFee ? groupOwnerWallet(record) : null;
@@ -9156,7 +9213,7 @@ function syncNowForCurrentScreen() {
     return;
   }
   lastPublicBackgroundSyncAt = 0;
-  scheduleMessageAutoSync(1_000, { manual: true });
+  scheduleMessageAutoSync(1_000);
 }
 for (const indicator of globalSyncIndicators) {
   indicator.addEventListener('click', () => (pendingServiceWorkerAppShellReload ? offerAppUpdate({ asked: true }) : syncNowForCurrentScreen()));
@@ -9305,6 +9362,17 @@ function restoreDialogFocus(target) {
     target = (key && document.querySelector(key)) || target;
   }
   if (!target?.isConnected || target.isContentEditable || target.matches('input, textarea, select')) return;
+  if (target.disabled && typeof MutationObserver === 'function') {
+    const watch = new MutationObserver(() => {
+      if (target.disabled) return;
+      watch.disconnect();
+      const now = document.activeElement;
+      if (!now || now === document.body) restoreDialogFocus(target);
+    });
+    watch.observe(target, { attributes: true, attributeFilter: ['disabled'] });
+    setTimeout(() => watch.disconnect(), 3_000);
+    return;
+  }
   if (target.closest('[inert]') || !elementRendered(target)) return;
   try { target.focus({ preventScroll: true }); } catch { }
 }
@@ -9325,6 +9393,8 @@ function openNewChatDialog() {
     return;
   }
   newChatReturnFocus = dialogReturnFocusTarget();
+  newChatAttempt += 1;
+  setNewChatResolving(false);
   recipientInput.value = '';
   if (recipientLocalLabel) recipientLocalLabel.value = '';
   recipientHint.textContent = t('chat.newChatRecipientHint');
@@ -9334,6 +9404,8 @@ function openNewChatDialog() {
 }
 
 function closeNewChatDialog({ restoreFocus = false } = {}) {
+  newChatAttempt += 1;
+  setNewChatResolving(false);
   hideDialogAnimated(newChatDialog, () => {
     if (recipientInput) recipientInput.value = '';
     if (recipientLocalLabel) recipientLocalLabel.value = '';
@@ -15340,7 +15412,7 @@ async function publicAllFeedPassBody() {
     }
     outcome.read += 1;
     if (read.unchanged) {
-      held.marker = item.shard.marker;
+      if (read.hiddenUnread !== true) held.marker = item.shard.marker;
       if (Array.isArray(read.hidden) && read.hidden.length > 0) {
         held.posts = applyHiddenBitmaps(held.posts ?? [], read.hidden);
         record.memo = null;
@@ -15360,7 +15432,7 @@ async function publicAllFeedPassBody() {
     const complete = matched >= expected;
     record.shards.set(item.shard.key, {
       key: item.shard.key,
-      marker: complete ? item.shard.marker : (held?.marker ?? null),
+      marker: complete && read.hiddenUnread !== true ? item.shard.marker : (held?.marker ?? null),
       entryCount: complete ? read.entryCount : (held?.entryCount ?? null),
       era: item.shard.era,
       epochTag: item.shard.epochTag,
@@ -18164,6 +18236,7 @@ async function resolveInboundPeerWalletIdentity(thread, claimedUsername = null) 
       });
       await resolvePeerReplyBundle({
         provider, peerWallet, peerKeyId: thread.convPeerKeyId, callOptions: criticalChainReadOptions(), peerWalletCandidates: rec?.peerWalletCandidates ?? [],
+        peerSignKey: rec?.peerSignPublicKey ?? null,
         onVerifiedWallet: async (wallet) => {
           peerWallet = wallet;
           if (rec) await settleVerifiedPeerWallet(localRecipientKeyPair.keyId, thread.convPeerKeyId, rec, wallet);
@@ -19496,6 +19569,7 @@ function mergeOpenedPrivateMessage(existingMessage, incomingMessage) {
     'chainLastEntryId',
     'convShardAddress',
     'convSealedAtMs',
+    'chainFiledAtMs',
     'createdAt',
     'createdAtMs',
     'meta',
@@ -20016,6 +20090,8 @@ function messageMetaLine(message) {
 }
 
 function messageCreatedAtMs(message) {
+  const filed = Number(message?.chainFiledAtMs);
+  if (Number.isFinite(filed) && filed > 0) return filed;
   const signed = capsuleSenderCreatedAtMs(message);
   if (signed !== null) return signed;
   const local = Number(message?.localCreatedAtMs ?? message?.localHistoryCreatedAt);
@@ -20041,6 +20117,7 @@ function privateChainMessageOrderFields(entry, opened = null) {
   if (createdAtMs !== null) {
     fields.createdAtMs = createdAtMs;
     fields.createdAt = new Date(createdAtMs).toISOString();
+    if (entry?.filedByChain === true) fields.chainFiledAtMs = createdAtMs;
   }
   return fields;
 }
@@ -20230,7 +20307,9 @@ function groupTokenPreviewText(message) {
   if (invite) return groupInviteTitleText(invite, message.type === 'out');
   const join = parseGroupJoinToken(text);
   if (join) {
-    const name = groupRuntimeInstance?.get(String(join.groupId))?.name ?? t('group.untitled');
+    const record = groupRuntimeInstance?.get(String(join.groupId)) ?? null;
+    if (message.type === 'out' && !record) return t('group.askSent');
+    const name = record?.name ?? t('group.untitled');
     return message.type === 'out' ? t('group.joinSent', { name }) : t('group.joinReceived', { name });
   }
   return '';
@@ -20867,7 +20946,8 @@ async function buildGroupRuntime() {
     onUnreadable: (id) => console.warn('[groups] a waiting request cannot be opened under this wallet\'s key', id),
   }));
   if (plathoWallet !== wallet) return null;
-  const lane = createGroupReadLane({ readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CONV_READ_OPCODES, strict: true }) });
+  const lane = createGroupReadLane({ readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CONV_READ_OPCODES, strict: true }), readRecordPage: storedRecordPageReader(),
+    nowSec: chainNowSec });
   const runtime = createGroupRuntime({
     store,
     requests,
@@ -22146,7 +22226,7 @@ function buildGroupJoinCard(join, mine) {
   const groupName = record?.name ?? t('group.untitled');
   const title = document.createElement('div');
   title.className = 'group-invite-title';
-  title.textContent = mine ? t('group.joinSent', { name: groupName }) : t('group.joinReceived', { name: groupName });
+  title.textContent = mine ? (record ? t('group.joinSent', { name: groupName }) : t('group.askSent')) : t('group.joinReceived', { name: groupName });
   card.append(title);
   if (!mine && record) {
     const amAdmin = groupSelfIsAdmin(record);
@@ -23025,9 +23105,19 @@ async function sendGroupMessageFromComposer(thread, text) {
   renderConversation();
 }
 
+function storedRecordPageReader() {
+  return createRecordShardPageReader((call) => {
+    const transport = globalThis.plathoTonRpcTransport;
+    if (typeof transport?.runGetMethod !== 'function') throw new Error('no transport to read the shard\'s records from');
+    return transport.runGetMethod({ ...call, cacheTtlMs: 0 });
+  });
+}
+
 function convReadLane() {
   if (!convReadLaneInstance) {
     convReadLaneInstance = createConvReadLane({
+      readRecordPage: storedRecordPageReader(),
+      nowSec: chainNowSec,
       readMessagesWithSource: createShardMessagesWithSourceReader({ opcode: CONV_READ_OPCODES, strict: true }),
       markLimit: CONV_READ_MARK_LIMIT,
     });
@@ -23046,10 +23136,11 @@ function convPlansDueThisPass(plans, { forceFull = false, epochNow = null } = {}
   const due = [];
   const settled = [];
   const left = [];
+  const rootsTag = (plan) => [...new Set(plan.rootShards.map((root) => Array.from(root.kRoot ?? [], (b) => b.toString(16).padStart(2, '0')).join('')))].sort().join(',');
   for (const plan of plans) {
     const key = introKeyIdString(plan.peerKeyId);
     if (plan.cold || !convQuietAt.has(key)) due.push(plan);
-    else if (convQuietProbedClean.get(key) === epochNow) { convQuietProbedClean.delete(key); settled.push(plan); }
+    else if (convQuietProbedClean.has(key) && convQuietProbedClean.get(key) === `${epochNow}|${rootsTag(plan)}`) { convQuietProbedClean.delete(key); settled.push(plan); }
     else left.push(plan);
   }
   return { due, settled, left };
@@ -23077,6 +23168,7 @@ function probeQuietConversations(plans, { epochNow, now = Date.now(), quietAddre
   const due = takeQuietWithinShare(waited, { now, quietAddresses, quietMs: CONV_QUIET_PROBE_MS, book: 'conversations', ceiling: currentStatesBatchCeiling() }).map((item) => item.plan);
   if (due.length === 0) return null;
   const session = walletSessionGeneration;
+  const rootsTag = (plan) => [...new Set(plan.rootShards.map((root) => Array.from(root.kRoot ?? [], (b) => b.toString(16).padStart(2, '0')).join('')))].sort().join(',');
   convQuietProbeRun = (async () => {
     const states = await readConvShardStates(due);
     if (session !== walletSessionGeneration || !states) return 0;
@@ -23092,7 +23184,7 @@ function probeQuietConversations(plans, { epochNow, now = Date.now(), quietAddre
       } else {
         convQuietAt.set(key, now);
         convQuietProbedClean.delete(key);
-        convQuietProbedClean.set(key, epochNow);
+        convQuietProbedClean.set(key, `${epochNow}|${rootsTag(plan)}`);
       }
     }
     while (convQuietProbedClean.size > CONV_QUIET_MAX) convQuietProbedClean.delete(convQuietProbedClean.keys().next().value);
@@ -23139,6 +23231,7 @@ async function syncConvCapsulesFromShards(options = {}) {
   const lane = convReadLane();
   const nowSec = chainNowSec();
   const epochNow = epochFromCreatedAtSeconds(nowSec);
+  const clockTrusted = roomClockTrusted();
   const forwardEpochs = convForwardEpochs(nowSec);
   healCrossWalletIdentityBleed();
   let imported = 0;
@@ -23199,7 +23292,7 @@ async function syncConvCapsulesFromShards(options = {}) {
   noteConvQuiet(plans, shardStates);
 
   if (forceFull) {
-    for (const plan of plans) for (const root of plan.rootShards) for (const shard of root.shards) lane.forgetShard(shard.address);
+    for (const plan of plans) for (const root of plan.rootShards) for (const shard of root.shards) lane.forgetShard(shard.address, { refused: true });
   }
 
   for (const plan of settled.length > 0 ? [...plans, ...settled] : plans) {
@@ -23215,6 +23308,7 @@ async function syncConvCapsulesFromShards(options = {}) {
     const gapsOpened = new Map();
     const gapsClosed = new Set();
     const bucketTransient = new Set();
+    let peerSignKey = signKeyHex(store.getConversation(selfKeyId, peerKeyId)?.peerSignPublicKey);
     let deepWalkCameShort = false;
     let seqSkipped = 0;
     let ownCopiesOpened = 0;
@@ -23226,6 +23320,7 @@ async function syncConvCapsulesFromShards(options = {}) {
         entries = await lane.readIncoming({
           kRoot, selfKeyId, peerKeyId, epochNow, windowW: plan.windowW, shards, states: shardStates,
           bindBucket: true,
+          nowSec: chainNowSec(),
           knownSeqOf: deepWalk ? () => 0 : convBucketSeqHighWater,
           fullWalk: deepWalk,
           onShardFailed: (address, error) => {
@@ -23275,7 +23370,23 @@ async function syncConvCapsulesFromShards(options = {}) {
           continue;
         }
         if (seqUsable) bucketMaxSeq.set(bucket, Math.max(bucketMaxSeq.get(bucket) ?? 0, foundSeq));
+        if (!ownCopies) {
+          const stated = signKeyHex(opened.senderSigningPublicKey);
+          if (peerSignKey && stated !== peerSignKey) { skipped += 1; continue; }
+          if (!peerSignKey && stated && !tornDown()) {
+            peerSignKey = stated;
+            try { await store.pinPeerSignKey(selfKeyId, peerKeyId, stated, { persist: false }); } catch (error) { console.warn('[conv] the peer\'s signing key was not kept', error); }
+          }
+        }
+        const signedAtMs = Number(opened?.capsule?.header1?.createdAt);
+        const shardDay = Number(found.epoch);
+        const backdated = !ownCopies && Number.isFinite(signedAtMs) && Number.isFinite(shardDay) && signedAtMs < (shardDay - 1) * CONV_EPOCH_SECONDS * 1000;
         collected.push({ opened, entry: { entry_id: found.seq, address: bucket || undefined } });
+        if (backdated) {
+          const chainStamp = Number(found.createdAt);
+          collected[collected.length - 1].entry.created_at = Number.isFinite(chainStamp) && chainStamp > 0 ? Math.trunc(chainStamp) : shardDay * CONV_EPOCH_SECONDS;
+          collected[collected.length - 1].entry.filedByChain = true;
+        }
         if (ownCopies) ownCopiesOpened += 1;
         await yieldIfDue();
       }
@@ -23311,10 +23422,10 @@ async function syncConvCapsulesFromShards(options = {}) {
     if (collected.length > 0 || seqSkipped > 0) {
       recordConvRouteDebug({ selfKeyId, peerKeyId, targetThread, collected: collected.length, appended: appendedNow, seqSkipped });
     }
-    if (convClean && !tornDown() && epochIsDerivable('record', epochNow) && historyKeptSince(historyFailuresAtStart)) {
+    if (convClean && !tornDown() && clockTrusted && epochIsDerivable('record', epochNow) && historyKeptSince(historyFailuresAtStart)) {
       convDeepWalkPending.delete(convKey);
       convDeepWalkShort.delete(convKey);
-      await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow, { persist: false });
+      await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow, { persist: false, roots: plan.rootShards.map((root) => root.kRoot) });
     }
   }
   try { await store.flush?.(); } catch (error) { console.warn('[conv] the scan cursors could not be written; the next pass writes them', error); }
@@ -23423,13 +23534,10 @@ function beginSyncPhaseProfile() {
 
 const PUBLIC_BACKGROUND_SYNC_MS = 30_000;
 let lastPublicBackgroundSyncAt = 0;
-function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS, { manual = false } = {}) {
+function scheduleMessageAutoSync(delayMs = MESSAGE_AUTO_SYNC_MS) {
   clearMessageAutoSyncTimer();
   if (!pageOnScreen()) return;
-  const transport = globalThis.plathoTonRpcTransport;
-  const degradedTransport = typeof transport?.isDegraded === 'function' && transport.isDegraded();
-  const requestedDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
-  const effectiveDelayMs = degradedTransport && !manual ? Math.max(requestedDelayMs, MESSAGE_AUTO_SYNC_DEGRADED_MS) : requestedDelayMs;
+  const effectiveDelayMs = Math.max(1_000, Number(delayMs) || MESSAGE_AUTO_SYNC_MS);
   messageAutoSyncPhase = messageAutoSyncLastErrorLabel ? 'delayed' : (messageAutoSyncLastResult ? 'synced' : 'scheduled');
   messageAutoSyncAt = Date.now() + effectiveDelayMs;
   scheduleMessageAutoSyncCountdownUi();
@@ -23521,6 +23629,7 @@ function serializeMessageForHistory(message) {
     meta: message.meta,
     createdAt: message.createdAt ?? null,
     createdAtMs: messageCreatedAtMs(message),
+    chainFiledAtMs: message.chainFiledAtMs ?? null,
     chainEntryId: message.chainEntryId ?? null,
     chainLastEntryId: message.chainLastEntryId ?? null,
     convShardAddress: message.convShardAddress ?? null,
@@ -24157,6 +24266,7 @@ async function bootEncryptedMessageHistory() {
 }
 
 const convKeyStoreWallet = new WeakMap();
+const convKeyStoresRestored = new WeakSet();
 async function bootConvKeyStore() {
   if (!plathoWallet?.address) return;
   const session = walletSessionGeneration;
@@ -24181,7 +24291,11 @@ async function bootConvKeyStore() {
   }
   hydrateConvGapFloors(convKeyStore);
   const ledger = await readSelfSlotLedger({ force: true });
-  await restoreConvKeysFromRecoveryIfBehind(ledger);
+  try {
+    await restoreConvKeysFromRecoveryIfBehind(ledger);
+  } finally {
+    if (session === walletSessionGeneration) convKeyStoresRestored.add(convKeyStore);
+  }
   await restorePrefsFromRecoveryIfFresh(ledger);
   await restoreSelfNotesFromRecovery(ledger);
   await restoreGroupsFromRecoveryIfFresh(ledger);
@@ -24247,6 +24361,10 @@ async function restoreGroupsFromRecoveryIfFresh(ledger = undefined) {
 }
 
 async function backupGroupsIfNeeded() {
+  if (!groupsBackupAllowed && plathoWallet?.seed && Date.now() - groupsBackupLatchAskedAt >= 60_000) {
+    groupsBackupLatchAskedAt = Date.now();
+    await restoreGroupsFromRecoveryIfFresh();
+  }
   if (!groupsBackupAllowed || !plathoWallet?.seed || groupsRecoveryStored === null) return;
   if (groupsBackupInFlight) return;
   if (!groupRuntimeInstance && !publicGroupRuntimeInstance) return;
@@ -24260,16 +24378,26 @@ async function backupGroupsIfNeeded() {
     const comparable = entries.filter((entry) => !groupsRecoveryOverflowIds.has(String(entry.g).toLowerCase()));
     return { entries, stale: groupsRecoveryIsStale(comparable, groupsRecoveryStored, today) };
   };
-  if (!current().stale) return;
+  const setOf = (entries) => entries.map((entry) => String(entry.g).toLowerCase()).sort().join(',');
+  const balanceNow = vaultPocketState.wallet?.ton_balance;
+  const toppedUp = typeof groupsBackupShortBalance === 'bigint' && typeof balanceNow === 'bigint' && balanceNow > groupsBackupShortBalance;
+  if (Date.now() < groupsBackupNotBefore && groupsBackupWaitsFor === setOf(current().entries) && !toppedUp) return;
+  if (!current().stale) { clearChatKeysBackupShortfall('groups'); return; }
   const transport = globalThis.plathoWalletRpcTransport ?? globalThis.plathoTonRpcTransport;
   if (!transport?.runGetMethod) return;
   groupsBackupInFlight = true;
+  let sent = false;
+  let written = false;
+  let short = false;
+  let paid = false;
+  let attempted = '';
   try {
   const readFor = plathoWallet;
   await restoreGroupsFromRecoveryIfFresh(await readSelfSlotLedger({ force: true, only: 'groups' }));
   if (plathoWallet !== readFor || !groupsBackupAllowed || groupsRecoveryStored === null) return;
   const { entries, stale } = current();
   if (!stale) return;
+  attempted = setOf(entries);
   const seed = plathoWallet.seed;
   const { chunks, overflow } = await packGroupsForRecovery(seed, entries);
   groupsRecoveryOverflowIds = new Set(overflow.map((entry) => String(entry.g).toLowerCase()));
@@ -24292,8 +24420,11 @@ async function backupGroupsIfNeeded() {
         RECOVERY_PUBLISH_VALUE + arrear
           + walletSendFeeReserveNanotons([...(arrear > 0n ? [1] : []), walletSendSizeClassForPayloadBytes(tonCell.serializeBoc(built.body).length)]),
         'groups backup');
+      paid = true;
     } catch (error) {
       noteChatKeysBackupShortfall('groups', error);
+      short = true;
+      groupsBackupShortBalance = typeof vaultPocketState.wallet?.ton_balance === 'bigint' ? vaultPocketState.wallet.ton_balance : null;
       throw error;
     }
     const messages = [];
@@ -24304,15 +24435,25 @@ async function backupGroupsIfNeeded() {
       if (plathoWallet !== backupWallet) return;
       await sendPlathoWalletTransaction(backupWallet, { messages }, { transport });
     } catch (error) {
+      sent = true;
       if (!broadcastMayHaveLanded(error)) throw error;
     }
+    sent = true;
     // eslint-disable-next-line no-await-in-loop
     if (!(await confirmRecoverySlotWrite({ readView, address: built.to, seq: built.seq, h1: built.h1 ?? null }))) return;
     }
     groupsRecoveryStored = chunks.flat();
     clearChatKeysBackupShortfall('groups');
+    written = true;
   } finally {
     groupsBackupInFlight = false;
+    if (paid && !short) groupsBackupShortBalance = null;
+    if (written || (!sent && !short)) groupsBackupFailures = 0;
+    else {
+      groupsBackupFailures += 1;
+      groupsBackupNotBefore = Date.now() + GROUPS_BACKUP_RETRY_MS[Math.min(groupsBackupFailures, GROUPS_BACKUP_RETRY_MS.length) - 1];
+      groupsBackupWaitsFor = attempted;
+    }
   }
 }
 
@@ -24322,6 +24463,12 @@ let prefsBackupAllowed = false;
 let groupsBackupAllowed = false;
 let groupsRecoveryStored = null;
 let groupsBackupInFlight = false;
+const GROUPS_BACKUP_RETRY_MS = Object.freeze([30_000, 60_000, 2 * 60_000, 5 * 60_000, 15 * 60_000]);
+let groupsBackupFailures = 0;
+let groupsBackupNotBefore = 0;
+let groupsBackupWaitsFor = '';
+let groupsBackupShortBalance = null;
+let groupsBackupLatchAskedAt = 0;
 let groupsRecoveryOverflowIds = new Set();
 
 function createSelfSlotStatesReader() {
@@ -27681,7 +27828,7 @@ function refreshProfileBalanceCardUi() {
   const own = rawWalletAddress(plathoWallet?.address);
   const read = Boolean(own) && Boolean(cachedChannelProfile(own)?.fetchedAt);
   if (read) profileBalanceCardSelect.value = publishedBalanceCard() ? 'show' : 'hide';
-  else profileBalanceCardSelect.selectedIndex = -1;
+  else profileBalanceCardSelect.value = '';
   profileBalanceCardSelect.disabled = !own || !hasActivePlathoAccount() || !read;
   if (own && !read && hasActivePlathoAccount() && ownProfileReadAsked.wallet !== own) {
     const ask = {};
@@ -29509,6 +29656,8 @@ function refreshMessagingControls() {
   if (replaceVaultKeysButton) {
     replaceVaultKeysButton.hidden = true;
     replaceVaultKeysButton.disabled = true;
+    const section = replaceVaultKeysButton.closest('.profile-section');
+    if (section) section.hidden = true;
   }
   if (profileCardMintNameButton) profileCardMintNameButton.disabled = false;
   if (setAvatarButton) setAvatarButton.disabled = plathoProfileAvatarPending;
@@ -29612,7 +29761,12 @@ function setView(view, { restoreRoom = true } = {}) {
   }
   if (view !== 'public') flushPublicFeedRead();
   if (view !== 'public') closePublicDiscovery();
-  railItems.forEach((item) => item.classList.toggle('is-active', item.dataset.tab === view));
+  railItems.forEach((item) => {
+    const active = item.dataset.tab === view;
+    item.classList.toggle('is-active', active);
+    if (active) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
+  });
   panels.forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === view));
   if (globalThis.__plathoGiftRuntimeReady) applyGiftAppearance();
   if (installPromptUiReady && plathoWallet) checkForServiceWorkerUpdate(SERVICE_WORKER_UPDATE_ON_VIEW_MS);
@@ -30681,13 +30835,14 @@ newChatForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (isResolvingNewChat) return;
   const localLabel = recipientLocalLabel?.value;
-  const parsed = createRecipientThread(recipientInput?.value, { localLabel });
+  const entered = recipientInput?.value;
+  const parsed = createRecipientThread(entered, { localLabel });
   if (!parsed.ok) { showNewChatHint(parsed.error); return; }
   const identity = parsed.thread.identity;
   const isUsername = identity
     && (identity.type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT || identity.type === RECIPIENT_IDENTITY_TYPES.TON_DNS);
   if (!isUsername) {
-    const result = selectOrCreateRecipientThread(recipientInput?.value, { localLabel });
+    const result = selectOrCreateRecipientThread(entered, { localLabel });
     if (!result.ok) { showNewChatHint(result.error); return; }
     followContactPublicChannel(ownerWalletFromThread(threads.find((item) => item.id === activeThreadId)));
     return;
@@ -30695,19 +30850,21 @@ newChatForm?.addEventListener('submit', async (event) => {
   setNewChatResolving(true);
   showNewChatHint(t('chat.resolvingUsername', { name: canonicalUsernameDisplay(identity.label) }), 'info');
   const session = walletSessionGeneration;
+  const attempt = newChatAttempt;
   try {
     let ownerWallet = null;
     try {
       ownerWallet = await resolveRecipientWalletForThread(parsed.thread);
     } catch (error) {
-      if (session !== walletSessionGeneration) return;
-      if (error instanceof UsernameNotRegisteredError) { showNewChatHint(t('chat.usernameNotRegistered', { name: canonicalUsernameDisplay(identity.label) })); return; }
+      if (session !== walletSessionGeneration || attempt !== newChatAttempt) return;
+      if (error instanceof UsernameNotRegisteredError || error?.code === TON_DNS_NOT_REGISTERED) { showNewChatHint(t('chat.usernameNotRegistered', { name: canonicalUsernameDisplay(identity.label) })); return; }
+      if (error?.code === TON_DNS_NO_WALLET) { showNewChatHint(`${canonicalUsernameDisplay(identity.label)}: ${t('wallet.statusNoWallet')}`); return; }
       console.warn('Username resolve failed (transient); using legacy path', error);
-      const result = selectOrCreateRecipientThread(recipientInput?.value, { localLabel });
+      const result = selectOrCreateRecipientThread(entered, { localLabel });
       if (!result.ok) showNewChatHint(result.error);
       return;
     }
-    if (session !== walletSessionGeneration) return;
+    if (session !== walletSessionGeneration || attempt !== newChatAttempt) return;
     reconcileUsernameOwnership(identity, ownerWallet);
     const result = selectOrCreateRecipientThread(ownerWallet, { localLabel });
     if (!result.ok) { showNewChatHint(result.error); return; }
@@ -30727,7 +30884,7 @@ newChatForm?.addEventListener('submit', async (event) => {
       }
     }
   } finally {
-    setNewChatResolving(false);
+    if (attempt === newChatAttempt) setNewChatResolving(false);
   }
 });
 actionCancelButton?.addEventListener('click', () => {
@@ -31308,9 +31465,11 @@ async function openAddPublicChannelDialog() {
           const resolved = await resolvePublicChannelIdentity(values.channelIdentity);
           return { ok: true, result: { ...values, resolved } };
         } catch (error) {
-          if (error instanceof UsernameNotRegisteredError) {
+          if (error instanceof UsernameNotRegisteredError || error?.code === TON_DNS_NOT_REGISTERED) {
             return { ok: false, error: t('chat.usernameNotRegistered', { name: canonicalUsernameDisplay(values.channelIdentity) }) };
           }
+          if (error?.code === TON_DNS_NO_WALLET) return { ok: false, error: `${canonicalUsernameDisplay(values.channelIdentity)}: ${t('wallet.statusNoWallet')}` };
+          if (!parseRecipientIdentity(values.channelIdentity).ok) return { ok: false, error: t('wallet.recipientTypo') };
           return { ok: false, error: t('dialog.invalidInput') };
         }
       },
@@ -31353,6 +31512,7 @@ async function openAddPublicChannelDialog() {
       publicChannelSearchQuery = '';
     }
     setPublicStatus('channel added');
+    flashWalletIdentityStatus(t('public.channelAddedFlash'), 4_000);
   } catch (error) {
     setPublicStatus('channel blocked');
     console.error(error);
@@ -31430,9 +31590,22 @@ privateComposerAddMenu?.addEventListener('click', (event) => {
   event.stopPropagation();
 });
 
+const ACTIVATION_CHECKING_HOLD_MS = 30_000;
 async function runAccountActivation({ line = null } = {}) {
+  const checkingHolds = [];
+  const releaseChecking = () => {
+    for (const [node, hold] of checkingHolds) if (hold && heldStatusText.get(node) === hold) heldStatusText.delete(node);
+    checkingHolds.length = 0;
+  };
   try {
     registerVaultKeysButton.disabled = true;
+    holdStatusText(vaultDraftStatus, t('profile.statusChecking'), { scope: plathoWallet?.address ?? null, ms: ACTIVATION_CHECKING_HOLD_MS, refresh: refreshMessagingControls });
+    checkingHolds.push([vaultDraftStatus, heldStatusText.get(vaultDraftStatus)]);
+    if (line === privateComposerCostStatus || line === publicComposerCostStatus) {
+      holdStatusText(line, t('dialog.checking'), { scope: line === privateComposerCostStatus ? activeThreadId : publicComposerHoldScope(), ms: ACTIVATION_CHECKING_HOLD_MS,
+        refresh: refreshComposerCostStatus });
+      checkingHolds.push([line, heldStatusText.get(line)]);
+    }
     await submitVaultRegisterMessagingKeys();
   } catch (error) {
     const rateLimited = noteTonRpcRateLimit(error);
@@ -31459,7 +31632,9 @@ async function runAccountActivation({ line = null } = {}) {
     }
     if (!rateLimited) console.error(error);
   } finally {
+    releaseChecking();
     refreshMessagingControls();
+    if (line === privateComposerCostStatus || line === publicComposerCostStatus) refreshComposerCostStatus();
   }
 }
 registerVaultKeysButton?.addEventListener('click', doorPress(runAccountActivation, { money: true }));
@@ -32329,7 +32504,7 @@ sendWalletTonButton?.addEventListener('click', async () => {
     if (!sameWalletAddress(plathoWallet?.address, pressedBy)) { console.warn('[wallet] a transfer of a wallet no longer open was refused', error); return; }
     const reason = gramShortfallText(error) ?? (error?.code === 'PLATHO_WALLET_BALANCE_UNREAD' ? t('wallet.balanceUnreadNothingSent')
       : error?.code === 'APP_UPDATE_PENDING' ? t('wallet.updateReadyReload')
-        : walletTransferNotRun(error) ? t('wallet.transferNotRun') : t('common.blocked'));
+        : walletTransferNotRun(error) ? t('wallet.transferNotRun') : t('wallet.sendNotConfirmed'));
     holdStatusText(sendWalletTonStatus, reason, { refresh: refreshMessagingControls });
     flashWalletIdentityStatus(reason, 8_000);
     console.error(error);
@@ -32376,10 +32551,13 @@ function renderChatKeysBackupWarning() {
   const needs = [chatKeysBackupShortfall.conv, chatKeysBackupShortfall.groups].filter((v) => v !== null);
   chatKeysBackupWarning.hidden = needs.length === 0;
   const largest = needs.reduce((max, v) => (v > max ? v : max), 0n);
-  if (chatKeysBackupStatus) chatKeysBackupStatus.textContent = largest > 0n ? t('errors.walletNeedsGram', { amount: formatTonNanotonsUp(largest) }) : '';
+  const balance = vaultPocketState.wallet?.ton_balance;
+  const covered = typeof balance === 'bigint' && balance >= largest;
+  if (chatKeysBackupStatus) chatKeysBackupStatus.textContent = largest > 0n && !covered ? t('errors.walletNeedsGram', { amount: formatTonNanotonsUp(largest) }) : '';
 }
 chatKeysBackupWarning?.addEventListener('click', () => {
   scheduleRecoveryBackup(null, 0);
+  groupsBackupNotBefore = 0;
   void backupGroupsIfNeeded().catch((error) => { if (!noteTonRpcRateLimit(error)) console.warn('[groups] backup retry', error); });
 });
 
@@ -32628,7 +32806,7 @@ async function openOtherWallets() {
   }
   const answered = await openActionDialog({
     title: t('wallet.otherWalletsTitle'),
-    hint: t('wallet.otherWalletsHint'),
+    hint: list.querySelector('.wallet-list-cloud') ? t('wallet.otherWalletsHint') : t('wallet.otherWalletsHintPlain'),
     tone: 'muted',
     submitLabel: t('common.close'),
     cancellable: true,
@@ -33963,13 +34141,16 @@ async function resolveVaultCustodyWallet(vaultAddress) {
 
 const ATH_WALLET_ADDRESS_FRESH_MS = 60_000;
 const recentAthWalletAddresses = new Map();
-function recentAthWalletAddress(owner, read) {
+const sessionAthWalletAddresses = new Map();
+function recentAthWalletAddress(owner, read, { shown = false } = {}) {
   const key = `${requireAthMasterAddress()}|${owner}`;
+  if (shown && sessionAthWalletAddresses.has(key)) return Promise.resolve(sessionAthWalletAddresses.get(key));
   const held = recentAthWalletAddresses.get(key);
   if (held && Date.now() - held.at < ATH_WALLET_ADDRESS_FRESH_MS) return held.answer;
   const answer = read();
   recentAthWalletAddresses.set(key, { at: Date.now(), answer });
-  answer.catch(() => { if (recentAthWalletAddresses.get(key)?.answer === answer) recentAthWalletAddresses.delete(key); });
+  answer.then((address) => { if (address) sessionAthWalletAddresses.set(key, address); },
+    () => { if (recentAthWalletAddresses.get(key)?.answer === answer) recentAthWalletAddresses.delete(key); });
   return answer;
 }
 
@@ -35053,6 +35234,7 @@ function webpCanvasSize(bytes) {
     const tag = (at) => String.fromCharCode(bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]);
     if (tag(0) !== 'RIFF' || tag(8) !== 'WEBP') return null;
     const chunk = tag(12);
+    if (chunk === 'VP8X' && (bytes[20] & 0x02) !== 0) return null;
     if (chunk === 'VP8X') return { width: 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16)), height: 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16)) };
     if (chunk === 'VP8L') {
       if (bytes[20] !== 0x2f) return null;
@@ -35635,8 +35817,8 @@ async function assertWalletGramAtLeast(requiredNanotons, action) {
   }
 }
 
-async function loadConnectedAthWalletBalance({ priority = 'wallet' } = {}) {
-  const athWalletAddress = await loadConnectedAthWalletAddress();
+async function loadConnectedAthWalletBalance({ priority = 'wallet', shown = false } = {}) {
+  const athWalletAddress = await loadConnectedAthWalletAddress({ shown });
   const provider = createAthWalletTonRpcProvider({ athWalletAddress });
   try {
     const data = await withVaultReadLock(() => provider.getWalletData({ address: athWalletAddress, priority }));
@@ -35756,7 +35938,7 @@ async function refreshVaultNavBalanceInBackground(options = {}) {
     const forWalletRaw = rawWalletAddress(plathoWallet.address);
     const priority = walletBalanceReadPriority();
     const ton = await loadConnectedTonWalletBalance(undefined, { priority });
-    const ath = await loadConnectedAthWalletBalance({ priority }).catch(() => null);
+    const ath = await loadConnectedAthWalletBalance({ priority, shown: true }).catch(() => null);
     if (!plathoWallet?.address || rawWalletAddress(plathoWallet.address) !== forWalletRaw) return null;
     if (ton === null && ath === null) {
       markNavVaultBalanceRetryNeeded('balance unavailable');
@@ -35869,6 +36051,7 @@ function refreshNavVaultBalance() {
 
 function refreshVaultMoveWidget() {
   refreshNavVaultBalance();
+  renderChatKeysBackupWarning();
 }
 
 async function resolveAthMasterProvider() {
@@ -35960,7 +36143,12 @@ async function openBuyAthDialog() {
     setText(buyAthStatus, t('profile.buyAthWalletRequired'));
     return;
   }
-  await refreshMarketStabilityState({ fresh: true });
+  setText(buyAthStatus, t('profile.statusChecking'));
+  try {
+    await refreshMarketStabilityState({ fresh: true });
+  } finally {
+    renderBuyAthStatus();
+  }
   const state = marketStabilityState;
   if (!state) {
     setText(buyAthStatus, t('profile.buyAthUnavailable'));
@@ -36200,6 +36388,7 @@ async function refreshVaultNow({ includeActivation = false, includeStats = false
       .then(() => refreshVaultNow({ includeActivation: missingActivation, includeStats: missingStats }));
   }
   vaultRefreshInFlightFlags = { includeActivation, includeStats };
+  vaultRefreshStartedAt = Date.now();
   const vaultWork = (async () => {
     const results = [];
     results.push(...await Promise.allSettled([refreshVaultNavBalanceInBackground()]));
@@ -36604,6 +36793,7 @@ async function resolvePlathoUsernameOwner(label, { readOptions = null } = {}) {
     registryAddress,
     registryCallOptions: { address: registryAddress, ...readClass() },
     itemCallOptions: { address: itemAddress, ...readClass() },
+    derived: { nameHash, itemAddress },
   });
   if (proof.reason === 'item_not_initialized') {
     throw new UsernameNotRegisteredError(`${displayLabel} is not registered`);
@@ -36678,7 +36868,7 @@ async function resolveTonDnsProvider() {
   });
 }
 
-async function loadConnectedAthWalletAddress() {
+async function loadConnectedAthWalletAddress({ shown = false } = {}) {
   const owner = requirePlathoWalletAddress();
   requireBasechainAddress(owner, 'Connected wallet');
   requireBasechainAddress(requireAthMasterAddress(), 'ATHMaster');
@@ -36689,7 +36879,7 @@ async function loadConnectedAthWalletAddress() {
       ...criticalChainReadOptions(),
     }));
     return requireBasechainAddress(walletAddress, 'Connected ATH wallet');
-  });
+  }, { shown });
 }
 
 async function resolveWalletFromIdentityVariants(variants, purpose) {
@@ -36778,10 +36968,14 @@ async function resolveTransferRecipient(input) {
     error.code = 'PLATHO_RECIPIENT_INVALID';
     throw error;
   }
-  return {
-    identity: parsed.identity,
-    wallet: await resolveWalletFromIdentityVariants([parsed.identity], 'Transfer recipient'),
-  };
+  let wallet;
+  try {
+    wallet = await resolveWalletFromIdentityVariants([parsed.identity], 'Transfer recipient');
+  } catch (error) {
+    if (parsed.identity.type !== RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS) throw error;
+    throw Object.assign(new Error('Transfer recipient is not a basechain wallet address'), { code: 'PLATHO_RECIPIENT_INVALID', cause: error });
+  }
+  return { identity: parsed.identity, wallet };
 }
 
 function transferRecipientDisplay(identity, wallet) {
@@ -36790,7 +36984,9 @@ function transferRecipientDisplay(identity, wallet) {
 
 function transferRecipientError(error, entered) {
   if (error instanceof UsernameNotRegisteredError) return t('chat.usernameNotRegistered', { name: entered });
-  if (error?.code === 'PLATHO_RECIPIENT_INVALID') return t('username.recipientInvalid');
+  if (error?.code === 'PLATHO_RECIPIENT_INVALID') return t('wallet.recipientTypo');
+  if (error?.code === TON_DNS_NOT_REGISTERED) return t('chat.usernameNotRegistered', { name: entered });
+  if (error?.code === TON_DNS_NO_WALLET) return `${entered}: ${t('wallet.statusNoWallet')}`;
   console.error(error);
   return t('username.recipientUnresolved', { name: entered });
 }
@@ -38172,8 +38368,18 @@ async function attemptIntroFirstContactDirect(context, owner = undefined) {
       profileRegistryAddress: registry, predecessorRegistryAddress: configuredProfileRegistryPredecessorAddress(),
       decodeAddressSliceBoc: decodeTonAddressSliceBoc,
     });
-    const bundle = await resolveRecipientBundleByWallet({ provider, wallet: peerWallet, callOptions: criticalChainReadOptions() });
+    if (keyStore !== convKeyStore || !sameWalletAddress(convKeyStoreWallet.get(keyStore), signer?.address) || !convKeyStoresRestored.has(keyStore)) throw convIntroPendingError();
+    const { bundle, signKey: shardSignKey } = await resolveRecipientByWallet({ provider, wallet: peerWallet, callOptions: criticalChainReadOptions() });
     const peerKeyId = bundle.keyId;
+    const heldConversation = keyStore.getConversation(selfKeyId, peerKeyId);
+    const heldSignKey = signKeyHex(heldConversation?.peerSignPublicKey);
+    if (heldSignKey && shardSignKey && heldSignKey !== shardSignKey) throw peerKeysCopiedError();
+    if (heldConversation && !heldSignKey && !sameWalletAddress(heldConversation.peerWallet, peerWallet)) {
+      const heldWallets = [heldConversation.peerWallet, ...(heldConversation.peerWalletCandidates ?? [])].filter((wallet) => wallet && !sameWalletAddress(wallet, peerWallet));
+      const heldShardSignKey = await heldPeerShardSignKey({ provider, wallets: heldWallets, peerKeyId, callOptions: criticalChainReadOptions() });
+      if (!heldShardSignKey || !shardSignKey || heldShardSignKey !== shardSignKey) throw peerKeysCopiedError();
+    }
+    const peerSignKey = shardSignKey;
 
     const draftBytes = messageDocumentBytesFromDraft(
       context.text, context.attachments, {},
@@ -38194,6 +38400,7 @@ async function attemptIntroFirstContactDirect(context, owner = undefined) {
     const pending = {
       at: Date.now(), boc: null, kRoot: capsule.kRoot, introNonce: capsule.introNonce,
       peerKeyId, peerWallet, epoch: slot.epoch, bucket: slot.bucket, expectedEntryId: slot.expectedEntryId, r, viewTag,
+      ...(peerSignKey ? { peerSignKey } : {}),
     };
     message.introDirectSend = pending;
     await updateMessageInEncryptedHistory(thread, message).catch((error) => console.warn('[history] the first contact could not be kept', error));
@@ -38246,6 +38453,7 @@ async function attemptIntroFirstContactDirect(context, owner = undefined) {
 
   const adopted = {
     kRoot: sendState.kRoot, createdAt: createdAtSec, introNonce: sendState.introNonce, peerKeyId: sendState.peerKeyId, peerEncPublicKey: null, peerWallet: sendState.peerWallet,
+    peerSignPublicKey: sendState.peerSignKey ?? null,
   };
   await keyStore.upsertConversationKRoot(selfKeyId, sendState.peerKeyId, adopted);
   const sameWallet = sameWalletAddress(plathoWallet?.address, signer?.address);
@@ -38906,6 +39114,7 @@ async function attemptConvMessagePublishDirect(context, owner = undefined) {
   let verifiedWallet = rec.peerWallet;
   const bundle = await resolvePeerReplyBundle({
     provider, peerWallet: rec.peerWallet, peerKeyId, callOptions: criticalChainReadOptions(), peerWalletCandidates: rec.peerWalletCandidates ?? [],
+    peerSignKey: rec.peerSignPublicKey ?? null,
     onVerifiedWallet: async (wallet) => { verifiedWallet = wallet; await settleVerifiedPeerWallet(selfKeyId, peerKeyId, rec, wallet, keyStore); },
   });
   walletOfSend(signer?.address ?? null);
@@ -40810,6 +41019,11 @@ window.addEventListener('focus', () => {
   resumeWalletUnlockPrompt();
   scheduleMessageAutoSync(2_000);
   if (isVaultViewActive()) {
+    const sinceRefresh = Date.now() - vaultRefreshStartedAt;
+    if (sinceRefresh >= 0 && sinceRefresh < VAULT_FOCUS_REFRESH_FLOOR_MS) {
+      scheduleVaultAutoRefresh(Math.max(1_000, VAULT_FOCUS_REFRESH_FLOOR_MS - sinceRefresh));
+      return;
+    }
     refreshVaultNow({ includeActivation: true }).catch((error) => {
       if (noteTonRpcRateLimit(error)) setVaultStatus('RPC busy, retrying');
       if (!isExpectedVaultProviderUnavailable(error)) console.error(error);
@@ -41097,6 +41311,7 @@ function buildQuickStartActivateBody() {
     const mine = () => generation === quickStartActivationGeneration;
     activate.disabled = true;
     setText(quickStartStepStatus, t('quickstart.working'));
+    if (quickStartStepStatus) delete quickStartStepStatus.dataset.tone;
     try {
       const published = await submitVaultRegisterMessagingKeys({ preConfirmed: true });
       if (!mine()) return;
@@ -41104,6 +41319,7 @@ function buildQuickStartActivateBody() {
         quickStartActivationInFlight = true;
         applyGate();
         setText(quickStartStepStatus, t('quickstart.activationSent'));
+        if (quickStartStepStatus) delete quickStartStepStatus.dataset.tone;
       }
       await confirmActivation(generation);
     } catch (error) {
@@ -41114,6 +41330,7 @@ function buildQuickStartActivateBody() {
       setText(quickStartStepStatus, error?.code === 'PLATHO_WALLET_GRAM_REQUIRED'
         ? error.message
         : t('quickstart.couldNotCompleteLater'));
+      if (quickStartStepStatus) quickStartStepStatus.dataset.tone = 'error';
     } finally {
       if (mine()) activate.disabled = false;
     }
@@ -41471,6 +41688,7 @@ function renderQuickStartStep({ skipCompleted = true } = {}) {
   setText(quickStartStepTitle, step.title());
   setText(quickStartStepWhy, step.why());
   setText(quickStartStepStatus, '');
+  if (quickStartStepStatus) delete quickStartStepStatus.dataset.tone;
   if (quickStartStepBody) {
     quickStartStepBody.innerHTML = '';
     const body = step.body();
@@ -41485,6 +41703,7 @@ function quickStartAdvance() {
   if (quickStartStepIndex >= QUICK_START_STEPS.length - 1) { finishQuickStart(); return; }
   quickStartStepIndex += 1;
   renderQuickStartStep();
+  focusQuickStartStepTitle();
 }
 
 let quickStartBackupMode = false;
@@ -41608,6 +41827,11 @@ function openQuickStart() {
   if (quickStartStepsView) quickStartStepsView.hidden = true;
   quickStartDialog.classList.remove('is-closing'); quickStartDialog.hidden = false;
   holdPageBehindModal(quickStartDialog);
+  const title = document.querySelector('#quickStartTitle');
+  if (title) {
+    if (!title.hasAttribute('tabindex')) title.setAttribute('tabindex', '-1');
+    title.focus({ preventScroll: true });
+  }
 }
 
 function quickStartStepIndexByKey(key) {
@@ -41674,12 +41898,18 @@ async function runQuickStartPrimaryAction() {
   if (!step || !quickStartActionButton) return;
   quickStartActionButton.disabled = true;
   setText(quickStartStepStatus, t('quickstart.working'));
+  if (quickStartStepStatus) delete quickStartStepStatus.dataset.tone;
+  const refused = () => { if (quickStartStepStatus) quickStartStepStatus.dataset.tone = 'error'; };
   try {
     const ok = await step.run();
     if (typeof ok === 'string') {
       setText(quickStartStepStatus, ok);
+      refused();
+      revealInActionDialog(quickStartStepStatus);
     } else if (ok === false) {
-      setText(quickStartStepStatus, step.optional ? t('quickstart.nothingEntered') : t('quickstart.notCompleted'));
+      setText(quickStartStepStatus, t('quickstart.notCompleted'));
+      if (!step.optional) refused();
+      revealInActionDialog(quickStartStepStatus);
     } else {
       setText(quickStartStepStatus, t('quickstart.done'));
       quickStartAdvance();
@@ -41689,12 +41919,22 @@ async function runQuickStartPrimaryAction() {
     setText(quickStartStepStatus, walletDeviceFaultWords(error) ?? (step.optional
       ? t('quickstart.couldNotCompleteLater')
       : t('quickstart.couldNotComplete', { reason: error?.message ?? t('quickstart.tryAgain') })));
+    refused();
+    revealInActionDialog(quickStartStepStatus);
   } finally {
     quickStartActionButton.disabled = false;
   }
 }
 
 quickStartActionButton?.addEventListener('click', () => { runQuickStartPrimaryAction(); });
+quickStartStepBody?.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || event.shiftKey) return;
+  const field = event.target;
+  if (!(field instanceof HTMLInputElement) || !['text', 'password'].includes(field.type)) return;
+  if (!quickStartActionButton || quickStartActionButton.disabled || quickStartActionButton.hidden) return;
+  event.preventDefault();
+  quickStartActionButton.click();
+});
 
 const PLATHO_EMOJI_LIST = [
   '😀','😃','😄','😁','😆','😅','😂','🤣','🥲','😊','🙂','🙃','😉','😌','😍','🥰','😘','😋','😛','😜','🤪','😝','🤗','🤭','🤔','🤐','😶','😏','😒','🙄','😬','😔','😴','😷','🤒','🤢','🤮','🥵','🥶','😵',
@@ -46234,7 +46474,7 @@ function openWalletTokenCard(token, { refill = false } = {}) {
       walletCardStat(t('wallet.tokenStatus'), t(token.scam ? 'wallet.tokenScam' : token.verified ? 'wallet.tokenVerified' : 'wallet.tokenUnverified')),
       walletCardStat(t('wallet.tokenAddress'), shortAddress(friendly), { copy: friendly, copied: 'wallet.tokenAddressCopied' }),
       walletHiddenAssets().has(token.master) ? walletCardUnhide(token.master)
-        : walletAssetsFresh('tokens') ? walletCardSendRow(walletCardSend(() => runWalletAssetSend({ kind: 'jetton', token })),
+        : walletAssetsFresh('tokens') ? walletCardSendRow(walletCardSend(() => runWalletAssetSend({ kind: 'jetton', token: athWithCornerBalance(token) })),
         token.verified ? null : walletCardBurn(() => runWalletAssetBurn({ kind: 'jetton', token })),
         token.verified ? null : walletCardHide(token.master, token.symbol || token.name || shortAddress(token.master)))
         : walletCardStat(t('wallet.actionSend'), t('wallet.readingChain')),
@@ -46974,6 +47214,10 @@ function walletCardSend(onPress, label = t('wallet.actionSend'), variant = '', {
   button.addEventListener('click', doorPress(() => { closeWalletGroup(); return onPress(); }, { money }));
   return button;
 }
+function athWithCornerBalance(token) {
+  const held = vaultPocketState.wallet?.ath_balance;
+  return token && token.master === walletAthMaster() && typeof held === 'bigint' ? { ...token, balance: held } : token;
+}
 function walletAthToken() {
   const ath = walletAthMaster();
   if (!ath) return null;
@@ -47018,10 +47262,11 @@ async function openWalletSendChooser() {
     drawnWith = listed();
     list.replaceChildren();
     list.append(walletAssetRow({ picture: gramPicture(), title: 'GRAM', letter: 'G', amount: walletBalanceRowText('TON'), balanceRow: 'TON', onOpen: choose({ kind: 'gram' }) }));
-    const ath = walletAthToken();
+    const ath = athWithCornerBalance(walletAthToken());
     const athHeld = ath && ath.balance !== null && ath.balance !== undefined ? BigInt(ath.balance) : null;
     if (ath && athHeld !== 0n) {
-      list.append(walletAssetRow({ picture: assetPicture(ath.master), title: 'ATH', letter: 'A', amount: walletBalanceRowText('ATH'), balanceRow: 'ATH', onOpen: choose({ kind: 'jetton', token: ath }) }));
+      const pressAth = () => { picked = { kind: 'jetton', token: athWithCornerBalance(walletAthToken()) ?? ath }; actionSubmitButton?.click(); };
+      list.append(walletAssetRow({ picture: assetPicture(ath.master), title: 'ATH', letter: 'A', amount: walletBalanceRowText('ATH'), balanceRow: 'ATH', onOpen: pressAth }));
     }
     const tokens = (walletAssetsState.tokens ?? []).filter((token) => token.master !== ath?.master);
     const hiddenNow = walletHiddenAssets();
@@ -47111,7 +47356,7 @@ function walletAssetSendRefusal(error) {
       : error?.code === 'JETTON_WALLET_DISAGREES' ? t('wallet.tokenWalletRefused')
         : error?.code === 'NFT_NOT_OWNED' ? t('wallet.nftNotYours')
           : error?.code === 'NFT_ON_OWN_SALE' ? t('nft.onOwnSale')
-            : walletTransferNotRun(error) ? t('wallet.transferNotRun') : t('common.blocked'));
+            : walletTransferNotRun(error) ? t('wallet.transferNotRun') : t('wallet.sendNotConfirmed'));
 }
 function walletPressRefusal(error, signing) {
   return (!signing && refusalTextFor(error)) || walletAssetSendRefusal(error);
@@ -47303,10 +47548,11 @@ function walletSwapOffers() {
   if (swapRoutesFrom(GRAM).length) offers.push({ id: GRAM, symbol: 'GRAM', decimals: 9, balance: null, wallet: '', master: '' });
   const hidden = walletHiddenAssets();
   for (const token of walletAssetsState.tokens ?? []) {
-    if (!token.verified || hidden.has(token.master) || BigInt(token.balance ?? 0) <= 0n || !swapRoutesFrom(token.master).length) continue;
+    const balance = BigInt(athWithCornerBalance(token).balance ?? 0);
+    if (!token.verified || hidden.has(token.master) || balance <= 0n || !swapRoutesFrom(token.master).length) continue;
     const listed = swapListedToken(token.master);
     offers.push({ id: token.master, symbol: listed?.symbol || token.symbol || token.name, decimals: listed?.decimals ?? walletTokenDecimals(token) ?? 9,
-      balance: BigInt(token.balance), wallet: token.wallet, master: token.master, isAth: token.master === ath });
+      balance, wallet: token.wallet, master: token.master, isAth: token.master === ath });
   }
   return offers;
 }
@@ -47608,7 +47854,10 @@ function renderWalletMarket(panel) {
       if (first) walletMarketShow(first, walletMarketRouteOf(first.id));
     }
   };
-  search.addEventListener('input', draw);
+  search.addEventListener('input', () => {
+    if (isDesktopLayout()) list.scrollTop = 0;
+    draw();
+  });
   side.append(search, list, empty);
   box.append(head, side, detail);
   panel.replaceChildren(box);
@@ -47701,17 +47950,42 @@ function renderWalletNftMarket(panel) {
   const detail = document.createElement('section');
   detail.className = 'wallet-market-detail wallet-nft-detail profile-stat-list';
   box.append(head, side, detail);
+  const focusedKey = walletNftMarket.picker?.contains(document.activeElement) ? document.activeElement?.dataset?.collection ?? null : null;
   panel.replaceChildren(box);
   walletNftMarket.pickerRows.clear();
   Object.assign(walletNftMarket, { box, picker, pickerNote, detail, parts: null, drawnDesktop: isDesktopLayout() });
+  const place = walletNftMarket.places.get(walletNftMarket.drawnDesktop);
+  const kept = place && place.query === walletNftMarket.query ? place : null;
+  walletNftMarket.pickerShown = kept ? kept.shown : 0;
+  walletNftPickerKeys(picker);
   search.addEventListener('input', () => {
     walletNftMarket.query = search.value;
+    walletNftMarket.pickerShown = 0;
+    if (walletNftMarket.drawnDesktop) picker.scrollTop = 0;
     walletNftPickerPaint();
     void walletNftFindByAddress();
   });
   walletNftPickerPaint();
-  if (walletNftMarket.drawnDesktop) walletNftShow(walletNftMarket.view ?? '');
   const page = panel.closest('.wallet-scroll-content');
+  const scroller = walletNftMarket.drawnDesktop ? picker : page;
+  if (kept && scroller && kept.top > 0) {
+    if (walletNftMarket.drawnDesktop) walletMarketFit();
+    scroller.scrollTop = kept.top;
+  }
+  if (focusedKey !== null) picker.querySelector(`[data-collection="${CSS.escape(focusedKey)}"]`)?.focus({ preventScroll: true });
+  const desktop = walletNftMarket.drawnDesktop;
+  const keepHere = () => {
+    if (walletNftMarket.picker !== picker || !picker.isConnected || walletAssetsState.tab !== 'market' || !scroller) return;
+    if (isDesktopLayout() !== desktop) return;
+    walletNftMarket.places.set(desktop, { query: walletNftMarket.query, shown: walletNftMarket.pickerShown, top: scroller.scrollTop });
+  };
+  walletNftMarket.placeKeep = keepHere;
+  if (desktop) picker.addEventListener('scroll', keepHere, { passive: true });
+  else if (page && walletNftMarket.placePage !== page) {
+    page.addEventListener('scroll', () => { if (!walletNftMarket.drawnDesktop) walletNftMarket.placeKeep?.(); }, { passive: true });
+    walletNftMarket.placePage = page;
+  }
+  if (walletNftMarket.drawnDesktop) walletNftShow(walletNftMarket.view ?? '');
   walletNftMarket.fitObserver?.disconnect();
   walletNftMarket.fitObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
     if (walletNftMarket.box !== box) return;
@@ -48145,20 +48419,81 @@ function walletNftPickerPaint() {
   const all = walletNftCollection(NFT_ALL);
   const feed = walletNftVisibleFeed().length;
   const rows = query ? [] : [walletNftPickerRow({ collection: NFT_ALL, name: t('nft.allCollections'), picture: '', feed, count: feed, more: all.hasMore && all.at > 0, read: true, floor: null })];
-  rows.push(...entries.slice(0, NFT_PICKER_ROWS).map(walletNftPickerRow));
+  const shown = typeof IntersectionObserver === 'function' ? Math.max(NFT_PICKER_ROWS, walletNftMarket.pickerShown) : entries.length;
+  rows.push(...entries.slice(0, shown).map(walletNftPickerRow));
+  const end = entries.length > shown ? walletNftPickerEnd() : null;
+  if (end) rows.push(end);
   const focused = picker.contains(document.activeElement) ? document.activeElement?.dataset?.collection ?? null : null;
   const scroller = focused === null ? null : walletNftMarket.drawnDesktop ? picker : picker.closest('.wallet-scroll-content');
   const stood = scroller ? scroller.scrollTop : 0;
-  picker.replaceChildren(...rows);
-  walletNftWatchRows(picker);
+  const same = rows.length === picker.children.length && rows.every((row, at) => picker.children[at] === row);
+  if (!same) {
+    picker.replaceChildren(...rows);
+    walletNftWatchRows(picker);
+    if (end) { walletNftMarket.pickerEndSeer?.unobserve(end); walletNftMarket.pickerEndSeer?.observe(end); }
+  } else {
+    void walletNftNameRows();
+    void walletNftReadRows();
+  }
   if (focused !== null) picker.querySelector(`[data-collection="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
   if (scroller && scroller.scrollTop !== stood) scroller.scrollTop = stood;
+  walletNftPickerRove(picker);
   picker.hidden = rows.length === 0;
   const filling = !all.at || (walletNftViewOpen(NFT_ALL) && all.hasMore && all.pages < NFT_COLLECTION_DEEP_PAGES);
   setTextIfChanged(pickerNote, rows.length ? ''
     : address && walletNftCollectionVerified(address) === 'no' ? t('nft.collectionUnverified')
       : filling ? t('nft.collectionsLoading') : t('wallet.swapNothingFound'));
   pickerNote.hidden = !pickerNote.textContent;
+}
+function walletNftPickerRove(picker) {
+  const drawnRow = (key) => {
+    const row = key === null || key === undefined ? null : walletNftMarket.pickerRows.get(key);
+    return row?.parentNode === picker ? row : null;
+  };
+  const stop = drawnRow(walletNftMarket.pickerStop) ?? (walletNftMarket.drawnDesktop ? drawnRow(walletNftMarket.view) : null)
+    ?? picker.querySelector(':scope > .wallet-nft-collection-row');
+  const held = picker.querySelector(':scope > .wallet-nft-collection-row[tabindex="0"]');
+  if (held && held !== stop) held.tabIndex = -1;
+  if (stop && stop.tabIndex !== 0) stop.tabIndex = 0;
+}
+function walletNftPickerKeys(picker) {
+  picker.addEventListener('keydown', (event) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const row = event.target?.closest?.('.wallet-nft-collection-row');
+    if (!row || row.parentNode !== picker) return;
+    const rows = [...picker.querySelectorAll(':scope > .wallet-nft-collection-row')];
+    const at = rows.indexOf(row);
+    const next = event.key === 'Home' ? rows[0] : event.key === 'End' ? rows.at(-1) : rows[at + (event.key === 'ArrowDown' ? 1 : -1)];
+    event.preventDefault();
+    next?.focus();
+  });
+  picker.addEventListener('focusin', (event) => {
+    const row = event.target?.closest?.('.wallet-nft-collection-row');
+    if (!row || row.parentNode !== picker) return;
+    walletNftMarket.pickerStop = row.dataset.collection ?? null;
+    walletNftPickerRove(picker);
+  });
+}
+function walletNftPickerEnd() {
+  if (!walletNftMarket.pickerEnd) {
+    const end = document.createElement('div');
+    end.className = 'wallet-nft-picker-end';
+    end.setAttribute('aria-hidden', 'true');
+    walletNftMarket.pickerEnd = end;
+  }
+  const end = walletNftMarket.pickerEnd;
+  const picker = walletNftMarket.picker;
+  const root = walletNftMarket.drawnDesktop ? picker : picker?.closest('.wallet-scroll-content') ?? null;
+  if (!walletNftMarket.pickerEndSeer || walletNftMarket.pickerEndRoot !== root) {
+    walletNftMarket.pickerEndSeer?.disconnect();
+    walletNftMarket.pickerEndRoot = root;
+    walletNftMarket.pickerEndSeer = new IntersectionObserver((seen) => {
+      if (!seen.some((one) => one.isIntersecting) || !end.isConnected) return;
+      walletNftMarket.pickerShown = Math.max(NFT_PICKER_ROWS, walletNftMarket.pickerShown) + NFT_PICKER_ROWS;
+      walletNftPickerPaint();
+    }, { root, rootMargin: '0px 0px 800px 0px' });
+  }
+  return end;
 }
 const NFT_ROW_STALE_MS = 10 * WALLET_MARKET_REFRESH_MS;
 function walletNftWatchRows(picker) {
@@ -48244,6 +48579,7 @@ function walletNftPickerRow(entry) {
   if (!row || row.dataset.title !== title) {
     row = walletAssetRow({ letter: key ? title : '\u2726', title, subtitle: ' ', amount: '', shared: true,
       onOpen: () => walletNftPick(key), className: 'wallet-market-row wallet-nft-collection-row' });
+    row.tabIndex = -1;
     row.dataset.collection = key;
     row.dataset.title = title;
     row.dataset.picture = '';
@@ -48255,23 +48591,30 @@ function walletNftPickerRow(entry) {
     const icon = row.querySelector('.wallet-asset-icon');
     if (icon) paintWalletAssetIconFirst(icon, pictures, { shared: true });
   }
-  const stat = document.createElement('span');
-  stat.className = 'wallet-market-stat';
-  const label = document.createElement('span');
-  label.className = 'wallet-market-stat-key';
   const known = Boolean(entry.read || entry.count || entry.more);
-  label.textContent = t(known ? 'nft.listedCount' : 'nft.newCount');
-  const value = document.createElement('span');
-  value.className = 'wallet-market-stat-value';
-  value.textContent = known ? `${entry.count}${entry.more ? '+' : ''}` : String(entry.feed);
-  stat.append(label, value);
-  row.querySelector('.wallet-asset-sub')?.replaceChildren(...(known || entry.feed ? [stat] : []));
+  const words = known || entry.feed ? [t(known ? 'nft.listedCount' : 'nft.newCount'), known ? `${entry.count}${entry.more ? '+' : ''}` : String(entry.feed)] : [];
+  if (row.dataset.stat !== words.join('\n')) {
+    row.dataset.stat = words.join('\n');
+    let stat = null;
+    if (words.length) {
+      stat = document.createElement('span');
+      stat.className = 'wallet-market-stat';
+      const label = document.createElement('span');
+      label.className = 'wallet-market-stat-key';
+      label.textContent = words[0];
+      const value = document.createElement('span');
+      value.className = 'wallet-market-stat-value';
+      value.textContent = words[1];
+      stat.append(label, value);
+    }
+    row.querySelector('.wallet-asset-sub')?.replaceChildren(...(stat ? [stat] : []));
+  }
   const amount = row.querySelector('.wallet-asset-amount');
-  if (amount) amount.textContent = entry.floor === null ? '' : t('nft.fromPrice', { price: `${formatUnits(String(entry.floor), 9)} GRAM` });
+  if (amount) setTextIfChanged(amount, entry.floor === null ? '' : t('nft.fromPrice', { price: `${formatUnits(String(entry.floor), 9)} GRAM` }));
   const picked = walletNftMarket.drawnDesktop && walletNftMarket.view === key;
-  row.classList.toggle('is-selected', picked);
-  if (picked) row.setAttribute('aria-current', 'true');
-  else row.removeAttribute('aria-current');
+  if (row.classList.contains('is-selected') !== picked) row.classList.toggle('is-selected', picked);
+  if (picked && row.getAttribute('aria-current') !== 'true') row.setAttribute('aria-current', 'true');
+  else if (!picked && row.hasAttribute('aria-current')) row.removeAttribute('aria-current');
   return row;
 }
 function walletNftNamed(key) {
@@ -48853,7 +49196,8 @@ function openWalletNftListing(listing, { back = null } = {}) {
   const gram = nftGram;
   const share = (part) => `${(part / (NFT_FEE_BASE / 100)).toLocaleString('en', { maximumFractionDigits: 3 })} %`;
   const usdRoute = walletMarketRouteOf(PRICE_USDT);
-  const gramPerUsd = usdRoute ? walletMarketPrice(usdRoute) : null;
+  const usdRead = usdRoute ? walletMarket.reserves.get(usdRoute.pair.pool) : null;
+  const gramPerUsd = usdRead && Date.now() - usdRead.at < 2 * WALLET_MARKET_REFRESH_MS ? walletMarketPrice(usdRoute) : null;
   const withUsd = (units) => `${gram(units)}${gramPerUsd ? ` ($${formatUsdAmount(Number(units) / 1e9 / gramPerUsd)})` : ''}`;
   const friendly = (address) => displayWalletAddress(address);
   const me = plathoWallet?.address ?? '';
@@ -49792,7 +50136,8 @@ function walletSwapPercent(bps) {
 async function openWalletSwapDialog(start, hold, asked = null) {
   if (!plathoWallet) return null;
   const pressedBy = plathoWallet.address;
-  if (!(await whileWalletTileBusy(walletSwapAction, () => loadWalletAssets('tokens')))) return null;
+  const tokensRead = loadWalletAssets('tokens').catch(() => {});
+  if (!Array.isArray(walletAssetsState.tokens) && start !== GRAM && !(await whileWalletTileBusy(walletSwapAction, () => tokensRead))) return null;
   if (!walletTilePressStands(pressedBy)) return null;
   if (walletTransferOnItsWay(pressedBy)) return null;
   const offers = walletSwapOffers();
@@ -50021,7 +50366,9 @@ async function openWalletSwapDialog(start, hold, asked = null) {
     const units = maxIn();
     if (units === null) { showAppNotice(t('wallet.swapMaxUnread')); return; }
     if (units <= 0n) {
-      showAppNotice(t('wallet.tokenNotEnough', { symbol: 'GRAM', amount: formatUnits(vaultPocketState.wallet.ton_balance, 9, { shown: 9 }) }));
+      showAppNotice(state.offer.id === GRAM
+        ? t('wallet.tokenNotEnough', { symbol: 'GRAM', amount: formatUnits(vaultPocketState.wallet.ton_balance, 9, { shown: 9 }) })
+        : t('wallet.tokenNotEnough', { symbol: state.offer.symbol, amount: formatUnits(state.offer.balance, state.offer.decimals, { shown: state.offer.decimals }) }));
       return;
     }
     give.input.value = formatUnits(units, state.offer.decimals, { shown: state.offer.decimals }).replace(/\s/g, '');
@@ -50032,6 +50379,23 @@ async function openWalletSwapDialog(start, hold, asked = null) {
   let outcome = null;
   const startAsks = swapAsksFrom(state.offer.id);
   choose((startAsks.find((ask) => ask.id === asked) ?? startAsks.find((ask) => ask.id === walletAthMaster()) ?? startAsks[0])?.id ?? '');
+  let stillReadingSaid = false;
+  void tokensRead.then(() => {
+    if (state.closed || plathoWallet?.address !== pressedBy) return;
+    const now = walletSwapOffers();
+    for (const one of offers) {
+      if (one.id === GRAM) continue;
+      const fresh = now.find((other) => other.id === one.id);
+      one.balance = fresh ? fresh.balance : 0n;
+    }
+    for (const fresh of now) if (!offers.some((one) => one.id === fresh.id)) offers.push(fresh);
+    label();
+    if (stillReadingSaid && walletAssetsState.at.has('tokens') && actionHint && activeActionDialog?.hintOverridden !== true) {
+      actionHint.textContent = '';
+      actionHint.hidden = true;
+    }
+  });
+  stillReadingSaid = !walletAssetsState.at.has('tokens');
   walletTonTransfersBusy.add(pressedBy);
   try {
     refreshMessagingControls();
@@ -50384,6 +50748,8 @@ function openProfileSettings() {
   profileSettingsDialog.hidden = false;
   refreshWalletHomeRows({ read: true });
   if (plathoWallet?.address) refreshProfilePaneReads();
+  const languageNote = document.querySelector('#appLanguageNote');
+  if (languageNote) languageNote.hidden = !hasStoredPlathoWalletRecord();
 }
 
 function closeProfileSettings() {

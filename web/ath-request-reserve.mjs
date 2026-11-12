@@ -1,6 +1,6 @@
 
 import { beginCell, bytesToBase64, parseBocBase64, serializeBoc } from './pwa-contract-transactions.mjs?v=60';
-import { cellReader } from './public-shard-ton-rpc-provider.mjs?v=45';
+import { cellReader } from './public-shard-ton-rpc-provider.mjs?v=46';
 
 export const ATH_NOTIFY_OWNER_REQUEST_EXEC_RESERVE = 10_000_000n;
 

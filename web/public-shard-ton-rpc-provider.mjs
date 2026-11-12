@@ -2,6 +2,7 @@
 import { computeCellHashAndDepth, beginCell, parseBocBase64, readPublicPartHeaderInfo, bytesToBigUint } from './pwa-contract-transactions.mjs?v=60';
 import { parseVaultPublishEnvelope } from './m21c-envelope.mjs?v=5';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
+import { feeVaultAddress, feeVaultCodeBoc } from './shard-address.mjs?v=49';
 
 export class PublicShardTonRpcProviderError extends Error {
   constructor(message) {
@@ -212,6 +213,14 @@ function criticalCallOptions(callOptions = {}) {
 
 export function createPublicShardTonRpcProvider(options = {}) {
   const decodeAddr = options.decodeAddressSliceBoc;
+  const vaults = new Map();
+  const vaultOf = (payer) => {
+    if (!vaults.has(payer)) {
+      if (vaults.size >= 2048) vaults.clear();
+      vaults.set(payer, (async () => feeVaultAddress(feeVaultCodeBoc(), payer))().catch(() => null));
+    }
+    return vaults.get(payer);
+  };
   return {
     kind: options.kind ?? options.transport?.kind ?? 'ton-rpc',
 
@@ -289,6 +298,7 @@ export function createPublicShardTonRpcProvider(options = {}) {
           if (!row || claimed.has(commit)) continue;
           if (!message.source) continue;
           const source = parseTonAddress(message.source).raw;
+          if (parsed.publisher && (await vaultOf(parsed.publisher)) !== source) continue;
           const publisher = parsed.publisher ?? source;
           if (publisherTagOf(publisher) !== row.publisher_tag) continue;
           claimed.add(commit);

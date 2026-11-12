@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-Dernière mise à jour : 31 octobre 2026
+Dernière mise à jour : 11 novembre 2026
 
 Platho est une messagerie sans serveur dorsal. Ce document est court parce qu'il
 y a très peu de choses à divulguer — et précis là où quelque chose quitte
@@ -81,6 +81,8 @@ peut calculer à partir de la publication ; n'importe qui — y compris l'auteur
 cette publication — peut donc voir quel portefeuille a signalé ou réagi. Un
 signalement rejeté et une sanction levée annulent leur effet, pas la trace : la
 transaction reste sur la chaîne pour toujours.
+
+**Les groupes publics, votre profil et les communautés que vous rattachez sont publics eux aussi.** Les messages d’un groupe public ne sont pas chiffrés : n’importe qui peut les lire, et les portefeuilles, les noms .ath et l’appartenance de ses membres sont publics sur la chaîne. Ce que vous publiez avec votre profil — sa description, les groupes que vous y épinglez, la carte de solde, le cadeau que vous portez — et un groupe que vous rattachez à un jeton, une collection ou un NFT comme sa communauté sont publics de la même manière.
 
 ## Les tiers que votre appareil contacte
 

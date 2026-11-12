@@ -1,5 +1,5 @@
 
-import { toWireAddress } from './shard-reader.mjs?v=113';
+import { toWireAddress } from './shard-reader.mjs?v=115';
 import { stackNumOr0 } from './ton-stack-num.mjs?v=2';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=60';
 

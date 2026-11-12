@@ -1,6 +1,6 @@
 # Política de Privacidad
 
-Última actualización: 31 de octubre de 2026
+Última actualización: 11 de noviembre de 2026
 
 Platho es un mensajero sin backend. Este documento es breve porque hay muy poco
 que revelar, y es concreto allí donde algo sale realmente de tu dispositivo.
@@ -81,6 +81,8 @@ publicación, así que cualquiera —incluido el autor de esa publicación— pu
 qué billetera denunció o reaccionó. Una denuncia desestimada y una sanción
 levantada deshacen su efecto, no el registro: la transacción permanece en la
 cadena para siempre.
+
+**Los grupos públicos, tu perfil y las comunidades que vinculas también son públicos.** Los mensajes de un grupo público no están cifrados: cualquiera puede leerlos, y las billeteras, los nombres .ath y la pertenencia de sus miembros son públicos en la cadena. Lo que publicas con tu perfil —su descripción, los grupos que fijas en él, la tarjeta de saldo, el regalo que llevas— y un grupo que vinculas a un token, una colección o un NFT como su comunidad son públicos de la misma manera.
 
 ## Terceros con los que contacta tu dispositivo
 

@@ -1,7 +1,7 @@
 
 import { beginCell, computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
-import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=98';
+import { formatTonUserFriendlyAddress } from './platho-wallet.mjs?v=100';
 import {
   recordShardStateInit,
   introShardStateInit,
@@ -13,7 +13,7 @@ import {
   hasLaneCode,
   canDeriveForEpoch,
   rawAddress,
-} from './shard-address.mjs?v=48';
+} from './shard-address.mjs?v=49';
 import { generationsForEra } from './cutover-epoch.mjs?v=7';
 
 export const EPOCH_SECONDS = 86400;

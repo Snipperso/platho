@@ -1,6 +1,6 @@
 
 import { beginCell, bytesToBase64, serializeBoc } from './pwa-contract-transactions.mjs?v=60';
-import { readInt, readCell, cellReader, extractStack } from './public-shard-ton-rpc-provider.mjs?v=45';
+import { readInt, readCell, cellReader, extractStack } from './public-shard-ton-rpc-provider.mjs?v=46';
 
 export const PUBLIC_REACT_OPCODE = 0x50535034;
 export const PUBLIC_REACTION_COUNT = 16;

@@ -1,6 +1,6 @@
 import { parseTonAddress, sha256Sync } from './crypto/platho-crypto.mjs?v=32';
 import { beginCell, tonCell } from './pwa-contract-transactions.mjs?v=60';
-import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=116';
+import { createTonCenterV3Transport } from './ton-rpc-transport.mjs?v=118';
 
 export class TonDnsProviderError extends Error {
   constructor(message) {
@@ -8,6 +8,10 @@ export class TonDnsProviderError extends Error {
     this.name = 'TonDnsProviderError';
   }
 }
+
+export const TON_DNS_NOT_REGISTERED = 'TON_DNS_NOT_REGISTERED';
+export const TON_DNS_NO_WALLET = 'TON_DNS_NO_WALLET';
+const answered = (code, message) => Object.assign(new TonDnsProviderError(message), { code });
 
 export const TON_DNS_RECORD_TAGS = Object.freeze({
   NEXT_RESOLVER: 0xba93,
@@ -76,6 +80,7 @@ function readStackCellBocOrNull(stack, index, name) {
   const type = stackItemType(item);
   const value = stackItemValue(item);
   if (value === null || value === undefined || type === 'null') return null;
+  if ((type === 'list' || type === 'tuple') && Array.isArray(value) && value.length === 0) return null;
   if (typeof value === 'string' && (type.includes('cell') || type.includes('slice') || value.startsWith('te6'))) {
     return value;
   }
@@ -262,31 +267,40 @@ export function createTonDnsProvider(options = {}) {
       let queryBytes = tonDnsNameToInternalBytes(name);
 
       for (let depth = 0; depth < (options.maxDepth ?? MAX_DNS_RECURSION); depth += 1) {
-        const result = decodeDnsResolveStack(await transport.runGetMethod({
-          address: resolverAddress,
-          method: 'dnsresolve',
-          stack: [
-            stackSlice(queryBytes, 'TON DNS query'),
-            stackNumber(walletCategory),
-          ],
-          verify: callOptions.verify,
-          priority: callOptions.priority,
-          cacheTtlMs: callOptions.cacheTtlMs,
-        }));
-        if (result.resolvedBits <= 0n) throw new TonDnsProviderError(`${name} does not have a TON DNS wallet record`);
+        let answer;
+        try {
+          answer = await transport.runGetMethod({
+            address: resolverAddress,
+            method: 'dnsresolve',
+            stack: [
+              stackSlice(queryBytes, 'TON DNS query'),
+              stackNumber(walletCategory),
+            ],
+            verify: callOptions.verify,
+            priority: callOptions.priority,
+            cacheTtlMs: callOptions.cacheTtlMs,
+          });
+        } catch (error) {
+          const exit = Number(error?.exitCode);
+          const absent = exit === -13 || exit === -256 || /get-method exit code -(?:13|256)\b/.test(String(error?.message ?? ''));
+          if (absent && depth > 0) throw Object.assign(answered(TON_DNS_NOT_REGISTERED, `${name} is not registered`), { cause: error });
+          throw error;
+        }
+        const result = decodeDnsResolveStack(answer);
+        if (result.resolvedBits <= 0n) throw answered(TON_DNS_NOT_REGISTERED, `${name} does not have a TON DNS wallet record: no resolver knows the name`);
         if (result.resolvedBits % 8n !== 0n) throw new TonDnsProviderError('TON DNS resolver returned non-byte prefix');
         if (result.resolvedBits > BigInt(queryBytes.length * 8)) {
           throw new TonDnsProviderError('TON DNS resolver returned an invalid prefix length');
         }
 
         if (result.resolvedBits === BigInt(queryBytes.length * 8)) {
-          if (!result.record) throw new TonDnsProviderError(`${name} does not have a TON DNS wallet record`);
+          if (!result.record) throw answered(TON_DNS_NO_WALLET, `${name} does not have a TON DNS wallet record`);
           const record = decodeTonDnsRecordCell(result.record);
           if (record.type !== 'wallet') throw new TonDnsProviderError(`${name} resolved to a non-wallet TON DNS record`);
           return record.address;
         }
 
-        if (!result.record) throw new TonDnsProviderError(`${name} TON DNS resolver did not return a next resolver`);
+        if (!result.record) throw answered(TON_DNS_NOT_REGISTERED, `${name} is not registered: its resolver names nothing under the part it knows`);
         const record = decodeTonDnsRecordCell(result.record);
         if (record.type !== 'next_resolver') {
           throw new TonDnsProviderError(`${name} TON DNS partial result is not a next resolver`);

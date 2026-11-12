@@ -1,4 +1,4 @@
-import { t } from './i18n.mjs?v=325';
+import { t } from './i18n.mjs?v=331';
 
 export const RECIPIENT_IDENTITY_TYPES = Object.freeze({
   WALLET_ADDRESS: 'wallet_address',
@@ -22,6 +22,7 @@ export const RECIPIENT_IDENTITY_META = Object.freeze({
 });
 
 const FRIENDLY_TON_ADDRESS_RE = /^[A-Za-z0-9_-]{48}$/;
+const STANDARD_FRIENDLY_TON_ADDRESS_RE = /^(?=[A-Za-z0-9+/]*[+/])[A-Za-z0-9+/]{48}$/;
 const RAW_TON_ADDRESS_RE = /^-?\d+:[0-9a-fA-F]{64}$/;
 const TON_DNS_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ton$/;
 const PLATHO_NFT_RE = /^[a-z0-9_-]{4,16}\.ath$/;
@@ -66,13 +67,14 @@ export function parseRecipientIdentity(input) {
     return { ok: false, error: 'Use alex, alex.ath, alex.ton, or a wallet address; do not start with @.' };
   }
 
-  if (isWalletAddress(raw)) {
+  const address = STANDARD_FRIENDLY_TON_ADDRESS_RE.test(raw) ? raw.replace(/\+/g, '-').replace(/\//g, '_') : raw;
+  if (isWalletAddress(address)) {
     return {
       ok: true,
       identity: {
         type: RECIPIENT_IDENTITY_TYPES.WALLET_ADDRESS,
-        value: raw,
-        label: raw,
+        value: address,
+        label: address,
         entered: raw,
       },
     };
@@ -141,7 +143,9 @@ export function identityTone(identity) {
 }
 
 export function identityTypeLabel(identity) {
-  return RECIPIENT_IDENTITY_META[identity?.type]?.label ?? 'Wallet address';
+  const type = identity?.type;
+  return type === RECIPIENT_IDENTITY_TYPES.TON_DNS ? t('identity.tonDns')
+    : type === RECIPIENT_IDENTITY_TYPES.PLATHO_NFT ? t('identity.plathoNft') : t('identity.walletAddress');
 }
 
 export function normalizeRecipientIdentity(input) {
@@ -288,7 +292,7 @@ export function createInboundPeerThread(input = {}, options = {}) {
     id: identity ? recipientThreadId(identity) : `peer:${encodeURIComponent(anonymousId)}`,
     name: label,
     avatar: avatarFromLabel(label),
-    subtitle: identity ? identityTypeLabel(identity) : 'Anonymous sender',
+    subtitle: identity ? identityTypeLabel(identity) : t('identity.anonymousSender'),
     time: options.time ?? 'now',
     state: options.state ?? 'sealed',
     preview: options.preview ?? t('chat.previewNoMessages'),

@@ -1,4 +1,4 @@
-import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=101';
+import { computeUsernameNameHash } from './username-ton-rpc-provider.mjs?v=103';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
 
 const TONAPI_ORIGIN = 'https://tonapi.io';

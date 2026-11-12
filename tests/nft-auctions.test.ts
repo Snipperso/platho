@@ -90,9 +90,11 @@ describe('auctions and items on their own sale', () => {
     const nft = addr('a1');
     const auction = addr('ac');
     const transfers = { nft_transfers: [{ new_owner: auction, nft_address: nft, nft_collection: addr('c0'), transaction_lt: '900', transaction_now: now - 10 }], metadata: {} };
-    const stateOf = (data: string, codeHash = GETGEMS_AUCTION_V3R3_CODE_HASH) => ({ accounts: [{ address: auction, status: 'active', code_hash: codeHash, data_hash: 'h1', data_boc: data },
+    const stateOf = (data: string, codeHash = GETGEMS_AUCTION_V3R3_CODE_HASH, balance: string | null = String(200n * GRAM)) => ({ accounts: [
+      { address: auction, status: 'active', code_hash: codeHash, data_hash: 'h1', data_boc: data, ...(balance === null ? {} : { balance }) },
       { address: nft, status: 'active', last_transaction_lt: '900' }] });
-    const read = async (data: string, codeHash?: string) => (await readLatestListings({ fetchImpl: answer(transfers, stateOf(data, codeHash)).fetchImpl, origin: 'https://o', limit: 100 }));
+    const read = async (data: string, codeHash?: string, balance?: string) => (await readLatestListings({
+      fetchImpl: answer(transfers, balance === undefined ? stateOf(data, codeHash) : stateOf(data, codeHash, balance === 'none' ? null : balance)).fetchImpl, origin: 'https://o', limit: 100 }));
     const live = await read(auctionData({ endTime: now + 3600, bidder: addr('b1'), lastBid: 30n * GRAM }));
     expect(live.listings).toHaveLength(1);
     expect(live.listings[0]).toMatchObject({ kind: 'auction', sale: auction, nft, seller: addr('5e'), price: 31_500_000_000n, nextBid: 31_500_000_000n, lastBid: 30n * GRAM,
@@ -106,6 +108,13 @@ describe('auctions and items on their own sale', () => {
       expect((await read(data)).listings, why).toEqual([]);
     }
     expect((await read(auctionData({ endTime: now + 3600, seller: null }))).sales, 'not activated: judged, no listing').toEqual([auction]);
+    const phantom = auctionData({ endTime: now + 3600, bidder: addr('b1'), lastBid: 30n * GRAM });
+    expect((await read(phantom, undefined, '19656000')).listings, 'a bid of 30 named, 0.0197 held').toEqual([]);
+    expect((await read(phantom, undefined, String(30n * GRAM - 1n))).listings, 'one nanoton under the bid').toEqual([]);
+    expect((await read(phantom, undefined, 'none')).listings, 'a row with no balance proves nothing').toEqual([]);
+    expect((await read(phantom, undefined, String(30n * GRAM))).listings, 'exactly the bid').toHaveLength(1);
+    expect((await read(auctionData({ endTime: now + 3600 }), undefined, '19656000')).listings, 'no bid named: nothing to hold').toHaveLength(1);
+    expect((await read(auctionData({ endTime: now + 3600 }), undefined, 'none')).listings, 'no bid named, no balance read').toHaveLength(1);
     expect((await read(auctionData({ endTime: now + 3600 }), 'AAAA' + GETGEMS_AUCTION_V3R3_CODE_HASH.slice(4))).listings, 'another code').toEqual([]);
   });
 
@@ -116,7 +125,7 @@ describe('auctions and items on their own sale', () => {
       { address: addr('a1'), status: 'active', last_transaction_lt: '900' }] });
     expect((await readListingsChanged({ fetchImpl: answer(light(GETGEMS_AUCTION_V3R3_CODE_HASH)).fetchImpl, origin: 'https://o', listings: [listing] })).size, 'unchanged').toBe(0);
     expect((await readListingsChanged({ fetchImpl: answer(light(GETGEMS_SALE_V4_CODE_HASH + 'x')).fetchImpl, origin: 'https://o', listings: [listing] })).get(addr('ac'))).toBeNull();
-    const bid = { accounts: [{ address: addr('ac'), status: 'active', code_hash: GETGEMS_AUCTION_V3R3_CODE_HASH, data_hash: 'h2',
+    const bid = { accounts: [{ address: addr('ac'), status: 'active', code_hash: GETGEMS_AUCTION_V3R3_CODE_HASH, data_hash: 'h2', balance: String(40n * GRAM + 20_000_000n),
       data_boc: auctionData({ endTime: now + 600, bidder: addr('b2'), lastBid: 40n * GRAM }) }] };
     const changed = await readListingsChanged({ fetchImpl: answer(light(GETGEMS_AUCTION_V3R3_CODE_HASH, 'h2'), bid).fetchImpl, origin: 'https://o', listings: [listing] });
     expect(changed.get(addr('ac')), 'a new bid: its fresh figures').toMatchObject({ kind: 'auction', lastBid: 40n * GRAM, bidder: addr('b2'), live: true });
@@ -125,6 +134,8 @@ describe('auctions and items on their own sale', () => {
     expect(await readAuctionFresh({ fetchImpl: answer({ accounts: [] }).fetchImpl, origin: 'https://o', listing }), 'no such account').toBeNull();
     const another = { accounts: [{ address: addr('ac'), status: 'active', code_hash: GETGEMS_AUCTION_V3R3_CODE_HASH, data_hash: 'h3', data_boc: auctionData({ endTime: now + 600, nft: addr('a2') }) }] };
     expect((await readAuctionFresh({ fetchImpl: answer(another).fetchImpl, origin: 'https://o', listing }))?.live, 'its data names another NFT').toBe(false);
+    const unbacked = { accounts: [{ ...bid.accounts[0], balance: '20000000' }] };
+    expect((await readAuctionFresh({ fetchImpl: answer(unbacked).fetchImpl, origin: 'https://o', listing }))?.live, 'a bid of 40 named, 0.02 held').toBe(false);
   });
 
   it('TELE-01: an item\'s own data reads as Telemint lays it out; as a listing — a fixed price, an auction with or without a buy-now price, never past its end', () => {

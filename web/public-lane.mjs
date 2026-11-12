@@ -1,11 +1,11 @@
 
-import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=74';
+import { createShardStatesRequest, createShardMessagesWithSourceReader } from './shard-rpc.mjs?v=76';
 import { M21C_VAULT_PUBLISH_OPCODE } from './m21c-envelope.mjs?v=5';
 import { WRITES_GENERATION } from './cutover-epoch.mjs?v=7';
-import { isUnknownAccountState, readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=113';
-import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=45';
-import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=88';
-import { publicShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=48';
+import { isUnknownAccountState, readAccountStates, changeMarkerOf } from './shard-reader.mjs?v=115';
+import { createPublicShardTonRpcProvider } from './public-shard-ton-rpc-provider.mjs?v=46';
+import { PUBLIC_PUBLISH_OPCODE } from './public-publish-browser.mjs?v=90';
+import { publicShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=49';
 import { generationForUnixSeconds } from './cutover-epoch.mjs?v=7';
 import {
   publicBeaconScanAddresses,
@@ -23,7 +23,7 @@ import {
   addrKey,
   notePublicAddressGeneration,
   publicAddressGenerationOf,
-} from './shard-discovery.mjs?v=108';
+} from './shard-discovery.mjs?v=110';
 
 const PS_KIND_CHANNEL = 0;
 const PS_KIND_THREAD = 1;
@@ -248,6 +248,7 @@ const readMessagesWithSource = narrowedByGeneration(createShardMessagesWithSourc
       const rows = new Map();
       const take = (list) => { for (const row of list ?? []) rows.set(String(row.entry_id), row); };
       let count = null;
+      let hiddenUnread = false;
       let windowFrom = null;
       let oldestLt = null;
       let walkedLt = held?.value?.walkedLt ?? null;
@@ -257,19 +258,43 @@ const readMessagesWithSource = narrowedByGeneration(createShardMessagesWithSourc
         windowFrom = Number.isFinite(Number(fresh.from)) ? Number(fresh.from) : null;
         oldestLt = fresh.oldestLt ?? null;
       } else {
-        const tail = await readers.readShardPosts(state.address);
-        take(tail.posts);
-        count = Number(tail.entry_count ?? 0);
-        windowFrom = Math.max(0, count - PAGE_ROWS);
-        oldestLt = tail.oldestLt ?? null;
+        const heldValue = held?.value ?? null;
+        const heldCount = Number(heldValue?.entryCount);
+        const heldFrom = Number(heldValue?.from);
+        const heldWhole = heldValue !== null && Number.isFinite(heldCount) && Number.isFinite(heldFrom)
+          && (heldValue.posts ?? []).length >= heldCount - heldFrom;
+        const countNow = heldWhole
+          ? Number((await provider.getPage(state.address, 0n, 0n, { ...(readers.callOptions ?? {}), cacheTtlMs: 0 })).entry_count ?? 0n)
+          : null;
+        const stood = heldWhole && countNow === heldCount;
+        if (stood) {
+          take(heldValue.posts);
+          count = heldCount;
+          windowFrom = heldFrom;
+          oldestLt = heldValue.oldestLt ?? null;
+        } else {
+          const tail = await readers.readShardPosts(state.address, countNow === null ? {} : { entryCount: BigInt(countNow) });
+          take(tail.posts);
+          count = Number(tail.entry_count ?? 0);
+          windowFrom = Math.max(0, count - PAGE_ROWS);
+          oldestLt = tail.oldestLt ?? null;
+        }
         const holds = callerHolds(coord);
         if (count > 0 && Number(coord.generation ?? 17) >= 18 && (held !== null || (holds && holds.min < windowFrom))) {
           try {
             const map = await provider.getHiddenIds(state.address, { callOptions: readers.callOptions });
             posts.hidden.push({ epochTag: String(coord.epochTag), seq: coord.seq, generation: coord.generation,
               entryCount: count, ids: [...map.hidden], complete: map.complete });
+            if (stood) {
+              const hiddenNow = new Set([...map.hidden].map(Number));
+              for (const [id, row] of rows) {
+                const hidden = hiddenNow.has(Number(row.entry_id));
+                if ((hidden || map.complete) && hidden !== (row.hidden === true)) rows.set(id, { ...row, hidden });
+              }
+            }
           } catch (error) {
             void error;
+            hiddenUnread = true;
           }
         }
       }
@@ -311,7 +336,9 @@ const readMessagesWithSource = narrowedByGeneration(createShardMessagesWithSourc
       if (merged.length > 0 || count === 0) {
         const kept = windowFrom === null ? merged : merged.filter((row) => Number(row.entry_id) >= windowFrom);
         const whole = fresh !== null || count === 0 || windowFrom === null || kept.length >= count - windowFrom;
-        if (windowWorthKeeping(key, marker, whole)) writeShardSnapshot(key, marker, { posts: kept, from: windowFrom, entryCount: count, oldestLt, walked, walkedLt });
+        if (hiddenUnread) {
+          if (whole && held !== null) writeShardSnapshot(key, held.marker, { posts: kept, from: windowFrom, entryCount: count, oldestLt, walked, walkedLt });
+        } else if (windowWorthKeeping(key, marker, whole)) writeShardSnapshot(key, marker, { posts: kept, from: windowFrom, entryCount: count, oldestLt, walked, walkedLt });
       }
       for (const p of merged) posts.push({ ...p, channelWallet, channelEpochTag: coord.epochTag, channelShardSeq: coord.seq, generation: coord.generation });
     }
@@ -662,6 +689,7 @@ const readShardPosts = (address, options = {}) => provider.readPosts(address, { 
       let entryCount;
       let fresh = null;
       const hidden = [];
+      let hiddenUnread = false;
       if (full) {
         entryCount = Number(full.entryCount ?? (full.posts ?? []).length);
         rows = (full.posts ?? []).filter((row) => Number(row?.entry_id ?? -1) >= entryCount - rowsWanted);
@@ -675,9 +703,10 @@ const readShardPosts = (address, options = {}) => provider.readPosts(address, { 
               entryCount: count, ids: [...map.hidden], complete: map.complete });
           } catch (error) {
             void error;
+            hiddenUnread = true;
           }
         }
-        if (held !== null && held === count) return { posts: [], entryCount: count, fresh: 0, unchanged: true, hidden };
+        if (held !== null && held === count) return { posts: [], entryCount: count, fresh: 0, unchanged: true, hidden, hiddenUnread };
         const window = held === null ? rowsWanted : Math.min(rowsWanted, count - held);
         const tail = await provider.readPosts(shard.address, {
           readMessagesWithSource: readers.readMessages,
@@ -691,7 +720,7 @@ const readShardPosts = (address, options = {}) => provider.readPosts(address, { 
       }
       const posts = rows.map((row) => ({ ...row, channelWallet, channelEpochTag: shard.epochTag, channelShardSeq: shard.seq, generation: shard.generation }));
       posts.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
-      return { posts, entryCount, fresh, unchanged: false, hidden };
+      return { posts, entryCount, fresh, unchanged: false, hidden, hiddenUnread };
     },
 
     async readPostAt(channelWallet, channelEpochTag, channelShardSeq, shardEntryId, { window = 16, generation = null, requestClass = null } = {}) {

@@ -1,13 +1,14 @@
 
-import { incomingRecordShards } from './conv-discovery.mjs?v=109';
+import { incomingRecordShards } from './conv-discovery.mjs?v=111';
 import {
-  parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature, convReadOpcodesForGeneration, convHeader0BucketKey,
-} from './conv-lane-read.mjs?v=126';
+  parseCapsulePublishBody, convChainEntryFromParsed, verifyConvWriteSignature, convReadOpcodesForGeneration, convHeader0BucketKey, convFrameCommitOfParsed,
+} from './conv-lane-read.mjs?v=129';
 import { computeKEpoch, computeBucketKey } from './crypto/conv-routing.mjs?v=9';
-import { changeMarkerOf } from './shard-reader.mjs?v=113';
-import { addrKey } from './shard-discovery.mjs?v=108';
+import { changeMarkerOf } from './shard-reader.mjs?v=115';
+import { addrKey } from './shard-discovery.mjs?v=110';
 
 const CONV_SHARD_MESSAGE_PAGE_LIMIT = 128;
+const CONV_STORED_SETTLE_SEC = 300;
 const CONV_READ_THROUGH_SLACK_SEC = 3_600;
 const rowsAnswered = (rows) => (Number.isFinite(rows?.rawCount) ? rows.rawCount : (rows?.length ?? 0));
 
@@ -16,7 +17,7 @@ const CONV_MAX_OLDER_BODY_PAGES = 4;
 const CONV_MAX_OLDER_BODY_PAGES_FULL = 32;
 const convGapWarnedShards = new Set();
 
-export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = true, markLimit = 512 } = {}) {
+export function createConvReadLane({ readMessagesWithSource, readRecordPage = null, nowSec: laneClock = null, verifyWriteSig = true, markLimit = 512 } = {}) {
   if (typeof readMessagesWithSource !== 'function') throw new Error('createConvReadLane requires readMessagesWithSource');
 
   const shardMarks = new Map();
@@ -59,6 +60,44 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
     return at;
   }
 
+  const storedCommits = new Map();
+  const STORED_PAGE_ROWS = 256;
+  const STORED_PAGE_READS = 17;
+
+  async function storedCommitsOf(key, address) {
+    let held = storedCommits.get(key) ?? { count: 0, commits: new Set(), refused: new Set() };
+    let total = null;
+    let restarted = false;
+    for (let reads = 0; reads < STORED_PAGE_READS; reads += 1) {
+      const page = await readRecordPage(address, held.count, STORED_PAGE_ROWS);
+      if (!page?.exists) { held = { count: 0, commits: new Set(), refused: new Set(), absent: true }; break; }
+      total = Number(page.recordCount);
+      if (!Number.isFinite(total) || total < held.count) {
+        if (restarted) throw new Error('RecordShard records went back twice in one read');
+        restarted = true;
+        reads = -1;
+        held = { count: 0, commits: new Set(), refused: new Set() };
+        continue;
+      }
+      const rows = Array.isArray(page.rows) ? page.rows : [];
+      if (Number(page.fromId) !== held.count || rows.length !== Number(page.count)) {
+        throw new Error(`RecordShard get_page answered ${rows.length} rows from ${page.fromId}, asked from ${held.count}`);
+      }
+      for (const row of rows) held.commits.add(BigInt(row.frameCommit));
+      held = { count: held.count + rows.length, commits: held.commits, refused: held.refused };
+      if (held.count >= total || rows.length === 0) break;
+    }
+    if (!held.absent && total !== null && held.count < total) throw new Error(`RecordShard records read to ${held.count} of ${total}`);
+    storedCommits.delete(key);
+    storedCommits.set(key, held);
+    while (storedCommits.size > SHARD_MARK_LIMIT) {
+      const oldest = storedCommits.keys().next();
+      if (oldest.done) break;
+      storedCommits.delete(oldest.value);
+    }
+    return held;
+  }
+
   function markShard(key, marker, through = undefined) {
     if (!key || marker === null || marker === undefined) return;
     shardMarks.delete(key);
@@ -73,8 +112,12 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
   }
 
   return {
-    forgetShard(address) {
+    forgetShard(address, { refused = false } = {}) {
       if (!address) return;
+      if (refused) {
+        try { const key = addrKey(address); shardMarks.delete(key); readThrough.delete(key); storedCommits.get(key)?.refused?.clear(); } catch { }
+        return;
+      }
       try { const key = addrKey(address); shardMarks.delete(key); readThrough.delete(key); } catch { }
     },
 
@@ -93,7 +136,7 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
       return { ...laneStats, marks: shardMarks.size, junkShards: junkRuns.size };
     },
 
-    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null, onShardFailed = null, onShardGap = null, onShardRead = null, fullWalk = false, bindBucket = false }) {
+    async readIncoming({ kRoot, selfKeyId, peerKeyId, epochNow, windowW, shards = null, states = null, knownSeqOf = null, onShardFailed = null, onShardGap = null, onShardRead = null, fullWalk = false, bindBucket = false, nowSec = null }) {
       if (bindBucket && !kRoot) throw new Error('readIncoming: bindBucket needs kRoot');
       const bucketKeys = new Map();
       const bucketKeyOf = async (bucket) => {
@@ -228,15 +271,46 @@ export function createConvReadLane({ readMessagesWithSource, verifyWriteSig = tr
           }
         }
         if (olderReadFailed) { shardFailed(bucket.address, olderReadFailed); continue; }
-        let newestAt = 0;
-        if (whole) for (const row of messages ?? []) { const created = Number(row?.createdAt); if (Number.isFinite(created) && created > newestAt) newestAt = created; }
-        if (marker !== null && !gapRemains) markShard(key, marker, whole && newestAt > 0 ? newestAt : undefined);
-        try { onShardRead?.(bucket.address, { gap: gapRemains }); } catch { }
-        const firstOfSeq = new Map();
+        const candidates = [];
         for (const row of messages ?? []) {
           const parsed = await isOurs(row);
           if (!parsed) continue;
           if (bindBucket && convHeader0BucketKey(parsed.header0) !== await bucketKeyOf(bucket)) continue;
+          candidates.push({ row, parsed });
+        }
+        let kept = null;
+        if (typeof readRecordPage === 'function' && Number(bucket.laneGeneration) >= 18 && candidates.length > 0) {
+          for (const candidate of candidates) {
+            candidate.commit = await convFrameCommitOfParsed(candidate.parsed);
+            candidate.rowKey = `${candidate.row?.createdLt ?? ''}|${candidate.commit}`;
+          }
+          const held = storedCommits.get(key);
+          if (held && candidates.every((candidate) => held.commits.has(candidate.commit) || held.refused.has(candidate.rowKey))) kept = held;
+          else {
+            try { kept = await storedCommitsOf(key, bucket.address); } catch (error) { shardFailed(bucket.address, error); continue; }
+          }
+          if (kept.absent) kept = null;
+        }
+        const laneNow = typeof laneClock === 'function' ? Number(laneClock()) : NaN;
+        const clock = Number.isFinite(Number(nowSec)) && Number(nowSec) > 0 ? Number(nowSec)
+          : Number.isFinite(laneNow) && laneNow > 0 ? laneNow : Math.floor(Date.now() / 1000);
+        let unsettled = false;
+        const keptRows = [];
+        for (const candidate of candidates) {
+          if (kept && !kept.commits.has(candidate.commit)) {
+            const created = Number(candidate.row?.createdAt);
+            if (Number.isFinite(created) && created > 0 && clock - created < CONV_STORED_SETTLE_SEC) unsettled = true;
+            else kept.refused.add(candidate.rowKey);
+            continue;
+          }
+          keptRows.push(candidate);
+        }
+        let newestAt = 0;
+        if (whole) for (const row of messages ?? []) { const created = Number(row?.createdAt); if (Number.isFinite(created) && created > newestAt) newestAt = created; }
+        if (marker !== null && !gapRemains && !unsettled) markShard(key, marker, whole && newestAt > 0 ? newestAt : undefined);
+        try { onShardRead?.(bucket.address, { gap: gapRemains }); } catch { }
+        const firstOfSeq = new Map();
+        for (const { row, parsed } of keptRows) {
           const seqKey = String(parsed.seq);
           let lt = null;
           try { lt = row?.createdLt == null ? null : BigInt(row.createdLt); } catch { lt = null; }

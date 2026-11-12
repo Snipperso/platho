@@ -1934,7 +1934,7 @@ export function createFallbackTonRpcTransport(options = {}) {
         if (!tonRpcErrorIsUninitializedAccount(lastError) || tonRpcErrorIsUninitializedAccount(error)) lastError = error;
         if (
           tonRpcErrorIsUninitializedAccount(error)
-          && (call?.stopOnUninitializedAccount === true || requestOptions.stopOnUninitializedAccount === true)
+          && call?.stopOnUninitializedAccount !== false && requestOptions.stopOnUninitializedAccount !== false
         ) {
           throw error;
         }

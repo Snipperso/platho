@@ -319,7 +319,7 @@ describe('R11 delta — what the device remembers, and for whom', () => {
     let now = 1_000_000;
     let fail = false;
     const memo = lift({ requireAthMasterAddress: () => 'M', Date: { now: () => now } }, [
-      line('const ATH_WALLET_ADDRESS_FRESH_MS'), line('const recentAthWalletAddresses'), fn('function recentAthWalletAddress('),
+      line('const ATH_WALLET_ADDRESS_FRESH_MS'), line('const recentAthWalletAddresses'), line('const sessionAthWalletAddresses'), fn('function recentAthWalletAddress('),
     ], 'recentAthWalletAddress');
     const read = () => { reads += 1; return fail ? Promise.reject(new Error('429')) : Promise.resolve(`ath-${reads}`); };
     expect(await memo('owner', read)).toBe('ath-1');

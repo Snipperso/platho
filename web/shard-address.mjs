@@ -224,3 +224,16 @@ export function rawAddress({ workchain, hash }) {
   const hex = Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('');
   return `${workchain}:${hex}`;
 }
+
+export function feeVaultStateInitCell(vaultCodeBoc, ownerWallet) {
+  return shardStateInitCell(vaultCodeBoc, [['owner', ownerWallet, 'address']]);
+}
+
+export async function feeVaultAddressBytes(vaultCodeBoc, ownerWallet) {
+  const { hash } = await computeCellHashAndDepth(feeVaultStateInitCell(vaultCodeBoc, ownerWallet));
+  return { workchain: 0, hash };
+}
+
+export async function feeVaultAddress(vaultCodeBoc, ownerWallet) {
+  return rawAddress(await feeVaultAddressBytes(vaultCodeBoc, ownerWallet));
+}

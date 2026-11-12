@@ -465,6 +465,7 @@ const windowOf = async () => {
     console: { warn() {}, error() {}, info() {}, log() {} },
     t: (key: string) => key,
     plathoWallet: { address: ADDRESS_A, label: 'wallet A', seed: 'seed of wallet A' }, convKeyStore: ksA, convKeyStoreWallet,
+    convKeyStoresRestored: new WeakSet([ksA, ksB]),
     localRecipientKeyPair: { keyId: SELF_A }, localIdentity: { who: 'identity of wallet A' }, walletSessionGeneration: 1, threads: [],
     sameWalletAddress: (a: any, b: any) => Boolean(a) && a === b,
     awaitWalletChainClock: async () => {}, chainNowSec: nowSec, walletChainNowMs: () => Date.now(),
@@ -475,6 +476,7 @@ const windowOf = async () => {
     confirmIntroCreatedAt: async () => ({ createdAt: 1_759_000_123 }),
     pricedGenerationMovedAt: () => false, resolveRecipientWalletForThread: async () => X_WALLET, requireBasechainAddress: (value: any) => value,
     resolveRecipientBundleByWallet: async () => ({ keyId: X }),
+    resolveRecipientByWallet: async () => ({ bundle: { keyId: X }, signKey: null }), signKeyHex: () => null, peerKeysCopiedError: () => new Error('copied keys'),
     messageDocumentBytesFromDraft: (text: string) => new TextEncoder().encode(String(text)),
     pickIntroSendSlot: async () => ({ epoch: 20733, bucket: 1, expectedEntryId: 5 }), INTRO_EPOCH_SIGNED_FROM: 99_999,
     createEncryptedIntroCapsule: async (_bundle: any, identity: any) => {

@@ -1,6 +1,6 @@
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
-import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=116';
-import { shardStateInitCell } from './shard-address.mjs?v=48';
+import { decodeTonAddressSliceBoc, encodeTonAddressSliceBoc } from './ton-rpc-transport.mjs?v=118';
+import { shardStateInitCell } from './shard-address.mjs?v=49';
 import { computeCellHashAndDepth } from './pwa-contract-transactions.mjs?v=60';
 import { ATHWALLET_CODE_BOC } from './ath-wallet-code.mjs?v=2';
 

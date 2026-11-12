@@ -35,6 +35,7 @@ function adoptionOf(opened, capsule, createdAt) {
     peerEncPublicKey: opened.senderEncPublicKey,
     peerWallet: capsule.source ?? null,
     peerWalletCandidates: Array.isArray(capsule.sourceCandidates) ? capsule.sourceCandidates.map((s) => String(s)) : [],
+    peerSignPublicKey: opened.senderSigningPublicKey ?? null,
   };
 }
 

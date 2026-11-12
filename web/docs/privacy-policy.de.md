@@ -1,6 +1,6 @@
 # Datenschutzerklärung
 
-Zuletzt aktualisiert: 31. Oktober 2026
+Zuletzt aktualisiert: 11. November 2026
 
 Platho ist ein Messenger ohne Backend. Dieses Dokument ist kurz, weil es sehr
 wenig offenzulegen gibt — und genau dort konkret, wo tatsächlich etwas Ihr Gerät
@@ -82,6 +82,8 @@ Transaktion an eine Adresse, die jeder aus dem Beitrag berechnen kann – also k
 jeder, auch der Autor dieses Beitrags, sehen, welche Wallet gemeldet oder reagiert
 hat. Eine abgewiesene Meldung und eine aufgehobene Sanktion machen ihre Wirkung
 rückgängig, nicht den Eintrag: Die Transaktion bleibt für immer in der Kette.
+
+**Öffentliche Gruppen, Ihr Profil und die Communitys, die Sie verknüpfen, sind ebenfalls öffentlich.** Die Nachrichten einer öffentlichen Gruppe sind nicht verschlüsselt: Jeder kann sie lesen, und die Wallets, .ath-Namen und die Mitgliedschaft ihrer Mitglieder sind öffentlich auf der Chain. Was Sie mit Ihrem Profil veröffentlichen – seine Beschreibung, die darin angehefteten Gruppen, die Guthabenkarte, das Geschenk, das Sie tragen – und eine Gruppe, die Sie einem Token, einer Sammlung oder einem NFT als dessen Community zuordnen, sind auf dieselbe Weise öffentlich.
 
 ## Dritte, die Ihr Gerät kontaktiert
 

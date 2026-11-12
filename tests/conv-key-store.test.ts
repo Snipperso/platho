@@ -81,8 +81,11 @@ describe('CONV-KEY-STORE', () => {
     expect(store.getConversation(A, B)!.lastScannedEpoch, 'monotonic — never rewinds').toBe(19000);
     await store.advanceConvScanCursor(A, B, 19005);
     expect(store.getConversation(A, B)!.lastScannedEpoch, 'advances forward').toBe(19005);
-    await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 200, introNonce: nonce(2) });
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(2), createdAt: 19005 * 86_400 + 60, introNonce: nonce(2) });
     expect(store.getConversation(A, B)!.lastScannedEpoch, 'cursor survives a re-INTRO').toBe(19005);
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(3), createdAt: 19006 * 86_400, introNonce: nonce(3) });
+    await store.upsertConversationKRoot(A, B, { kRoot: kroot(4), createdAt: 19001 * 86_400 + 5, introNonce: nonce(4) });
+    expect(store.getConversation(A, B)!.lastScannedEpoch, 'an older INTRO, kept for reading, born before the cursor').toBeNull();
     await store.advanceConvScanCursor(A, kroot(9), 5);
   });
 
@@ -102,8 +105,10 @@ describe('CONV-KEY-STORE', () => {
 
     const live = createMemoryConvKeyStore();
     await live.upsertConversationKRoot(A, B, { kRoot: kroot(9), createdAt: 300, introNonce: nonce(9) });
-    expect(await live.importConversations(backupMap), 'older backup does not overwrite a newer live root').toBe(0);
+    expect(await live.importConversations(backupMap), 'older backup does not overwrite a newer live root; its root is kept for reading').toBe(1);
     expect(hx(live.getConversation(A, B)!.kRootCurrent), 'the live (rotated) root stays current').toBe(hx(kroot(9)));
+    expect(live.getConversation(A, B)!.kRootsForRead.map((entry: any) => hx(entry.kRoot))).toEqual([hx(kroot(1))]);
+    expect(await live.importConversations(backupMap), 'the same backup again: nothing').toBe(0);
 
     const stale = createMemoryConvKeyStore();
     await stale.upsertConversationKRoot(A, B, { kRoot: kroot(1), createdAt: 50, introNonce: nonce(1) });

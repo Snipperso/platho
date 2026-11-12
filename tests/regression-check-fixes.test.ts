@@ -112,7 +112,7 @@ describe('the regression check\'s fixes', () => {
         loadWalletAssets: (tab: string) => new Promise<void>((resolve) => { reads[tab] = resolve; }),
         walletAssetsState: state, document: { createElement: node }, actionSubmitButton: null, sendWalletTonButton: null,
         walletAssetRow: () => { rows += 1; return { tag: 'row' }; }, gramPicture: () => '', walletBalanceRowText: () => '', assetPicture: () => '',
-        walletAthToken: () => ({ master: 'ATH', balance: '5' }), walletHiddenAssets: () => new Set(), formatUnits: (v: string) => v, shortAddress: (v: string) => v,
+        walletAthToken: () => ({ master: 'ATH', balance: '5' }), athWithCornerBalance: (token: any) => token, walletHiddenAssets: () => new Set(), formatUnits: (v: string) => v, shortAddress: (v: string) => v,
         t: (key: string) => key, runWalletAssetSend: async () => {},
         openActionDialog: (config: any) => { const list = config.fields[0].render(); list.isConnected = true; return new Promise(() => {}); },
       }, [fn('async function openWalletSendChooser() {')], 'openWalletSendChooser');

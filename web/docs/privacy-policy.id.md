@@ -1,6 +1,6 @@
 # Kebijakan Privasi
 
-Terakhir diperbarui: 31 Oktober 2026
+Terakhir diperbarui: 11 November 2026
 
 Platho adalah messenger tanpa backend. Dokumen ini singkat karena memang sangat
 sedikit yang perlu diungkapkan — dan menjadi rinci di tempat sesuatu benar-benar
@@ -80,6 +80,8 @@ Anda ke alamat yang bisa dihitung siapa pun dari kiriman itu, sehingga siapa pun
 — termasuk penulis kiriman tersebut — bisa melihat dompet mana yang melaporkan
 atau memberi reaksi. Laporan yang ditolak dan sanksi yang dicabut membatalkan
 efeknya, bukan catatannya: transaksi tetap di rantai selamanya.
+
+**Grup publik, profil Anda, dan komunitas yang Anda tautkan juga bersifat publik.** Pesan grup publik tidak dienkripsi: siapa pun dapat membacanya, dan dompet, nama .ath, serta keanggotaan para anggotanya bersifat publik di chain. Apa yang Anda terbitkan bersama profil Anda — deskripsinya, grup yang Anda sematkan, kartu saldo, hadiah yang Anda kenakan — dan grup yang Anda tautkan ke token, koleksi, atau NFT sebagai komunitasnya bersifat publik dengan cara yang sama.
 
 ## Pihak ketiga yang dihubungi perangkat Anda
 

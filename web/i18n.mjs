@@ -1,4 +1,4 @@
-import { I18N_STRINGS, I18N_LOCALES } from './i18n-strings.mjs?v=325';
+import { I18N_STRINGS, I18N_LOCALES } from './i18n-strings.mjs?v=330';
 
 const I18N_STORAGE_KEY = 'platho.locale.v1';
 const DEFAULT_LOCALE = 'en';
@@ -14,12 +14,21 @@ function normalizeLocaleCode(value) {
   return I18N_STRINGS[base] ? base : null;
 }
 
+function telegramDoorPresent() {
+  try {
+    const page = globalThis;
+    return typeof page.TelegramWebviewProxy !== 'undefined' || Boolean(page.external && 'notify' in page.external) || page.parent !== page;
+  } catch {
+    return false;
+  }
+}
+
 export function detectPreferredLocale() {
   try {
     const stored = normalizeLocaleCode(localStorage.getItem(I18N_STORAGE_KEY));
     if (stored) return stored;
   } catch { }
-  const tgLocale = normalizeLocaleCode(globalThis.Telegram?.WebApp?.initDataUnsafe?.user?.language_code);
+  const tgLocale = telegramDoorPresent() ? normalizeLocaleCode(globalThis.Telegram?.WebApp?.initDataUnsafe?.user?.language_code) : null;
   if (tgLocale) return tgLocale;
   const candidates = Array.isArray(navigator?.languages) && navigator.languages.length > 0
     ? navigator.languages

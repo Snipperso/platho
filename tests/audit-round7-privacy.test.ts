@@ -444,7 +444,7 @@ describe('PRIVACY — the policy says it, in all ten languages', () => {
     for (const suffix of ['', '.ru', '.zh', '.es', '.pt', '.fr', '.de', '.hi', '.id', '.ja']) {
       const doc = readFileSync(`web/docs/privacy-policy${suffix}.md`, 'utf8');
       const lines = doc.split('\n');
-      expect(lines[2], `${suffix || 'en'} date`).toMatch(/October|\u043e\u043a\u0442\u044f\u0431\u0440\u044f|10月\d+日|octubre|outubro|octobre|Oktober|अक्टूबर/);
+      expect(lines[2], `${suffix || 'en'} date`).toMatch(/November|\u043d\u043e\u044f\u0431\u0440\u044f|11月\d+日|noviembre|novembro|novembre|नवंबर/);
       expect(lines[2]).toMatch(/2026/);
       expect(doc, `${suffix || 'en'} names the cloud storage`).toContain('CloudStorage');
       const heads = lines.map((l, i) => (l.startsWith('## ') ? i : -1)).filter((i) => i >= 0);

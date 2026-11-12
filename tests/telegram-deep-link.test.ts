@@ -36,6 +36,7 @@ function build({ startParam = null, telegram = false, miniAppLink = null, pathna
     rawWalletAddress: (value: any) => (/^0:[0-9a-f]{64}$/i.test(String(value ?? '')) ? String(value).toLowerCase() : null),
     telegramWebApp: () => (telegram ? { initDataUnsafe: startParam === null ? {} : { start_param: startParam } } : null),
     isTelegramEnv: () => telegram,
+    telegramBridgePresent: () => telegram,
     location: { pathname, origin: ORIGIN },
     history: { replaceState: (_state: any, _title: string, path: string) => { replaced.push(path); } },
     appConfig: { telegram: { miniAppLink } },

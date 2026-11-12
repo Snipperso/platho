@@ -36,6 +36,18 @@ async function sha256Big(bytes) {
   return bytesToBig(new Uint8Array(digest));
 }
 
+function signKeyBytes(value) {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value) || /^0{64}$/.test(value)) return null;
+  return Uint8Array.from(value.match(/../g).map((pair) => Number.parseInt(pair, 16)));
+}
+function signKeyFromBlob(value) {
+  if (typeof value !== 'string' || value === '') return null;
+  let bytes = null;
+  try { bytes = unb64(value); } catch { bytes = null; }
+  if (!(bytes instanceof Uint8Array) || bytes.length !== 32 || bytes.every((byte) => byte === 0)) return null;
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export function serializeRecoveryMap(map) {
   const out = {};
   for (const [convId, r] of map) {
@@ -51,6 +63,7 @@ export function serializeRecoveryMap(map) {
       n: b64(r.adoptedIntroNonce),
       e: r.lastScannedEpoch == null ? null : Number(r.lastScannedEpoch),
       ...((r.retiredIntroNonces ?? []).length > 0 ? { x: r.retiredIntroNonces.slice(-8).map((n) => b64(n)) } : {}),
+      ...(signKeyBytes(r.peerSignPublicKey) ? { g: b64(signKeyBytes(r.peerSignPublicKey)) } : {}),
     };
   }
   return out;
@@ -72,6 +85,7 @@ export function deserializeRecoveryMap(obj) {
       outgoingSeq: {},
       lastScannedEpoch: r.e == null ? null : Number(r.e),
       retiredIntroNonces: Array.isArray(r.x) ? r.x.map((n) => unb64(n)).filter((n) => n?.length === 16) : [],
+      ...(signKeyFromBlob(r.g) ? { peerSignPublicKey: signKeyFromBlob(r.g) } : {}),
     });
   }
   return map;

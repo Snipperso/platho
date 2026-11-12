@@ -6,11 +6,11 @@ import {
   buildVaultUnstakeUnjamMessage, feeDueForStakedAtoms, feeVaultAddress, stakeBandVerdict, vaultExitDebtWindow,
   vaultStakeTransferParams, FV_RENT_FLOAT, FV_FLOAT_TOPUP_BELOW, FV_FLOAT_RETURN_MIN,
   vaultExitInboundNanotons, vaultStakeAttachNanotons,
-} from './fee-vault.mjs?v=40';
-import { feeVaultCodeBoc, feeVaultCodeAvailable } from './shard-address.mjs?v=48';
+} from './fee-vault.mjs?v=41';
+import { feeVaultCodeBoc, feeVaultCodeAvailable } from './shard-address.mjs?v=49';
 import { createAthWalletMessage } from './pwa-contract-transactions.mjs?v=60';
-import { athTransferTopUpNanotons, buildAthWalletTopUpMessage } from './ath-request-reserve.mjs?v=11';
-import { buildUnfreezeMessage } from './frozen-account.mjs?v=29';
+import { athTransferTopUpNanotons, buildAthWalletTopUpMessage } from './ath-request-reserve.mjs?v=12';
+import { buildUnfreezeMessage } from './frozen-account.mjs?v=31';
 
 export const VAULT_UNAVAILABLE = 'unavailable';
 export const VAULT_ABSENT = 'absent';
@@ -25,7 +25,7 @@ export async function vaultAddressFor(ownerWallet) {
   return feeVaultAddress(feeVaultCodeBoc(), ownerWallet);
 }
 
-export { decodeFeeVaultViewStack, createFeeVaultReader, FEE_VAULT_VIEW_ARITY } from './fee-vault-read.mjs?v=59';
+export { decodeFeeVaultViewStack, createFeeVaultReader, FEE_VAULT_VIEW_ARITY } from './fee-vault-read.mjs?v=61';
 
 export function vaultSnapshot(view, { nowSec = 0, chainSec = nowSec, clockMarginSec = 0, state, frozenHash = null, custodyFrozen = null } = {}) {
   const empty = (kind) => ({

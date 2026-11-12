@@ -408,12 +408,14 @@ describe('AUDIT ROUND 7 — money: a first contact is looked for before a second
     const lane = pagedIntroBucket(address, entries, faults);
     const calls = { mints: 0, publishes: 0, rebroadcasts: 0, adopted: [] as any[] };
     const message: any = { introDirectSend: prior };
+    const keyStore = { upsertConversationKRoot: async (_self: string, _peer: string, record: any) => { calls.adopted.push(record); }, getConversation: () => null };
     const run = appFunctions({
       ...deadEnv(NOW),
       localRecipientKeyPair: { keyId: 'SELF' }, localIdentity: {}, globalThis: { plathoWalletRpcTransport: { runGetMethod: async () => ({}) } },
-      convKeyStore: { upsertConversationKRoot: async (_self: string, _peer: string, record: any) => { calls.adopted.push(record); } },
+      convKeyStore: keyStore,
       createMemoryConvKeyStore: () => null,
-      sameWalletAddress: (a: any, b: any) => a === b, convKeyStoreWallet: new WeakMap(),
+      resolveRecipientByWallet: async () => ({ bundle: { keyId: 'PEER' }, signKey: null }), signKeyHex: () => null, peerKeysCopiedError: () => new Error('copied keys'),
+      sameWalletAddress: (a: any, b: any) => a === b, convKeyStoreWallet: new WeakMap([[keyStore, 'WALLET_A']]), convKeyStoresRestored: new WeakSet([keyStore]),
       createEntryReader: () => lane.readEntry, createScanPageReader: () => lane.readScanPage, confirmIntroCreatedAt,
       rebroadcastSignedExternal: async () => { calls.rebroadcasts += 1; return { verdict: 'accepted' }; },
       BROADCAST_VERDICT: { REJECTED: 'rejected', ACCEPTED: 'accepted' }, directSendSeqnoConsumed: async () => false,

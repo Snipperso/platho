@@ -19,7 +19,7 @@ function cacheFirstBody(): string {
 describe('OFFLINE — a cached release stays internally consistent', () => {
   it('OFFLINE-01: navigation never overwrites a cached shell', () => {
     const body = navigationBody();
-    expect(body).toContain('if (!(await cachedAppShell()))');
+    expect(body).toContain('if (!(await cachedAppShell()) && await isAppShell(response)) await cacheSameOrigin(appShellCacheRequest(), response);');
     expect(body).not.toMatch(/return await cacheSameOrigin\(appShellCacheRequest\(\), response\);/);
   });
 

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 31 October 2026
+Last updated: 11 November 2026
 
 Platho is a messenger with no backend. This document is short because there is
 very little to disclose — and specific where something genuinely leaves your
@@ -74,6 +74,8 @@ address that anyone can compute from the post, so anyone — including the autho
 of that post — can see which wallet reported or reacted. A dismissed report and a
 lifted sanction undo their effect, not the record: the transaction stays on the
 chain for ever.
+
+**Public groups, your profile and the communities you attach are public too.** A public group's messages are not encrypted: anyone can read them, and its members' wallets, .ath names and membership are public on the chain. What you publish with your profile — its description, the groups you pin to it, the balance card, the gift you wear — and a group you attach to a token, a collection or an NFT as its community are public in the same way.
 
 ## Third parties your device contacts
 

@@ -1,6 +1,6 @@
 # Política de Privacidade
 
-Última atualização: 31 de outubro de 2026
+Última atualização: 11 de novembro de 2026
 
 O Platho é um mensageiro sem backend. Este documento é curto porque há muito
 pouco a divulgar — e é específico onde algo realmente sai do seu dispositivo.
@@ -76,6 +76,8 @@ que qualquer pessoa pode calcular a partir do post, por isso qualquer pessoa —
 inclusive o autor desse post — pode ver qual carteira denunciou ou reagiu. Uma
 denúncia rejeitada e uma sanção retirada desfazem o seu efeito, não o registo: a
 transação permanece na cadeia para sempre.
+
+**Os grupos públicos, o seu perfil e as comunidades que associa também são públicos.** As mensagens de um grupo público não são cifradas: qualquer pessoa pode lê-las, e as carteiras, os nomes .ath e a participação dos seus membros são públicos na cadeia. O que publica com o seu perfil — a descrição, os grupos que nele fixa, o cartão de saldo, o presente que usa — e um grupo que associa a um token, a uma coleção ou a um NFT como a sua comunidade são públicos da mesma forma.
 
 ## Terceiros que o seu dispositivo contacta
 

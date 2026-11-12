@@ -1,14 +1,14 @@
 
-import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=109';
+import { selfRecoveryShardSpace, selfRecoveryShard } from './conv-discovery.mjs?v=111';
 import {
   sealRecoveryBlob, openRecoveryBlob, sealPrefsBlob, openPrefsBlob, sealGroupsBlob, openGroupsBlob, PREFS_SEAL_OVERHEAD_BYTES,
-} from './recovery-blob.mjs?v=32';
-import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=107';
+} from './recovery-blob.mjs?v=33';
+import { buildRecoveryPublishBrowser } from './recovery-publish-browser.mjs?v=109';
 import {
   RECOVERY_MAX_SLOTS, GROUPS_NAMED_SLOT_BASE, GROUPS_NAMED_SLOT_COUNT, PREFS_CHUNK_COUNT, prefsChunkSlotIndex, addrKey,
-} from './shard-discovery.mjs?v=108';
+} from './shard-discovery.mjs?v=110';
 import { groupsRecoveryBytes, parseGroupsRecovery } from './group-store.mjs?v=43';
-import { probeActiveAddresses } from './shard-reader.mjs?v=113';
+import { probeActiveAddresses } from './shard-reader.mjs?v=115';
 
 const RS_MAX_BLOB_CELLS = 79;
 const SNAKE_CELL_BYTES = 127;
@@ -96,7 +96,14 @@ export async function prepareRecoveryBackup({ seed, slotIndex, map, readView, va
   const view = await readView(slot.address);
   const currentSeq = view?.bound ? BigInt(view.seq) : 0n;
   const nextSeq = Number(currentSeq) + 1;
-  const { body, h0, h1 } = await sealRecoveryBlob(seed, map);
+  let { body, h0, h1 } = await sealRecoveryBlob(seed, map);
+  if (countCells(body) > RS_MAX_BLOB_CELLS) {
+    const withoutKeys = new Map([...map].map(([id, record]) => {
+      const { peerSignPublicKey: _key, ...rest } = record ?? {};
+      return [id, rest];
+    }));
+    ({ body, h0, h1 } = await sealRecoveryBlob(seed, withoutKeys));
+  }
   const cells = countCells(body);
   if (cells > RS_MAX_BLOB_CELLS) {
     const error = new Error(`recovery blob is ${cells} cells, over the on-chain cap of ${RS_MAX_BLOB_CELLS} — the conversation set does not fit one slot (multi-slot sharding is the follow-up)`);

@@ -2,8 +2,8 @@ import { sha256Sync } from './crypto/platho-crypto.mjs?v=32';
 import { readRef, readUint, readerOf } from './intro-codec.mjs?v=4';
 import { ed25519 } from './vendor/@noble/curves/ed25519.js';
 import { beginCell, bytesToBase64, computeCellHashAndDepth, parseBocBase64 } from './pwa-contract-transactions.mjs?v=60';
-import { WALLET_LIST_PAGES, WALLET_NFT_PAGE, assetAttributesOf, assetContentUriOf, assetInfoOf, assetPictureOf, assetText, rawAccount } from './wallet-assets.mjs?v=58';
-import { readTelemintAuction } from './wallet-transfers.mjs?v=23';
+import { WALLET_LIST_PAGES, WALLET_NFT_PAGE, assetAttributesOf, assetContentUriOf, assetInfoOf, assetPictureOf, assetText, rawAccount } from './wallet-assets.mjs?v=61';
+import { readTelemintAuction } from './wallet-transfers.mjs?v=25';
 
 export const GETGEMS_SALE_DEPLOYER = '0:39d63083e48f46452ff8a04cd0d3733a90c8be299aa5951b62741759b2c17e0e';
 export const GETGEMS_SALE_V4_CODE_HASH = 'a5WmQYucnSNZBF0edVm41UmuDlBvJMqrWPowyPsf64Y=';
@@ -203,8 +203,9 @@ function auctionOfState(item, state, now) {
   if (!item || !data?.seller || !data.nft) return null;
   const nextBid = auctionNextBid(data);
   const shares = auctionPercent(NANO, data.feeFactor, data.feeBase) + auctionPercent(NANO, data.royaltyFactor, data.royaltyBase) < NANO;
+  const bidHeld = data.lastBid === 0n || (typeof state.balance === 'bigint' && state.balance >= data.lastBid);
   const live = state.active && state.codeHash === GETGEMS_AUCTION_V3R3_CODE_HASH && !data.ended && !data.canceled && data.nft === item.nft && shares
-    && now < data.endTime && data.endTime - now <= NFT_AUCTION_LONGEST_S && nextBid > 0n && (data.maxBid === 0n || data.maxBid >= nextBid);
+    && bidHeld && now < data.endTime && data.endTime - now <= NFT_AUCTION_LONGEST_S && nextBid > 0n && (data.maxBid === 0n || data.maxBid >= nextBid);
   return {
     ...item, kind: 'auction', seller: data.seller, price: nextBid, nextBid, lastBid: data.lastBid, bidder: data.bidder, maxBid: data.maxBid,
     endTime: data.endTime, minStep: data.minStep, stepTime: data.stepTime, marketplace: data.marketplace,
@@ -286,7 +287,8 @@ export async function readSaleStates({ fetchImpl, origin, sales, boc = true, max
     const sale = rawAccount(row?.address);
     if (!wanted.has(sale)) continue;
     out.set(sale, { active: row.status === 'active', codeHash: String(row.code_hash ?? ''), dataHash: String(row.data_hash ?? ''),
-      dataBoc: typeof row.data_boc === 'string' ? row.data_boc : '', lastLt: String(row.last_transaction_lt ?? '') });
+      dataBoc: typeof row.data_boc === 'string' ? row.data_boc : '', lastLt: String(row.last_transaction_lt ?? ''),
+      balance: /^\d+$/.test(String(row.balance ?? '')) ? BigInt(row.balance) : null });
   }
   return out;
 }
@@ -685,19 +687,28 @@ export async function buildListing({ nft, seller, price, feePercent, royaltyAddr
 export async function readListingsOf({ fetchImpl, origin, owner }) {
   const account = rawAccount(owner);
   if (!account) return [];
-  const sales = [];
+  const items = [];
   let cut = false;
   for (let page = 0; page < WALLET_LIST_PAGES; page += 1) {
     const body = await json(fetchImpl, `${origin}/api/v3/nft/items?owner_address=${encodeURIComponent(account)}&include_on_sale=true&limit=${WALLET_NFT_PAGE}&offset=${page * WALLET_NFT_PAGE}`);
     const rows = Array.isArray(body?.nft_items) ? body.nft_items : [];
-    for (const row of rows) if (row?.on_sale === true && rawAccount(row?.real_owner) === account && rawAccount(row?.owner_address)) sales.push(rawAccount(row.owner_address));
+    for (const row of rows) {
+      const sale = rawAccount(row?.owner_address);
+      if (row?.on_sale !== true || rawAccount(row?.real_owner) !== account || !sale || sale === account) continue;
+      const item = itemOfRow(row, body?.metadata, sale);
+      if (item) items.push(item);
+    }
     if (rows.length < WALLET_NFT_PAGE) break;
     cut = page === WALLET_LIST_PAGES - 1;
   }
   const out = [];
-  for (let at = 0; at < sales.length; at += NFT_SALES_MAX) {
-    const read = await readSalesNow({ fetchImpl, origin, sales: sales.slice(at, at + NFT_SALES_MAX) });
-    for (const listing of read.values()) if (listing.live && listing.seller === account) out.push(listing);
+  for (let at = 0; at < items.length; at += NFT_SALES_MAX) {
+    const batch = items.slice(at, at + NFT_SALES_MAX);
+    const states = await readSaleStates({ fetchImpl, origin, sales: batch.map((item) => item.sale) });
+    for (const item of batch) {
+      const listing = listingOfState(item, states.get(item.sale));
+      if (listing?.live && listing.seller === account) out.push(listing);
+    }
   }
   return cut ? Object.defineProperty(out, 'capped', { value: WALLET_LIST_PAGES * WALLET_NFT_PAGE }) : out;
 }

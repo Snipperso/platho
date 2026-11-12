@@ -1,5 +1,5 @@
 
-import { scheduleToncenterHttpRequest, deriveToncenterV2Endpoint, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=116';
+import { scheduleToncenterHttpRequest, deriveToncenterV2Endpoint, deriveToncenterV3Endpoint, toncenterScanLaneOptions } from './ton-rpc-transport.mjs?v=118';
 import { parseBocBase64 } from './pwa-contract-transactions.mjs?v=60';
 
 const SCAN_REQUEST_OPTIONS = Object.freeze({

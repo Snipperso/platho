@@ -1207,15 +1207,15 @@ describe('Vault TON RPC provider', () => {
     expect(fallbackCalls).toEqual(['read:get_global', 'send']);
   });
 
-  it('VAULT-RPC-04K: stops the read fallback on a definitive uninitialized-account (-13) only when the caller opts in', async () => {
-    const makeTransports = () => {
+  it('VAULT-RPC-04K: a definitive uninitialized-account (-13) stops the read fallback, unless the caller asks for every door', async () => {
+    const makeTransports = (exitCode = -13) => {
       const calls: string[] = [];
       const uninitialized = (kind: string) => ({
         kind,
         async runGetMethod(call: any) {
           calls.push(`${kind}:${call.method}`);
-          const error: any = new Error('TON RPC get-method exit code -13');
-          error.exitCode = -13;
+          const error: any = new Error(`TON RPC get-method exit code ${exitCode}`);
+          error.exitCode = exitCode;
           throw error;
         },
       });
@@ -1230,11 +1230,41 @@ describe('Vault TON RPC provider', () => {
     })).rejects.toMatchObject({ exitCode: -13 });
     expect(optIn.calls).toEqual(['primary-rpc:seqno']);
 
-    const noOptIn = makeTransports();
-    await expect(noOptIn.transport?.runGetMethod({
+    const noWord = makeTransports();
+    await expect(noWord.transport?.runGetMethod({
       address: VAULT, method: 'get_global', stack: [],
     })).rejects.toMatchObject({ exitCode: -13 });
-    expect(noOptIn.calls).toEqual(['primary-rpc:get_global', 'fallback-rpc:get_global']);
+    expect(noWord.calls).toEqual(['primary-rpc:get_global']);
+    const everyDoor = makeTransports();
+    await expect(everyDoor.transport?.runGetMethod({
+      address: VAULT, method: 'get_global', stack: [], stopOnUninitializedAccount: false,
+    })).rejects.toMatchObject({ exitCode: -13 });
+    expect(everyDoor.calls).toEqual(['primary-rpc:get_global', 'fallback-rpc:get_global']);
+    const refused = makeTransports(11);
+    await expect(refused.transport?.runGetMethod({
+      address: VAULT, method: 'get_global', stack: [],
+    })).rejects.toMatchObject({ exitCode: 11 });
+    expect(refused.calls).toEqual(['primary-rpc:get_global', 'fallback-rpc:get_global']);
+  });
+
+  it('VAULT-RPC-04K2 [client audit round 154 — K5-1]: the pump spaces answered requests; one that got no answer does not hold the queue', async () => {
+    const SPACING = 200;
+    const run = async (answer: () => any) => {
+      const startedAt: number[] = [];
+      const transport = createTonCenterV3Transport({
+        endpoint: `https://spacing-${Math.random().toString(16).slice(2)}.example/api/v3/runGetMethod`,
+        requestSpacingMs: SPACING,
+        fetch: async () => { startedAt.push(Date.now()); return answer(); },
+      });
+      await Promise.allSettled(Array.from({ length: 4 }, (_, index) => transport.runGetMethod({ address: VAULT, method: `get_part_${index}`, stack: [], cacheTtlMs: 0 })));
+      return startedAt.slice(1).map((at, index) => at - startedAt[index]);
+    };
+    const gaps = await run(() => { throw new TypeError('Failed to fetch'); });
+    expect(gaps.length, 'every queued read went out').toBe(3);
+    for (const gap of gaps) expect(gap, 'no answer: the next read goes at once').toBeLessThan(SPACING * 0.75);
+    const answered = await run(() => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ exit_code: 0, stack: [] }), text: async () => '' }));
+    expect(answered.length).toBe(3);
+    for (const gap of answered) expect(gap, 'an answered read is followed at the pump\'s pace').toBeGreaterThanOrEqual(SPACING - 15);
   });
 
   it('VAULT-RPC-04J1: read-only send fallback does not replace the real broadcast error', async () => {

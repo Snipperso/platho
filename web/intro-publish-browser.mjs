@@ -1,8 +1,8 @@
 
 import { beginCell } from './pwa-contract-transactions.mjs?v=60';
-import { introShardAddressBytes, introShardStateInit, rawAddress } from './shard-address.mjs?v=48';
+import { introShardAddressBytes, introShardStateInit, rawAddress } from './shard-address.mjs?v=49';
 import { INTRO_PUBLISH_OPCODE } from './intro-codec.mjs?v=4';
-import { assertReadableBucket } from './intro-bucket.mjs?v=108';
+import { assertReadableBucket } from './intro-bucket.mjs?v=110';
 
 export function buildIntroPublishBody({ r, viewTag, header0, body }) {
   const builder = beginCell();

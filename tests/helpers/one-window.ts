@@ -92,7 +92,7 @@ export const bootPage = ({ shellChildren = 0, focused = true }: { shellChildren?
   };
 };
 
-export const GATE_SOURCES = ['function holdActiveWindow() {', 'function showOpenElsewhere({ locks, onUseHere, takeIfFree }) {', 'function letGoWhenFrozen(locks) {',
+export const GATE_SOURCES = ['function telegramBridgePresent() {', 'function holdActiveWindow() {', 'function showOpenElsewhere({ locks, onUseHere, takeIfFree }) {', 'function letGoWhenFrozen(locks) {',
   'function noteActiveWindowTurn() {', 'function activeWindowTurnTaken() {', 'function activeWindowSigningHeld() {', 'function askActiveWindowToLetGo() {',
   'function listenForActiveWindowAsk() {', 'async function letGoOfActiveWindow() {', 'function activeWindowHoldsWork() {', 'function sendWorkInHand() {', 'function pageHoldsTyping() {'];
 

@@ -1,5 +1,5 @@
-import { isVerifiedJettonMaster, isVerifiedNftCollection } from './verified-assets.mjs?v=9';
-import { isApprovedNftCollection } from './nft-collections.mjs?v=5';
+import { isVerifiedJettonMaster, isVerifiedNftCollection } from './verified-assets.mjs?v=11';
+import { isApprovedNftCollection } from './nft-collections.mjs?v=8';
 import { parseTelegramGiftItemUri } from './telegram-gift-nfts.mjs?v=28';
 
 export const WALLET_TOKEN_PAGE = 1000;

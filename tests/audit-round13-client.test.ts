@@ -617,7 +617,7 @@ describe('R13 the app — money, holds and what the screen says', () => {
     expect(persisted.length).toBe(1);
     await store.flush();
     expect(persisted.length, 'nothing held: nothing written').toBe(1);
-    expect(app).toContain('await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow, { persist: false });');
+    expect(app).toContain('await store.advanceConvScanCursor(selfKeyId, peerKeyId, epochNow, { persist: false, roots: plan.rootShards.map((root) => root.kRoot) });');
   });
 
   it('R13-I18N: the report sheet says who sees a report; an invitee pays only their answer; the retry names its button; the repair says what it costs', () => {

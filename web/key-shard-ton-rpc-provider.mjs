@@ -1,7 +1,7 @@
 
 import { WRITES_GENERATION } from './cutover-epoch.mjs?v=7';
 import { parseTonAddress } from './crypto/platho-crypto.mjs?v=32';
-import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=48';
+import { keyShardAddressBytes, rawAddress } from './shard-address.mjs?v=49';
 
 export class KeyShardTonRpcProviderError extends Error {
   constructor(message) {

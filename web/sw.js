@@ -1,36 +1,36 @@
-const CACHE_NAME = 'platho-pwa-c82fa3c36d1c';
+const CACHE_NAME = 'platho-pwa-7e90937fb8ff';
 const ASSETS = [
   './',
   './index.html',
   './privacy.html',
   './terms.html',
-  './styles.css?v=632',
-  './app.js?v=b7cf3f8d5',
-  './i18n.mjs?v=325',
-  './i18n-strings.mjs?v=325',
+  './styles.css?v=642',
+  './app.js?v=b55557769',
+  './i18n.mjs?v=331',
+  './i18n-strings.mjs?v=330',
   './boot-signal-field.mjs?v=16',
   './cutover-epoch.mjs?v=7',
   './boot-signal-worker.js?v=19',
   './vendor/telegram-web-app.js?v=3',
   './vendor/lottie-web/lottie_light_canvas.min.js?v=1',
-  './boot-guard.js?v=17',
-  './platho-config.mjs?v=180',
+  './boot-guard.js?v=19',
+  './platho-config.mjs?v=183',
   './capsule-part-policy.mjs?v=24',
   './message-pricing-policy.mjs?v=15',
-  './public-channel-subscriptions.mjs?v=311',
+  './public-channel-subscriptions.mjs?v=317',
   './thread-list-order.mjs?v=5',
   './keyed-rows.mjs?v=3',
-  './recipient-identities.mjs?v=141',
+  './recipient-identities.mjs?v=148',
   './channels/platho.app/feed.json',
   './encrypted-message-store.mjs?v=23',
-  './platho-wallet.mjs?v=98',
+  './platho-wallet.mjs?v=100',
   './ton-mnemonic-wordlist.mjs?v=2',
   './pwa-contract-transactions.mjs?v=60',
-  './ton-rpc-transport.mjs?v=116',
-  './ton-dns-provider.mjs?v=100',
-  './ath-ton-rpc-provider.mjs?v=98',
-  './profile-registry-ton-rpc-provider.mjs?v=99',
-  './username-ton-rpc-provider.mjs?v=101',
+  './ton-rpc-transport.mjs?v=118',
+  './ton-dns-provider.mjs?v=103',
+  './ath-ton-rpc-provider.mjs?v=100',
+  './profile-registry-ton-rpc-provider.mjs?v=101',
+  './username-ton-rpc-provider.mjs?v=103',
   './crypto/platho-crypto.mjs?v=32',
   './replay-store.mjs?v=8',
   './profile-avatar-media-store.mjs?v=7',
@@ -39,96 +39,96 @@ const ASSETS = [
   './ath-wallet-code.mjs?v=2',
   './telegram-launch.mjs?v=2',
   './wallet-keyring.mjs?v=7',
-  './wallet-assets.mjs?v=58',
-  './verified-assets.mjs?v=9',
-  './asset-pictures.mjs?v=11',
-  './wallet-transfers.mjs?v=23',
-  './wallet-swap.mjs?v=32',
-  './swap-pools.mjs?v=9',
-  './wallet-swap-dedust.mjs?v=25',
-  './dedust-pools.mjs?v=10',
-  './swap-routes.mjs?v=33',
-  './pool-activity.mjs?v=9',
+  './wallet-assets.mjs?v=61',
+  './verified-assets.mjs?v=11',
+  './asset-pictures.mjs?v=14',
+  './wallet-transfers.mjs?v=25',
+  './wallet-swap.mjs?v=35',
+  './swap-pools.mjs?v=12',
+  './wallet-swap-dedust.mjs?v=28',
+  './dedust-pools.mjs?v=13',
+  './swap-routes.mjs?v=36',
+  './pool-activity.mjs?v=12',
   './pool-state.mjs?v=5',
   './price-history.mjs?v=16',
-  './nft-market.mjs?v=50',
-  './nft-collections.mjs?v=5',
+  './nft-market.mjs?v=54',
+  './nft-collections.mjs?v=8',
   './asset-communities.mjs?v=4',
   './webp-encoder.mjs?v=1',
   './qr-code.mjs?v=1',
-  './conv-discovery.mjs?v=109',
-  './conv-key-persist.mjs?v=45',
-  './conv-key-store.mjs?v=27',
-  './conv-lane-read.mjs?v=126',
-  './conv-lane-send.mjs?v=141',
+  './conv-discovery.mjs?v=111',
+  './conv-key-persist.mjs?v=53',
+  './conv-key-store.mjs?v=35',
+  './conv-lane-read.mjs?v=129',
+  './conv-lane-send.mjs?v=143',
   './crypto/group-lane.mjs?v=8',
   './group-protocol.mjs?v=32',
-  './public-reactions.mjs?v=32',
-  './group-lane-send.mjs?v=102',
-  './group-lane-read.mjs?v=79',
+  './public-reactions.mjs?v=33',
+  './group-lane-send.mjs?v=104',
+  './group-lane-read.mjs?v=86',
   './group-store.mjs?v=43',
   './group-record-store.mjs?v=16',
-  './group-runtime.mjs?v=122',
+  './group-runtime.mjs?v=130',
   './public-group-protocol.mjs?v=11',
   './public-group-runtime.mjs?v=29',
   './group-entry-fee.mjs?v=14',
-  './fee-vault-read.mjs?v=59',
-  './fee-vault.mjs?v=40',
-  './conv-lane.mjs?v=138',
-  './conv-publish-browser.mjs?v=49',
-  './conv-reply-bundle.mjs?v=30',
+  './fee-vault-read.mjs?v=61',
+  './fee-vault.mjs?v=41',
+  './conv-lane.mjs?v=145',
+  './conv-publish-browser.mjs?v=50',
+  './conv-reply-bundle.mjs?v=38',
   './m21c-envelope.mjs?v=5',
   './device-secret-store.mjs?v=12',
   './at-rest-seal.mjs?v=5',
   './crypto/conv-routing.mjs?v=9',
   './crypto/intro-handshake.mjs?v=8',
-  './intro-bucket.mjs?v=108',
+  './intro-bucket.mjs?v=110',
   './intro-codec.mjs?v=4',
   './intro-cursor-store.mjs?v=16',
-  './intro-lane-send.mjs?v=140',
-  './intro-lane.mjs?v=140',
-  './intro-publish-browser.mjs?v=109',
-  './intro-receive-handler.mjs?v=33',
-  './intro-receive.mjs?v=88',
+  './intro-lane-send.mjs?v=142',
+  './intro-lane.mjs?v=142',
+  './intro-publish-browser.mjs?v=111',
+  './intro-receive-handler.mjs?v=34',
+  './intro-receive.mjs?v=90',
   './intro-scan-policy.mjs?v=6',
-  './intro-scan-runner.mjs?v=118',
+  './intro-scan-runner.mjs?v=120',
   './intro-scan.mjs?v=17',
-  './intro-send-coords.mjs?v=110',
-  './intro-send-state.mjs?v=5',
-  './intro-transport.mjs?v=116',
-  './key-shard-register-browser.mjs?v=47',
-  './key-shard-register-send.mjs?v=95',
-  './key-shard-ton-rpc-provider.mjs?v=46',
-  './market-stability-buy-send.mjs?v=69',
+  './intro-send-coords.mjs?v=112',
+  './intro-send-state.mjs?v=6',
+  './intro-transport.mjs?v=118',
+  './key-shard-register-browser.mjs?v=48',
+  './key-shard-register-send.mjs?v=97',
+  './key-shard-ton-rpc-provider.mjs?v=47',
+  './market-stability-buy-send.mjs?v=71',
   './market-stability-read.mjs?v=3',
   './message-plain-text.mjs?v=5',
-  './notes-lane.mjs?v=117',
-  './public-lane-send.mjs?v=149',
-  './public-lane.mjs?v=169',
-  './public-publish-browser.mjs?v=88',
-  './public-shard-ton-rpc-provider.mjs?v=45',
+  './notes-lane.mjs?v=119',
+  './public-lane-send.mjs?v=151',
+  './public-lane.mjs?v=171',
+  './public-publish-browser.mjs?v=90',
+  './public-shard-ton-rpc-provider.mjs?v=46',
   './publish-price.mjs?v=17',
-  './shard-debt.mjs?v=87',
-  './moderation.mjs?v=84',
-  './recovery-blob.mjs?v=32',
-  './recovery-lane.mjs?v=138',
-  './recovery-publish-browser.mjs?v=107',
-  './recovery-transport.mjs?v=115',
-  './shard-address.mjs?v=48',
-  './vault-account.mjs?v=78',
-  './frozen-account.mjs?v=29',
+  './shard-debt.mjs?v=89',
+  './moderation.mjs?v=87',
+  './recovery-blob.mjs?v=33',
+  './recovery-lane.mjs?v=141',
+  './recovery-publish-browser.mjs?v=109',
+  './recovery-transport.mjs?v=117',
+  './shard-address.mjs?v=49',
+  './vault-account.mjs?v=80',
+  './frozen-account.mjs?v=31',
   './shard-code.mjs?v=6',
   './shard-code-18.mjs?v=2',
-  './ath-request-reserve.mjs?v=11',
-  './publish-final-cost.mjs?v=19',
-  './shard-discovery.mjs?v=108',
-  './shard-reader.mjs?v=113',
-  './shard-rpc.mjs?v=74',
+  './ath-request-reserve.mjs?v=12',
+  './publish-final-cost.mjs?v=20',
+  './shard-discovery.mjs?v=110',
+  './shard-reader.mjs?v=115',
+  './shard-rpc.mjs?v=76',
   './telegram-gift-nfts.mjs?v=28',
   './ton-stack-num.mjs?v=2',
-  './username-nft-owned.mjs?v=45',
+  './username-nft-owned.mjs?v=47',
   './username-nft-transfer.mjs?v=24',
-  './wallet-send-fee.mjs?v=70',
+  './wallet-send-fee.mjs?v=72',
   './vendor/@noble/hashes/hkdf.js',
   './vendor/@jsquash/webp/codec/enc/webp_enc.js',
   './vendor/@jsquash/webp/codec/enc/webp_enc.wasm',
@@ -232,13 +232,14 @@ self.addEventListener('install', (event) => {
     for (const key of previous) { try { olds.push(await caches.open(key)); } catch { } }
     await Promise.allSettled(ASSETS.map(async (asset) => {
       if (await cache.match(asset)) return;
-      if (/\.(?:mjs|js|css)\?v=[A-Za-z0-9]+$/.test(asset)) {
+      const versioned = /\.(?:mjs|js|css)\?v=[A-Za-z0-9]+$/.test(asset);
+      if (versioned) {
         for (const old of olds) {
           const held = await old.match(asset);
           if (held && held.ok && !held.redirected) { await cache.put(asset, held.clone()); return; }
         }
       }
-      await cache.add(new Request(asset, { cache: 'reload' }));
+      await cache.add(versioned ? asset : new Request(asset, { cache: 'reload' }));
     }));
   })());
   self.skipWaiting();
@@ -294,6 +295,7 @@ async function matchCurrentFirst(request, options = undefined) {
 
 let precacheCompletionAt = 0;
 async function completePrecacheIfNeeded() {
+  if (self.registration?.installing || self.registration?.waiting) return;
   const keys = await caches.keys();
   if (keys.every((key) => key === CACHE_NAME)) return;
   const nowMs = Date.now();
@@ -320,6 +322,14 @@ function appShellCacheRequest() {
   return new Request(new URL('./index.html', self.location.href).href);
 }
 
+async function isAppShell(response) {
+  try {
+    return (await response.clone().text()).includes('id="bootScreen"');
+  } catch {
+    return false;
+  }
+}
+
 const NAVIGATION_NETWORK_TIMEOUT_MS = 6000;
 const ASSET_NETWORK_TIMEOUT_MS = 30000;
 
@@ -342,7 +352,7 @@ async function navigationResponse(event) {
       if (shell) return shell;
       return response;
     }
-    if (!(await cachedAppShell())) await cacheSameOrigin(appShellCacheRequest(), response);
+    if (!(await cachedAppShell()) && await isAppShell(response)) await cacheSameOrigin(appShellCacheRequest(), response);
     return response;
   } catch (error) {
     { const own = await cachedIgnoringVersion(event.request); if (own && !own.redirected) return own; }

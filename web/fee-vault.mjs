@@ -1,10 +1,11 @@
 
 import {
-  beginCell, bytesToBase64, computeCellHashAndDepth, serializeBoc,
+  beginCell, bytesToBase64, serializeBoc,
   estimateAthWalletAttachedValueNanotons,
 } from './pwa-contract-transactions.mjs?v=60';
-import { shardStateInitCell, rawAddress } from './shard-address.mjs?v=48';
-import { gasFeeNanotons } from './ath-request-reserve.mjs?v=11';
+import { feeVaultStateInitCell } from './shard-address.mjs?v=49';
+export { feeVaultStateInitCell, feeVaultAddressBytes, feeVaultAddress } from './shard-address.mjs?v=49';
+import { gasFeeNanotons } from './ath-request-reserve.mjs?v=12';
 
 const toBig = (value, name) => {
   let out;
@@ -233,10 +234,6 @@ export const FV_FLOAT_RETURN_MIN = 10_000_000n;
 
 const bytesToBig = (b) => { let x = 0n; for (const byte of b) x = (x << 8n) | BigInt(byte & 0xff); return x; };
 
-export function feeVaultStateInitCell(vaultCodeBoc, ownerWallet) {
-  return shardStateInitCell(vaultCodeBoc, [['owner', ownerWallet, 'address']]);
-}
-
 export function feeVaultInitializedDataCell(ownerWallet) {
   const match = /^(-?\d+):([0-9a-fA-F]{64})$/.exec(String(ownerWallet ?? '').trim());
   if (!match) throw new RangeError(`the vault owner must be a raw "workchain:hex" address, got ${JSON.stringify(ownerWallet)}`);
@@ -255,14 +252,6 @@ export function feeVaultInitializedDataCell(ownerWallet) {
   return data.endCell();
 }
 
-export async function feeVaultAddressBytes(vaultCodeBoc, ownerWallet) {
-  const { hash } = await computeCellHashAndDepth(feeVaultStateInitCell(vaultCodeBoc, ownerWallet));
-  return { workchain: 0, hash };
-}
-
-export async function feeVaultAddress(vaultCodeBoc, ownerWallet) {
-  return rawAddress(await feeVaultAddressBytes(vaultCodeBoc, ownerWallet));
-}
 
 
 

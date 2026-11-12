@@ -1125,7 +1125,7 @@ describe('R14 the re-secure carries what it can fetch again — and asks for no 
     const sw = code(readFileSync('web/sw.js', 'utf8'));
     const install = sw.slice(sw.indexOf("self.addEventListener('install'"), sw.indexOf("self.addEventListener('activate'"));
     expect(install.indexOf('if (await cache.match(asset)) return;')).toBeGreaterThan(-1);
-    expect(install.indexOf('if (await cache.match(asset)) return;'), 'kept before anything is fetched').toBeLessThan(install.indexOf("await cache.add(new Request(asset, { cache: 'reload' }));"));
+    expect(install.indexOf('if (await cache.match(asset)) return;'), 'kept before anything is fetched').toBeLessThan(install.indexOf("await cache.add(versioned ? asset : new Request(asset, { cache: 'reload' }));"));
     expect(code(fn('async function runStorageResecureIfSafe() {'))).toContain('caches: globalThis.caches ?? null,');
     const kept = new IDBFactory();
     await seedDatabases(kept);

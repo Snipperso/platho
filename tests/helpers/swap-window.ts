@@ -51,6 +51,7 @@ export function swapWorld({ offers, pairs = {}, gramBalance = 10_000_000_000n, e
     walletTonTransfersBusy: new Set(), refreshMessagingControls: () => {}, updateActiveActionSummary: () => {},
     t: (key: string) => key, GRAM, vaultPocketState: { wallet: { ton_balance: gramBalance } }, document: { createElement: (tag: string) => new El(tag) },
     actionDialog: null, walletAssetsState: { at: new Map([['tokens', 1]]) },
+    actionHint: null, activeActionDialog: null,
     openActionDialog: (config: any) => { dialog = config; return new Promise(() => {}); },
     SWAP_DEFAULT_SLIPPAGE_BPS: 100, SWAP_SLIPPAGE_CHOICES_BPS: [50, 100, 300], walletSwapPercent: (bps: number) => `${bps / 100}%`, spendPasswordFields: () => [], spendPasswordRefusal: async () => '',
     walletSwapTileBalance: () => {}, walletAthMaster: () => 'ATH',

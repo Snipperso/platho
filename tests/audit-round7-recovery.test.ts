@@ -176,6 +176,8 @@ describe('R7 — the notepad and the groups blob: read before write', () => {
       GROUPS_NAMED_SLOT_COUNT: 0, console: { warn: () => {} },
       createRecoveryViewReader: () => async () => null, requireBasechainAddress: () => {}, requirePlathoWalletAddress: () => WALLET,
       noteChatKeysBackupShortfall: () => {}, clearChatKeysBackupShortfall: () => {},
+      groupsBackupNotBefore: 0, groupsBackupFailures: 0, GROUPS_BACKUP_RETRY_MS: [30_000],
+      groupsBackupShortBalance: null, groupsBackupLatchAskedAt: Date.now(), vaultPocketState: { wallet: { ton_balance: 10n ** 12n } },
     };
     const boxAllowed = (v: boolean) => { box.allowed = v; };
     const boxStored = (v: any[]) => { box.stored = v; };

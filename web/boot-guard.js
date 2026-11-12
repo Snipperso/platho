@@ -30,14 +30,14 @@
     var plathoBackground = localStorage.getItem('platho.background.v1');
     document.documentElement.setAttribute(
       'data-background',
-      (plathoBackground === 'plasma' || plathoBackground === 'nodes') ? plathoBackground : 'none',
+      (plathoBackground === 'plasma' || plathoBackground === 'nodes') ? plathoBackground : 'none'
     );
   } catch (e) { }
 
   var GRACE_MS = Number(document.documentElement.getAttribute('data-platho-boot-guard-timeout-ms')) || 6000;
-  var STALL_MS = 12000;
+  var STALL_MS = 45000;
   var MIN_WAIT_MS = 10000;
-  var HARD_CAP_MS = 60000;
+  var HARD_CAP_MS = 180000;
   var bootErrors = [];
   var guardFired = false;
   var lastProgressAt = Date.now();
@@ -239,6 +239,13 @@
     overlay.appendChild(dismiss);
 
     document.body.appendChild(overlay);
+
+    var healTimer = setInterval(function () {
+      if (!overlay.parentNode) { clearInterval(healTimer); return; }
+      if (document.documentElement.getAttribute('data-platho-app-js') !== 'ready') return;
+      clearInterval(healTimer);
+      overlay.parentNode.removeChild(overlay);
+    }, 500);
   }
 
   var startedAt = Date.now();

@@ -1,5 +1,5 @@
 
-import { conversationOrder, base64urlDecode } from './crypto/conv-routing.mjs?v=9';
+import { conversationOrder, base64urlDecode, CONV_EPOCH_SECONDS } from './crypto/conv-routing.mjs?v=9';
 import { generationForEpoch } from './cutover-epoch.mjs?v=7';
 
 function toBytes(value, length, name) {
@@ -26,6 +26,28 @@ function compareBytes(a, b) {
   const len = Math.min(a.length, b.length);
   for (let i = 0; i < len; i += 1) { if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1; }
   return a.length === b.length ? 0 : (a.length < b.length ? -1 : 1);
+}
+
+export function signKeyHex(value) {
+  let big = null;
+  try {
+    if (value instanceof Uint8Array || Array.isArray(value)) {
+      if (value.length !== 32) return null;
+      big = BigInt(`0x${hex(Uint8Array.from(value))}`);
+    } else if (typeof value === 'bigint') {
+      big = value;
+    } else if (typeof value === 'string' && value !== '') {
+      const text = value.trim();
+      if (/^[0-9a-fA-F]{64}$/.test(text)) big = BigInt(`0x${text}`);
+      else if (/^0x[0-9a-fA-F]{1,64}$/.test(text)) big = BigInt(text);
+      else if (/^[0-9]{1,78}$/.test(text)) big = BigInt(text);
+      else big = BigInt(`0x${hex(toBytes(text, 32, 'signing key'))}`);
+    }
+  } catch {
+    return null;
+  }
+  if (big === null || big <= 0n || big >= (1n << 256n)) return null;
+  return big.toString(16).padStart(64, '0');
 }
 
 export function conversationId(selfKeyId, peerKeyId) {
@@ -81,6 +103,13 @@ function appendReadRoot(list, kRoot, adoptedAt) {
 }
 
 export function adoptKRoot(existing, candidate) {
+  const peerSign = signKeyHex(candidate.peerSignPublicKey);
+  const adopted = adoptKRootUnpinned(existing, candidate);
+  if (!peerSign || adopted.record.peerSignPublicKey) return adopted;
+  return { outcome: adopted.outcome, record: { ...adopted.record, peerSignPublicKey: peerSign } };
+}
+
+function adoptKRootUnpinned(existing, candidate) {
   const kRoot = toBytes(candidate.kRoot, 32, 'kRoot');
   const introNonce = toBytes(candidate.introNonce, 16, 'introNonce');
   const createdAt = Number(candidate.createdAt ?? 0);
@@ -88,6 +117,9 @@ export function adoptKRoot(existing, candidate) {
   const peerEncPublicKey = candidate.peerEncPublicKey == null ? null : toBytes(candidate.peerEncPublicKey, 32, 'peerEncPublicKey');
   const peerWallet = candidate.peerWallet == null ? null : String(candidate.peerWallet);
   const peerWalletCandidates = Array.isArray(candidate.peerWalletCandidates) ? walletList(candidate.peerWalletCandidates) : [];
+  const bornEpoch = createdAt > 0 ? Math.floor((createdAt > 1e12 ? createdAt / 1000 : createdAt) / CONV_EPOCH_SECONDS) : null;
+  const rewalk = existing && existing.lastScannedEpoch != null && bornEpoch !== null && bornEpoch < Number(existing.lastScannedEpoch)
+    ? { lastScannedEpoch: null } : {};
   if (!existing) {
     return { outcome: 'created', record: { kRootCurrent: kRoot, kRootsForRead: [], peerKeyId, peerEncPublicKey, peerWallet, peerWalletCandidates, adoptedCreatedAt: createdAt, adoptedIntroNonce: introNonce, outgoingSeq: {}, lastScannedEpoch: null } };
   }
@@ -120,6 +152,7 @@ export function adoptKRoot(existing, candidate) {
         peerWalletCandidates: walletList([existing.peerWallet], existing.peerWalletCandidates ?? [], [peerWallet], peerWalletCandidates),
         adoptedCreatedAt: createdAt,
         adoptedIntroNonce: introNonce,
+        ...rewalk,
       },
     };
   }
@@ -127,6 +160,7 @@ export function adoptKRoot(existing, candidate) {
     outcome: 'retained',
     record: {
       ...existing,
+      ...rewalk,
       kRootsForRead: appendReadRoot(existing.kRootsForRead, kRoot, createdAt),
       retiredIntroNonces: appendRetiredNonce(existing.retiredIntroNonces, introNonce),
     },
@@ -138,10 +172,12 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
 
   let heldChanges = 0;
   let writtenChanges = 0;
+  let edits = 0;
   let dirty = false;
   const persistAndAdopt = async (claim = null) => {
     if (!persist) return;
     const covers = heldChanges;
+    const editsAt = edits;
     let merged;
     try {
       merged = await persist(byConv, claim);
@@ -152,6 +188,7 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
     dirty = false;
     writtenChanges = Math.max(writtenChanges, covers);
     if (!(merged instanceof Map) || merged === byConv) return;
+    if (edits !== editsAt) return;
     byConv.clear();
     for (const [id, record] of merged) byConv.set(id, record);
   };
@@ -161,7 +198,7 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       const id = conversationId(selfKeyId, peerKeyId);
       const held = byConv.get(id);
       const { record, outcome } = adoptKRoot(held, { ...candidate, peerKeyId });
-      if ((outcome !== 'duplicate' && outcome !== 'replayed') || record !== held || dirty) { byConv.set(id, record); await persistAndAdopt(); }
+      if ((outcome !== 'duplicate' && outcome !== 'replayed') || record !== held || dirty) { byConv.set(id, record); edits += 1; await persistAndAdopt(); }
       return outcome;
     },
 
@@ -180,7 +217,19 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
         peerWalletVerified: true,
         peerWalletCandidates: walletList([String(wallet)], [held.peerWallet], held.peerWalletCandidates ?? []),
       });
+      edits += 1;
       await persistAndAdopt();
+      return true;
+    },
+
+    async pinPeerSignKey(selfKeyId, peerKeyId, signKey, { persist: write = true } = {}) {
+      const id = conversationId(selfKeyId, peerKeyId);
+      const held = byConv.get(id);
+      const pin = signKeyHex(signKey);
+      if (!held || !pin || held.peerSignPublicKey) return false;
+      byConv.set(id, { ...held, peerSignPublicKey: pin });
+      edits += 1;
+      if (write) await persistAndAdopt(); else heldChanges += 1;
       return true;
     },
 
@@ -188,17 +237,23 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       return byConv.get(conversationId(selfKeyId, peerKeyId)) ?? null;
     },
 
-    async advanceConvScanCursor(selfKeyId, peerKeyId, epoch, { persist: write = true } = {}) {
+    async advanceConvScanCursor(selfKeyId, peerKeyId, epoch, { persist: write = true, roots = null } = {}) {
       const record = byConv.get(conversationId(selfKeyId, peerKeyId));
       if (!record) return;
       const e = Number(epoch);
       if (!Number.isFinite(e)) return;
+      if (Array.isArray(roots)) {
+        const walked = new Set(roots.map((kRoot) => hex(toBytes(kRoot, 32, 'kRoot'))));
+        const held = [record.kRootCurrent, ...(record.kRootsForRead ?? []).map((entry) => entry?.kRoot)].filter((kRoot) => kRoot != null);
+        if (held.some((kRoot) => !walked.has(hex(toBytes(kRoot, 32, 'kRoot'))))) return;
+      }
       const generation = generationForEpoch(e);
       const stampChanged = record.lastScannedGeneration !== generation;
       const advanced = record.lastScannedEpoch == null || e > record.lastScannedEpoch;
       if (advanced) record.lastScannedEpoch = e;
       record.lastScannedGeneration = generation;
       if (!(advanced || stampChanged)) return;
+      edits += 1;
       if (write) await persistAndAdopt(); else heldChanges += 1;
     },
 
@@ -217,6 +272,7 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       const keys = Object.keys(floors);
       for (const drop of keys.slice(0, Math.max(0, keys.length - CONV_GAP_FLOORS_MAX))) delete floors[drop];
       record.gapFloors = floors;
+      edits += 1;
       await persistAndAdopt();
     },
 
@@ -226,6 +282,7 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
       const floors = { ...record.gapFloors };
       delete floors[String(address)];
       record.gapFloors = floors;
+      edits += 1;
       await persistAndAdopt();
     },
 
@@ -243,6 +300,7 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
         throw error;
       }
       record.outgoingSeq[e] = next;
+      edits += 1;
       for (const key of Object.keys(record.outgoingSeq)) if (Number(key) < e - OUTGOING_SEQ_KEEP_EPOCHS) delete record.outgoingSeq[key];
       let claimed = next;
       await persistAndAdopt((merged, onDisk) => {
@@ -275,16 +333,40 @@ export function createConvKeyStore({ persist = null, load: loadImpl = null } = {
         const incomingAt = Number(incoming.adoptedCreatedAt ?? 0);
         const existingAt = Number(existing?.adoptedCreatedAt ?? 0);
         const rootHex = (value) => (value instanceof Uint8Array ? [...value].map((b) => b.toString(16).padStart(2, '0')).join('') : String(value ?? '').toLowerCase());
+        const sameRoot = existing && rootHex(incoming.kRootCurrent) === rootHex(existing.kRootCurrent);
+        const readRootsOf = (winner, loser) => {
+          if (sameRoot || !loser?.kRootCurrent) return { roots: winner.kRootsForRead ?? [], nonces: winner.retiredIntroNonces ?? [], grew: false };
+          let roots = winner.kRootsForRead ?? [];
+          for (const entry of [{ kRoot: loser.kRootCurrent, adoptedAt: loser.adoptedCreatedAt }, ...(loser.kRootsForRead ?? [])]) {
+            if (entry?.kRoot && rootHex(entry.kRoot) !== rootHex(winner.kRootCurrent)) roots = appendReadRoot(roots, entry.kRoot, Number(entry.adoptedAt ?? 0));
+          }
+          const nonces = loser.adoptedIntroNonce != null ? appendRetiredNonce(winner.retiredIntroNonces ?? [], loser.adoptedIntroNonce) : (winner.retiredIntroNonces ?? []);
+          return { roots, nonces, grew: roots.length !== (winner.kRootsForRead ?? []).length };
+        };
         if (!existing || incomingAt > existingAt || (incomingAt === existingAt && rootHex(incoming.kRootCurrent) > rootHex(existing.kRootCurrent))) {
+          const kept = readRootsOf(incoming, existing);
           byConv.set(id, {
             ...incoming, lastScannedEpoch: null, gapFloors: existing?.gapFloors ?? {},
-            retiredIntroNonces: [...(incoming.retiredIntroNonces ?? []), ...(existing?.retiredIntroNonces ?? [])]
+            ...(kept.grew ? { kRootsForRead: kept.roots } : {}),
+            ...(signKeyHex(existing?.peerSignPublicKey) ? { peerSignPublicKey: signKeyHex(existing.peerSignPublicKey) } : {}),
+            retiredIntroNonces: [...(existing?.retiredIntroNonces ?? []), ...kept.nonces]
               .reduce((list, nonce) => appendRetiredNonce(list, nonce), []),
           });
           changed += 1;
+        } else {
+          const kept = readRootsOf(existing, incoming);
+          const learnsKey = !signKeyHex(existing.peerSignPublicKey) && signKeyHex(incoming.peerSignPublicKey);
+          if (kept.grew || learnsKey) {
+            byConv.set(id, {
+              ...existing,
+              ...(kept.grew ? { kRootsForRead: kept.roots, retiredIntroNonces: kept.nonces, lastScannedEpoch: null } : {}),
+              ...(learnsKey ? { peerSignPublicKey: signKeyHex(incoming.peerSignPublicKey) } : {}),
+            });
+            changed += 1;
+          }
         }
       }
-      if (changed > 0) await persistAndAdopt();
+      if (changed > 0) { edits += 1; await persistAndAdopt(); }
       return changed;
     },
 

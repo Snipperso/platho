@@ -1,11 +1,11 @@
 
-import { createConvReadLane } from './conv-lane.mjs?v=138';
+import { createConvReadLane } from './conv-lane.mjs?v=145';
 import { groupAvatarKey, groupAvatarLanePublicKey, groupContentKey, groupLanePublicKey } from './crypto/group-lane.mjs?v=8';
 import {
   assembleGroupParts, decodeGroupPayload, groupAvatarHash, groupAvatarSecretIn, openGroupCapsule, GROUP_AVATAR_SENDER, GROUP_KIND,
 } from './group-protocol.mjs?v=32';
 import { parseBocBase64, readSnakeCellBytes } from './pwa-contract-transactions.mjs?v=60';
-import { recordShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=48';
+import { recordShardAddressBytesFor, rawAddress } from './shard-address.mjs?v=49';
 import { generationForEpochAt } from './cutover-epoch.mjs?v=7';
 
 const bytesToBig = (bytes) => [...bytes].reduce((acc, byte) => (acc << 8n) | BigInt(byte), 0n);
@@ -143,8 +143,8 @@ async function collectWhole({ rows, contentKey, contextFor, onUnreadable }) {
   return out;
 }
 
-export function createGroupReadLane({ readMessagesWithSource, verifyWriteSig = true } = {}) {
-  const conv = createConvReadLane({ readMessagesWithSource, verifyWriteSig, markLimit: 65536 });
+export function createGroupReadLane({ readMessagesWithSource, readRecordPage = null, nowSec = null, verifyWriteSig = true } = {}) {
+  const conv = createConvReadLane({ readMessagesWithSource, readRecordPage, nowSec, verifyWriteSig, markLimit: 65536 });
   return {
     shardReadStats: conv.shardReadStats,
     exportMarks: () => conv.exportMarks(),

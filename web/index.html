@@ -11,8 +11,8 @@
     <link rel="manifest" href="/manifest.webmanifest?v=3">
     <link rel="icon" href="/assets/platho-icon-192.png?v=3" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="/assets/platho-icon-192.png?v=3">
-    <link rel="stylesheet" href="/styles.css?v=632">
-    <script src="/boot-guard.js?v=17"></script>
+    <link rel="stylesheet" href="/styles.css?v=642">
+    <script src="/boot-guard.js?v=19"></script>
   </head>
   <body>
     <div class="app-shell" data-view="wallet">
@@ -27,13 +27,13 @@
             <div class="network-pill" id="brandNetworkPill">
               <span class="status-dot"></span>
               <span id="brandNetworkLabel" data-i18n="nav.network">network</span>
-              <span class="app-version-label" id="appVersionLabel">1.5.27</span>
+              <span class="app-version-label" id="appVersionLabel">1.5.28</span>
             </div>
           </div>
         </div>
 
         <nav class="rail" aria-label="Primary" data-i18n-aria-label="nav.primary">
-          <button class="rail-item rail-item-wallet is-active" type="button" data-tab="wallet" aria-label="Wallet" title="Wallet" data-i18n-aria-label="common.wallet" data-i18n-title="common.wallet">
+          <button class="rail-item rail-item-wallet is-active" type="button" data-tab="wallet" aria-current="page" aria-label="Wallet" title="Wallet" data-i18n-aria-label="common.wallet" data-i18n-title="common.wallet">
             <span class="rail-vault-balance is-pending" aria-hidden="true" data-nav-vault-balance>
               <span data-i18n="nav.balance">Balance</span>
               <strong data-nav-vault-ton>0 GRAM</strong>
@@ -428,7 +428,7 @@
         <div class="modal-backdrop" id="walletGroupDialog" hidden>
         <section class="content-pane profile-pane profile-settings-dialog wallet-group-dialog" role="dialog" aria-modal="true" aria-labelledby="walletGroupTitle">
           <header class="pane-header inline">
-            <button class="icon-button" id="walletGroupBackButton" type="button" aria-label="Back" title="Back" data-i18n-aria-label="common.back" data-i18n-title="common.back" hidden>
+            <button class="icon-button" id="walletGroupBackButton" type="button" aria-label="Back" title="Back" data-i18n-aria-label="common.back" data-i18n-title="common.back" data-nav-back="true" hidden>
               <span class="icon icon-back" aria-hidden="true"></span>
             </button>
             <div class="pane-title-block">
@@ -495,7 +495,7 @@
             <div class="pane-title-block">
               <h1 id="profileSettingsTitle" data-i18n="profile.settingsTitle">Settings</h1>
               <p id="profileHandle" data-i18n="profile.settingsLead">This device and this account</p>
-              <span class="app-version-label" id="profileVersionLabel" hidden>1.5.27</span>
+              <span class="app-version-label" id="profileVersionLabel" hidden>1.5.28</span>
             </div>
             <button class="icon-button" id="profileSettingsCloseButton" type="button" aria-label="Close" title="Close" data-i18n-aria-label="common.close" data-i18n-title="common.close">
               <span class="icon icon-close" aria-hidden="true"></span>
@@ -518,6 +518,7 @@
                   <select id="appLanguageSelect" aria-label="App language" data-i18n-aria-label="profile.language.row"></select>
                 </label>
               </div>
+              <p class="profile-section-note" id="appLanguageNote" data-i18n="profile.language.reloadHint">The app restarts in the new language, and the wallet asks for its password again.</p>
             </section>
 
             <section class="profile-section" aria-label="Messages" data-i18n-aria-label="chat.messages">
@@ -580,6 +581,7 @@
                 <label class="settings-select-row compact-select-row" for="profileBalanceCardSelect">
                   <span data-i18n="profile.balanceCard">Balance card in profile</span>
                   <select id="profileBalanceCardSelect" aria-label="Balance card in profile" data-i18n-aria-label="profile.balanceCard">
+                    <option value="" disabled hidden>—</option>
                     <option value="hide" data-i18n="profile.balanceCardHide">Hidden</option>
                     <option value="show" data-i18n="profile.balanceCardShow">Shown</option>
                   </select>
@@ -972,8 +974,8 @@
             </div>
             <p class="quick-start-step-why" id="quickStartStepWhy"></p>
             <div class="quick-start-step-body" id="quickStartStepBody"></div>
-            <p class="quick-start-status" id="quickStartStepStatus" aria-live="polite"></p>
             <div class="quick-start-actions quick-start-step-actions">
+              <p class="quick-start-status" id="quickStartStepStatus" aria-live="polite"></p>
               <button class="secondary-button" id="quickStartBackButton" type="button" data-i18n="common.back" data-nav-back="true">Back</button>
               <button class="recipient-submit" id="quickStartActionButton" type="button" data-i18n="wallet.create">Create wallet</button>
             </div>
@@ -1015,6 +1017,6 @@
       </div>
     </div>
     <script src="/vendor/telegram-web-app.js?v=3"></script>
-    <script src="/app.js?v=b7cf3f8d5" type="module"></script>
+    <script src="/app.js?v=b55557769" type="module"></script>
   </body>
 </html>

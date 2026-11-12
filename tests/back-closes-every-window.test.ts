@@ -133,7 +133,7 @@ describe('Back and the windows', () => {
     const install = code(fn('function installNavBackHandling() {'));
     expect(install).toContain("for (const modal of document.querySelectorAll('.modal-backdrop')) observer.observe(modal, { attributes: true, attributeFilter: ['hidden'] });");
     expect(install).toContain('observer.observe(document.body, { childList: true });');
-    expect(install).toContain('if (navHistorySilentPops > 0) { navHistorySilentPops -= 1; navHistorySentinel = false; syncNavBackAffordance(); return; }');
+    expect(install).toContain('if (navHistorySilentPops > 0) { navHistorySilentPops -= 1; navHistorySentinel = false; syncNavBackAffordance(); dropActedLinkFromAddressBar(); return; }');
     expect(app.split("cancelBtn.dataset.backCloses = 'true';").length - 1).toBe(2);
   });
 

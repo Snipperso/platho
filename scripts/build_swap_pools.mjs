@@ -3,6 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { Address, Cell, beginCell } from '@ton/core';
 import { PLATHO_APP_CONFIG } from '../web/platho-config.mjs';
 import { toncenterAccess } from './lib/toncenter-access.mjs';
+import { jettonVerdictKey, proveJettonsWhole, toncenterJettonReads } from './lib/jetton-pays-whole.mjs';
+import { JETTON_PROOF } from './lib/swap-lists-age.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) => (value.startsWith('--') ? [...pairs, [value.slice(2), all[index + 1]]] : pairs), []));
 for (const name of ['routers', 'pools', 'assets', 'verified', 'cache']) {
@@ -168,6 +170,47 @@ for (let at = kept.length - 1; at >= 0; at -= 1) {
 }
 writeFileSync(args.cache, JSON.stringify(cache));
 
+{
+  const call = async (url) => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const slot = Math.max(Date.now(), nextSlot);
+      nextSlot = slot + access.spacingMs;
+      await sleep(slot - Date.now());
+      let response;
+      try { response = await fetch(url, { headers: { accept: 'application/json', ...access.headers } }); } catch { await sleep(3000); continue; }
+      if (response.status === 429 || response.status >= 500) { await sleep(2000 * (attempt + 1)); continue; }
+      return response.json();
+    }
+    throw new Error(`${url.slice(0, 120)}: no answer`);
+  };
+  const holders = [];
+  const short = new Map();
+  const seen = new Set();
+  for (const one of kept) {
+    for (const [token, wallet, askWallet] of [[one.token0, one.wallet0, one.wallet1], [one.token1, one.wallet1, one.wallet0]]) {
+      if (token.id === 'gram' || seen.has(`${token.id}|${wallet}`)) continue;
+      seen.add(`${token.id}|${wallet}`);
+      const held = cache[jettonVerdictKey(token.id, wallet)];
+      if (held) { if (!held.whole) short.set(token.id, held.why); continue; }
+      holders.push({ master: token.id, owner: one.router, wallet, symbol: token.symbol, sale: { dex: 'stonfi', askWallet } });
+    }
+  }
+  const verdicts = await proveJettonsWhole({ holders, ...toncenterJettonReads(call), log: (line) => console.log(line) });
+  for (const holder of holders) {
+    const verdict = verdicts.get(`${holder.master}|${holder.wallet}`) ?? { whole: false, why: 'not run' };
+    if (!verdict.unproven) cache[jettonVerdictKey(holder.master, holder.wallet)] = { whole: verdict.whole, why: verdict.why };
+    if (!verdict.whole) short.set(holder.master, verdict.why);
+  }
+  writeFileSync(args.cache, JSON.stringify(cache));
+  for (let at = kept.length - 1; at >= 0; at -= 1) {
+    const token = [kept[at].token0, kept[at].token1].find((one) => short.has(one.id));
+    if (!token) continue;
+    console.log(`left out ${kept[at].token0.symbol}/${kept[at].token1.symbol} ${kept[at].pool}: ${token.symbol} does not reach a wallet whole — ${short.get(token.id)}`);
+    kept.splice(at, 1);
+  }
+  console.log(`${holders.length} jettons run in the sandbox, ${short.size} not whole`);
+}
+
 const hashOf = (rawAddress) => Buffer.from(rawAddress.slice(2), 'hex').toString('base64url');
 const routerList = [...new Set(kept.map((one) => one.router))];
 const tokenList = [{ id: 'gram', symbol: 'GRAM', decimals: 9 }];
@@ -182,10 +225,15 @@ const pools = kept.map((one) => `  [${JSON.stringify(hashOf(one.pool))}, ${route
   + `${JSON.stringify(hashOf(one.wallet0))}, ${JSON.stringify(hashOf(one.wallet1))}],`).join('\n');
 const out = `/**
  * The pools the wallet swaps through (STON.fi v2 constant-product, direct pairs), as of ${TAKEN}: ${kept.length} pairs among ${tokenList.length} tokens
- * on ${routerList.length} routers, each pair's deepest pool holding at least $${FLOOR_USD}, every router, pool and wallet read back from the chain.
+ * on ${routerList.length} routers, each pair's deepest pool holding at least $${FLOOR_USD}, every router, pool and wallet read back from the chain,
+ * every jetton paid out of its router's own wallet in a sandbox and sold back by the app's own message, arriving whole both ways.
  * Built by scripts/build_swap_pools.mjs — not edited by hand. Account ids are the 32 bytes of a basechain address, base64url.
  */
 export const SWAP_POOLS_TAKEN = '${TAKEN}';
+/** The day every jetton below was proven to reach a wallet whole (scripts/lib/jetton-pays-whole.mjs) — the day the list was taken, or it does not ship. */
+export const SWAP_TOKENS_WHOLE = '${TAKEN}';
+/** The number of the proof that did it (scripts/lib/swap-lists-age.mjs): a list proven by an older one does not ship. */
+export const SWAP_TOKENS_PROOF = ${JETTON_PROOF};
 /** Each router's account id. */
 export const SWAP_ROUTERS = [
 ${routerList.map((router) => `  ${JSON.stringify(hashOf(router))},`).join('\n')}

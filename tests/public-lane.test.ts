@@ -131,7 +131,18 @@ describe('PUBLIC-LANE — the read assembly', () => {
     markerLt = '2';
     const third = await lane.readChannelPosts(owner.address.toString());
     expect(third.length).toBe(2);
-    expect(messageReads, 'a moved marker re-reads exactly once').toBe(2);
+    expect(messageReads, 'the count did not grow: nothing re-fetched').toBe(1);
+    bc.now = oldEraStart + 9_000;
+    const [header, body] = [cell(201), cell(202)];
+    const view = await shard.getGetView();
+    await shard.send(owner.getSender(), { value: view.min_value + toNano('0.02') },
+      { $$type: 'PublicPublish', kind: BigInt(KIND.CHANNEL), key_arg: 0n, shard_seq: 0n, header, body } as any);
+    rows.unshift({ bodyCell: publicPublishBody(KIND.CHANNEL, 0n, header, body), source: owner.address.toString() });
+    bc.now = CLOCK;
+    markerLt = '3';
+    const fourth = await lane.readChannelPosts(owner.address.toString());
+    expect(fourth.length, 'the new post is read').toBe(3);
+    expect(messageReads, 'a new entry re-reads exactly once').toBe(2);
   }, 300_000);
 
   it('PL-02: sweepChannelCatalog reads EVERY live bucket, most recently touched first, and dedups a channel to its newest announcement', async () => {
